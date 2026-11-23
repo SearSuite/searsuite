@@ -1,0 +1,47 @@
+{
+  "name": "@searsuite/sear-render-metrics",
+  "description": "Defines text shaping and glyph measurement contracts.",
+  "version": "0.0.1",
+  "license": "MIT",
+  "homepage": "https://searsuite.com/",
+  "keywords": [
+    "searsuite",
+    "editor",
+    "text-shaping",
+    "font-metrics"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm run clean && pnpm run compile",
+    "clean": "rimraf ./dist",
+    "compile": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "@searsuite/sear-domain-doc": "workspace:*",
+    "@searsuite/sear-render-context": "workspace:*",
+    "@searsuite/sear-foundation-error": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SearSuite/searsuite.git",
+    "directory": "packages/sear-render-metrics"
+  },
+  "bugs": {
+    "url": "https://github.com/SearSuite/searsuite/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

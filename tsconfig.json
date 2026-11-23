@@ -1,0 +1,31 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "paths": {
+      "@searsuite/sear-assembly-headless": ["../searsuite-pro/packages/sear-assembly-headless/src"],
+      "@searsuite/sear-node-adapters": ["../searsuite-pro/packages/sear-node-adapters/src"],
+      "@searsuite/sear-browser-adapters": ["../searsuite-browser/packages/sear-browser-adapters/src"],
+      "@searsuite/*": ["packages/*/src"],
+      "@searsuite-test/formula-coverage-cases": ["scripts/fixtures/formula-coverage-cases.json"]
+    },
+    "resolveJsonModule": true,
+    "noEmit": false,
+    "types": ["jest", "node"],
+    "lib": ["es2022", "dom"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strict": true,
+    "useDefineForClassFields": true,
+    "ignoreDeprecations": "5.0"
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs",
+      "moduleResolution": "node"
+    }
+  },
+  "exclude": ["node_modules", "**/dist", "**/dist/**"]
+}

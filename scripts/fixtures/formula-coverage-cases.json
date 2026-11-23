@@ -1,0 +1,1573 @@
+[
+  {
+    "name": "ABS",
+    "formula": "=ABS(-1)"
+  },
+  {
+    "name": "ACOS",
+    "formula": "=ACOS(0.5)"
+  },
+  {
+    "name": "ACOSH",
+    "formula": "=ACOSH(2)"
+  },
+  {
+    "name": "ACOT",
+    "formula": "=ACOT(1)"
+  },
+  {
+    "name": "ACOTH",
+    "formula": "=ACOTH(2)"
+  },
+  {
+    "name": "AGGREGATE",
+    "formula": "=AGGREGATE(9,6,A1:A100)"
+  },
+  {
+    "name": "ARABIC",
+    "formula": "=ARABIC(\"MCMXCIX\")"
+  },
+  {
+    "name": "ARRAYTOTEXT",
+    "formula": "=ARRAYTOTEXT({1,\"A\"},1)"
+  },
+  {
+    "name": "ASC",
+    "formula": "=ASC(\"ＡＢＣ１２３\")"
+  },
+  {
+    "name": "ASIN",
+    "formula": "=ASIN(0.5)"
+  },
+  {
+    "name": "ASINH",
+    "formula": "=ASINH(1)"
+  },
+  {
+    "name": "ATAN",
+    "formula": "=ATAN(1)"
+  },
+  {
+    "name": "ATAN2",
+    "formula": "=ATAN2(1,1)"
+  },
+  {
+    "name": "ATANH",
+    "formula": "=ATANH(0.5)"
+  },
+  {
+    "name": "AVEDEV",
+    "formula": "=AVEDEV(A1:A100)"
+  },
+  {
+    "name": "AVERAGE",
+    "formula": "=AVERAGE(A1:A100)"
+  },
+  {
+    "name": "AVERAGEA",
+    "formula": "=AVERAGEA(A1:A100)"
+  },
+  {
+    "name": "AVERAGEIF",
+    "formula": "=AVERAGEIF(A1:A100,\">50\")"
+  },
+  {
+    "name": "AVERAGEIFS",
+    "formula": "=AVERAGEIFS(A1:A100,A1:A100,\">50\")"
+  },
+  {
+    "name": "BAHTTEXT",
+    "formula": "=BAHTTEXT(1234567.89)"
+  },
+  {
+    "name": "BASE",
+    "formula": "=BASE(100,16)"
+  },
+  {
+    "name": "BETA.DIST",
+    "formula": "=BETA.DIST(2,8,10,TRUE,1,3)"
+  },
+  {
+    "name": "BETA.INV",
+    "formula": "=BETA.INV(0.685470581,8,10,1,3)"
+  },
+  {
+    "name": "BINOM.DIST",
+    "formula": "=BINOM.DIST(6,10,0.5,FALSE)"
+  },
+  {
+    "name": "BINOM.DIST.RANGE",
+    "formula": "=BINOM.DIST.RANGE(60,0.75,45,50)"
+  },
+  {
+    "name": "BINOM.INV",
+    "formula": "=BINOM.INV(6,0.5,0.75)"
+  },
+  {
+    "name": "CEILING.MATH",
+    "formula": "=CEILING.MATH(24.3,5)"
+  },
+  {
+    "name": "CEILING.PRECISE",
+    "formula": "=CEILING.PRECISE(24.3,5)"
+  },
+  {
+    "name": "CHAR",
+    "formula": "=CHAR(65)"
+  },
+  {
+    "name": "CHISQ.DIST",
+    "formula": "=CHISQ.DIST(0.5,1,TRUE)"
+  },
+  {
+    "name": "CHISQ.DIST.RT",
+    "formula": "=CHISQ.DIST.RT(18.307,10)"
+  },
+  {
+    "name": "CHISQ.INV",
+    "formula": "=CHISQ.INV(0.93,1)"
+  },
+  {
+    "name": "CHISQ.INV.RT",
+    "formula": "=CHISQ.INV.RT(0.05,10)"
+  },
+  {
+    "name": "CHISQ.TEST",
+    "formula": "=CHISQ.TEST({58,35;11,25;10,23},{45.35,47.65;17.56,18.44;16.09,16.91})"
+  },
+  {
+    "name": "CLEAN",
+    "formula": "=CLEAN(\"A\")"
+  },
+  {
+    "name": "CODE",
+    "formula": "=CODE(\"A\")"
+  },
+  {
+    "name": "COMBIN",
+    "formula": "=COMBIN(20,3)"
+  },
+  {
+    "name": "COMBINA",
+    "formula": "=COMBINA(20,3)"
+  },
+  {
+    "name": "CONCAT",
+    "formula": "=CONCAT(\"A\",1,\"B\")"
+  },
+  {
+    "name": "CONCATENATE",
+    "formula": "=CONCATENATE(\"A\",\"B\")"
+  },
+  {
+    "name": "CONFIDENCE.NORM",
+    "formula": "=CONFIDENCE.NORM(0.05,2.5,50)"
+  },
+  {
+    "name": "CONFIDENCE.T",
+    "formula": "=CONFIDENCE.T(0.05,1,50)"
+  },
+  {
+    "name": "CORREL",
+    "formula": "=CORREL(A1:A100,C1:C100)"
+  },
+  {
+    "name": "COS",
+    "formula": "=COS(1)"
+  },
+  {
+    "name": "COSH",
+    "formula": "=COSH(1)"
+  },
+  {
+    "name": "COT",
+    "formula": "=COT(1)"
+  },
+  {
+    "name": "COTH",
+    "formula": "=COTH(1)"
+  },
+  {
+    "name": "COUNT",
+    "formula": "=COUNT(A1:A100)"
+  },
+  {
+    "name": "COUNTA",
+    "formula": "=COUNTA(A1:A100)"
+  },
+  {
+    "name": "COUNTBLANK",
+    "formula": "=COUNTBLANK(A1:A100)"
+  },
+  {
+    "name": "COUNTIF",
+    "formula": "=COUNTIF(A1:A100,\">50\")"
+  },
+  {
+    "name": "COUNTIFS",
+    "formula": "=COUNTIFS(A1:A100,\">50\",C1:C100,\"<150\")"
+  },
+  {
+    "name": "COVARIANCE.P",
+    "formula": "=COVARIANCE.P(A1:A100,C1:C100)"
+  },
+  {
+    "name": "COVARIANCE.S",
+    "formula": "=COVARIANCE.S(A1:A100,C1:C100)"
+  },
+  {
+    "name": "CSC",
+    "formula": "=CSC(1)"
+  },
+  {
+    "name": "CSCH",
+    "formula": "=CSCH(1)"
+  },
+  {
+    "name": "CUBEKPIMEMBER",
+    "formula": "=CUBEKPIMEMBER(\"Sales\",\"MySalesKPI\",KPIGoal)"
+  },
+  {
+    "name": "CUBEMEMBER",
+    "formula": "=CUBEMEMBER(\"Sales\",\"[Time].[2004]\")"
+  },
+  {
+    "name": "CUBEMEMBERPROPERTY",
+    "formula": "=CUBEMEMBERPROPERTY(\"Sales\",\"[Time].[2004]\",\"Name\")"
+  },
+  {
+    "name": "CUBERANKEDMEMBER",
+    "formula": "=CUBERANKEDMEMBER(\"Sales\",CUBESET(\"Sales\",\"TopCount(...)\"),1)"
+  },
+  {
+    "name": "CUBESET",
+    "formula": "=CUBESET(\"Sales\",\"[Product].Members\")"
+  },
+  {
+    "name": "CUBESETCOUNT",
+    "formula": "=CUBESETCOUNT(CUBESET(\"Sales\",\"[Product].Members\"))"
+  },
+  {
+    "name": "CUBEVALUE",
+    "formula": "=CUBEVALUE(\"Sales\",\"[Measures].[Profit]\")"
+  },
+  {
+    "name": "DATE",
+    "formula": "=DATE(2024,2,29)"
+  },
+  {
+    "name": "DATEDIF",
+    "formula": "=DATEDIF(\"2001-1-1\",\"2031-12-31\",\"D\")"
+  },
+  {
+    "name": "DATEVALUE",
+    "formula": "=DATEVALUE(\"2024-2-29\")"
+  },
+  {
+    "name": "DAY",
+    "formula": "=DAY(\"2024-2-29\")"
+  },
+  {
+    "name": "DAYS",
+    "formula": "=DAYS(\"2030-1-1\",\"2024-1-1\")"
+  },
+  {
+    "name": "DAYS360",
+    "formula": "=DAYS360(\"2024-1-1\",\"2030-12-31\")"
+  },
+  {
+    "name": "DBCS",
+    "formula": "=DBCS(\"ABC123\")"
+  },
+  {
+    "name": "DECIMAL",
+    "formula": "=DECIMAL(\"101010\",2)"
+  },
+  {
+    "name": "DEGREES",
+    "formula": "=DEGREES(1)"
+  },
+  {
+    "name": "DETECTLANGUAGE",
+    "formula": "=DETECTLANGUAGE(\"hello\")"
+  },
+  {
+    "name": "DEVSQ",
+    "formula": "=DEVSQ(A1:A100)"
+  },
+  {
+    "name": "DOLLAR",
+    "formula": "=DOLLAR(1234.5,2)"
+  },
+  {
+    "name": "EDATE",
+    "formula": "=EDATE(\"2024-1-31\",120)"
+  },
+  {
+    "name": "ENCODEURL",
+    "formula": "=ENCODEURL(\"A&B\")"
+  },
+  {
+    "name": "EOMONTH",
+    "formula": "=EOMONTH(\"2024-1-31\",120)"
+  },
+  {
+    "name": "EVEN",
+    "formula": "=EVEN(1.5)"
+  },
+  {
+    "name": "EXACT",
+    "formula": "=EXACT(\"word\",\"word\")"
+  },
+  {
+    "name": "EXP",
+    "formula": "=EXP(1)"
+  },
+  {
+    "name": "EXPON.DIST",
+    "formula": "=EXPON.DIST(0.2,10,TRUE)"
+  },
+  {
+    "name": "F.DIST",
+    "formula": "=F.DIST(15.2069,6,4,TRUE)"
+  },
+  {
+    "name": "F.DIST.RT",
+    "formula": "=F.DIST.RT(15.2069,6,4)"
+  },
+  {
+    "name": "F.INV",
+    "formula": "=F.INV(0.5,5,2)"
+  },
+  {
+    "name": "F.INV.RT",
+    "formula": "=F.INV.RT(0.01,6,4)"
+  },
+  {
+    "name": "F.TEST",
+    "formula": "=F.TEST(A1:A100,C1:C100)"
+  },
+  {
+    "name": "FACT",
+    "formula": "=FACT(10)"
+  },
+  {
+    "name": "FACTDOUBLE",
+    "formula": "=FACTDOUBLE(10)"
+  },
+  {
+    "name": "FILTERXML",
+    "formula": "=FILTERXML(\"<r><v>42</v><v>43</v></r>\",\"//v\")"
+  },
+  {
+    "name": "FIND",
+    "formula": "=FIND(\"M\",\"Profit Margin\")"
+  },
+  {
+    "name": "FINDB",
+    "formula": "=FINDB(\"B\",\"A\u4e2dB\")"
+  },
+  {
+    "name": "FISHER",
+    "formula": "=FISHER(0.75)"
+  },
+  {
+    "name": "FISHERINV",
+    "formula": "=FISHERINV(0.972955)"
+  },
+  {
+    "name": "FIXED",
+    "formula": "=FIXED(1234.567,2)"
+  },
+  {
+    "name": "FLOOR.MATH",
+    "formula": "=FLOOR.MATH(24.3,5)"
+  },
+  {
+    "name": "FLOOR.PRECISE",
+    "formula": "=FLOOR.PRECISE(24.3,5)"
+  },
+  {
+    "name": "FORECAST",
+    "formula": "=FORECAST(4,{2,4,6},{1,2,3})"
+  },
+  {
+    "name": "FORECAST.ETS",
+    "formula": "=FORECAST.ETS(4,{2,4,6},{1,2,3})"
+  },
+  {
+    "name": "FORECAST.ETS.CONFINT",
+    "formula": "=FORECAST.ETS.CONFINT(4,{2,4,6},{1,2,3})"
+  },
+  {
+    "name": "FORECAST.ETS.SEASONALITY",
+    "formula": "=FORECAST.ETS.SEASONALITY({2,4,6},{1,2,3})"
+  },
+  {
+    "name": "FORECAST.ETS.STAT",
+    "formula": "=FORECAST.ETS.STAT({2,4,6},{1,2,3},1)"
+  },
+  {
+    "name": "FORECAST.LINEAR",
+    "formula": "=FORECAST.LINEAR(4,{2,4,6},{1,2,3})"
+  },
+  {
+    "name": "FREQUENCY",
+    "formula": "=FREQUENCY(A1:A100,{25;50;75})"
+  },
+  {
+    "name": "GAMMA",
+    "formula": "=GAMMA(2.5)"
+  },
+  {
+    "name": "GAMMA.DIST",
+    "formula": "=GAMMA.DIST(10,9,2,TRUE)"
+  },
+  {
+    "name": "GAMMA.INV",
+    "formula": "=GAMMA.INV(0.068094,9,2)"
+  },
+  {
+    "name": "GAMMALN",
+    "formula": "=GAMMALN(4)"
+  },
+  {
+    "name": "GAMMALN.PRECISE",
+    "formula": "=GAMMALN.PRECISE(4)"
+  },
+  {
+    "name": "GAUSS",
+    "formula": "=GAUSS(2)"
+  },
+  {
+    "name": "GCD",
+    "formula": "=GCD(12345,67890)"
+  },
+  {
+    "name": "GEOMEAN",
+    "formula": "=GEOMEAN({4,5,8,7,11,4,3})"
+  },
+  {
+    "name": "GROWTH",
+    "formula": "=GROWTH({2,4,8},{1,2,3},{4})"
+  },
+  {
+    "name": "HARMEAN",
+    "formula": "=HARMEAN({4,5,8,7,11,4,3})"
+  },
+  {
+    "name": "HOUR",
+    "formula": "=HOUR(\"2024-1-1 18:30:45\")"
+  },
+  {
+    "name": "HYPGEOM.DIST",
+    "formula": "=HYPGEOM.DIST(1,4,8,20,FALSE)"
+  },
+  {
+    "name": "IF",
+    "formula": "=IF(TRUE,42,1/0)"
+  },
+  {
+    "name": "IFERROR",
+    "formula": "=IFERROR(1/0,42)"
+  },
+  {
+    "name": "INT",
+    "formula": "=INT(-1.5)"
+  },
+  {
+    "name": "INTERCEPT",
+    "formula": "=INTERCEPT(A1:A100,C1:C100)"
+  },
+  {
+    "name": "ISO.CEILING",
+    "formula": "=ISO.CEILING(24.3,5)"
+  },
+  {
+    "name": "ISOWEEKNUM",
+    "formula": "=ISOWEEKNUM(\"2024-12-31\")"
+  },
+  {
+    "name": "JIS",
+    "formula": "=JIS(\"ABC\")"
+  },
+  {
+    "name": "KURT",
+    "formula": "=KURT(A1:A100)"
+  },
+  {
+    "name": "LARGE",
+    "formula": "=LARGE(A1:A100,99)"
+  },
+  {
+    "name": "LCM",
+    "formula": "=LCM(123,456)"
+  },
+  {
+    "name": "LEFT",
+    "formula": "=LEFT(\"Spreadsheet\",5)"
+  },
+  {
+    "name": "LEFTB",
+    "formula": "=LEFTB(\"A\u4e2dB\",2)"
+  },
+  {
+    "name": "LEN",
+    "formula": "=LEN(\"Spreadsheet\")"
+  },
+  {
+    "name": "LENB",
+    "formula": "=LENB(\"A\u4e2dB\")"
+  },
+  {
+    "name": "LET",
+    "formula": "=LET(value,21,value*2)"
+  },
+  {
+    "name": "LINEST",
+    "formula": "=LINEST({2,4,6},{1,2,3})"
+  },
+  {
+    "name": "LN",
+    "formula": "=LN(86)"
+  },
+  {
+    "name": "LOG",
+    "formula": "=LOG(86,2)"
+  },
+  {
+    "name": "LOG10",
+    "formula": "=LOG10(86)"
+  },
+  {
+    "name": "LOGEST",
+    "formula": "=LOGEST({2,4,8},{1,2,3})"
+  },
+  {
+    "name": "LOGNORM.DIST",
+    "formula": "=LOGNORM.DIST(4,3.5,1.2,TRUE)"
+  },
+  {
+    "name": "LOGNORM.INV",
+    "formula": "=LOGNORM.INV(0.039084,3.5,1.2)"
+  },
+  {
+    "name": "LOWER",
+    "formula": "=LOWER(\"Spreadsheet\")"
+  },
+  {
+    "name": "MAX",
+    "formula": "=MAX(A1:A100)"
+  },
+  {
+    "name": "MAXA",
+    "formula": "=MAXA(A1:A100)"
+  },
+  {
+    "name": "MAXIFS",
+    "formula": "=MAXIFS(A1:A100,C1:C100,\"<150\")"
+  },
+  {
+    "name": "MDETERM",
+    "formula": "=MDETERM({1,2;3,4})"
+  },
+  {
+    "name": "MEDIAN",
+    "formula": "=MEDIAN(A1:A100)"
+  },
+  {
+    "name": "MID",
+    "formula": "=MID(\"Spreadsheet\",3,5)"
+  },
+  {
+    "name": "MIDB",
+    "formula": "=MIDB(\"A\u4e2dB\",2,2)"
+  },
+  {
+    "name": "MIN",
+    "formula": "=MIN(A1:A100)"
+  },
+  {
+    "name": "MINA",
+    "formula": "=MINA(A1:A100)"
+  },
+  {
+    "name": "MINIFS",
+    "formula": "=MINIFS(A1:A100,C1:C100,\">50\")"
+  },
+  {
+    "name": "MINUTE",
+    "formula": "=MINUTE(\"2024-1-1 18:30:45\")"
+  },
+  {
+    "name": "MINVERSE",
+    "formula": "=MINVERSE({1,2;3,4})"
+  },
+  {
+    "name": "MMULT",
+    "formula": "=MMULT({1,2;3,4},{5,6;7,8})"
+  },
+  {
+    "name": "MOD",
+    "formula": "=MOD(12345,97)"
+  },
+  {
+    "name": "MODE.MULT",
+    "formula": "=MODE.MULT({1,1,2,2,3})"
+  },
+  {
+    "name": "MODE.SNGL",
+    "formula": "=MODE.SNGL({1,1,2,3})"
+  },
+  {
+    "name": "MONTH",
+    "formula": "=MONTH(\"2024-2-29\")"
+  },
+  {
+    "name": "MROUND",
+    "formula": "=MROUND(12345,97)"
+  },
+  {
+    "name": "MULTINOMIAL",
+    "formula": "=MULTINOMIAL(3,4,5)"
+  },
+  {
+    "name": "MUNIT",
+    "formula": "=MUNIT(10)"
+  },
+  {
+    "name": "NEGBINOM.DIST",
+    "formula": "=NEGBINOM.DIST(10,5,0.25,FALSE)"
+  },
+  {
+    "name": "NETWORKDAYS",
+    "formula": "=NETWORKDAYS(DATE(1900,1,1),DATE(2447,7,31))"
+  },
+  {
+    "name": "NETWORKDAYS.INTL",
+    "formula": "=NETWORKDAYS.INTL(DATE(1900,1,1),DATE(2447,7,31),11)"
+  },
+  {
+    "name": "NORM.DIST",
+    "formula": "=NORM.DIST(42,40,1.5,TRUE)"
+  },
+  {
+    "name": "NORM.S.DIST",
+    "formula": "=NORM.S.DIST(1.333333,TRUE)"
+  },
+  {
+    "name": "NORM.S.INV",
+    "formula": "=NORM.S.INV(0.908789)"
+  },
+  {
+    "name": "NORMINV",
+    "formula": "=NORMINV(0.908789,40,1.5)"
+  },
+  {
+    "name": "NOW",
+    "formula": "=NOW()"
+  },
+  {
+    "name": "NUMBERVALUE",
+    "formula": "=NUMBERVALUE(\"2.500,27\",\",\",\".\")"
+  },
+  {
+    "name": "ODD",
+    "formula": "=ODD(1.5)"
+  },
+  {
+    "name": "PEARSON",
+    "formula": "=PEARSON(A1:A100,C1:C100)"
+  },
+  {
+    "name": "PERCENTILE.EXC",
+    "formula": "=PERCENTILE.EXC(A1:A100,0.5)"
+  },
+  {
+    "name": "PERCENTILE.INC",
+    "formula": "=PERCENTILE.INC(A1:A100,0.3)"
+  },
+  {
+    "name": "PERCENTOF",
+    "formula": "=PERCENTOF({25},{100})"
+  },
+  {
+    "name": "PERCENTRANK.EXC",
+    "formula": "=PERCENTRANK.EXC(A1:A100,49.5)"
+  },
+  {
+    "name": "PERCENTRANK.INC",
+    "formula": "=PERCENTRANK.INC(A1:A100,49.5)"
+  },
+  {
+    "name": "PERMUT",
+    "formula": "=PERMUT(4,3)"
+  },
+  {
+    "name": "PERMUTATIONA",
+    "formula": "=PERMUTATIONA(4,3)"
+  },
+  {
+    "name": "PHI",
+    "formula": "=PHI(1)"
+  },
+  {
+    "name": "PHONETIC",
+    "formula": "=PHONETIC(\"かな\")"
+  },
+  {
+    "name": "PI",
+    "formula": "=PI()"
+  },
+  {
+    "name": "POISSON.DIST",
+    "formula": "=POISSON.DIST(2,5,TRUE)"
+  },
+  {
+    "name": "POWER",
+    "formula": "=POWER(98.6,3.2)"
+  },
+  {
+    "name": "PROB",
+    "formula": "=PROB({1,2,3},{0.2,0.3,0.5},2,3)"
+  },
+  {
+    "name": "PRODUCT",
+    "formula": "=PRODUCT(2,3,4,5)"
+  },
+  {
+    "name": "PROPER",
+    "formula": "=PROPER(\"this is a title\")"
+  },
+  {
+    "name": "QUARTILE.EXC",
+    "formula": "=QUARTILE.EXC(A1:A100,2)"
+  },
+  {
+    "name": "QUARTILE.INC",
+    "formula": "=QUARTILE.INC(A1:A100,1)"
+  },
+  {
+    "name": "QUOTIENT",
+    "formula": "=QUOTIENT(12345,97)"
+  },
+  {
+    "name": "RADIANS",
+    "formula": "=RADIANS(180)"
+  },
+  {
+    "name": "RAND",
+    "formula": "=RAND()"
+  },
+  {
+    "name": "RANDARRAY",
+    "formula": "=RANDARRAY(20,20,0,1,FALSE)"
+  },
+  {
+    "name": "RANDBETWEEN",
+    "formula": "=RANDBETWEEN(1,100)"
+  },
+  {
+    "name": "RANK.AVG",
+    "formula": "=RANK.AVG(50,A1:A100,1)"
+  },
+  {
+    "name": "RANK.EQ",
+    "formula": "=RANK.EQ(50,A1:A100,1)"
+  },
+  {
+    "name": "REGEXEXTRACT",
+    "formula": "=REGEXEXTRACT(\"A12 B34\",\"[0-9]+\",1)"
+  },
+  {
+    "name": "REGEXREPLACE",
+    "formula": "=REGEXREPLACE(\"A12 B34\",\"[0-9]+\",\"#\")"
+  },
+  {
+    "name": "REGEXTEST",
+    "formula": "=REGEXTEST(\"A12\",\"[0-9]+\")"
+  },
+  {
+    "name": "REPLACE",
+    "formula": "=REPLACE(\"Spreadsheet\",3,5,\"X\")"
+  },
+  {
+    "name": "REPLACEB",
+    "formula": "=REPLACEB(\"A\u4e2dB\",2,2,\"\u6587\")"
+  },
+  {
+    "name": "REPT",
+    "formula": "=REPT(\"abc\",100)"
+  },
+  {
+    "name": "RIGHT",
+    "formula": "=RIGHT(\"Spreadsheet\",5)"
+  },
+  {
+    "name": "RIGHTB",
+    "formula": "=RIGHTB(\"A\u4e2dB\",3)"
+  },
+  {
+    "name": "ROMAN",
+    "formula": "=ROMAN(2024)"
+  },
+  {
+    "name": "ROUND",
+    "formula": "=ROUND(12345.678,2)"
+  },
+  {
+    "name": "ROUNDDOWN",
+    "formula": "=ROUNDDOWN(12345.678,2)"
+  },
+  {
+    "name": "ROUNDUP",
+    "formula": "=ROUNDUP(12345.678,2)"
+  },
+  {
+    "name": "RSQ",
+    "formula": "=RSQ(A1:A100,C1:C100)"
+  },
+  {
+    "name": "SEARCH",
+    "formula": "=SEARCH(\"sheet\",\"Spreadsheet\")"
+  },
+  {
+    "name": "SEARCHB",
+    "formula": "=SEARCHB(\"b\",\"A\u4e2dB\")"
+  },
+  {
+    "name": "SEC",
+    "formula": "=SEC(1)"
+  },
+  {
+    "name": "SECH",
+    "formula": "=SECH(1)"
+  },
+  {
+    "name": "SECOND",
+    "formula": "=SECOND(\"2024-1-1 18:30:45\")"
+  },
+  {
+    "name": "SEQUENCE",
+    "formula": "=SEQUENCE(100,100,1,1)"
+  },
+  {
+    "name": "SERIESSUM",
+    "formula": "=SERIESSUM(2,0,1,{1,2,3})"
+  },
+  {
+    "name": "SIGN",
+    "formula": "=SIGN(-1)"
+  },
+  {
+    "name": "SIN",
+    "formula": "=SIN(1)"
+  },
+  {
+    "name": "SINH",
+    "formula": "=SINH(1)"
+  },
+  {
+    "name": "SKEW",
+    "formula": "=SKEW(A1:A100)"
+  },
+  {
+    "name": "SKEW.P",
+    "formula": "=SKEW.P(A1:A100)"
+  },
+  {
+    "name": "SLOPE",
+    "formula": "=SLOPE(A1:A100,C1:C100)"
+  },
+  {
+    "name": "SMALL",
+    "formula": "=SMALL(A1:A100,99)"
+  },
+  {
+    "name": "SQRT",
+    "formula": "=SQRT(16)"
+  },
+  {
+    "name": "SQRTPI",
+    "formula": "=SQRTPI(2)"
+  },
+  {
+    "name": "STANDARDIZE",
+    "formula": "=STANDARDIZE(42,40,1.5)"
+  },
+  {
+    "name": "STDEV.P",
+    "formula": "=STDEV.P(A1:A100)"
+  },
+  {
+    "name": "STDEV.S",
+    "formula": "=STDEV.S(A1:A100)"
+  },
+  {
+    "name": "STDEVA",
+    "formula": "=STDEVA(A1:A100)"
+  },
+  {
+    "name": "STDEVPA",
+    "formula": "=STDEVPA(A1:A100)"
+  },
+  {
+    "name": "STEYX",
+    "formula": "=STEYX(A1:A100,C1:C100)"
+  },
+  {
+    "name": "SUBSTITUTE",
+    "formula": "=SUBSTITUTE(\"a-b-c\",\"-\",\"/\")"
+  },
+  {
+    "name": "SUBTOTAL",
+    "formula": "=SUBTOTAL(109,A1:A100)"
+  },
+  {
+    "name": "SUM",
+    "formula": "=SUM(A1:A100)"
+  },
+  {
+    "name": "SUMIF",
+    "formula": "=SUMIF(A1:A100,\">5000\",A1:A100)"
+  },
+  {
+    "name": "SUMIFS",
+    "formula": "=SUMIFS(A1:A100,A1:A100,\">5000\")"
+  },
+  {
+    "name": "SUMPRODUCT",
+    "formula": "=SUMPRODUCT(A1:A100,A1:A100)"
+  },
+  {
+    "name": "SUMSQ",
+    "formula": "=SUMSQ(A1:A100)"
+  },
+  {
+    "name": "SUMX2MY2",
+    "formula": "=SUMX2MY2(A1:A100,A1:A100)"
+  },
+  {
+    "name": "SUMX2PY2",
+    "formula": "=SUMX2PY2(A1:A100,A1:A100)"
+  },
+  {
+    "name": "SUMXMY2",
+    "formula": "=SUMXMY2(A1:A100,A1:A100)"
+  },
+  {
+    "name": "T",
+    "formula": "=T(\"text\")"
+  },
+  {
+    "name": "T.DIST",
+    "formula": "=T.DIST(60,1,TRUE)"
+  },
+  {
+    "name": "T.DIST.2T",
+    "formula": "=T.DIST.2T(1.96,60)"
+  },
+  {
+    "name": "T.DIST.RT",
+    "formula": "=T.DIST.RT(1.96,60)"
+  },
+  {
+    "name": "T.INV",
+    "formula": "=T.INV(0.75,2)"
+  },
+  {
+    "name": "T.INV.2T",
+    "formula": "=T.INV.2T(0.546449,60)"
+  },
+  {
+    "name": "T.TEST",
+    "formula": "=T.TEST({3,4,5,8,9,1,2,4,5},{6,19,3,2,14,4,5,17,1},2,1)"
+  },
+  {
+    "name": "TAN",
+    "formula": "=TAN(1)"
+  },
+  {
+    "name": "TANH",
+    "formula": "=TANH(1)"
+  },
+  {
+    "name": "TEXT",
+    "formula": "=TEXT(1234.5,\"#,##0.00\")"
+  },
+  {
+    "name": "TEXTAFTER",
+    "formula": "=TEXTAFTER(\"a-b-c\",\"-\",2)"
+  },
+  {
+    "name": "TEXTBEFORE",
+    "formula": "=TEXTBEFORE(\"a-b-c\",\"-\",2)"
+  },
+  {
+    "name": "TEXTJOIN",
+    "formula": "=TEXTJOIN(\",\",TRUE,\"A\",\"B\",\"C\")"
+  },
+  {
+    "name": "TEXTSPLIT",
+    "formula": "=TEXTSPLIT(\"A,B;C,D\",\",\",\";\")"
+  },
+  {
+    "name": "TIME",
+    "formula": "=TIME(18,30,45)"
+  },
+  {
+    "name": "TIMEVALUE",
+    "formula": "=TIMEVALUE(\"18:30:45\")"
+  },
+  {
+    "name": "TODAY",
+    "formula": "=TODAY()"
+  },
+  {
+    "name": "TRANSLATE",
+    "formula": "=TRANSLATE(\"hello\",\"en\",\"zh-Hans\")"
+  },
+  {
+    "name": "TREND",
+    "formula": "=TREND({2,4,6},{1,2,3},{4,5})"
+  },
+  {
+    "name": "TRIM",
+    "formula": "=TRIM(\"  a   b  \")"
+  },
+  {
+    "name": "TRIMMEAN",
+    "formula": "=TRIMMEAN(A1:A100,0.2)"
+  },
+  {
+    "name": "TRUNC",
+    "formula": "=TRUNC(12345.678,2)"
+  },
+  {
+    "name": "UNICHAR",
+    "formula": "=UNICHAR(9733)"
+  },
+  {
+    "name": "UNICODE",
+    "formula": "=UNICODE(\"★\")"
+  },
+  {
+    "name": "UPPER",
+    "formula": "=UPPER(\"Spreadsheet\")"
+  },
+  {
+    "name": "VALUE",
+    "formula": "=VALUE(\"$1,234.50\")"
+  },
+  {
+    "name": "VALUETOTEXT",
+    "formula": "=VALUETOTEXT(\"A\",1)"
+  },
+  {
+    "name": "VAR",
+    "formula": "=VAR(A1:A100)"
+  },
+  {
+    "name": "VAR.P",
+    "formula": "=VAR.P(A1:A100)"
+  },
+  {
+    "name": "VAR.S",
+    "formula": "=VAR.S(A1:A100)"
+  },
+  {
+    "name": "VARA",
+    "formula": "=VARA(A1:A100)"
+  },
+  {
+    "name": "VARPA",
+    "formula": "=VARPA(A1:A100)"
+  },
+  {
+    "name": "VLOOKUP",
+    "formula": "=VLOOKUP(2,A1:C100,3,FALSE)"
+  },
+  {
+    "name": "WEBSERVICE",
+    "formula": "=WEBSERVICE(\"https://example.com/formula.xml\")"
+  },
+  {
+    "name": "WEEKDAY",
+    "formula": "=WEEKDAY(\"2024-2-29\",2)"
+  },
+  {
+    "name": "WEEKNUM",
+    "formula": "=WEEKNUM(\"2024-12-31\",21)"
+  },
+  {
+    "name": "WEIBULL.DIST",
+    "formula": "=WEIBULL.DIST(105,20,100,TRUE)"
+  },
+  {
+    "name": "WORKDAY",
+    "formula": "=WORKDAY(DATE(2024,1,1),1000)"
+  },
+  {
+    "name": "WORKDAY.INTL",
+    "formula": "=WORKDAY.INTL(DATE(2024,1,1),1000,11)"
+  },
+  {
+    "name": "YEAR",
+    "formula": "=YEAR(\"2024-2-29\")"
+  },
+  {
+    "name": "YEARFRAC",
+    "formula": "=YEARFRAC(\"2024-1-1\",\"2030-12-31\",1)"
+  },
+  {
+    "name": "Z.TEST",
+    "formula": "=Z.TEST(A1:A100,49)"
+  },
+  {
+    "name": "ACCRINT",
+    "formula": "=ACCRINT(DATE(2020,1,1),DATE(2020,7,1),DATE(2020,4,1),0.06,1000,2,0)"
+  },
+  {
+    "name": "ACCRINTM",
+    "formula": "=ACCRINTM(DATE(2020,1,1),DATE(2020,7,1),0.06,1000,0)"
+  },
+  {
+    "name": "AMORDEGRC",
+    "formula": "=AMORDEGRC(2400,DATE(2020,1,1),DATE(2020,7,1),300,1,0.15,1)"
+  },
+  {
+    "name": "AMORLINC",
+    "formula": "=AMORLINC(2400,DATE(2020,1,1),DATE(2020,7,1),300,1,0.15,1)"
+  },
+  {
+    "name": "COUPDAYBS",
+    "formula": "=COUPDAYBS(DATE(2024,3,15),DATE(2026,12,31),2,0)"
+  },
+  {
+    "name": "COUPDAYS",
+    "formula": "=COUPDAYS(DATE(2024,3,15),DATE(2026,12,31),2,0)"
+  },
+  {
+    "name": "COUPDAYSNC",
+    "formula": "=COUPDAYSNC(DATE(2024,3,15),DATE(2026,12,31),2,0)"
+  },
+  {
+    "name": "COUPNCD",
+    "formula": "=COUPNCD(DATE(2024,3,15),DATE(2026,12,31),2,0)"
+  },
+  {
+    "name": "COUPNUM",
+    "formula": "=COUPNUM(DATE(2024,3,15),DATE(2026,12,31),2,0)"
+  },
+  {
+    "name": "COUPPCD",
+    "formula": "=COUPPCD(DATE(2024,3,15),DATE(2026,12,31),2,0)"
+  },
+  {
+    "name": "CUMIPMT",
+    "formula": "=CUMIPMT(0.08/12,60,5000,1,12,0)"
+  },
+  {
+    "name": "CUMPRINC",
+    "formula": "=CUMPRINC(0.08/12,60,5000,1,12,0)"
+  },
+  {
+    "name": "DB",
+    "formula": "=DB(10000,1000,5,1,12)"
+  },
+  {
+    "name": "DDB",
+    "formula": "=DDB(10000,1000,5,1,2)"
+  },
+  {
+    "name": "DISC",
+    "formula": "=DISC(DATE(2024,1,1),DATE(2024,7,1),97,100,0)"
+  },
+  {
+    "name": "DOLLARDE",
+    "formula": "=DOLLARDE(1.125,16)"
+  },
+  {
+    "name": "DOLLARFR",
+    "formula": "=DOLLARFR(1.125,16)"
+  },
+  {
+    "name": "DURATION",
+    "formula": "=DURATION(DATE(2024,1,1),DATE(2029,1,1),0.06,0.05,2,0)"
+  },
+  {
+    "name": "EFFECT",
+    "formula": "=EFFECT(0.08,12)"
+  },
+  {
+    "name": "FV",
+    "formula": "=FV(0.08/12,60,-100,0,0)"
+  },
+  {
+    "name": "FVSCHEDULE",
+    "formula": "=FVSCHEDULE(100,{0.05,0.06,0.07})"
+  },
+  {
+    "name": "INTRATE",
+    "formula": "=INTRATE(DATE(2024,1,1),DATE(2024,7,1),97,100,0)"
+  },
+  {
+    "name": "IPMT",
+    "formula": "=IPMT(0.08/12,1,60,5000)"
+  },
+  {
+    "name": "IRR",
+    "formula": "=IRR({-1000,300,400,500})"
+  },
+  {
+    "name": "ISPMT",
+    "formula": "=ISPMT(0.1,1,4,1000)"
+  },
+  {
+    "name": "MDURATION",
+    "formula": "=MDURATION(DATE(2024,1,1),DATE(2029,1,1),0.06,0.05,2,0)"
+  },
+  {
+    "name": "MIRR",
+    "formula": "=MIRR({-1000,300,400,500},0.08,0.1)"
+  },
+  {
+    "name": "NOMINAL",
+    "formula": "=NOMINAL(0.083,12)"
+  },
+  {
+    "name": "NPER",
+    "formula": "=NPER(0.08/12,-100,5000)"
+  },
+  {
+    "name": "NPV",
+    "formula": "=NPV(0.1,300,400,500)"
+  },
+  {
+    "name": "ODDFPRICE",
+    "formula": "=ODDFPRICE(DATE(2024,1,1),DATE(2029,4,1),DATE(2023,7,1),DATE(2024,4,1),0.06,0.05,100,2,0)"
+  },
+  {
+    "name": "ODDFYIELD",
+    "formula": "=ODDFYIELD(DATE(2024,1,1),DATE(2029,4,1),DATE(2023,7,1),DATE(2024,4,1),0.06,95,100,2,0)"
+  },
+  {
+    "name": "ODDLPRICE",
+    "formula": "=ODDLPRICE(DATE(2024,1,1),DATE(2029,1,1),DATE(2028,4,1),0.06,0.05,100,2,0)"
+  },
+  {
+    "name": "ODDLYIELD",
+    "formula": "=ODDLYIELD(DATE(2024,1,1),DATE(2029,1,1),DATE(2028,4,1),0.06,95,100,2,0)"
+  },
+  {
+    "name": "PDURATION",
+    "formula": "=PDURATION(0.08,1000,2000)"
+  },
+  {
+    "name": "PMT",
+    "formula": "=PMT(0.08/12,60,5000)"
+  },
+  {
+    "name": "PPMT",
+    "formula": "=PPMT(0.08/12,1,60,5000)"
+  },
+  {
+    "name": "PRICE",
+    "formula": "=PRICE(DATE(2024,1,1),DATE(2029,1,1),0.06,0.05,100,2,0)"
+  },
+  {
+    "name": "PRICEDISC",
+    "formula": "=PRICEDISC(DATE(2024,1,1),DATE(2024,7,1),0.05,100,0)"
+  },
+  {
+    "name": "PRICEMAT",
+    "formula": "=PRICEMAT(DATE(2024,1,1),DATE(2025,1,1),DATE(2023,1,1),0.06,0.05,0)"
+  },
+  {
+    "name": "PV",
+    "formula": "=PV(0.08/12,60,-100)"
+  },
+  {
+    "name": "RATE",
+    "formula": "=RATE(60,-100,5000)"
+  },
+  {
+    "name": "RECEIVED",
+    "formula": "=RECEIVED(DATE(2024,1,1),DATE(2024,7,1),97,0.05,0)"
+  },
+  {
+    "name": "RRI",
+    "formula": "=RRI(5,1000,1500)"
+  },
+  {
+    "name": "SLN",
+    "formula": "=SLN(10000,1000,5)"
+  },
+  {
+    "name": "SYD",
+    "formula": "=SYD(10000,1000,5,1)"
+  },
+  {
+    "name": "TBILLEQ",
+    "formula": "=TBILLEQ(DATE(2024,1,1),DATE(2024,7,1),0.05)"
+  },
+  {
+    "name": "TBILLPRICE",
+    "formula": "=TBILLPRICE(DATE(2024,1,1),DATE(2024,7,1),0.05)"
+  },
+  {
+    "name": "TBILLYIELD",
+    "formula": "=TBILLYIELD(DATE(2024,1,1),DATE(2024,7,1),97.5)"
+  },
+  {
+    "name": "VDB",
+    "formula": "=VDB(10000,1000,5,0,1)"
+  },
+  {
+    "name": "XIRR",
+    "formula": "=XIRR({-1000,300,400,500},{DATE(2024,1,1),DATE(2024,7,1),DATE(2025,1,1),DATE(2025,7,1)})"
+  },
+  {
+    "name": "XNPV",
+    "formula": "=XNPV(0.1,{-1000,300,400,500},{DATE(2024,1,1),DATE(2024,7,1),DATE(2025,1,1),DATE(2025,7,1)})"
+  },
+  {
+    "name": "YIELD",
+    "formula": "=YIELD(DATE(2024,1,1),DATE(2029,1,1),0.06,100,100,2,0)"
+  },
+  {
+    "name": "YIELDDISC",
+    "formula": "=YIELDDISC(DATE(2024,1,1),DATE(2024,7,1),97,100,0)"
+  },
+  {
+    "name": "YIELDMAT",
+    "formula": "=YIELDMAT(DATE(2024,1,1),DATE(2025,1,1),DATE(2023,1,1),0.06,100,0)"
+  },
+  { "name": "ADDRESS", "formula": "=ADDRESS(2,3)" },
+  { "name": "AREAS", "formula": "=AREAS(A1:B2)" },
+  { "name": "CHOOSE", "formula": "=CHOOSE(2,\"A\",\"B\")" },
+  { "name": "CHOOSECOLS", "formula": "=CHOOSECOLS({1,2;3,4},1)" },
+  { "name": "CHOOSEROWS", "formula": "=CHOOSEROWS({1,2;3,4},2)" },
+  { "name": "COLUMN", "formula": "=COLUMN(C1)" },
+  { "name": "COLUMNS", "formula": "=COLUMNS(A1:C1)" },
+  { "name": "DROP", "formula": "=DROP({1,2;3,4},1)" },
+  { "name": "EXPAND", "formula": "=EXPAND({1},2,2,0)" },
+  { "name": "FILTER", "formula": "=FILTER({1;2},{TRUE;FALSE})" },
+  { "name": "FORMULATEXT", "formula": "=FORMULATEXT(D1)" },
+  { "name": "GETPIVOTDATA", "formula": "=GETPIVOTDATA(\"Sales\",\"A1\")" },
+  { "name": "GROUPBY", "formula": "=GROUPBY({\"A\";\"B\";\"A\"},{1;2;3},SUM)" },
+  { "name": "HLOOKUP", "formula": "=HLOOKUP(2,{1,2;10,20},2,FALSE)" },
+  { "name": "HSTACK", "formula": "=HSTACK({1;2},{3;4})" },
+  { "name": "HYPERLINK", "formula": "=HYPERLINK(\"https://example.com\",\"Open\")" },
+  { "name": "IMAGE", "formula": "=IMAGE(\"https://example.com/a.png\")" },
+  { "name": "INDEX", "formula": "=INDEX({1,2;3,4},2,1)" },
+  { "name": "INDIRECT", "formula": "=IFERROR(INDIRECT(\"A1\"),0)" },
+  { "name": "LOOKUP", "formula": "=LOOKUP(2,{1,2,3},{10,20,30})" },
+  { "name": "MATCH", "formula": "=MATCH(2,{1,2,3},0)" },
+  { "name": "OFFSET", "formula": "=OFFSET(A1,1,1)" },
+  { "name": "PIVOTBY", "formula": "=PIVOTBY({\"A\";\"A\"},{\"X\";\"Y\"},{1;2},SUM)" },
+  { "name": "ROW", "formula": "=ROW(A1)" },
+  { "name": "ROWS", "formula": "=ROWS(A1:A2)" },
+  { "name": "RTD", "formula": "=RTD(\"provider\",\"server\",\"topic\")" },
+  { "name": "SORT", "formula": "=SORT({2;1})" },
+  { "name": "SORTBY", "formula": "=SORTBY({2;1},{2;1},1)" },
+  { "name": "TAKE", "formula": "=TAKE({1;2},1)" },
+  { "name": "TOCOL", "formula": "=TOCOL({1,2;3,4})" },
+  { "name": "TOROW", "formula": "=TOROW({1,2;3,4})" },
+  { "name": "TRANSPOSE", "formula": "=TRANSPOSE({1,2;3,4})" },
+  { "name": "TRIMRANGE", "formula": "=TRIMRANGE({\"\",1;\"\",2})" },
+  { "name": "UNIQUE", "formula": "=UNIQUE({1;1;2})" },
+  { "name": "VSTACK", "formula": "=VSTACK({1,2},{3,4})" },
+  { "name": "WRAPCOLS", "formula": "=WRAPCOLS({1,2,3},2,0)" },
+  { "name": "WRAPROWS", "formula": "=WRAPROWS({1,2,3},2,0)" },
+  { "name": "XLOOKUP", "formula": "=XLOOKUP(2,{1,2},{10,20})" },
+  { "name": "XMATCH", "formula": "=XMATCH(2,{1,2},0)" },
+  { "name": "BESSELI", "formula": "=BESSELI(1.5,1)" },
+  { "name": "BESSELJ", "formula": "=BESSELJ(1.9,2)" },
+  { "name": "BESSELK", "formula": "=BESSELK(1.5,1)" },
+  { "name": "BESSELY", "formula": "=BESSELY(2.5,1)" },
+  { "name": "BIN2DEC", "formula": "=BIN2DEC(1100100)" },
+  { "name": "BIN2HEX", "formula": "=BIN2HEX(11111011)" },
+  { "name": "BIN2OCT", "formula": "=BIN2OCT(1001)" },
+  { "name": "BITAND", "formula": "=BITAND(13,25)" },
+  { "name": "BITLSHIFT", "formula": "=BITLSHIFT(4,2)" },
+  { "name": "BITOR", "formula": "=BITOR(23,10)" },
+  { "name": "BITRSHIFT", "formula": "=BITRSHIFT(16,2)" },
+  { "name": "BITXOR", "formula": "=BITXOR(5,3)" },
+  { "name": "COMPLEX", "formula": "=COMPLEX(3,4)" },
+  { "name": "CONVERT", "formula": "=CONVERT(1,\"mi\",\"km\")" },
+  { "name": "DEC2BIN", "formula": "=DEC2BIN(9)" },
+  { "name": "DEC2HEX", "formula": "=DEC2HEX(100)" },
+  { "name": "DEC2OCT", "formula": "=DEC2OCT(58)" },
+  { "name": "DELTA", "formula": "=DELTA(5,5)" },
+  { "name": "ERF", "formula": "=ERF(1)" },
+  { "name": "ERF.PRECISE", "formula": "=ERF.PRECISE(1)" },
+  { "name": "ERFC", "formula": "=ERFC(1)" },
+  { "name": "ERFC.PRECISE", "formula": "=ERFC.PRECISE(1)" },
+  { "name": "GESTEP", "formula": "=GESTEP(5,4)" },
+  { "name": "HEX2BIN", "formula": "=HEX2BIN(\"F\")" },
+  { "name": "HEX2DEC", "formula": "=HEX2DEC(\"A5\")" },
+  { "name": "HEX2OCT", "formula": "=HEX2OCT(\"F\")" },
+  { "name": "IMABS", "formula": "=IMABS(\"5+12i\")" },
+  { "name": "IMAGINARY", "formula": "=IMAGINARY(\"3+4i\")" },
+  { "name": "IMARGUMENT", "formula": "=IMARGUMENT(\"3+4i\")" },
+  { "name": "IMCONJUGATE", "formula": "=IMCONJUGATE(\"3+4i\")" },
+  { "name": "IMCOS", "formula": "=IMCOS(\"1+i\")" },
+  { "name": "IMCOSH", "formula": "=IMCOSH(\"1+i\")" },
+  { "name": "IMCOT", "formula": "=IMCOT(\"1+i\")" },
+  { "name": "IMCSC", "formula": "=IMCSC(\"1+i\")" },
+  { "name": "IMCSCH", "formula": "=IMCSCH(\"1+i\")" },
+  { "name": "IMDIV", "formula": "=IMDIV(\"-238+240i\",\"10+24i\")" },
+  { "name": "IMEXP", "formula": "=IMEXP(\"1+i\")" },
+  { "name": "IMLN", "formula": "=IMLN(\"3+4i\")" },
+  { "name": "IMLOG10", "formula": "=IMLOG10(\"3+4i\")" },
+  { "name": "IMLOG2", "formula": "=IMLOG2(\"3+4i\")" },
+  { "name": "IMPOWER", "formula": "=IMPOWER(\"2+3i\",3)" },
+  { "name": "IMPRODUCT", "formula": "=IMPRODUCT(\"3+4i\",\"5-3i\")" },
+  { "name": "IMREAL", "formula": "=IMREAL(\"6-9i\")" },
+  { "name": "IMSEC", "formula": "=IMSEC(\"1+i\")" },
+  { "name": "IMSECH", "formula": "=IMSECH(\"1+i\")" },
+  { "name": "IMSIN", "formula": "=IMSIN(\"1+i\")" },
+  { "name": "IMSINH", "formula": "=IMSINH(\"1+i\")" },
+  { "name": "IMSQRT", "formula": "=IMSQRT(\"1+i\")" },
+  { "name": "IMSUB", "formula": "=IMSUB(\"13+4i\",\"5+3i\")" },
+  { "name": "IMSUM", "formula": "=IMSUM(\"3+6i\",\"5-2i\")" },
+  { "name": "IMTAN", "formula": "=IMTAN(\"1+i\")" },
+  { "name": "OCT2BIN", "formula": "=OCT2BIN(3)" },
+  { "name": "OCT2DEC", "formula": "=OCT2DEC(54)" },
+  { "name": "OCT2HEX", "formula": "=OCT2HEX(100)" },
+  { "name": "CALL", "formula": "=CALL(1)" },
+  { "name": "EUROCONVERT", "formula": "=EUROCONVERT(1.2,\"DEM\",\"EUR\")" },
+  { "name": "REGISTER.ID", "formula": "=REGISTER.ID(\"example\",\"entry\",\"JJ\")" },
+  { "name": "BETADIST", "formula": "=BETADIST(2,8,10,1,3)" },
+  { "name": "BETAINV", "formula": "=BETAINV(0.685470581,8,10,1,3)" },
+  { "name": "BINOMDIST", "formula": "=BINOMDIST(6,10,0.5,FALSE)" },
+  { "name": "CEILING", "formula": "=CEILING(2.5,1)" },
+  { "name": "CHIDIST", "formula": "=CHIDIST(18.307,10)" },
+  { "name": "CHIINV", "formula": "=CHIINV(0.05,10)" },
+  { "name": "CHITEST", "formula": "=CHITEST({58,35;11,25},{45,48;24,22})" },
+  { "name": "CONFIDENCE", "formula": "=CONFIDENCE(0.05,2.5,50)" },
+  { "name": "COVAR", "formula": "=COVAR({2,4,8},{5,11,12})" },
+  { "name": "CRITBINOM", "formula": "=CRITBINOM(6,0.5,0.75)" },
+  { "name": "EXPONDIST", "formula": "=EXPONDIST(0.2,10,TRUE)" },
+  { "name": "FDIST", "formula": "=FDIST(15.2069,6,4)" },
+  { "name": "FINV", "formula": "=FINV(0.01,6,4)" },
+  { "name": "FLOOR", "formula": "=FLOOR(2.5,1)" },
+  { "name": "FTEST", "formula": "=FTEST({1,2,3},{1,2,4})" },
+  { "name": "GAMMADIST", "formula": "=GAMMADIST(10,9,2,TRUE)" },
+  { "name": "GAMMAINV", "formula": "=GAMMAINV(0.068094,9,2)" },
+  { "name": "HYPGEOMDIST", "formula": "=HYPGEOMDIST(1,4,8,20)" },
+  { "name": "LOGINV", "formula": "=LOGINV(0.5,3.5,1.2)" },
+  { "name": "LOGNORMDIST", "formula": "=LOGNORMDIST(4,3.5,1.2)" },
+  { "name": "MODE", "formula": "=MODE(1,1,2,3)" },
+  { "name": "NEGBINOMDIST", "formula": "=NEGBINOMDIST(10,5,0.25)" },
+  { "name": "NORM.INV", "formula": "=NORM.INV(0.5,40,1.5)" },
+  { "name": "NORMDIST", "formula": "=NORMDIST(42,40,1.5,TRUE)" },
+  { "name": "NORMSDIST", "formula": "=NORMSDIST(1.333333)" },
+  { "name": "NORMSINV", "formula": "=NORMSINV(0.908789)" },
+  { "name": "PERCENTILE", "formula": "=PERCENTILE({1,2,3,4},0.5)" },
+  { "name": "PERCENTRANK", "formula": "=PERCENTRANK({1,2,3,4},3)" },
+  { "name": "POISSON", "formula": "=POISSON(2,5,TRUE)" },
+  { "name": "QUARTILE", "formula": "=QUARTILE({1,2,3,4,5},1)" },
+  { "name": "RANK", "formula": "=RANK(3,{1,2,3,4},0)" },
+  { "name": "STDEV", "formula": "=STDEV(1,2,3)" },
+  { "name": "STDEVP", "formula": "=STDEVP(1,2,3)" },
+  { "name": "TDIST", "formula": "=TDIST(1.96,60,2)" },
+  { "name": "TINV", "formula": "=TINV(0.05,10)" },
+  { "name": "TTEST", "formula": "=TTEST({1,2,3},{1,2,4},2,1)" },
+  { "name": "VARP", "formula": "=VARP(1,2,3)" },
+  { "name": "WEIBULL", "formula": "=WEIBULL(105,20,100,TRUE)" },
+  { "name": "ZTEST", "formula": "=ZTEST({3,6,7,8},4)" },
+  { "name": "AND", "formula": "=AND(TRUE,1)" },
+  { "name": "FALSE", "formula": "=FALSE()" },
+  { "name": "IFNA", "formula": "=IFNA(NA(),0)" },
+  { "name": "IFS", "formula": "=IFS(FALSE,1,TRUE,2)" },
+  { "name": "NOT", "formula": "=NOT(TRUE)" },
+  { "name": "OR", "formula": "=OR(FALSE,TRUE)" },
+  { "name": "SWITCH", "formula": "=SWITCH(2,1,\"one\",2,\"two\")" },
+  { "name": "TRUE", "formula": "=TRUE()" },
+  { "name": "XOR", "formula": "=XOR(TRUE,FALSE)" },
+  { "name": "DAVERAGE", "formula": "=DAVERAGE({\"Type\",\"Value\";\"A\",10;\"B\",20},\"Value\",{\"Type\";\"A\"})" },
+  { "name": "DCOUNT", "formula": "=DCOUNT({\"Type\",\"Value\";\"A\",10;\"B\",20},\"Value\",{\"Type\";\"A\"})" },
+  { "name": "DCOUNTA", "formula": "=DCOUNTA({\"Type\",\"Value\";\"A\",10;\"B\",20},\"Type\",{\"Type\";\"A\"})" },
+  { "name": "DGET", "formula": "=DGET({\"Type\",\"Value\";\"A\",10;\"B\",20},\"Value\",{\"Type\";\"A\"})" },
+  { "name": "DMAX", "formula": "=DMAX({\"Type\",\"Value\";\"A\",10;\"B\",20},\"Value\",{\"Value\";\">0\"})" },
+  { "name": "DMIN", "formula": "=DMIN({\"Type\",\"Value\";\"A\",10;\"B\",20},\"Value\",{\"Value\";\">0\"})" },
+  { "name": "DPRODUCT", "formula": "=DPRODUCT({\"Type\",\"Value\";\"A\",10;\"B\",20},\"Value\",{\"Value\";\">0\"})" },
+  { "name": "DSTDEV", "formula": "=DSTDEV({\"Type\",\"Value\";\"A\",10;\"B\",20},\"Value\",{\"Value\";\">0\"})" },
+  { "name": "DSTDEVP", "formula": "=DSTDEVP({\"Type\",\"Value\";\"A\",10;\"B\",20},\"Value\",{\"Value\";\">0\"})" },
+  { "name": "DSUM", "formula": "=DSUM({\"Type\",\"Value\";\"A\",10;\"B\",20},\"Value\",{\"Value\";\">0\"})" },
+  { "name": "DVAR", "formula": "=DVAR({\"Type\",\"Value\";\"A\",10;\"B\",20},\"Value\",{\"Value\";\">0\"})" },
+  { "name": "DVARP", "formula": "=DVARP({\"Type\",\"Value\";\"A\",10;\"B\",20},\"Value\",{\"Value\";\">0\"})" },
+  { "name": "CELL", "formula": "=CELL(\"row\",B2)" },
+  { "name": "ERROR.TYPE", "formula": "=ERROR.TYPE(NA())" },
+  { "name": "INFO", "formula": "=INFO(\"numfile\")" },
+  { "name": "ISBLANK", "formula": "=ISBLANK(A1)" },
+  { "name": "ISERR", "formula": "=ISERR(1/0)" },
+  { "name": "ISERROR", "formula": "=ISERROR(1/0)" },
+  { "name": "ISEVEN", "formula": "=ISEVEN(4)" },
+  { "name": "ISFORMULA", "formula": "=ISFORMULA(B2)" },
+  { "name": "ISLOGICAL", "formula": "=ISLOGICAL(TRUE)" },
+  { "name": "ISNA", "formula": "=ISNA(NA())" },
+  { "name": "ISNONTEXT", "formula": "=ISNONTEXT(42)" },
+  { "name": "ISNUMBER", "formula": "=ISNUMBER(42)" },
+  { "name": "ISODD", "formula": "=ISODD(3)" },
+  { "name": "ISREF", "formula": "=ISREF(A1)" },
+  { "name": "ISTEXT", "formula": "=ISTEXT(\"text\")" },
+  { "name": "N", "formula": "=N(TRUE)" },
+  { "name": "NA", "formula": "=IFNA(NA(),0)" },
+  { "name": "SHEET", "formula": "=SHEET()" },
+  { "name": "SHEETS", "formula": "=SHEETS()" },
+  { "name": "STOCKHISTORY", "formula": "=STOCKHISTORY(\"MSFT\",45000)" },
+  { "name": "TYPE", "formula": "=TYPE(42)" },
+  { "name": "ARRAY_CONSTRAIN", "formula": "=SUM(ARRAY_CONSTRAIN({1,2;3,4},1,2))" },
+  { "name": "FLATTEN", "formula": "=SUM(FLATTEN({1,2},{3,4}))" },
+  { "name": "EPOCHTODATE", "formula": "=EPOCHTODATE(0)" },
+  { "name": "TO_DATE", "formula": "=TO_DATE(45351.75)" },
+  { "name": "ISBETWEEN", "formula": "=ISBETWEEN(5,1,10)" },
+  { "name": "ISDATE", "formula": "=ISDATE(\"2024-02-29\")" },
+  { "name": "ISEMAIL", "formula": "=ISEMAIL(\"a@example.com\")" },
+  { "name": "ISURL", "formula": "=ISURL(\"https://example.com\")" },
+  { "name": "ROUNDBANK", "formula": "=ROUNDBANK(2.5,0)" },
+  { "name": "AVERAGE_WEIGHTED", "formula": "=AVERAGE_WEIGHTED({10,20},{1,3})" },
+  { "name": "MARGINOFERROR", "formula": "=MARGINOFERROR(0.95,{1,2,3,4})" },
+  { "name": "NUMBERSTRING", "formula": "=NUMBERSTRING(123,1)" },
+  { "name": "REGEXMATCH", "formula": "=REGEXMATCH(\"A12\",\"[0-9]+\")" },
+  { "name": "ADD", "formula": "=ADD(2,3)" },
+  { "name": "AI", "formula": "=AI(\"Summarize\",\"text\")" },
+  { "name": "ARRAYFORMULA", "formula": "=SUM(ARRAYFORMULA({1,2}*2))" },
+  { "name": "AVERAGE.WEIGHTED", "formula": "=AVERAGE.WEIGHTED({10,20},{1,3})" },
+  { "name": "COUNTUNIQUE", "formula": "=COUNTUNIQUE(1,1,2)" },
+  { "name": "DIVIDE", "formula": "=DIVIDE(6,2)" },
+  { "name": "EQ", "formula": "=EQ(2,2)" },
+  { "name": "GOOGLEFINANCE", "formula": "=GOOGLEFINANCE(\"NASDAQ:GOOG\",\"price\")" },
+  { "name": "GOOGLETRANSLATE", "formula": "=GOOGLETRANSLATE(\"hello\",\"en\",\"zh-CN\")" },
+  { "name": "GT", "formula": "=GT(3,2)" },
+  { "name": "GTE", "formula": "=GTE(2,2)" },
+  { "name": "IMPORTDATA", "formula": "=IMPORTDATA(\"https://example.com/data.csv\")" },
+  { "name": "IMPORTFEED", "formula": "=IMPORTFEED(\"https://example.com/feed.xml\")" },
+  { "name": "IMPORTHTML", "formula": "=IMPORTHTML(\"https://example.com\",\"table\",1)" },
+  { "name": "IMPORTRANGE", "formula": "=IMPORTRANGE(\"sheet-id\",\"A1:B2\")" },
+  { "name": "IMPORTXML", "formula": "=IMPORTXML(\"https://example.com\",\"//title\")" },
+  { "name": "JOIN", "formula": "=JOIN(\"-\",{1,2,3})" },
+  { "name": "LT", "formula": "=LT(2,3)" },
+  { "name": "LTE", "formula": "=LTE(2,2)" },
+  { "name": "MINUS", "formula": "=MINUS(5,2)" },
+  { "name": "MULTIPLY", "formula": "=MULTIPLY(3,4)" },
+  { "name": "NE", "formula": "=NE(2,3)" },
+  { "name": "POW", "formula": "=POW(2,3)" },
+  { "name": "QUERY", "formula": "=QUERY({\"A\",1;\"B\",2},\"select Col1 where Col2 > 1\",0)" },
+  { "name": "SORTN", "formula": "=SUM(SORTN({3;1;2},2))" },
+  { "name": "SPARKLINE", "formula": "=SPARKLINE({1,3,2})" },
+  { "name": "SPLIT", "formula": "=SPLIT(\"a,b\",\",\")" },
+  { "name": "TO_DOLLARS", "formula": "=TO_DOLLARS(12.5)" },
+  { "name": "TO_PERCENT", "formula": "=TO_PERCENT(0.25)" },
+  { "name": "TO_PURE_NUMBER", "formula": "=TO_PURE_NUMBER(\"42\")" },
+  { "name": "TO_TEXT", "formula": "=TO_TEXT(42)" },
+  { "name": "UMINUS", "formula": "=UMINUS(3)" },
+  { "name": "UNARY_PERCENT", "formula": "=UNARY_PERCENT(25)" },
+  { "name": "UPLUS", "formula": "=UPLUS(\"3\")" },
+  { "name": "IMCOTH", "formula": "=IMCOTH(\"1+i\")" },
+  { "name": "IMLOG", "formula": "=IMLOG(\"8\",2)" },
+  { "name": "IMTANH", "formula": "=IMTANH(\"1+i\")" }
+]

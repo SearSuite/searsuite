@@ -1,0 +1,70 @@
+{
+  "name": "@searsuite/sear-domain-formula-engine-ts",
+  "description": "Implements the formula parser, evaluator, dependency graph, and built-in functions in TypeScript.",
+  "version": "0.0.1",
+  "license": "MIT",
+  "homepage": "https://searsuite.com/",
+  "keywords": [
+    "searsuite",
+    "spreadsheet",
+    "formulas",
+    "formula-parser"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm run clean && pnpm run compile",
+    "clean": "rimraf ./dist",
+    "compile": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm run build",
+    "test": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/spec packages/sear-domain-formula-engine-ts/benchmark --runInBand --coverage",
+    "test:semantic": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/spec/FormulaSemanticCompatibility.spec.ts packages/sear-domain-formula-engine-ts/spec/ExcelGolden.spec.ts --runInBand",
+    "benchmark:sum": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/SUM.benchmark.spec.ts --runInBand",
+    "benchmark:count": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/COUNT.benchmark.spec.ts --runInBand",
+    "benchmark:average": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/AVERAGE.benchmark.spec.ts --runInBand",
+    "benchmark:if": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/IF.benchmark.spec.ts --runInBand",
+    "benchmark:iferror": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/IFERROR.benchmark.spec.ts --runInBand",
+    "benchmark:sumif": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/SUMIF.benchmark.spec.ts --runInBand",
+    "benchmark:vlookup": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/VLOOKUP.benchmark.spec.ts --runInBand",
+    "benchmark:text": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/TextFunctions.benchmark.spec.ts --runInBand",
+    "benchmark:datetime": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/DateTimeFunctions.benchmark.spec.ts --runInBand",
+    "benchmark:math": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/MathFunctions.benchmark.spec.ts --runInBand",
+    "benchmark:statistics": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/StatisticsFunctions.benchmark.spec.ts --runInBand",
+    "benchmark:web": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/ENCODEURL.benchmark.spec.ts packages/sear-domain-formula-engine-ts/benchmark/FILTERXML.benchmark.spec.ts packages/sear-domain-formula-engine-ts/benchmark/WEBSERVICE.benchmark.spec.ts --runInBand",
+    "benchmark:add-in": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/AddInFunctions.benchmark.spec.ts --runInBand",
+    "benchmark:missing-categories": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/CompatibilityFunctions.benchmark.spec.ts packages/sear-domain-formula-engine-ts/benchmark/LogicalFunctions.benchmark.spec.ts packages/sear-domain-formula-engine-ts/benchmark/DatabaseFunctions.benchmark.spec.ts packages/sear-domain-formula-engine-ts/benchmark/InformationFunctions.benchmark.spec.ts --runInBand",
+    "benchmark:dialect": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/DialectFunctions.benchmark.spec.ts --runInBand",
+    "benchmark:google": "jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark/GoogleFunctions.benchmark.spec.ts --runInBand",
+    "benchmark:ci": "FORMULA_BENCHMARK_MAX_P95_MS=500 jest --config ../../jest.config.ts packages/sear-domain-formula-engine-ts/benchmark packages/sear-domain-formula-engine-ts/spec/FunctionBenchmarkCoverage.spec.ts --runInBand"
+  },
+  "dependencies": {
+    "@searsuite/sear-domain-format": "workspace:*",
+    "@searsuite/sear-domain-formula-engine": "workspace:*",
+    "@searsuite/sear-domain-ot": "workspace:*",
+    "@searsuite/sear-foundation-di": "workspace:*",
+    "@searsuite/sear-foundation-error": "workspace:*",
+    "@searsuite/sear-foundation-platform": "workspace:*",
+    "@searsuite/sear-foundation-utils": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SearSuite/searsuite.git",
+    "directory": "packages/sear-domain-formula-engine-ts"
+  },
+  "bugs": {
+    "url": "https://github.com/SearSuite/searsuite/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "name": "@searsuite/sear-assembly-workbook",
+  "version": "0.0.1",
+  "license": "MIT",
+  "homepage": "https://searsuite.com/",
+  "keywords": [
+    "searsuite",
+    "spreadsheet",
+    "workbook",
+    "editor"
+  ],
+  "description": "Workbook structure, sheet mounting, workbook commands, and shared runtime services.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm run clean && pnpm run compile",
+    "clean": "rimraf ./dist",
+    "compile": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "@searsuite/sear-assembly-core": "workspace:*",
+    "@searsuite/sear-assembly-plugin": "workspace:*",
+    "@searsuite/sear-assembly-setup": "workspace:*",
+    "@searsuite/sear-domain-cell-types": "workspace:*",
+    "@searsuite/sear-domain-formula-engine": "workspace:*",
+    "@searsuite/sear-domain-formula-engine-ts": "workspace:*",
+    "@searsuite/sear-domain-ot": "workspace:*",
+    "@searsuite/sear-domain-transaction": "workspace:*",
+    "@searsuite/sear-domain-workbook": "workspace:*",
+    "@searsuite/sear-foundation-common": "workspace:*",
+    "@searsuite/sear-foundation-di": "workspace:*",
+    "@searsuite/sear-foundation-error": "workspace:*",
+    "@searsuite/sear-foundation-platform": "workspace:*",
+    "@searsuite/sear-foundation-rect": "workspace:*",
+    "@searsuite/sear-foundation-subscription": "workspace:*",
+    "@searsuite/sear-plugin-export": "workspace:*",
+    "@searsuite/sear-render-node": "workspace:*",
+    "@searsuite/sear-render-registry": "workspace:*",
+    "@searsuite/sear-plugin-collab": "workspace:*",
+    "@searsuite/sear-plugin-cell-fill": "workspace:*",
+    "@searsuite/sear-plugin-cell-highlight": "workspace:*",
+    "@searsuite/sear-plugin-duplicate": "workspace:*",
+    "@searsuite/sear-plugin-cell-format": "workspace:*",
+    "@searsuite/sear-plugin-cell-editor": "workspace:*",
+    "@searsuite/sear-plugin-clipboard": "workspace:*",
+    "@searsuite/sear-plugin-formula": "workspace:*",
+    "@searsuite/sear-plugin-format-painter": "workspace:*",
+    "@searsuite/sear-plugin-history": "workspace:*",
+    "@searsuite/sear-plugin-selection": "workspace:*",
+    "@searsuite/sear-plugin-fixed-row": "workspace:*",
+    "@searsuite/sear-render-engine": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SearSuite/searsuite.git",
+    "directory": "packages/sear-assembly-workbook"
+  },
+  "bugs": {
+    "url": "https://github.com/SearSuite/searsuite/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

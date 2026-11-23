@@ -1,0 +1,12 @@
+node_modules/
+coverage/
+dist/
+packages/*/dist/
+packages/*/.generated/
+packages/*/public/api/
+packages/*/src/generated/
+packages/*/docs/ref/index.html
+packages/*/docs/guide/index.html
+examples/dist/
+packages/sear-integration-test/playwright-report/
+packages/sear-integration-test/test-results/

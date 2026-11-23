@@ -1,0 +1,42 @@
+{
+  "name": "@searsuite/sear-foundation-keymap",
+  "description": "Defines portable key values, chords, and keyboard binding contracts.",
+  "version": "0.0.1",
+  "license": "MIT",
+  "homepage": "https://searsuite.com/",
+  "keywords": [
+    "searsuite",
+    "editor",
+    "keyboard-shortcuts",
+    "keymap"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm run clean && pnpm run compile",
+    "clean": "rimraf ./dist",
+    "compile": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm run build"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SearSuite/searsuite.git",
+    "directory": "packages/sear-foundation-keymap"
+  },
+  "bugs": {
+    "url": "https://github.com/SearSuite/searsuite/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,23 @@
+export const informationBenchmarkNames: readonly string[] = [
+  "CELL",
+  "ERROR.TYPE",
+  "INFO",
+  "ISBLANK",
+  "ISERR",
+  "ISERROR",
+  "ISEVEN",
+  "ISFORMULA",
+  "ISLOGICAL",
+  "ISNA",
+  "ISNONTEXT",
+  "ISNUMBER",
+  "ISODD",
+  "ISREF",
+  "ISTEXT",
+  "N",
+  "NA",
+  "SHEET",
+  "SHEETS",
+  "STOCKHISTORY",
+  "TYPE"
+];

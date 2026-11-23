@@ -1,0 +1,45 @@
+{
+  "name": "@searsuite/sear-plugin-export",
+  "version": "0.0.1",
+  "license": "MIT",
+  "homepage": "https://searsuite.com/",
+  "keywords": [
+    "searsuite",
+    "editor",
+    "export",
+    "serialization"
+  ],
+  "description": "Versioned export envelopes, codec registries, and durable document-state boundaries.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm run clean && pnpm run compile",
+    "clean": "rimraf ./dist",
+    "compile": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "@searsuite/sear-foundation-error": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SearSuite/searsuite.git",
+    "directory": "packages/sear-plugin-export"
+  },
+  "bugs": {
+    "url": "https://github.com/SearSuite/searsuite/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

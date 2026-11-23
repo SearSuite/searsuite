@@ -1,0 +1,354 @@
+[
+  {
+    "formula": "=ACCRINT(A2,A3,A4,A5,A6,A7,A8)",
+    "expected": "\"16.666667\""
+  },
+  {
+    "formula": "=ACCRINT(DATE(2008,3,5),A3,A4,A5,A6,A7,A8,FALSE)",
+    "expected": "\"15.555556\""
+  },
+  {
+    "formula": "=ACCRINT(DATE(2008, 4, 5), A3, A4, A5, A6, A7, A8, TRUE)",
+    "expected": "\"7.2222222\""
+  },
+  {
+    "formula": "=ACCRINTM(A2,A3,A4,A5,A6)",
+    "expected": "\"20.54794521\""
+  },
+  {
+    "formula": "=AMORDEGRC(A2,A3,A4,A5,A6,A7,A8)",
+    "expected": "\"776\""
+  },
+  {
+    "formula": "=AMORLINC(A2,A3,A4,A5,A6,A7,A7)",
+    "expected": "\"360\""
+  },
+  {
+    "formula": "=COUPDAYBS(A2,A3,A4,A5)",
+    "expected": "\"71\""
+  },
+  {
+    "formula": "=COUPDAYS(A2,A3,A4,A5)",
+    "expected": "\"181\""
+  },
+  {
+    "formula": "=COUPDAYSNC(A2,A3,A4,A5)",
+    "expected": "\"110\""
+  },
+  {
+    "formula": "=COUPNCD(A2,A3,A4,A5)",
+    "expected": "\"2011-5-15\""
+  },
+  {
+    "formula": "=COUPNUM(A2,A3,A4,A5)",
+    "expected": "\"4\""
+  },
+  {
+    "formula": "=COUPPCD(A2,A3,A4,A5)",
+    "expected": "\"2010-11-15\""
+  },
+  {
+    "formula": "=CUMIPMT(A2/12,A3*12,A4,13,24,0)",
+    "expected": "\"-11135.23213\""
+  },
+  {
+    "formula": "=CUMIPMT(A2/12,A3*12,A4,1,1,0)",
+    "expected": "\"-937.5\""
+  },
+  {
+    "formula": "=CUMPRINC(A2/12,A3*12,A4,13,24,0)",
+    "expected": "\"-934.1071234\""
+  },
+  {
+    "formula": "=CUMPRINC(A2/12,A3*12,A4,1,1,0)",
+    "expected": "\"-68.27827118\""
+  },
+  {
+    "formula": "=DB(A2,A3,A4,1,7)",
+    "expected": "\"￥1,860,833.30\""
+  },
+  {
+    "formula": "=DB(A2,A3,A4,2,7)",
+    "expected": "\"￥2,596,394.20\""
+  },
+  {
+    "formula": "=DB(A2,A3,A4,3,7)",
+    "expected": "\"￥1,768,144.40\""
+  },
+  {
+    "formula": "=DB(A2,A3,A4,4,7)",
+    "expected": "\"￥1,204,106.40\""
+  },
+  {
+    "formula": "=DB(A2,A3,A4,5,7)",
+    "expected": "\"￥819,996.40\""
+  },
+  {
+    "formula": "=DB(A2,A3,A4,6,7)",
+    "expected": "\"￥558,417.60\""
+  },
+  {
+    "formula": "=DB(A2,A3,A4,7,7)",
+    "expected": "\"￥158,451.00\""
+  },
+  {
+    "formula": "=DDB(A2,A3,A4*365,1)",
+    "expected": "\"￥13.2\""
+  },
+  {
+    "formula": "=DDB(A2,A3,A4*12,1,2)",
+    "expected": "\"￥400.00\""
+  },
+  {
+    "formula": "=DDB(A2,A3,A4,1,2)",
+    "expected": "\"￥4,800.00\""
+  },
+  {
+    "formula": "=DDB(A2,A3,A4,2,1.5)",
+    "expected": "\"￥3,060.00\""
+  },
+  {
+    "formula": "=DDB(A2,A3,A4,10)",
+    "expected": "\"￥221.20\""
+  },
+  {
+    "formula": "=DISC(A2,A3,A4,A5,A6)",
+    "expected": "\"0.001038\""
+  },
+  {
+    "formula": "=DOLLARDE(1.02,16)",
+    "expected": "\"1.125\""
+  },
+  {
+    "formula": "=DOLLARDE(1.1,32)",
+    "expected": "\"1.3125\""
+  },
+  {
+    "formula": "=DOLLARFR(1.125,16)",
+    "expected": "\"1.02\""
+  },
+  {
+    "formula": "=DOLLARFR(1.125,32)",
+    "expected": "\"1.04\""
+  },
+  {
+    "formula": "=DURATION(A2,A3,A4,A5,A6,A7)",
+    "expected": "\"10.9191453\""
+  },
+  {
+    "formula": "=EFFECT(A2,A3)",
+    "expected": "\"0.0535427\""
+  },
+  {
+    "formula": "=FV(A2/12, A3, A4, A5, A6)",
+    "expected": "\"￥25,814.00\""
+  },
+  {
+    "formula": "=FVSCHEDULE(1,{0.09,0.11,0.1})",
+    "expected": "\"1.3309\""
+  },
+  {
+    "formula": "=INTRATE(A2,A3,A4,A5,A6)",
+    "expected": "\"5.77%\""
+  },
+  {
+    "formula": "=IPMT(A2/12, A3, A4*12, A5)",
+    "expected": "\"(￥666.70)\""
+  },
+  {
+    "formula": "=IPMT(A2, 3, A4, A5)",
+    "expected": "\"(￥2924.50)\""
+  },
+  {
+    "formula": "=IRR(A2:A6)",
+    "expected": "\"-2.1%\""
+  },
+  {
+    "formula": "=IRR(A2:A7)",
+    "expected": "\"8.7%\""
+  },
+  {
+    "formula": "=IRR(A2:A4,-10%)",
+    "expected": "\"-44.4%\""
+  },
+  {
+    "formula": "=ISPMT(0.1,1,4,1000)",
+    "expected": "返回 -75。"
+  },
+  {
+    "formula": "=MDURATION(A2,A3,A4,A5,A6,A7)",
+    "expected": "\"5.736\""
+  },
+  {
+    "formula": "=MIRR(A2:A7, A8, A9)",
+    "expected": "\"13%\""
+  },
+  {
+    "formula": "=MIRR(A2:A5, A8, A9)",
+    "expected": "\"-5%\""
+  },
+  {
+    "formula": "=MIRR(A2:A7, A8, 14%)",
+    "expected": "\"13%\""
+  },
+  {
+    "formula": "=NOMINAL(A2,A3)",
+    "expected": "\"0.05250032\""
+  },
+  {
+    "formula": "=NPER(A2/12, A3, A4, A5, 1)",
+    "expected": "\"59.6738657\""
+  },
+  {
+    "formula": "=NPER(A2/12, A3, A4, A5)",
+    "expected": "\"60.0821229\""
+  },
+  {
+    "formula": "=NPER(A2/12, A3, A4)",
+    "expected": "\"-9.57859404\""
+  },
+  {
+    "formula": "=NPV(A2, A3, A4, A5, A6)",
+    "expected": "\"￥11,884.40\""
+  },
+  {
+    "formula": "=ODDFPRICE(A2, A3, A4, A5, A6, A7, A8, A9, A10)",
+    "expected": "\"$ 113.60\""
+  },
+  {
+    "formula": "=ODDFYIELD(A2, A3, A4, A5, A6, A7, A8, A9, A10)",
+    "expected": "\"7.72%\""
+  },
+  {
+    "formula": "=ODDLPRICE(A2, A3, A4, A5, A6, A7, A8, A9)",
+    "expected": "\"￥998.80\""
+  },
+  {
+    "formula": "=ODDLYIELD(A2, A3, A4, A5, A6, A7, A8, A9)",
+    "expected": "\"4.52%\""
+  },
+  {
+    "formula": "=PDURATION(2.5%,2000,2200)",
+    "expected": "\"3.86\""
+  },
+  {
+    "formula": "=PDURATION(0.025/12,1000,1200)",
+    "expected": "\"87.6\""
+  },
+  {
+    "formula": "=PMT(A2/12,A3,A4)",
+    "expected": "\"(￥10,370.30)\""
+  },
+  {
+    "formula": "=PMT (A2/12，A3，A4，，1)",
+    "expected": "\"(￥10,301.60)\""
+  },
+  {
+    "formula": "=PPMT(A2/12, 1, A3*12, A4)",
+    "expected": "\"(￥756.20)\""
+  },
+  {
+    "formula": "=PPMT (A8、A9、10、A10)",
+    "expected": "\"(￥275,980.50)\""
+  },
+  {
+    "formula": "=PRICE(A2,A3,A4,A5,A6,A7,A8)",
+    "expected": "\"￥946.30\""
+  },
+  {
+    "formula": "=PRICEDISC(A2,A3,A4,A5,A6)",
+    "expected": "\"￥998.00\""
+  },
+  {
+    "formula": "=PRICEMAT(A2,A3,A4,A5,A6,A7)",
+    "expected": "\"￥999.80\""
+  },
+  {
+    "formula": "=PV(A3/12, 12*A4, A2, , 0)",
+    "expected": "\"(￥597,771.50)\""
+  },
+  {
+    "formula": "=RATE(A2*12, A3, A4)",
+    "expected": "\"1%\""
+  },
+  {
+    "formula": "=RATE(A2*12, A3, A4)*12",
+    "expected": "\"9.24%\""
+  },
+  {
+    "formula": "=RECEIVED(A2,A3,A4,A5,A6)",
+    "expected": "\"￥ 10,145,846.50\""
+  },
+  {
+    "formula": "=RRI(96,10000,11000)",
+    "expected": "\"0.0009933\""
+  },
+  {
+    "formula": "=SLN(A2, A3, A4)",
+    "expected": "\"￥22,500\""
+  },
+  {
+    "formula": "=SYD(A2,A3,A4,1)",
+    "expected": "\"￥40,909.10\""
+  },
+  {
+    "formula": "=SYD(A2,A3,A4,10)",
+    "expected": "\"￥4,090.90\""
+  },
+  {
+    "formula": "=TBILLEQ(A2,A3,A4)",
+    "expected": "\"9.42%\""
+  },
+  {
+    "formula": "=TBILLPRICE(A2,A3,A4)",
+    "expected": "\"$ 98.45\""
+  },
+  {
+    "formula": "=TBILLYIELD(A2,A3,A4)",
+    "expected": "\"9.14%\""
+  },
+  {
+    "formula": "=VDB(A2, A3, A4*365, 0, 1)",
+    "expected": "\"￥1.32\""
+  },
+  {
+    "formula": "=VDB(A2, A3, A4*12, 0, 1)",
+    "expected": "\"￥40.00\""
+  },
+  {
+    "formula": "=VDB(A2, A3, A4, 0, 1)",
+    "expected": "\"￥480.00\""
+  },
+  {
+    "formula": "=VDB(A2, A3, A4*12, 6, 18)",
+    "expected": "\"￥396.31\""
+  },
+  {
+    "formula": "=VDB(A2, A3, A4*12, 6, 18, 1.5)",
+    "expected": "\"￥311.81\""
+  },
+  {
+    "formula": "=VDB(A2, A3, A4, 0, 0.875, 1.5)",
+    "expected": "\"￥315.00\""
+  },
+  {
+    "formula": "=XIRR(A3:A7, B3:B7, 0.1)",
+    "expected": "\"37.34%\""
+  },
+  {
+    "formula": "=XNPV(.09, A2:A6, B2:B6)",
+    "expected": "\"￥20,866.50\""
+  },
+  {
+    "formula": "=YIELD(A2,A3,A4,A5,A6,A7,A8)",
+    "expected": "\"6.5%\""
+  },
+  {
+    "formula": "=YIELDDISC(A2,A3,A4,A5,A6)",
+    "expected": "\"0.052823\""
+  },
+  {
+    "formula": "=YIELDMAT(A2,A3,A4,A5,A6,A7)",
+    "expected": "\"6.10%\""
+  }
+]

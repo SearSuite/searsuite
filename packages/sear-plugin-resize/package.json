@@ -1,0 +1,69 @@
+{
+  "name": "@searsuite/sear-plugin-resize",
+  "description": "Adds Sheet row and column sizing, resize interaction, rendering, and persistence.",
+  "version": "0.0.1",
+  "license": "MIT",
+  "homepage": "https://searsuite.com/",
+  "keywords": [
+    "searsuite",
+    "spreadsheet",
+    "row-column-resize",
+    "plugin"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm run clean && pnpm run compile",
+    "clean": "rimraf ./dist",
+    "compile": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "@searsuite/sear-assembly-commands": "workspace:*",
+    "@searsuite/sear-assembly-config": "workspace:*",
+    "@searsuite/sear-assembly-core": "workspace:*",
+    "@searsuite/sear-assembly-plugin": "workspace:*",
+    "@searsuite/sear-domain-cell-types": "workspace:*",
+    "@searsuite/sear-domain-matrix": "workspace:*",
+    "@searsuite/sear-domain-ot": "workspace:*",
+    "@searsuite/sear-domain-transaction": "workspace:*",
+    "@searsuite/sear-foundation-di": "workspace:*",
+    "@searsuite/sear-foundation-error": "workspace:*",
+    "@searsuite/sear-foundation-platform": "workspace:*",
+    "@searsuite/sear-foundation-rect": "workspace:*",
+    "@searsuite/sear-plugin-alignment": "workspace:*",
+    "@searsuite/sear-plugin-cell-format": "workspace:*",
+    "@searsuite/sear-plugin-selection": "workspace:*",
+    "@searsuite/sear-render-context": "workspace:*",
+    "@searsuite/sear-render-coord": "workspace:*",
+    "@searsuite/sear-render-cursor": "workspace:*",
+    "@searsuite/sear-render-engine": "workspace:*",
+    "@searsuite/sear-render-event-engine": "workspace:*",
+    "@searsuite/sear-render-input": "workspace:*",
+    "@searsuite/sear-render-metrics": "workspace:*",
+    "@searsuite/sear-render-node": "workspace:*",
+    "@searsuite/sear-render-registry": "workspace:*",
+    "@searsuite/sear-sheet-editor-contract": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SearSuite/searsuite.git",
+    "directory": "packages/sear-plugin-resize"
+  },
+  "bugs": {
+    "url": "https://github.com/SearSuite/searsuite/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

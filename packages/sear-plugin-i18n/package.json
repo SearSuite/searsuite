@@ -1,0 +1,56 @@
+{
+  "name": "@searsuite/sear-plugin-i18n",
+  "description": "Registers editor-local locales and built-in English and Chinese formula translations.",
+  "version": "0.0.1",
+  "license": "MIT",
+  "homepage": "https://searsuite.com/",
+  "keywords": [
+    "searsuite",
+    "editor",
+    "localization",
+    "internationalization"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm run clean && pnpm run compile",
+    "clean": "rimraf ./dist",
+    "compile": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@searsuite/sear-assembly-commands": "workspace:*",
+    "@searsuite/sear-assembly-core": "workspace:*",
+    "@searsuite/sear-assembly-plugin": "workspace:*",
+    "@searsuite/sear-domain-cell-types": "workspace:*",
+    "@searsuite/sear-domain-formula-engine": "workspace:*",
+    "@searsuite/sear-domain-formula-engine-ts": "workspace:*",
+    "@searsuite/sear-domain-transaction": "workspace:*",
+    "@searsuite/sear-foundation-di": "workspace:*",
+    "@searsuite/sear-foundation-error": "workspace:*",
+    "@searsuite/sear-foundation-subscription": "workspace:*",
+    "@searsuite/sear-plugin-formula": "workspace:*",
+    "@searsuite/sear-render-node": "workspace:*",
+    "@searsuite/sear-render-registry": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SearSuite/searsuite.git",
+    "directory": "packages/sear-plugin-i18n"
+  },
+  "bugs": {
+    "url": "https://github.com/SearSuite/searsuite/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

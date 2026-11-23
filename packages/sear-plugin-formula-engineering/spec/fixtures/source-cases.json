@@ -1,0 +1,362 @@
+[
+  {
+    "formula": "=BESSELI(1.5, 1)",
+    "expected": "0.981666428"
+  },
+  {
+    "formula": "=BESSELJ(1.9, 2)",
+    "expected": "0.329925829"
+  },
+  {
+    "formula": "=BESSELK(1.5, 1)",
+    "expected": "0.277387804"
+  },
+  {
+    "formula": "=BESSELY(2.5, 1)",
+    "expected": "0.145918138"
+  },
+  {
+    "formula": "=BIN2DEC(1100100)",
+    "expected": "100"
+  },
+  {
+    "formula": "=BIN2DEC(1111111111)",
+    "expected": "-1"
+  },
+  {
+    "formula": "=BIN2HEX(11111011, 4)",
+    "expected": "00FB"
+  },
+  {
+    "formula": "=BIN2HEX(1110)",
+    "expected": "E"
+  },
+  {
+    "formula": "=BIN2HEX(1111111111)",
+    "expected": "FFFFFFFFFF"
+  },
+  {
+    "formula": "=BIN2OCT(1001, 3)",
+    "expected": "011"
+  },
+  {
+    "formula": "=BIN2OCT(1100100)",
+    "expected": "144"
+  },
+  {
+    "formula": "=BIN2OCT(1111111111)",
+    "expected": "7777777777"
+  },
+  {
+    "formula": "=BITAND(1,5)",
+    "expected": "1"
+  },
+  {
+    "formula": "=BITAND(13,25)",
+    "expected": "9"
+  },
+  {
+    "formula": "=BITLSHIFT(4,2)",
+    "expected": "16"
+  },
+  {
+    "formula": "=BITOR(23,10)",
+    "expected": "31"
+  },
+  {
+    "formula": "=BITRSHIFT(13,2)",
+    "expected": "3"
+  },
+  {
+    "formula": "=BITXOR(5,3)",
+    "expected": "6"
+  },
+  {
+    "formula": "=COMPLEX(3,4)",
+    "expected": "3+4i"
+  },
+  {
+    "formula": "=COMPLEX(3,4,\"j\")",
+    "expected": "3+4j"
+  },
+  {
+    "formula": "=COMPLEX(0,1)",
+    "expected": "i"
+  },
+  {
+    "formula": "=COMPLEX(1,0)",
+    "expected": "1"
+  },
+  {
+    "formula": "=CONVERT(1, \"lbm\", \"kg\")",
+    "expected": "0.4535924"
+  },
+  {
+    "formula": "=CONVERT(68, \"F\", \"C\")",
+    "expected": "20"
+  },
+  {
+    "formula": "=CONVERT(2.5, \"ft\", \"sec\")",
+    "expected": "#N/A"
+  },
+  {
+    "formula": "=CONVERT(CONVERT(100,\"ft\",\"m\"),\"ft\",\"m\")",
+    "expected": "9.290304"
+  },
+  {
+    "formula": "=DEC2BIN(9, 4)",
+    "expected": "1001"
+  },
+  {
+    "formula": "=DEC2BIN(-100)",
+    "expected": "1110011100"
+  },
+  {
+    "formula": "=DEC2HEX(100, 4)",
+    "expected": "0064"
+  },
+  {
+    "formula": "=DEC2HEX(-54)",
+    "expected": "FFFFFFFFCA"
+  },
+  {
+    "formula": "=DEC2HEX(28)",
+    "expected": "1C"
+  },
+  {
+    "formula": "=DEC2HEX(64,1)",
+    "expected": "#NUM!"
+  },
+  {
+    "formula": "=DEC2OCT(58, 3)",
+    "expected": "072"
+  },
+  {
+    "formula": "=DEC2OCT(-100)",
+    "expected": "7777777634"
+  },
+  {
+    "formula": "=DELTA(5, 4)",
+    "expected": "0"
+  },
+  {
+    "formula": "=DELTA(5, 5)",
+    "expected": "1"
+  },
+  {
+    "formula": "=DELTA(0.5, 0)",
+    "expected": "0"
+  },
+  {
+    "formula": "=ERF(0.745)",
+    "expected": "0.70792892"
+  },
+  {
+    "formula": "=ERF(1)",
+    "expected": "0.84270079"
+  },
+  {
+    "formula": "=ERF.PRECISE(0.745)",
+    "expected": "0.70792892"
+  },
+  {
+    "formula": "=ERF.PRECISE(1)",
+    "expected": "0.84270079"
+  },
+  {
+    "formula": "=ERFC(1)",
+    "expected": "0.15729921"
+  },
+  {
+    "formula": "=ERFC.PRECISE(1)",
+    "expected": "0.15729921"
+  },
+  {
+    "formula": "=GESTEP(5, 4)",
+    "expected": "1"
+  },
+  {
+    "formula": "=GESTEP(5, 5)",
+    "expected": "1"
+  },
+  {
+    "formula": "=GESTEP(-4, -5)",
+    "expected": "1"
+  },
+  {
+    "formula": "=GESTEP(-1)",
+    "expected": "0"
+  },
+  {
+    "formula": "=HEX2BIN(\"F\", 8)",
+    "expected": "00001111"
+  },
+  {
+    "formula": "=HEX2BIN(\"B7\")",
+    "expected": "10110111"
+  },
+  {
+    "formula": "=HEX2BIN(\"FFFFFFFFFF\")",
+    "expected": "1111111111"
+  },
+  {
+    "formula": "=HEX2DEC(\"A5\")",
+    "expected": "165"
+  },
+  {
+    "formula": "=HEX2DEC(\"FFFFFFFF5B\")",
+    "expected": "-165"
+  },
+  {
+    "formula": "=HEX2DEC(\"3DA408B9\")",
+    "expected": "1.034E+09"
+  },
+  {
+    "formula": "=HEX2OCT(\"F\", 3)",
+    "expected": "017"
+  },
+  {
+    "formula": "=HEX2OCT(\"3B4E\")",
+    "expected": "35516"
+  },
+  {
+    "formula": "=HEX2OCT(\"FFFFFFFF00\")",
+    "expected": "7777777400"
+  },
+  {
+    "formula": "=IMABS(\"5+12i\")",
+    "expected": "13"
+  },
+  {
+    "formula": "=IMAGINARY(\"3+4i\")",
+    "expected": "4"
+  },
+  {
+    "formula": "=IMAGINARY(\"0-j\")",
+    "expected": "-1"
+  },
+  {
+    "formula": "=IMAGINARY(4)",
+    "expected": "0"
+  },
+  {
+    "formula": "=IMARGUMENT(\"3+4i\")",
+    "expected": "0.92729522"
+  },
+  {
+    "formula": "=IMCONJUGATE(\"3+4i\")",
+    "expected": "3-4i"
+  },
+  {
+    "formula": "=IMCOS(\"1+i\")",
+    "expected": "0.833730025131149-0.988897705762865i"
+  },
+  {
+    "formula": "=IMCOSH(\"4+3i\")",
+    "expected": "-27.0349456030742+3.85115333481178i"
+  },
+  {
+    "formula": "=IMCOT(\"4+3i\")",
+    "expected": "0.00490118239430447-0.999266927805902i"
+  },
+  {
+    "formula": "=IMCSC(\"4+3i\")",
+    "expected": "-0.0754898329158637+0.0648774713706355i"
+  },
+  {
+    "formula": "=IMCSCH(\"4+3i\")",
+    "expected": "-0.036275889628626-0.0051744731840194i"
+  },
+  {
+    "formula": "=IMDIV(\"-238+240i\",\"10+24i\")",
+    "expected": "5+12i"
+  },
+  {
+    "formula": "=IMEXP(\"1+i\")",
+    "expected": "1.46869393991589+2.28735528717884i"
+  },
+  {
+    "formula": "=IMLN(\"3+4i\")",
+    "expected": "1.6094379124341+0.927295218001612i"
+  },
+  {
+    "formula": "=IMLOG10(\"3+4i\")",
+    "expected": "0.698970004336019+0.402719196273373i"
+  },
+  {
+    "formula": "=IMLOG2(\"3+4i\")",
+    "expected": "2.32192809488736+1.33780421245098i"
+  },
+  {
+    "formula": "=IMPOWER(\"2+3i\", 3)",
+    "expected": "-46+9.00000000000001i"
+  },
+  {
+    "formula": "=IMPRODUCT(\"3+4i\",\"5-3i\")",
+    "expected": "27+11i"
+  },
+  {
+    "formula": "=IMPRODUCT(\"1+2i\",30)",
+    "expected": "30+60i"
+  },
+  {
+    "formula": "=IMREAL(\"6-9i\")",
+    "expected": "6"
+  },
+  {
+    "formula": "=IMSEC(\"4+3i\")",
+    "expected": "-0.0652940278579471-0.0752249603027732i"
+  },
+  {
+    "formula": "=IMSECH(\"4+3i\")",
+    "expected": "-0.0362534969158689-0.00516434460775318i"
+  },
+  {
+    "formula": "=IMSIN(\"4+3i\")",
+    "expected": "-7.61923172032141-6.548120040911i"
+  },
+  {
+    "formula": "=IMSINH(\"4+3i\")",
+    "expected": "-27.0168132580039+3.85373803791938i"
+  },
+  {
+    "formula": "=IMSQRT(\"1+i\")",
+    "expected": "1.09868411346781+0.455089860562227i"
+  },
+  {
+    "formula": "=IMSUB(\"13+4i\",\"5+3i\")",
+    "expected": "8+i"
+  },
+  {
+    "formula": "=IMSUM (\"3+6i\",\"5-2i\")",
+    "expected": "8+4i"
+  },
+  {
+    "formula": "=IMTAN(\"4+3i\")",
+    "expected": "0.00490825806749606+1.00070953606723i"
+  },
+  {
+    "formula": "=OCT2BIN(3, 3)",
+    "expected": "011"
+  },
+  {
+    "formula": "=OCT2BIN(7777777000)",
+    "expected": "1000000000"
+  },
+  {
+    "formula": "=OCT2DEC(54)",
+    "expected": "44"
+  },
+  {
+    "formula": "=OCT2DEC(7777777533)",
+    "expected": "-165"
+  },
+  {
+    "formula": "=OCT2HEX(100, 4)",
+    "expected": "0040"
+  },
+  {
+    "formula": "=OCT2HEX(7777777533)",
+    "expected": "FFFFFFFF5B"
+  }
+]

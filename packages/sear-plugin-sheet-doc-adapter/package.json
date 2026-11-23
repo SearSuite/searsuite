@@ -1,0 +1,60 @@
+{
+  "name": "@searsuite/sear-plugin-sheet-doc-adapter",
+  "description": "Adapts the Doc runtime for rich-text editing inside Sheet cells.",
+  "version": "0.0.1",
+  "license": "MIT",
+  "homepage": "https://searsuite.com/",
+  "keywords": [
+    "searsuite",
+    "spreadsheet",
+    "rich-text",
+    "cell-editing"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm run clean && pnpm run compile",
+    "clean": "rimraf ./dist",
+    "compile": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "@searsuite/sear-assembly-core": "workspace:*",
+    "@searsuite/sear-assembly-doc": "workspace:*",
+    "@searsuite/sear-assembly-plugin": "workspace:*",
+    "@searsuite/sear-domain-doc": "workspace:*",
+    "@searsuite/sear-domain-doc-schema": "workspace:*",
+    "@searsuite/sear-domain-commands": "workspace:*",
+    "@searsuite/sear-domain-ot": "workspace:*",
+    "@searsuite/sear-domain-transaction": "workspace:*",
+    "@searsuite/sear-domain-editor": "workspace:*",
+    "@searsuite/sear-foundation-subscription": "workspace:*",
+    "@searsuite/sear-foundation-rect": "workspace:*",
+    "@searsuite/sear-render-context": "workspace:*",
+    "@searsuite/sear-render-metrics": "workspace:*",
+    "@searsuite/sear-render-node": "workspace:*",
+    "@searsuite/sear-sheet-editor-contract": "workspace:*",
+    "@searsuite/sear-foundation-error": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SearSuite/searsuite.git",
+    "directory": "packages/sear-plugin-sheet-doc-adapter"
+  },
+  "bugs": {
+    "url": "https://github.com/SearSuite/searsuite/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
