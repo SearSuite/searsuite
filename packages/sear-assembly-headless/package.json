@@ -1,0 +1,59 @@
+{
+  "name": "@searsuite/sear-assembly-headless",
+  "version": "0.0.1",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SearSuite/searsuite.git",
+    "directory": "packages/sear-assembly-headless"
+  },
+  "homepage": "https://searsuite.com/",
+  "keywords": [
+    "searsuite",
+    "spreadsheet",
+    "headless-editor",
+    "server"
+  ],
+  "description": "Headless SearSuite composition for tests, servers, and runtimes without a visual host.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm run clean && pnpm run compile",
+    "clean": "rimraf ./dist",
+    "compile": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@searsuite/sear-assembly-plugin": "workspace:*",
+    "@searsuite/sear-assembly-setup": "workspace:*",
+    "@searsuite/sear-assembly-workbook": "workspace:*",
+    "@searsuite/sear-foundation-platform": "workspace:*",
+    "@searsuite/sear-node-adapters": "workspace:*",
+    "@searsuite/sear-foundation-di": "workspace:*",
+    "@searsuite/sear-domain-formula-engine-ts": "workspace:*",
+    "@searsuite/sear-domain-formula-engine": "workspace:*",
+    "@searsuite/sear-plugin-cell-fill": "workspace:*",
+    "@searsuite/sear-plugin-cell-highlight": "workspace:*",
+    "@searsuite/sear-plugin-duplicate": "workspace:*",
+    "@searsuite/sear-plugin-formula-engineering": "workspace:*",
+    "@searsuite/sear-plugin-cell-format": "workspace:*",
+    "@searsuite/sear-plugin-collab": "workspace:*",
+    "@searsuite/sear-render-context": "workspace:*",
+    "@searsuite/sear-render-cursor": "workspace:*",
+    "@searsuite/sear-render-event-engine": "workspace:*",
+    "@searsuite/sear-render-input": "workspace:*",
+    "@searsuite/sear-render-metrics": "workspace:*",
+    "@searsuite/sear-render-scroll": "workspace:*",
+    "@xmldom/xmldom": "^0.8.10",
+    "xpath": "^0.0.34"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  }
+}

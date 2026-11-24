@@ -1,3 +1,5 @@
+import { createHeadlessEditor } from '@searsuite/sear-assembly-headless';
+import { NodePlatform } from '@searsuite/sear-node-adapters';
 import { ReadDropdownCellQuery, PickDropdownOptionCommand, DropdownMode } from '@searsuite/sear-plugin-dropdown';
 import {
   InsertCheckboxesCommand,
@@ -224,6 +226,13 @@ const ExternalWorkbookPluginImplementation =
 declare const sheetConfiguration: SheetEditorConfiguration;
 declare const docConfiguration: DocEditorConfiguration;
 declare const workbookConfiguration: WorkbookEditorConfiguration;
+
+const platform = new NodePlatform();
+const headless = createHeadlessEditor({
+  sheetState: sheetConfiguration.sheetState,
+  currentDateTime: () => platform.currentDateTime(),
+});
+headless.destroy();
 
 const sheet = createSheetEditor({
   ...sheetConfiguration,

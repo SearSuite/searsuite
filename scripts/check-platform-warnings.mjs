@@ -21,7 +21,8 @@ async function visit(directory) {
     const source = await readFile(path, 'utf8');
     if (
       /\bconsole\.warn\s*\(/.test(source) &&
-      relativePath.startsWith('packages/')
+      // NodePlatform implements the host warning sink for headless editors.
+      relativePath !== join('packages', 'sear-node-adapters', 'src', 'NodePlatform.ts')
     ) {
       violations.push(`${relativePath}: reusable packages must report diagnostics through Platform.warn`);
     }

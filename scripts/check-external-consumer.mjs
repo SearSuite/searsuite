@@ -40,6 +40,7 @@ try {
   }
 
   const directDependencies = [
+    '@searsuite/sear-assembly-headless',
     '@searsuite/sear-assembly-plugin',
     '@searsuite/sear-assembly-setup',
     '@searsuite/sear-assembly-workbook',
@@ -50,6 +51,7 @@ try {
     '@searsuite/sear-domain-transaction',
     '@searsuite/sear-foundation-di',
     '@searsuite/sear-foundation-subscription',
+    '@searsuite/sear-node-adapters',
     '@searsuite/sear-plugin-checkbox',
     '@searsuite/sear-plugin-dropdown',
     '@searsuite/sear-plugin-collab',

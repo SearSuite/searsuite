@@ -27,6 +27,8 @@ sheet.sheetData.addItem(0, 0, { type: 'string', value: 'Hello' });
 
 `createEmptySheetDocumentState(4, 4)` supplies the initial document. To create an editor, provide host rendering and input adapters to `createSheetEditor()`; see the package's public API for the adapter contracts.
 
+The core workspace also provides `@searsuite/sear-assembly-headless` for Sheet and Workbook editors on Node.js and `@searsuite/sear-node-adapters` for platform timing and HTTP services.
+
 ## Run tests
 
 For contributors working in this repository, run `pnpm install` and `pnpm run test:unit`.
