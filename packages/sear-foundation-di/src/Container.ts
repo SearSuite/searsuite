@@ -24,18 +24,18 @@ type FactoryFunction<T> = () => T;
 export class Container {
   /** Registered dependency tokens owned by this container. */
   public readonly types = new Map();
-  private singletons = new Map();
-  private bindings = new Map();
-  private resolvingStack: (string | symbol)[] = [];
+  #singletons = new Map();
+  #bindings = new Map();
+  #resolvingStack: (string | symbol)[] = [];
 
   // store factory dependencies
-  private dependencies = new Map<symbol | string, (symbol | string)[]>();
+  #dependencies = new Map<symbol | string, (symbol | string)[]>();
   /** Adds the dependency. */
   addDependency(parent: symbol, dependency: symbol | string): void {
-    if (!this.dependencies.has(parent)) {
-      this.dependencies.set(parent, []);
+    if (!this.#dependencies.has(parent)) {
+      this.#dependencies.set(parent, []);
     }
-    this.dependencies.get(parent)!.push(dependency);
+    this.#dependencies.get(parent)!.push(dependency);
   }
 
   /** Registers the types. */
@@ -48,48 +48,48 @@ export class Container {
     if (!Reflect.getMetadata(INJECTABLE_METADATA_KEY, clazz)) {
       throw new SearError(`Class ${clazz.name} is not injectable`);
     }
-    this.bindings.set(identifier, { clazz, scope });
+    this.#bindings.set(identifier, { clazz, scope });
   }
 
   /** Registers the factory. */
   registerFactory<T>(identifier: Identifier<T>, factory: FactoryFunction<T>, scope: Scope = Scope.Singleton): void {
-    this.bindings.set(identifier, { factory, scope });
+    this.#bindings.set(identifier, { factory, scope });
   }
 
   /** Registers the instance. */
   registerInstance<T>(identifier: Identifier<T>, instance: T): void {
-    this.bindings.set(identifier, { instance, scope: Scope.Singleton });
+    this.#bindings.set(identifier, { instance, scope: Scope.Singleton });
   }
 
   /** Binds a parent-owned instance without acquiring its teardown responsibility. */
   registerBorrowedInstance<T>(identifier: Identifier<T>, instance: T): void {
-    this.bindings.set(identifier, { instance, scope: Scope.Singleton, owned: false });
+    this.#bindings.set(identifier, { instance, scope: Scope.Singleton, owned: false });
   }
 
   /** Returns whether a singleton has already been materialized for an identifier. */
   public hasSingleton(identifier: string | symbol): boolean {
-    return this.singletons.has(identifier);
+    return this.#singletons.has(identifier);
   }
 
   /** Returns whether this container has an explicit local binding for an identifier. */
   public hasBinding(identifier: string | symbol): boolean {
-    return this.bindings.has(identifier);
+    return this.#bindings.has(identifier);
   }
 
   /** Resolves a dependency from this container and its parent scope. */
   resolve<T>(identifier: string | symbol): T {
-    if (this.resolvingStack.includes(identifier)) {
+    if (this.#resolvingStack.includes(identifier)) {
       throw new SearError(
-        `Circular dependency detected: ${this.resolvingStack
+        `Circular dependency detected: ${this.#resolvingStack
           .map((item) => item.toString())
           .join(' -> ')} -> ${identifier.toString()}`,
       );
     }
 
-    this.resolvingStack.push(identifier);
+    this.#resolvingStack.push(identifier);
 
     try {
-      const binding = this.bindings.get(identifier);
+      const binding = this.#bindings.get(identifier);
       if (!binding) {
         throw new SearError(`No binding found for identifier ${identifier.toString()}`);
       }
@@ -97,29 +97,29 @@ export class Container {
       let instance: T;
 
       if (binding.scope === Scope.Singleton) {
-        if (!this.singletons.has(identifier)) {
+        if (!this.#singletons.has(identifier)) {
           if ('factory' in binding) {
             instance = binding.factory();
           } else if ('instance' in binding) {
             return binding.instance;
           } else {
-            instance = this.createInstance(binding.clazz);
+            instance = this.#createInstance(binding.clazz);
           }
-          this.singletons.set(identifier, instance);
+          this.#singletons.set(identifier, instance);
         } else {
-          instance = this.singletons.get(identifier);
+          instance = this.#singletons.get(identifier);
         }
       } else {
         if ('factory' in binding) {
           instance = binding.factory();
         } else {
-          instance = this.createInstance(binding.clazz);
+          instance = this.#createInstance(binding.clazz);
         }
       }
 
       return instance;
     } finally {
-      this.resolvingStack.pop();
+      this.#resolvingStack.pop();
     }
   }
 
@@ -131,7 +131,7 @@ export class Container {
     };
   }
 
-  private createInstance<T>(clazz: Constructor<T>): T {
+  #createInstance<T>(clazz: Constructor<T>): T {
     const metadata = Reflect.getMetadata(INJECT_METADATA_KEY, clazz);
     const injectedParams: unknown[] = Array.isArray(metadata) ? metadata : [];
     const dependencies = injectedParams.map((dep) => this.resolve(dep as string | symbol));
@@ -142,8 +142,8 @@ export class Container {
   public reset(): void {
     const disposed = new Set<unknown>();
     const candidates = [
-      ...this.singletons.values(),
-      ...[...this.bindings.values()].flatMap((binding) =>
+      ...this.#singletons.values(),
+      ...[...this.#bindings.values()].flatMap((binding) =>
         'instance' in binding && binding.owned !== false ? [binding.instance] : [],
       ),
     ];
@@ -160,10 +160,10 @@ export class Container {
       }
     }
     this.types.clear();
-    this.singletons.clear();
-    this.bindings.clear();
-    this.resolvingStack = [];
-    this.dependencies.clear();
+    this.#singletons.clear();
+    this.#bindings.clear();
+    this.#resolvingStack = [];
+    this.#dependencies.clear();
   }
 
   /** @deprecated Use reset() when rebuilding an application or test harness. */
@@ -195,7 +195,7 @@ export class Container {
 
       console.log(`${'    '.repeat(level)}${level ? '├──' : ''}%c ${String(identifier)}`, `color: ${color};`);
 
-      const deps = registry.dependencies.get(identifier) || [];
+      const deps = registry.#dependencies.get(identifier) || [];
 
       if (deps.length > 0) {
         deps.forEach((dep) => {
@@ -204,7 +204,7 @@ export class Container {
       }
       visited.delete(identifier);
     }
-    for (const [identifier] of this.dependencies.entries()) {
+    for (const [identifier] of this.#dependencies.entries()) {
       printDependencyNode(identifier, 0);
     }
     console.groupEnd();
@@ -225,7 +225,7 @@ export class Container {
       }
       visited.add(identifier);
 
-      const binding = this.bindings.get(identifier);
+      const binding = this.#bindings.get(identifier);
 
       if (!binding) {
         output += `${'  '.repeat(indentLevel)}- ${identifier.toString()} (No binding found)\n`;
@@ -248,7 +248,7 @@ export class Container {
       visited.delete(identifier);
     };
 
-    for (const [identifier] of this.bindings.entries()) {
+    for (const [identifier] of this.#bindings.entries()) {
       resolveDependencies(identifier);
     }
 

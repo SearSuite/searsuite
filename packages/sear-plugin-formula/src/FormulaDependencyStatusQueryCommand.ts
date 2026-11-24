@@ -9,18 +9,24 @@ import {
 import { createFormulaDependencyStatus } from './FormulaDependencyStatus';
 
 export class FormulaDependencyStatusQueryCommand implements SheetCommand<FormulaDependencyStatusCommandResult> {
+  readonly #provider: IFormulaStatusProvider;
+  readonly #input: FormulaDependencyStatusCommandInput;
+
   public readonly id = GetFormulaDependencyStatusCommand.id;
 
   public constructor(
-    private readonly provider: IFormulaStatusProvider,
-    private readonly input: FormulaDependencyStatusCommandInput,
-  ) {}
+    provider: IFormulaStatusProvider,
+    input: FormulaDependencyStatusCommandInput,
+  ) {
+    this.#provider = provider;
+    this.#input = input;
+  }
 
   public execute(_context: SheetCommandContext): FormulaDependencyStatusCommandResult {
-    const status = this.provider.getFormulaCellStatus(this.input.row, this.input.col);
+    const status = this.#provider.getFormulaCellStatus(this.#input.row, this.#input.col);
     return {
       pipeline: new Pipeline(this.id),
-      dependencyStatus: createFormulaDependencyStatus(this.provider, status, this.input),
+      dependencyStatus: createFormulaDependencyStatus(this.#provider, status, this.#input),
     };
   }
 }

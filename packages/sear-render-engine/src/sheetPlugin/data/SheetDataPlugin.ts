@@ -49,6 +49,8 @@ const pluginKey = new PluginKey('SheetDataPlugin');
  */
 @Injectable()
 export class SheetDataPlugin extends Plugin<unknown, CellProperties, SheetDataPluginState> {
+  readonly #formatCodecs: (() => CellFormatTransferRegistry) | undefined;
+
   /** Sheet data is state-only; duplicate render/event depth diagnostics do not apply. */
   public override readonly warnOnDuplicateDepth = false;
   /** Sheet data transactions share the registered MatrixOT algebra. */
@@ -94,8 +96,9 @@ export class SheetDataPlugin extends Plugin<unknown, CellProperties, SheetDataPl
    * Constructs the sheet data plugin.
    * @param state - Shared sheet data state.
    */
-  constructor(state: SheetDataPluginState, private readonly formatCodecs?: () => CellFormatTransferRegistry) {
+  constructor(state: SheetDataPluginState, formatCodecs?: () => CellFormatTransferRegistry) {
     super({ key: pluginKey, state });
+    this.#formatCodecs = formatCodecs;
   }
 
   /** Registers the sheet data matrix for commands, rendering, and collaboration. */
@@ -119,8 +122,8 @@ export class SheetDataPlugin extends Plugin<unknown, CellProperties, SheetDataPl
 
   /** Contributes this owner's cell state to atomic range moves. */
   public registerFormatTransfers(registry: SheetFormatTransferRegistry): void {
-    if (this.formatCodecs)
-      registry.register(createSheetDataFormatTransfer(this.key, () => this.getState().sheetData, this.formatCodecs()));
+    if (this.#formatCodecs)
+      registry.register(createSheetDataFormatTransfer(this.key, () => this.getState().sheetData, this.#formatCodecs()));
   }
 
   public registerRangeMoves(registry: SheetRangeMoveRegistry): void {
@@ -161,7 +164,7 @@ export class SheetDataPlugin extends Plugin<unknown, CellProperties, SheetDataPl
    * @returns Updated plugin state, or null when the transaction has no relevant operations.
    */
   public apply(pluginState: SheetDataPluginState, transaction: Transaction): SheetDataPluginState | null {
-    const operations = this.createInvertibleSheetDataOperations(pluginState.sheetData, transaction);
+    const operations = this.#createInvertibleSheetDataOperations(pluginState.sheetData, transaction);
     if (operations.length === 0) return null;
     MatrixOT.apply(pluginState.sheetData, operations);
     return pluginState;
@@ -180,7 +183,7 @@ export class SheetDataPlugin extends Plugin<unknown, CellProperties, SheetDataPl
     return [];
   }
 
-  private createInvertibleSheetDataOperations(
+  #createInvertibleSheetDataOperations(
     matrix: SheetMatrix,
     transaction: Transaction,
   ): MatrixOTOperation<CellMatrixElement>[] {

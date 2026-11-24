@@ -24,6 +24,8 @@ export interface DocCompositionProvider {
 /** Owns optional IME composition state independently from cursor and selection state. */
 @Injectable()
 export class DocCompositionManager implements DocCompositionProvider {
+  readonly #textShaper: TextShaper;
+
   /** DI token for resolving DocCompositionManager. */
   public static readonly symbol: symbol = Symbol.for('DocCompositionManager');
 
@@ -33,7 +35,9 @@ export class DocCompositionManager implements DocCompositionProvider {
   #isCommandExecuting: (() => boolean) | null = null;
   #teardownToken: object | null = null;
 
-  public constructor(@Inject(TextShaper.symbol) private readonly textShaper: TextShaper) {}
+  public constructor(@Inject(TextShaper.symbol) textShaper: TextShaper) {
+    this.#textShaper = textShaper;
+  }
 
   /** Closes direct composition writes after editor assembly. */
   public enforceCommandBoundary(isCommandExecuting: () => boolean, teardownToken?: object): void {
@@ -78,7 +82,7 @@ export class DocCompositionManager implements DocCompositionProvider {
       this.#caretPixelOffset = 0;
       return { active: false, text: '', textWidth: 0, caretPixelOffset: 0 };
     }
-    const shaped = this.textShaper.shape({ text: this.#text, font });
+    const shaped = this.#textShaper.shape({ text: this.#text, font });
     const textWidth = shaped.width;
     const caretPixelOffset = shaped.caretStops.find((stop) => stop.textOffset === this.#caretOffset)?.x ?? 0;
     this.#caretPixelOffset = caretPixelOffset;

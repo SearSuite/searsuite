@@ -7,25 +7,31 @@ import { type DocEditorChange } from './DocEditorContracts';
 /** Owns rich-document session state and host-facing document snapshots. */
 @Injectable()
 export class DocDocumentSessionCoordinator {
+  readonly #inputPlugin: DocInputPlugin;
+  readonly #cursorManager: DocCursorManager;
+
   /** DI token for resolving the session coordinator. */
   public static readonly symbol = Symbol.for('DocDocumentSessionCoordinator');
 
   /** Creates a document session coordinator. */
   public constructor(
     @Inject(DocInputPlugin.symbol)
-    private readonly inputPlugin: DocInputPlugin,
+    inputPlugin: DocInputPlugin,
     @Inject(DocCursorManager.symbol)
-    private readonly cursorManager: DocCursorManager,
-  ) {}
+    cursorManager: DocCursorManager,
+  ) {
+    this.#inputPlugin = inputPlugin;
+    this.#cursorManager = cursorManager;
+  }
 
   /** Replaces the active document and resets transient cursor/session state. */
   public loadDocument(document: RichDocNode[]): void {
     const nextDocument = createDocument(document);
-    this.inputPlugin.resetSession(nextDocument, {
+    this.#inputPlugin.resetSession(nextDocument, {
       anchor: { path: [0, 0], offset: 0 },
       head: { path: [0, 0], offset: 0 },
     });
-    this.cursorManager.clearCursor();
+    this.#cursorManager.clearCursor();
   }
 
   /** Returns a detached host-facing snapshot from the committed document state. */
@@ -38,17 +44,17 @@ export class DocDocumentSessionCoordinator {
 
   /** Subscribes to committed document projection changes. */
   public subscribe(listener: (change: DocEditorChange) => void): () => void {
-    return this.inputPlugin.subscribeDocument(() => listener(this.getChangeSnapshot()));
+    return this.#inputPlugin.subscribeDocument(() => listener(this.getChangeSnapshot()));
   }
 
   /** Returns a clone of the current rich-document content. */
   public getDocument(): RichDocNode[] {
-    return cloneRichDocument(this.inputPlugin.session.pendingDoc);
+    return cloneRichDocument(this.#inputPlugin.session.pendingDoc);
   }
 
   /** Returns a plain-text view of the current document. */
   public getText(): string {
-    return readPlainText(this.inputPlugin.session.pendingDoc);
+    return readPlainText(this.#inputPlugin.session.pendingDoc);
   }
 }
 

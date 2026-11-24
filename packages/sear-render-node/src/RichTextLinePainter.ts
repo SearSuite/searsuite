@@ -9,13 +9,19 @@ import { RichTextRunRenderer } from './RichTextRunRenderer';
 /** Paints laid-out rich-text lines by grouping adjacent characters into runs. */
 @Injectable()
 export class RichTextLineRenderer {
+  readonly #inlineStyles: RichTextInlineStyleRegistry;
+  readonly #runRenderer: RichTextRunRenderer;
+
   /** DI token for resolving the line renderer. */
   public static readonly symbol = Symbol.for('RichTextLineRenderer');
   /** Creates a line renderer with domain style comparison and run rendering. */
   public constructor(
-    private readonly inlineStyles: RichTextInlineStyleRegistry,
-    private readonly runRenderer: RichTextRunRenderer,
-  ) {}
+    inlineStyles: RichTextInlineStyleRegistry,
+    runRenderer: RichTextRunRenderer,
+  ) {
+    this.#inlineStyles = inlineStyles;
+    this.#runRenderer = runRenderer;
+  }
 
   /** Paints one laid-out line at the supplied world-space origin. */
   public paint(
@@ -33,7 +39,7 @@ export class RichTextLineRenderer {
 
     const flushRun = (): void => {
       if (!runText) return;
-      this.runRenderer.paint(context, {
+      this.#runRenderer.paint(context, {
         text: runText,
         style: activeStyle,
         font: input.font ?? '16px sans-serif',
@@ -49,7 +55,7 @@ export class RichTextLineRenderer {
 
     for (const char of input.line.chars) {
       const nextStyle = char.style;
-      if (!this.inlineStyles.sameStyle(activeStyle, nextStyle)) {
+      if (!this.#inlineStyles.sameStyle(activeStyle, nextStyle)) {
         flushRun();
         activeStyle = nextStyle;
         runStartX = cursorX;

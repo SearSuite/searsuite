@@ -6,21 +6,21 @@ import { Node, type ClipRegion, type NodeProperties } from '@searsuite/sear-rend
 export class TriangleNode<T extends NodeProperties> extends Node<T> {
   /** @inheritdoc */
   public override sticky = true;
-  private readonly points: [number, number][];
+  readonly #points: [number, number][];
 
   /** Creates a TriangleNode instance. */
   public constructor(positionRect: PositionRectProps, props: Partial<T>, points: [number, number][]) {
     super(positionRect, props);
-    this.points = points;
+    this.#points = points;
   }
 
   /** Draws this handle into the visible scene context. */
   public drawScene(context: RenderContext, _clipRegion?: ClipRegion): void {
-    if (!this.points.length) return;
+    if (!this.#points.length) return;
     context.save();
     context.beginPath();
-    context.moveTo(this.points[0][0], this.points[0][1]);
-    for (let i = 1; i < this.points.length; i++) context.lineTo(this.points[i][0], this.points[i][1]);
+    context.moveTo(this.#points[0][0], this.#points[0][1]);
+    for (let i = 1; i < this.#points.length; i++) context.lineTo(this.#points[i][0], this.#points[i][1]);
     context.closePath();
     if (this.fill) {
       context.setFillStyle(this.fill);

@@ -90,10 +90,10 @@ export interface WorkbookFormulaCompiledReferenceShiftResult {
 
 /** Runtime adapter that evaluates workbook formulas through the shared formula engine. */
 export class WorkbookFormulaEvaluationRuntime {
-  private readonly parser: IFormulaParser;
-  private readonly evaluator: IFormulaEvaluator;
-  private readonly formatter: FormulaFormatter;
-  private readonly workbookReferenceShifter: WorkbookFormulaReferenceShifter;
+  readonly #parser: IFormulaParser;
+  readonly #evaluator: IFormulaEvaluator;
+  readonly #formatter: FormulaFormatter;
+  readonly #workbookReferenceShifter: WorkbookFormulaReferenceShifter;
 
   /** Creates a workbook formula evaluation runtime. */
   public constructor(
@@ -110,14 +110,14 @@ export class WorkbookFormulaEvaluationRuntime {
       };
     } = {},
   ) {
-    this.parser = input.parser ?? new FormulaParser();
-    this.evaluator = input.evaluator ?? new FormulaEvaluator(new FunctionRegistry(), new AggregationCache());
-    this.formatter = new FormulaFormatter();
-    this.workbookReferenceShifter = new WorkbookFormulaReferenceShifter();
-    this.contextServices = input.contextServices ?? (() => ({}));
+    this.#parser = input.parser ?? new FormulaParser();
+    this.#evaluator = input.evaluator ?? new FormulaEvaluator(new FunctionRegistry(), new AggregationCache());
+    this.#formatter = new FormulaFormatter();
+    this.#workbookReferenceShifter = new WorkbookFormulaReferenceShifter();
+    this.#contextServices = input.contextServices ?? (() => ({}));
   }
 
-  private readonly contextServices: () => {
+  readonly #contextServices: () => {
     readonly xmlXPath?: NonNullable<EvalContext['xmlXPath']>;
     readonly externalServices?: NonNullable<EvalContext['externalServices']>;
     readonly dateTimeLocale?: FormulaDateTimeLocale;
@@ -132,12 +132,12 @@ export class WorkbookFormulaEvaluationRuntime {
     source: string,
     workbookState: WorkbookDocumentState<SheetDocumentState>,
   ): CompiledWorkbookFormula {
-    const bound = bindWorkbookFormulaObjects(this.parser.parse(source), this.parser, workbookState);
+    const bound = bindWorkbookFormulaObjects(this.#parser.parse(source), this.#parser, workbookState);
     const ast = bound.ast;
     const sheetBindings = new Map(readWorkbookFormulaBindings(workbookState, formulaCell, source));
-    const extractedDependencies = this.parser.extractDependencies(ast);
+    const extractedDependencies = this.#parser.extractDependencies(ast);
     const dependencies = extractedDependencies.map((dependency) =>
-      this.toWorkbookDependency(formulaCell.sheetId, dependency, workbookState.sheets, sheetBindings),
+      this.#toWorkbookDependency(formulaCell.sheetId, dependency, workbookState.sheets, sheetBindings),
     );
     const hasWorkbookReferences = bound.expanded || extractedDependencies.some(
       (dependency) =>
@@ -155,19 +155,19 @@ export class WorkbookFormulaEvaluationRuntime {
   }): WorkbookFormulaCompiledReferenceShiftResult {
     const localAst =
       input.formulaCell.sheetId === input.changedSheetId
-        ? this.parser.shiftReferences(input.compiled.ast, [...input.changes])
+        ? this.#parser.shiftReferences(input.compiled.ast, [...input.changes])
         : input.compiled.ast;
-    const workbookShift = this.workbookReferenceShifter.shiftReferences({
+    const workbookShift = this.#workbookReferenceShifter.shiftReferences({
       ast: localAst,
       sheetBindings: input.compiled.sheetBindings,
       changedSheetId: input.changedSheetId,
       changes: input.changes,
     });
     const ast = workbookShift.ast;
-    const dependencies = this.parser
+    const dependencies = this.#parser
       .extractDependencies(ast)
       .map((dependency) =>
-        this.toWorkbookDependency(input.formulaCell.sheetId, dependency, [], new Map(input.compiled.sheetBindings)),
+        this.#toWorkbookDependency(input.formulaCell.sheetId, dependency, [], new Map(input.compiled.sheetBindings)),
       )
       .filter(isValidWorkbookReference);
     const brokenReferences = [
@@ -201,7 +201,7 @@ export class WorkbookFormulaEvaluationRuntime {
     workbookState: WorkbookDocumentState<SheetDocumentState>,
   ): string {
     if (!compiled.hasWorkbookReferences || compiled.hasExpandedObjects) return compiled.source;
-    return this.formatter.format(compiled.ast, {
+    return this.#formatter.format(compiled.ast, {
       missingSheetName: FormulaErrorCode.Reference.slice(0, -1),
       resolveSheetName: (formulaSheetName) => {
         const sheetId = compiled.sheetBindings.get(formulaSheetName);
@@ -230,12 +230,12 @@ export class WorkbookFormulaEvaluationRuntime {
           remaining.delete(formulaKey);
           continue;
         }
-        if (!this.canEvaluate(formulaCell, input.graph, input.formulas)) continue;
+        if (!this.#canEvaluate(formulaCell, input.graph, input.formulas)) continue;
         const value = input.graph.hasBrokenReferences(formulaCell)
           ? createFormulaError(FormulaErrorCode.Reference)
-          : this.evaluator.evaluate(
+          : this.#evaluator.evaluate(
               compiled.ast,
-              this.createEvalContext(formulaCell, compiled, input.graph, input.runtime),
+              this.#createEvalContext(formulaCell, compiled, input.graph, input.runtime),
             );
         input.graph.setFormulaResult(formulaCell, value);
         remaining.delete(formulaKey);
@@ -256,7 +256,7 @@ export class WorkbookFormulaEvaluationRuntime {
     };
   }
 
-  private toWorkbookDependency(
+  #toWorkbookDependency(
     formulaSheetId: string,
     dependency: Dependency,
     sheets: readonly WorkbookSheetDescriptor[],
@@ -270,14 +270,14 @@ export class WorkbookFormulaEvaluationRuntime {
     }
     if (dependency.kind === FormulaNodeKind.WorkbookCell) {
       return {
-        sheetId: this.resolveSheetBinding(dependency.sheetName, sheets, sheetBindings),
+        sheetId: this.#resolveSheetBinding(dependency.sheetName, sheets, sheetBindings),
         row: dependency.row,
         col: dependency.col,
       };
     }
     if (dependency.kind === FormulaNodeKind.WorkbookRange) {
       return {
-        sheetId: this.resolveSheetBinding(dependency.sheetName, sheets, sheetBindings),
+        sheetId: this.#resolveSheetBinding(dependency.sheetName, sheets, sheetBindings),
         start: dependency.start,
         end: dependency.end,
       };
@@ -288,7 +288,7 @@ export class WorkbookFormulaEvaluationRuntime {
     return { sheetId: formulaSheetId, startRow: dependency.startRow, endRow: dependency.endRow };
   }
 
-  private resolveSheetBinding(
+  #resolveSheetBinding(
     sheetName: string,
     sheets: readonly WorkbookSheetDescriptor[],
     sheetBindings: Map<string, string>,
@@ -301,17 +301,17 @@ export class WorkbookFormulaEvaluationRuntime {
     return sheet.id;
   }
 
-  private canEvaluate(
+  #canEvaluate(
     formulaCell: WorkbookCellReference,
     graph: WorkbookFormulaDependencyGraph,
     formulas: ReadonlyMap<WorkbookCellKey, CompiledWorkbookFormula>,
   ): boolean {
     return !graph
       .getDependencies(formulaCell)
-      .some((dependency) => this.referencesDirtyFormula(dependency, graph, formulas));
+      .some((dependency) => this.#referencesDirtyFormula(dependency, graph, formulas));
   }
 
-  private referencesDirtyFormula(
+  #referencesDirtyFormula(
     dependency: WorkbookFormulaGraphReference,
     graph: WorkbookFormulaDependencyGraph,
     formulas: ReadonlyMap<WorkbookCellKey, CompiledWorkbookFormula>,
@@ -337,22 +337,22 @@ export class WorkbookFormulaEvaluationRuntime {
     return false;
   }
 
-  private createEvalContext(
+  #createEvalContext(
     formulaCell: WorkbookCellReference,
     compiled: CompiledWorkbookFormula,
     graph: WorkbookFormulaDependencyGraph,
     runtime: WorkbookPluginRuntime,
   ): EvalContext {
-    const sheetData = this.readSheetData(formulaCell.sheetId, runtime);
+    const sheetData = this.#readSheetData(formulaCell.sheetId, runtime);
     const [rowCount, colCount] = sheetData?.shape ?? [0, 0];
     const isLocalCellInBounds = (row: number, col: number): boolean =>
       row >= 0 && row < rowCount && col >= 0 && col < colCount;
     const readWorkbookCellValue = (sheetName: string, row: number, col: number): FormulaValue => {
       const sheetId = compiled.sheetBindings.get(sheetName);
       if (!sheetId) return createFormulaError(FormulaErrorCode.Reference);
-      return this.readWorkbookCellValue({ sheetId, row, col }, graph, runtime);
+      return this.#readWorkbookCellValue({ sheetId, row, col }, graph, runtime);
     };
-    const services = this.contextServices();
+    const services = this.#contextServices();
     const workbookState = runtime.document.getState();
     const sheets = workbookState.sheets;
     const currentSheet = sheets.find((sheet) => sheet.id === formulaCell.sheetId);
@@ -363,17 +363,17 @@ export class WorkbookFormulaEvaluationRuntime {
         readCell: ({ row, col, sheetName }) => {
           const target = sheetName === undefined ? currentSheet : sheets.find((sheet) => sheet.name === sheetName);
           if (!target) return undefined;
-          const targetData = this.readSheetData(target.id, runtime);
+          const targetData = this.#readSheetData(target.id, runtime);
           const cell = targetData?.getItem(row, col);
           if (!targetData || row < 0 || col < 0 || row >= targetData.shape[0] || col >= targetData.shape[1]) {
             return undefined;
           }
           const source =
             !cell || cell.type === CellType.Empty ? 'empty' : cell.type === CellType.Formula ? 'formula' : 'value';
-          const value = this.cellToFormulaValue({ sheetId: target.id, row, col }, cell, graph);
+          const value = this.#cellToFormulaValue({ sheetId: target.id, row, col }, cell, graph);
           const formula =
             cell?.type === CellType.Formula && typeof cell.formula === 'string' ? cell.formula : undefined;
-          const numberFormat = cellFormatToExcelCode(this.readSheetFormats(target.id, runtime)?.getItem(row, col));
+          const numberFormat = cellFormatToExcelCode(this.#readSheetFormats(target.id, runtime)?.getItem(row, col));
           return {
             reference: { row, col, sheetName: target.name },
             source,
@@ -398,13 +398,13 @@ export class WorkbookFormulaEvaluationRuntime {
       getSheetShape: () => [rowCount, colCount],
       getCellValue: (row, col) => {
         if (!isLocalCellInBounds(row, col)) return createFormulaError(FormulaErrorCode.Reference);
-        return this.cellToFormulaValue({ sheetId: formulaCell.sheetId, row, col }, sheetData?.getItem(row, col), graph);
+        return this.#cellToFormulaValue({ sheetId: formulaCell.sheetId, row, col }, sheetData?.getItem(row, col), graph);
       },
       getWorkbookCellValue: readWorkbookCellValue,
       getSpillValue: (row, col, sheetName) => {
         const sheetId = sheetName === undefined ? formulaCell.sheetId : compiled.sheetBindings.get(sheetName);
         if (!sheetId) return undefined;
-        const targetData = this.readSheetData(sheetId, runtime);
+        const targetData = this.#readSheetData(sheetId, runtime);
         const [targetRows, targetCols] = targetData?.shape ?? [0, 0];
         if (row < 0 || col < 0 || row >= targetRows || col >= targetCols) return undefined;
         return graph.getFormulaResult({ sheetId, row, col });
@@ -413,7 +413,7 @@ export class WorkbookFormulaEvaluationRuntime {
         if (!isLocalCellInBounds(startRow, startCol) || !isLocalCellInBounds(endRow, endCol)) {
           return [createFormulaError(FormulaErrorCode.Reference)];
         }
-        const readCellValue = this.cellToFormulaValue.bind(this);
+        const readCellValue = this.#cellToFormulaValue.bind(this);
         return {
           *[Symbol.iterator]() {
             for (let row = startRow; row <= endRow; row++) {
@@ -427,12 +427,12 @@ export class WorkbookFormulaEvaluationRuntime {
       iterateWorkbookRange: (sheetName, startRow, startCol, endRow, endCol): Iterable<FormulaValue> => {
         const sheetId = compiled.sheetBindings.get(sheetName);
         if (!sheetId) return [createFormulaError(FormulaErrorCode.Reference)];
-        const targetData = this.readSheetData(sheetId, runtime);
+        const targetData = this.#readSheetData(sheetId, runtime);
         const [targetRowCount, targetColCount] = targetData?.shape ?? [0, 0];
         if (!targetData || startRow < 0 || startCol < 0 || endRow >= targetRowCount || endCol >= targetColCount) {
           return [createFormulaError(FormulaErrorCode.Reference)];
         }
-        const readCellValue = this.cellToFormulaValue.bind(this);
+        const readCellValue = this.#cellToFormulaValue.bind(this);
         return {
           *[Symbol.iterator]() {
             for (let row = startRow; row <= endRow; row++) {
@@ -446,27 +446,27 @@ export class WorkbookFormulaEvaluationRuntime {
     };
   }
 
-  private readWorkbookCellValue(
+  #readWorkbookCellValue(
     reference: WorkbookCellReference,
     graph: WorkbookFormulaDependencyGraph,
     runtime: WorkbookPluginRuntime,
   ): FormulaValue {
-    const sheetData = this.readSheetData(reference.sheetId, runtime);
+    const sheetData = this.#readSheetData(reference.sheetId, runtime);
     if (!sheetData) return createFormulaError(FormulaErrorCode.Reference);
     const [rowCount, colCount] = sheetData.shape;
     if (reference.row < 0 || reference.row >= rowCount || reference.col < 0 || reference.col >= colCount) {
       return createFormulaError(FormulaErrorCode.Reference);
     }
-    return this.cellToFormulaValue(reference, sheetData.getItem(reference.row, reference.col), graph);
+    return this.#cellToFormulaValue(reference, sheetData.getItem(reference.row, reference.col), graph);
   }
 
-  private readSheetData(sheetId: string, runtime: WorkbookPluginRuntime): SheetCellDataReader | null {
+  #readSheetData(sheetId: string, runtime: WorkbookPluginRuntime): SheetCellDataReader | null {
     const activeEditor = runtime.sheets.getEditor(sheetId);
     if (activeEditor) return activeEditor.queries.run(ReadSheetCellDataQuery, void 0);
     return runtime.document.getState().sheetStates[sheetId]?.sheetData ?? null;
   }
 
-  private readSheetFormats(sheetId: string, runtime: WorkbookPluginRuntime): SheetCellFormatReader | null {
+  #readSheetFormats(sheetId: string, runtime: WorkbookPluginRuntime): SheetCellFormatReader | null {
     const activeEditor = runtime.sheets.getEditor(sheetId);
     if (activeEditor) return activeEditor.queries.run(ReadSheetCellFormatQuery, void 0);
     const formats = runtime.document.getState().sheetStates[sheetId]?.cellFormats;
@@ -477,7 +477,7 @@ export class WorkbookFormulaEvaluationRuntime {
     };
   }
 
-  private cellToFormulaValue(
+  #cellToFormulaValue(
     reference: WorkbookCellReference,
     cell: CellMatrixElement | null | undefined,
     graph: WorkbookFormulaDependencyGraph,

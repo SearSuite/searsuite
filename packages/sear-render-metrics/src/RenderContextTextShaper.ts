@@ -7,7 +7,11 @@ import { type TextShapeResult } from './TextShaperTypes';
 
 /** Portable fallback backed by the host's render-neutral text measurements. */
 export class RenderContextTextShaper extends TextShaper {
-  public constructor(private readonly context: RenderContext) { super(); }
+  readonly #context: RenderContext;
+
+  public constructor(context: RenderContext) { super();
+    this.#context = context;
+   }
 
   protected override shapeText(input: NormalizedTextShapeInput): TextShapeResult {
     const unsupportedFeatures = Object.keys(input.features).filter((feature) => feature !== 'kern');
@@ -16,14 +20,14 @@ export class RenderContextTextShaper extends TextShaper {
       (kerning !== undefined && kerning !== true && kerning !== false && kerning !== 0 && kerning !== 1)) {
       throw new SearError('Render context cannot apply the requested text shaping options.', { input });
     }
-    this.context.save();
+    this.#context.save();
     try {
-      this.context.setFont(input.font);
-      const measured = this.context.measureText(input.text);
+      this.#context.setFont(input.font);
+      const measured = this.#context.measureText(input.text);
       return createMeasuredTextShapeResult(input.text, measured,
-        (end) => this.context.measureText(input.text.slice(0, end)).width);
+        (end) => this.#context.measureText(input.text.slice(0, end)).width);
     } finally {
-      this.context.restore();
+      this.#context.restore();
     }
   }
 }

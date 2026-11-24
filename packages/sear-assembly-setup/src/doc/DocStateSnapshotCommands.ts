@@ -29,14 +29,18 @@ export function registerDocStateSnapshotCommands(
 }
 
 class ExportDocStateSnapshotCommand implements DocEditorCommand<ExportDocStateCommandResult> {
+  readonly #document: DocDocumentSessionCoordinator;
+
   public readonly id = ExportDocStateCommand.id;
 
-  public constructor(private readonly document: DocDocumentSessionCoordinator) {}
+  public constructor(document: DocDocumentSessionCoordinator) {
+    this.#document = document;
+  }
 
   public execute(_context: DocCommandContext): ExportDocStateCommandResult {
     return {
       pipeline: new Pipeline(this.id),
-      documentState: { document: this.document.getDocument() },
+      documentState: { document: this.#document.getDocument() },
     };
   }
 }

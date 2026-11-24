@@ -5,10 +5,10 @@ import { type WorkbookFormulaFormatOptions } from './WorkbookFormulaFormatOption
 /** Formats the shared FormulaAST back to formula source text. */
 export class FormulaFormatter {
   public format(ast: FormulaAST, options: WorkbookFormulaFormatOptions = {}): string {
-    return `=${this.formatNode(ast, 0, options)}`;
+    return `=${this.#formatNode(ast, 0, options)}`;
   }
 
-  private formatNode(ast: FormulaAST, parentPrecedence: number, options: WorkbookFormulaFormatOptions): string {
+  #formatNode(ast: FormulaAST, parentPrecedence: number, options: WorkbookFormulaFormatOptions): string {
     switch (ast.kind) {
       case FormulaNodeKind.Number:
         return ast.rawLiteral ?? String(ast.value);
@@ -21,11 +21,11 @@ export class FormulaFormatter {
       case FormulaNodeKind.Name:
         return ast.name;
       case FormulaNodeKind.Tuple:
-        return `(${ast.items.map((item) => this.formatNode(item, 0, options)).join(',')})`;
+        return `(${ast.items.map((item) => this.#formatNode(item, 0, options)).join(',')})`;
       case FormulaNodeKind.Intersection:
-        return `${this.formatNode(ast.left, 7, options)} ${this.formatNode(ast.right, 7, options)}`;
+        return `${this.#formatNode(ast.left, 7, options)} ${this.#formatNode(ast.right, 7, options)}`;
       case FormulaNodeKind.Array:
-        return `{${ast.rows.map((row) => row.map((item) => this.formatNode(item, 0, options)).join(',')).join(';')}}`;
+        return `{${ast.rows.map((row) => row.map((item) => this.#formatNode(item, 0, options)).join(',')).join(';')}}`;
       case FormulaNodeKind.Missing:
         return '';
       case FormulaNodeKind.Cell:
@@ -43,14 +43,14 @@ export class FormulaFormatter {
         )}`;
       case FormulaNodeKind.WorkbookCell:
         if (ast.row < 0 || ast.col < 0) return FormulaErrorCode.Reference;
-        return `${this.formatSheetName(ast.sheetName, options)}!${toCellRef(ast.row, ast.col, ast.absRow, ast.absCol)}`;
+        return `${this.#formatSheetName(ast.sheetName, options)}!${toCellRef(ast.row, ast.col, ast.absRow, ast.absCol)}`;
       case FormulaNodeKind.Spill:
-        return `${this.formatNode(ast.reference, 7, options)}#`;
+        return `${this.#formatNode(ast.reference, 7, options)}#`;
       case FormulaNodeKind.WorkbookRange:
         if (ast.start[0] < 0 || ast.start[1] < 0 || ast.end[0] < 0 || ast.end[1] < 0) {
           return FormulaErrorCode.Reference;
         }
-        return `${this.formatSheetName(ast.sheetName, options)}!${toCellRef(
+        return `${this.#formatSheetName(ast.sheetName, options)}!${toCellRef(
           ast.start[0],
           ast.start[1],
           ast.absStartRow,
@@ -61,27 +61,27 @@ export class FormulaFormatter {
       case FormulaNodeKind.RowRange:
         return `${ast.absStartRow ? '$' : ''}${ast.startRow + 1}:${ast.absEndRow ? '$' : ''}${ast.endRow + 1}`;
       case FormulaNodeKind.Call:
-        return `${ast.name}(${ast.args.map((arg) => this.formatNode(arg, 0, options)).join(',')})`;
+        return `${ast.name}(${ast.args.map((arg) => this.#formatNode(arg, 0, options)).join(',')})`;
       case FormulaNodeKind.Invoke:
-        return `${this.formatNode(ast.callee, 7, options)}(${ast.args
-          .map((arg) => this.formatNode(arg, 0, options))
+        return `${this.#formatNode(ast.callee, 7, options)}(${ast.args
+          .map((arg) => this.#formatNode(arg, 0, options))
           .join(',')})`;
       case FormulaNodeKind.Unary: {
         const precedence = ast.op === '%' ? 6 : 5;
-        const operand = this.formatNode(ast.operand, precedence, options);
+        const operand = this.#formatNode(ast.operand, precedence, options);
         const formatted = ast.op === '%' ? `${operand}%` : `${ast.op}${operand}`;
         return parenthesizeIfNeeded(formatted, precedence, parentPrecedence);
       }
       case FormulaNodeKind.Binary: {
         const precedence = binaryPrecedence(ast.op);
-        const left = this.formatNode(ast.left, precedence, options);
-        const right = this.formatNode(ast.right, precedence + (isRightAssociativeSafe(ast.op) ? 0 : 1), options);
+        const left = this.#formatNode(ast.left, precedence, options);
+        const right = this.#formatNode(ast.right, precedence + (isRightAssociativeSafe(ast.op) ? 0 : 1), options);
         return parenthesizeIfNeeded(`${left}${ast.op}${right}`, precedence, parentPrecedence);
       }
     }
   }
 
-  private formatSheetName(formulaSheetName: string, options: WorkbookFormulaFormatOptions): string {
+  #formatSheetName(formulaSheetName: string, options: WorkbookFormulaFormatOptions): string {
     const pair = formulaSheetName.split(':');
     if (pair.length === 2) {
       const names = pair.map((name) => options.resolveSheetName?.(name) ?? name);

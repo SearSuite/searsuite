@@ -12,45 +12,53 @@ export interface CoordinatePoint {
 /** Single authority for host-view, world, and raster coordinate conversion. */
 @Injectable()
 export class CoordinateTransformer {
+  readonly #scrollManager: ScrollManager;
+  readonly #renderContext: RenderContext;
+  readonly #hitRenderContext: RenderContext;
+
   /** DI token for resolving the host-neutral coordinate transformer. */
   public static readonly symbol: symbol = Symbol.for('CoordinateTransformer');
 
   /** Creates a CoordinateTransformer instance. */
   constructor(
-    @Inject(ScrollManager.symbol) private readonly scrollManager: ScrollManager,
-    @Inject(RenderContext.symbol) private readonly renderContext: RenderContext,
+    @Inject(ScrollManager.symbol) scrollManager: ScrollManager,
+    @Inject(RenderContext.symbol) renderContext: RenderContext,
     @Inject(RenderContext.hitSymbol)
-    private readonly hitRenderContext: RenderContext,
-  ) {}
+    hitRenderContext: RenderContext,
+  ) {
+    this.#scrollManager = scrollManager;
+    this.#renderContext = renderContext;
+    this.#hitRenderContext = hitRenderContext;
+  }
 
   /** Converts a host-view point into world coordinates. */
   public viewToWorld(
     point: CoordinatePoint,
-    scroll: Pick<ScrollManagerState, 'x' | 'y'> = this.scrollManager.getState(),
+    scroll: Pick<ScrollManagerState, 'x' | 'y'> = this.#scrollManager.getState(),
   ): CoordinatePoint {
-    const scale = this.renderContext.getViewScale();
+    const scale = this.#renderContext.getViewScale();
     return { x: point.x / scale + scroll.x, y: point.y / scale + scroll.y };
   }
 
   /** Converts a world point into host-view coordinates. */
   public worldToView(
     point: CoordinatePoint,
-    scroll: Pick<ScrollManagerState, 'x' | 'y'> = this.scrollManager.getState(),
+    scroll: Pick<ScrollManagerState, 'x' | 'y'> = this.#scrollManager.getState(),
   ): CoordinatePoint {
-    const scale = this.renderContext.getViewScale();
+    const scale = this.#renderContext.getViewScale();
     return { x: (point.x - scroll.x) * scale, y: (point.y - scroll.y) * scale };
   }
 
   /** Converts a host-view point into raster coordinates for pixel reads. */
   public viewToRaster(point: CoordinatePoint): CoordinatePoint {
-    const scale = this.hitRenderContext.getRasterScale();
+    const scale = this.#hitRenderContext.getRasterScale();
     return { x: point.x * scale, y: point.y * scale };
   }
 
   /** Returns the visible world rect. */
   public getVisibleWorldRect(): PositionRect<unknown> {
-    const { x, y } = this.scrollManager.getState();
-    const [width, height] = this.scrollManager.getShape();
+    const { x, y } = this.#scrollManager.getState();
+    const [width, height] = this.#scrollManager.getShape();
     return new PositionRect(x, y, width, height);
   }
 }

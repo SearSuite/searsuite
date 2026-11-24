@@ -36,35 +36,48 @@ interface ISheetViewPluginState {
  */
 @Injectable()
 export class SheetRenderEngine extends RenderEngine<CellProperties, SheetRenderCoordinatorManager> {
+  readonly #offScreenRenderContext: RenderContext;
+  readonly #hitRenderContext: RenderContext;
+  readonly #screenRenderStrategy: ScreenRenderStrategy<CellProperties>;
+  readonly #dirtyRenderStrategy: DirtyRenderStrategy<CellProperties>;
+  readonly #stickyRenderStrategy: StickyRenderStrategy<CellProperties>;
+  readonly #overlayRenderStrategy: OverlayRenderStrategy<CellProperties>;
+
   /** Creates a SheetRenderEngine instance. */
   constructor(
     @Inject(ScrollManager.symbol) public readonly scrollManager: ScrollManager,
     @Inject(RenderContext.symbol) public readonly renderContext: RenderContext,
     @Inject(RenderContext.offScreenSymbol)
-    private readonly offScreenRenderContext: RenderContext,
+    offScreenRenderContext: RenderContext,
     @Inject(RenderContext.hitSymbol)
-    private readonly hitRenderContext: RenderContext,
+    hitRenderContext: RenderContext,
     @Inject(ConfigEngine.symbol) public readonly configEngine: ConfigEngine,
     @Inject(RenderCoordinatorManager.symbol)
     public readonly renderCoordinatorManager: SheetRenderCoordinatorManager,
     @Inject(RenderStrategyManager.symbol)
     public readonly renderStrategyManager: RenderStrategyManager<CellProperties>,
     @Inject(ScreenRenderStrategy.symbol)
-    private readonly screenRenderStrategy: ScreenRenderStrategy<CellProperties>,
+    screenRenderStrategy: ScreenRenderStrategy<CellProperties>,
     @Inject(DirtyRenderStrategy.symbol)
-    private readonly dirtyRenderStrategy: DirtyRenderStrategy<CellProperties>,
+    dirtyRenderStrategy: DirtyRenderStrategy<CellProperties>,
     @Inject(StickyRenderStrategy.symbol)
-    private readonly stickyRenderStrategy: StickyRenderStrategy<CellProperties>,
+    stickyRenderStrategy: StickyRenderStrategy<CellProperties>,
     @Inject(OverlayRenderStrategy.symbol)
-    private readonly overlayRenderStrategy: OverlayRenderStrategy<CellProperties>,
+    overlayRenderStrategy: OverlayRenderStrategy<CellProperties>,
   ) {
     super(scrollManager, renderContext, configEngine, renderCoordinatorManager, renderStrategyManager);
-    this.renderStrategyManager.addStrategy(ScreenRenderStrategy.symbol, this.screenRenderStrategy);
+    this.#offScreenRenderContext = offScreenRenderContext;
+    this.#hitRenderContext = hitRenderContext;
+    this.#screenRenderStrategy = screenRenderStrategy;
+    this.#dirtyRenderStrategy = dirtyRenderStrategy;
+    this.#stickyRenderStrategy = stickyRenderStrategy;
+    this.#overlayRenderStrategy = overlayRenderStrategy;
+    this.renderStrategyManager.addStrategy(ScreenRenderStrategy.symbol, this.#screenRenderStrategy);
     // Order: Screen -> Dirty -> Sticky, to avoid Dirty erasing newly drawn sticky header highlights.
-    this.renderStrategyManager.addStrategy(DirtyRenderStrategy.symbol, this.dirtyRenderStrategy);
-    this.renderStrategyManager.addStrategy(StickyRenderStrategy.symbol, this.stickyRenderStrategy);
+    this.renderStrategyManager.addStrategy(DirtyRenderStrategy.symbol, this.#dirtyRenderStrategy);
+    this.renderStrategyManager.addStrategy(StickyRenderStrategy.symbol, this.#stickyRenderStrategy);
     // Overlay render must be the last pass so editor visuals always win the final compositing order.
-    this.renderStrategyManager.addStrategy(OverlayRenderStrategy.symbol, this.overlayRenderStrategy);
+    this.renderStrategyManager.addStrategy(OverlayRenderStrategy.symbol, this.#overlayRenderStrategy);
 
     this.initialize();
   }
@@ -101,20 +114,20 @@ export class SheetRenderEngine extends RenderEngine<CellProperties, SheetRenderC
   /** Resizes every canvas layer and invalidates scroll optimization buffers. */
   public resize(width: number, height: number, scale: number): void {
     this.renderContext.resize(width, height, scale);
-    this.offScreenRenderContext.resize(width, height, scale);
-    this.hitRenderContext.resize(width, height, scale);
-    this.offScreenRenderContext.isDrawn = false;
+    this.#offScreenRenderContext.resize(width, height, scale);
+    this.#hitRenderContext.resize(width, height, scale);
+    this.#offScreenRenderContext.isDrawn = false;
   }
 
   /** Updates the view scale. */
   public setViewScale(scale: number): void {
     this.renderStrategyManager.setViewScale(scale);
-    this.offScreenRenderContext.isDrawn = false;
+    this.#offScreenRenderContext.isDrawn = false;
   }
 
   /** Drops retained screen content so the next frame repaints it. */
   public invalidateScreenCache(): void {
-    this.offScreenRenderContext.isDrawn = false;
+    this.#offScreenRenderContext.isDrawn = false;
   }
 
   /** Applies a transaction to SheetRenderEngine state. */

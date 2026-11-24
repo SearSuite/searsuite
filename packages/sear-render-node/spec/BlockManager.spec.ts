@@ -123,16 +123,16 @@ describe('BlockManager', () => {
   });
 
   it('falls back to hardcoded defaults when default metric probing returns no chars', () => {
-    const { manager } = createManager();
+    const { manager, shape } = createManager();
     manager.add(DocNodeRegistry.create({ type: ParagraphNode.nodeType, content: [] }));
-
-    const originalMeasureWords = (manager as any).measureWords.bind(manager);
-    (manager as any).measureWords = jest.fn((text: string) => {
-      if (text === ' ') return [];
-      return originalMeasureWords(text);
-    });
-
-    const perParagraph = manager.calculateLayoutPerParagraph(10);
+    shape.mockReturnValue({ glyphs: [], clusters: [], caretStops: [], width: 0, height: 0 });
+    const segmenter = jest.spyOn(Intl.Segmenter.prototype, 'segment').mockReturnValue([] as never);
+    let perParagraph;
+    try {
+      perParagraph = manager.calculateLayoutPerParagraph(10);
+    } finally {
+      segmenter.mockRestore();
+    }
     expect(perParagraph[0][0]).toEqual(
       expect.objectContaining({
         width: 0,

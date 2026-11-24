@@ -503,13 +503,19 @@ function createDocCommandRegistrationRecorder(
   commands: DocCommandBus,
   unregisterCommands: Array<() => void>,
 ): DocCommandBus {
-  const registrarCommands = Object.create(commands) as DocCommandBus;
-  registrarCommands.register = function registerDocCommandAndRecord(definition, factory) {
+  const register: DocCommandBus['register'] = function registerDocCommandAndRecord(definition, factory) {
     const unregister = commands.register(definition, factory);
     unregisterCommands.push(unregister);
     return unregister;
   } as DocCommandBus['register'];
-  return registrarCommands;
+  return new Proxy(commands, {
+    get(target, property) {
+      if (property === 'register') return register;
+      const value = Reflect.get(target, property, target);
+      if (Object.getOwnPropertyDescriptor(target, property)?.configurable === false) return value;
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
 }
 
 function createDocKeyboardBindingRegistrationRecorder(

@@ -1,18 +1,18 @@
 import { SparseMatrix } from '../src/SparseMatrix';
 
 class MockMatrix extends SparseMatrix<number> {
-  private data: Map<string, number> = new Map();
+  #data: Map<string, number> = new Map();
 
   constructor(rows: number, cols: number) {
     super(rows, cols);
   }
 
   public setItem(row: number, col: number, value: number) {
-    this.data.set(`${row},${col}`, value);
+    this.#data.set(`${row},${col}`, value);
   }
 
   public override getItem(row: number, col: number): number | null {
-    const val = this.data.get(`${row},${col}`);
+    const val = this.#data.get(`${row},${col}`);
     return val !== undefined ? val : null;
   }
 

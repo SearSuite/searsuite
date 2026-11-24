@@ -56,7 +56,7 @@ class ScopedFormulaFunctionPlugin extends SheetPlugin<null> {
   public static readonly symbol = Symbol.for('ScopedFormulaFunctionPlugin');
   public static disposeCount = 0;
   public static usedFormulaCapability = false;
-  private unregister: (() => void) | undefined;
+  #unregister: (() => void) | undefined;
 
   public constructor() {
     super({ key: new PluginKey('ScopedFormulaFunctionPlugin'), state: null });
@@ -66,15 +66,15 @@ class ScopedFormulaFunctionPlugin extends SheetPlugin<null> {
     const capability = context.runtime.extensions.require(SheetRuntimeCapability.Formula);
     ScopedFormulaFunctionPlugin.usedFormulaCapability = capability.functions === context.runtime.formula.functions;
     const unregister = capability.functions.register(scopedFunction);
-    this.unregister = () => {
+    this.#unregister = () => {
       unregister();
       ScopedFormulaFunctionPlugin.disposeCount++;
     };
   }
 
   public onEditorDestroy(_context: SheetPluginRuntimeContext): void {
-    this.unregister?.();
-    this.unregister = void 0;
+    this.#unregister?.();
+    this.#unregister = void 0;
   }
 
   public registerState() {

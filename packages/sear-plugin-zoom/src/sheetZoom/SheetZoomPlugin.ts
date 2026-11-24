@@ -32,6 +32,8 @@ export const sheetZoomPluginConfig = {
 /** Local-only Excel-style sheet view zoom. It never changes document data or OT state. */
 @Injectable()
 export class SheetZoomPlugin extends Plugin<SearCoreSheet, CellProperties, Record<string, never>> {
+  readonly #platform: Platform | undefined;
+
   /** DI token for resolving SheetZoomPlugin. */
   public static readonly symbol = Symbol.for('SheetZoomPlugin');
   /** Stable plugin key for SheetZoomPlugin. */
@@ -40,33 +42,34 @@ export class SheetZoomPlugin extends Plugin<SearCoreSheet, CellProperties, Recor
   #scale = 1;
   #commands: SheetCommandBus | null;
   #core: SearCoreSheet | undefined;
-  private readonly zoomListeners = new Set<(scale: number) => void>();
+  readonly #zoomListeners = new Set<(scale: number) => void>();
 
   /** Creates a SheetZoomPlugin instance. */
   constructor(
     @Inject(KeyboardRouter.symbol) keyboardRouter: KeyboardRouter,
     @Inject(SheetCommandBus.symbol) commands?: SheetCommandBus,
-    @Inject(Platform.symbol) private readonly platform?: Platform,
+    @Inject(Platform.symbol) platform?: Platform,
   ) {
     super({ key, state: {} });
+    this.#platform = platform;
     this.#commands = commands ?? null;
     keyboardRouter.subscribe({
-      onZoomIn: this.handleZoomInKey.bind(this),
-      onZoomOut: this.handleZoomOutKey.bind(this),
-      onZoomReset: this.handleZoomResetKey.bind(this),
+      onZoomIn: this.#handleZoomInKey.bind(this),
+      onZoomOut: this.#handleZoomOutKey.bind(this),
+      onZoomReset: this.#handleZoomResetKey.bind(this),
     });
     keyboardRouter.startListener();
   }
 
-  private handleZoomInKey(): void {
-    this.setScale(this.#scale + this.getConfig().step);
+  #handleZoomInKey(): void {
+    this.setScale(this.#scale + this.#getConfig().step);
   }
 
-  private handleZoomOutKey(): void {
-    this.setScale(this.#scale - this.getConfig().step);
+  #handleZoomOutKey(): void {
+    this.setScale(this.#scale - this.#getConfig().step);
   }
 
-  private handleZoomResetKey(): void {
+  #handleZoomResetKey(): void {
     this.setScale(1);
   }
 
@@ -94,8 +97,8 @@ export class SheetZoomPlugin extends Plugin<SearCoreSheet, CellProperties, Recor
     observations.register(SheetZoomObservation, {
       getSnapshot: () => this.#scale,
       subscribe: (listener) => {
-        this.zoomListeners.add(listener);
-        return () => this.zoomListeners.delete(listener);
+        this.#zoomListeners.add(listener);
+        return () => this.#zoomListeners.delete(listener);
       },
     });
   }
@@ -124,7 +127,7 @@ export class SheetZoomPlugin extends Plugin<SearCoreSheet, CellProperties, Recor
   }
   /** Returns the plugin config. */
   public getPluginConfig(): unknown {
-    return this.getConfig();
+    return this.#getConfig();
   }
   /** Applies a transaction to SheetZoomPlugin state. */
   public apply(state: Record<string, never>, _transaction: Transaction): Record<string, never> {
@@ -150,14 +153,14 @@ export class SheetZoomPlugin extends Plugin<SearCoreSheet, CellProperties, Recor
     if (!core) return;
     const commands = this.#commands;
     if (!commands) {
-      this.platform?.warn('SheetZoomPlugin setScale skipped: SheetCommandBus is missing.');
+      this.#platform?.warn('SheetZoomPlugin setScale skipped: SheetCommandBus is missing.');
       return;
     }
     commands.run(SetSheetZoomCommand, nextScale);
   }
 
   #applyScale(core: SearCoreSheet, nextScale: number): void {
-    const { minScale, maxScale } = this.getConfig();
+    const { minScale, maxScale } = this.#getConfig();
     const scale = Math.round(Math.min(maxScale, Math.max(minScale, nextScale)) * 100) / 100;
     if (scale === this.#scale) return;
 
@@ -178,17 +181,17 @@ export class SheetZoomPlugin extends Plugin<SearCoreSheet, CellProperties, Recor
     // Rebuild visual nodes and hit colors before the next pointer event.
     core.refreshViewport();
     runOutsideCommandExecution(() => {
-      for (const listener of this.zoomListeners) {
+      for (const listener of this.#zoomListeners) {
         try {
           listener(scale);
         } catch (error) {
-          this.platform?.warn('Sheet zoom listener failed.', error);
+          this.#platform?.warn('Sheet zoom listener failed.', error);
         }
       }
     });
   }
 
-  private getConfig(): typeof sheetZoomPluginConfig {
+  #getConfig(): typeof sheetZoomPluginConfig {
     const core = this.#core;
     if (!core) return sheetZoomPluginConfig;
     return (core.configEngine.getPluginConfig<typeof sheetZoomPluginConfig>(this.key) ??

@@ -1,3 +1,4 @@
+import { DirtyRegionCollector } from '../src/DirtyRegionCollector';
 import './testSetup';
 import { DirtyRenderStrategy } from '../src/DirtyRenderStrategy';
 import { type Node, type NodeProperties } from '@searsuite/sear-render-node';
@@ -130,14 +131,6 @@ describe('DirtyRenderStrategy', () => {
   });
 
   it('normalizes duplicate, collinear, and degenerate union-boundary geometry', () => {
-    const geometry = DirtyRenderStrategy as unknown as {
-      dedupePoints(points: [number, number][]): [number, number][];
-      removeCollinear(points: [number, number][]): [number, number][];
-      traceUnionBoundary(
-        rectA: { x1: number; y1: number; x2: number; y2: number },
-        rectB: { x1: number; y1: number; x2: number; y2: number },
-      ): [number, number][];
-    };
 
     const originalGet = Map.prototype.get;
     try {
@@ -148,7 +141,7 @@ describe('DirtyRenderStrategy', () => {
         return originalGet.call(this, key);
       };
 
-      expect(geometry.traceUnionBoundary({ x1: 0, y1: 0, x2: 1, y2: 1 }, { x1: 0, y1: 0, x2: 1, y2: 1 })).toEqual([
+      expect(DirtyRegionCollector.traceUnionBoundary({ x1: 0, y1: 0, x2: 1, y2: 1 }, { x1: 0, y1: 0, x2: 1, y2: 1 })).toEqual([
         [0, 0],
       ]);
     } finally {
@@ -156,7 +149,7 @@ describe('DirtyRenderStrategy', () => {
     }
 
     expect(
-      geometry.dedupePoints([
+      DirtyRegionCollector.dedupePoints([
         [0, 0],
         [0, 0],
         [1, 1],
@@ -166,7 +159,7 @@ describe('DirtyRenderStrategy', () => {
       [1, 1],
     ]);
     expect(
-      geometry.removeCollinear([
+      DirtyRegionCollector.removeCollinear([
         [0, 0],
         [1, 0],
         [2, 0],
@@ -177,7 +170,7 @@ describe('DirtyRenderStrategy', () => {
       [2, 0],
     ]);
     expect(
-      geometry.removeCollinear([
+      DirtyRegionCollector.removeCollinear([
         [0, 0],
         [1, 1],
       ]),
@@ -185,13 +178,13 @@ describe('DirtyRenderStrategy', () => {
       [0, 0],
       [1, 1],
     ]);
-    expect(geometry.traceUnionBoundary({ x1: 0, y1: 0, x2: 0, y2: 1 }, { x1: 0, y1: 0, x2: 0, y2: 1 })).toEqual([
+    expect(DirtyRegionCollector.traceUnionBoundary({ x1: 0, y1: 0, x2: 0, y2: 1 }, { x1: 0, y1: 0, x2: 0, y2: 1 })).toEqual([
       [0, 0],
       [0, 0],
       [0, 1],
       [0, 1],
     ]);
-    expect(geometry.traceUnionBoundary({ x1: 2, y1: 0, x2: 0, y2: 1 }, { x1: 2, y1: 0, x2: 0, y2: 1 })).toEqual([
+    expect(DirtyRegionCollector.traceUnionBoundary({ x1: 2, y1: 0, x2: 0, y2: 1 }, { x1: 2, y1: 0, x2: 0, y2: 1 })).toEqual([
       [2, 0],
       [0, 0],
       [0, 1],

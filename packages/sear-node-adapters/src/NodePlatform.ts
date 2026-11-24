@@ -7,19 +7,19 @@ export class NodePlatform extends Platform {
   /** DI token for resolving NodePlatform. */
   public static readonly symbol: symbol = Symbol.for('NodePlatform');
 
-  private nextHandle = 1;
-  private readonly timeouts = new Map<number, ReturnType<typeof setTimeout>>();
-  private readonly intervals = new Map<number, ReturnType<typeof setInterval>>();
+  #nextHandle = 1;
+  readonly #timeouts = new Map<number, ReturnType<typeof setTimeout>>();
+  readonly #intervals = new Map<number, ReturnType<typeof setInterval>>();
 
   /** Schedules a callback for the next host animation frame. */
   public requestAnimationFrame(callback: PlatformFrameRequestCallback): number {
-    const handle = this.nextHandle++;
+    const handle = this.#nextHandle++;
     const platform = this;
     const timeout = setTimeout(function runNodeAnimationFrameCallback() {
-      platform.timeouts.delete(handle);
+      platform.#timeouts.delete(handle);
       callback(platform.now());
     }, 0);
-    this.timeouts.set(handle, timeout);
+    this.#timeouts.set(handle, timeout);
     return handle;
   }
 
@@ -30,37 +30,37 @@ export class NodePlatform extends Platform {
 
   /** Updates the timeout. */
   public setTimeout(callback: () => void, ms: number): number {
-    const handle = this.nextHandle++;
+    const handle = this.#nextHandle++;
     const platform = this;
     const timeout = setTimeout(function runNodeTimeoutCallback() {
-      platform.timeouts.delete(handle);
+      platform.#timeouts.delete(handle);
       callback();
     }, ms);
-    this.timeouts.set(handle, timeout);
+    this.#timeouts.set(handle, timeout);
     return handle;
   }
 
   /** Cancels a one-shot host timer. */
   public clearTimeout(handle: number): void {
-    const timeout = this.timeouts.get(handle);
+    const timeout = this.#timeouts.get(handle);
     if (timeout === void 0) return;
     clearTimeout(timeout);
-    this.timeouts.delete(handle);
+    this.#timeouts.delete(handle);
   }
 
   /** Updates the interval. */
   public setInterval(callback: () => void, ms: number): number {
-    const handle = this.nextHandle++;
-    this.intervals.set(handle, setInterval(callback, ms));
+    const handle = this.#nextHandle++;
+    this.#intervals.set(handle, setInterval(callback, ms));
     return handle;
   }
 
   /** Cancels a repeating host timer. */
   public clearInterval(handle: number): void {
-    const interval = this.intervals.get(handle);
+    const interval = this.#intervals.get(handle);
     if (interval === void 0) return;
     clearInterval(interval);
-    this.intervals.delete(handle);
+    this.#intervals.delete(handle);
   }
 
   /** Returns the host's monotonic time in milliseconds. */
@@ -85,7 +85,7 @@ export class NodePlatform extends Platform {
 
   /** Creates a deterministic process-local runtime identifier. */
   public createId(prefix = 'node'): string {
-    return `${prefix}-${this.nextHandle++}`;
+    return `${prefix}-${this.#nextHandle++}`;
   }
 
   /** Registers a host event listener and returns an idempotent disposer. */

@@ -45,24 +45,50 @@ import { findNestedAggregateFormulaName } from './findNestedAggregateFormulaName
  */
 @Injectable()
 export class SheetFormulaSchedulerDataSource implements FormulaSchedulerDataSource {
+  readonly #dataEngine: DataEngine;
+  readonly #scrollManager: ScrollManager;
+  readonly #platform: Platform;
+  readonly #localeProvider: IFormulaLocaleProvider | undefined;
+  readonly #textServiceProvider: IFormulaTextServiceProvider | undefined;
+  readonly #externalServices: IFormulaExternalServiceProvider | undefined;
+  readonly #functions: IFunctionRegistry | undefined;
+  readonly #xmlXPath: XmlXPathEvaluator | undefined;
+  readonly #formulaSource: IFormulaSourceProvider | undefined;
+  readonly #dateSystemProvider: IFormulaDateSystemProvider | undefined;
+  readonly #formulaParser: IFormulaParser | undefined;
+  readonly #workbookMetadata: IFormulaWorkbookMetadataProvider | undefined;
+
   /** DI token for resolving SheetFormulaSchedulerDataSource. */
   public static readonly symbol = Symbol.for('SheetFormulaSchedulerDataSource');
 
   /** Creates a SheetFormulaSchedulerDataSource instance. */
   public constructor(
-    @Inject(DataEngine.symbol) private readonly dataEngine: DataEngine,
-    @Inject(ScrollManager.symbol) private readonly scrollManager: ScrollManager,
-    @Inject(Platform.symbol) private readonly platform: Platform,
-    @Inject(IFormulaLocaleProvider.symbol) private readonly localeProvider?: IFormulaLocaleProvider,
-    @Inject(IFormulaTextServiceProvider.symbol) private readonly textServiceProvider?: IFormulaTextServiceProvider,
-    @Inject(IFormulaExternalServiceProvider.symbol) private readonly externalServices?: IFormulaExternalServiceProvider,
-    @Inject(IFunctionRegistry.symbol) private readonly functions?: IFunctionRegistry,
-    @Inject(XmlXPathEvaluator.symbol) private readonly xmlXPath?: XmlXPathEvaluator,
-    @Inject(IFormulaSourceProvider.symbol) private readonly formulaSource?: IFormulaSourceProvider,
-    @Inject(IFormulaDateSystemProvider.symbol) private readonly dateSystemProvider?: IFormulaDateSystemProvider,
-    @Inject(IFormulaParser.symbol) private readonly formulaParser?: IFormulaParser,
-    @Inject(IFormulaWorkbookMetadataProvider.symbol) private readonly workbookMetadata?: IFormulaWorkbookMetadataProvider,
-  ) {}
+    @Inject(DataEngine.symbol) dataEngine: DataEngine,
+    @Inject(ScrollManager.symbol) scrollManager: ScrollManager,
+    @Inject(Platform.symbol) platform: Platform,
+    @Inject(IFormulaLocaleProvider.symbol) localeProvider?: IFormulaLocaleProvider,
+    @Inject(IFormulaTextServiceProvider.symbol) textServiceProvider?: IFormulaTextServiceProvider,
+    @Inject(IFormulaExternalServiceProvider.symbol) externalServices?: IFormulaExternalServiceProvider,
+    @Inject(IFunctionRegistry.symbol) functions?: IFunctionRegistry,
+    @Inject(XmlXPathEvaluator.symbol) xmlXPath?: XmlXPathEvaluator,
+    @Inject(IFormulaSourceProvider.symbol) formulaSource?: IFormulaSourceProvider,
+    @Inject(IFormulaDateSystemProvider.symbol) dateSystemProvider?: IFormulaDateSystemProvider,
+    @Inject(IFormulaParser.symbol) formulaParser?: IFormulaParser,
+    @Inject(IFormulaWorkbookMetadataProvider.symbol) workbookMetadata?: IFormulaWorkbookMetadataProvider,
+  ) {
+    this.#dataEngine = dataEngine;
+    this.#scrollManager = scrollManager;
+    this.#platform = platform;
+    this.#localeProvider = localeProvider;
+    this.#textServiceProvider = textServiceProvider;
+    this.#externalServices = externalServices;
+    this.#functions = functions;
+    this.#xmlXPath = xmlXPath;
+    this.#formulaSource = formulaSource;
+    this.#dateSystemProvider = dateSystemProvider;
+    this.#formulaParser = formulaParser;
+    this.#workbookMetadata = workbookMetadata;
+  }
 
   public isSpillObstacleTransaction(transaction: Transaction): boolean {
     return transaction.pluginKey === SheetCellMergePlugin.pluginKey;
@@ -70,45 +96,45 @@ export class SheetFormulaSchedulerDataSource implements FormulaSchedulerDataSour
 
   /** @inheritdoc */
   public createEvalContext(resultStore: FormulaResultStore): EvalContext {
-    const sheetData = readSheetDataMatrix(this.dataEngine);
+    const sheetData = readSheetDataMatrix(this.#dataEngine);
     if (!sheetData) {
-      this.platform.warn('FormulaSchedulerDataSource createEvalContext fell back: sheet data field is missing.');
-      return this.createReferenceErrorContext();
+      this.#platform.warn('FormulaSchedulerDataSource createEvalContext fell back: sheet data field is missing.');
+      return this.#createReferenceErrorContext();
     }
 
     const [rowCount, colCount] = sheetData.shape;
-    const rowSizes = readSheetRawRowSizes(this.dataEngine);
-    const hiddenRows = readSheetRowHiddenOriginalSizes(this.dataEngine);
-    const rowVisibility = this.dataEngine.readDataViewField<SheetRowVisibility>(
+    const rowSizes = readSheetRawRowSizes(this.#dataEngine);
+    const hiddenRows = readSheetRowHiddenOriginalSizes(this.#dataEngine);
+    const rowVisibility = this.#dataEngine.readDataViewField<SheetRowVisibility>(
       SheetDataFieldNamespace, SheetRowVisibilityFieldKey,
     );
-    const cellFormats = readSheetCellFormats(this.dataEngine);
-    const cellAlignments = readSheetCellAlignments(this.dataEngine);
-    const cellMerges = readSheetCellMerges(this.dataEngine);
-    const columnSizes = readSheetColumnSizes(this.dataEngine);
+    const cellFormats = readSheetCellFormats(this.#dataEngine);
+    const cellAlignments = readSheetCellAlignments(this.#dataEngine);
+    const cellMerges = readSheetCellMerges(this.#dataEngine);
+    const columnSizes = readSheetColumnSizes(this.#dataEngine);
     const aggregateFormulaNames = new Map<string, string | undefined>();
-    const formulaParser = this.formulaParser;
+    const formulaParser = this.#formulaParser;
     const isCellInBounds = (row: number, col: number): boolean =>
       row >= 0 && row < rowCount && col >= 0 && col < colCount;
 
-    const dateTimeLocale = this.localeProvider?.getDateTimeLocale();
-    const textLocale = this.localeProvider?.getTextLocale?.();
-    const phoneticReader = this.textServiceProvider?.getPhoneticReader?.();
-    const languageService = this.textServiceProvider?.getLanguageService?.();
+    const dateTimeLocale = this.#localeProvider?.getDateTimeLocale();
+    const textLocale = this.#localeProvider?.getTextLocale?.();
+    const phoneticReader = this.#textServiceProvider?.getPhoneticReader?.();
+    const languageService = this.#textServiceProvider?.getLanguageService?.();
     const context: EvalContext = {
-      ...(this.dateSystemProvider === undefined ? {} : { dateSystem: this.dateSystemProvider.getDateSystem() }),
-      ...(this.formulaSource === undefined ? {} : { formulaSource: this.formulaSource }),
-      ...(this.xmlXPath === undefined ? {} : { xmlXPath: this.xmlXPath }),
-      ...(this.externalServices === undefined ? {} : { externalServices: this.externalServices }),
+      ...(this.#dateSystemProvider === undefined ? {} : { dateSystem: this.#dateSystemProvider.getDateSystem() }),
+      ...(this.#formulaSource === undefined ? {} : { formulaSource: this.#formulaSource }),
+      ...(this.#xmlXPath === undefined ? {} : { xmlXPath: this.#xmlXPath }),
+      ...(this.#externalServices === undefined ? {} : { externalServices: this.#externalServices }),
       isCellInBounds,
       referenceResolver: { resolve: (text, options) => resolveSheetFormulaTextReference(text, options, [rowCount, colCount]) },
-      currentDateTime: (): number => this.platform.currentDateTime(),
+      currentDateTime: (): number => this.#platform.currentDateTime(),
       ...(dateTimeLocale === void 0 ? {} : { dateTimeLocale }),
       ...(textLocale === void 0 ? {} : { textLocale }),
       ...(phoneticReader === void 0 ? {} : { phoneticReader }),
       ...(languageService === void 0 ? {} : { languageService }),
       metadata: {
-        ...(this.workbookMetadata === undefined ? {} : { readWorkbook: () => this.workbookMetadata?.readWorkbook() }),
+        ...(this.#workbookMetadata === undefined ? {} : { readWorkbook: () => this.#workbookMetadata?.readWorkbook() }),
         readVisibleOrigin: () => this.getVisibleOrigin(),
         readCell: ({ row, col, sheetName }) => {
           if (sheetName !== undefined || !isCellInBounds(row, col)) return undefined;
@@ -217,16 +243,16 @@ export class SheetFormulaSchedulerDataSource implements FormulaSchedulerDataSour
 
   /** @inheritdoc */
   public getViewportFormulaKeys(formulaKeys: Iterable<CellKey>): Set<CellKey> {
-    const rowSizes = readSheetRowSizes(this.dataEngine);
-    const columnSizes = readSheetColumnSizes(this.dataEngine);
+    const rowSizes = readSheetRowSizes(this.#dataEngine);
+    const columnSizes = readSheetColumnSizes(this.#dataEngine);
     if (!rowSizes || !columnSizes) {
-      this.platform.warn(
+      this.#platform.warn(
         'FormulaSchedulerDataSource getViewportFormulaKeys skipped: sheet dimension fields are missing.',
       );
       return new Set<CellKey>();
     }
 
-    const { startRow, endRow, startCol, endCol } = computeViewportRange(this.scrollManager, rowSizes, columnSizes);
+    const { startRow, endRow, startCol, endCol } = computeViewportRange(this.#scrollManager, rowSizes, columnSizes);
     const viewport = new Set<CellKey>();
 
     for (const key of formulaKeys) {
@@ -241,9 +267,9 @@ export class SheetFormulaSchedulerDataSource implements FormulaSchedulerDataSour
 
   /** @inheritdoc */
   public getVisibleOrigin(): { row: number; col: number } {
-    const rowSizes = readSheetRowSizes(this.dataEngine);
-    const columnSizes = readSheetColumnSizes(this.dataEngine);
-    const { x, y } = this.scrollManager.getState();
+    const rowSizes = readSheetRowSizes(this.#dataEngine);
+    const columnSizes = readSheetColumnSizes(this.#dataEngine);
+    const { x, y } = this.#scrollManager.getState();
     return {
       row: rowSizes ? firstVisibleDimensionIndex(rowSizes, y) : 0,
       col: columnSizes ? firstVisibleDimensionIndex(columnSizes, x) : 0,
@@ -252,43 +278,43 @@ export class SheetFormulaSchedulerDataSource implements FormulaSchedulerDataSour
 
   /** @inheritdoc */
   public onViewportChanged(handler: () => void): () => void {
-    return this.scrollManager.subscribeScroll(handler);
+    return this.#scrollManager.subscribeScroll(handler);
   }
 
   /** Wakes functions whose descriptors depend on an invalidated service. */
   public onExternalServiceInvalidated(handler: (functionNames: readonly string[]) => void): () => void {
     const invalidate = (serviceIds: readonly string[]) => {
       const names =
-        this.functions
+        this.#functions
           ?.list()
           .filter((name) =>
-            this.functions?.get(name)?.descriptor?.externalServices?.some((id) => serviceIds.includes(id)),
+            this.#functions?.get(name)?.descriptor?.externalServices?.some((id) => serviceIds.includes(id)),
           ) ?? [];
       if (names.length > 0) handler(names);
     };
     const invalidateLanguage = () => invalidate([FormulaLanguageServiceDefinition.id]);
     const disposeLanguage =
-      this.textServiceProvider?.subscribeInvalidation?.(invalidateLanguage) ??
-      this.textServiceProvider?.getLanguageService?.()?.subscribeInvalidation?.(invalidateLanguage) ??
+      this.#textServiceProvider?.subscribeInvalidation?.(invalidateLanguage) ??
+      this.#textServiceProvider?.getLanguageService?.()?.subscribeInvalidation?.(invalidateLanguage) ??
       (() => {});
-    const disposeExternal = this.externalServices?.subscribeInvalidation(invalidate);
+    const disposeExternal = this.#externalServices?.subscribeInvalidation(invalidate);
     return () => {
       disposeExternal?.();
       disposeLanguage();
     };
   }
 
-  private createReferenceErrorContext(): EvalContext {
-    const dateTimeLocale = this.localeProvider?.getDateTimeLocale();
-    const textLocale = this.localeProvider?.getTextLocale?.();
-    const phoneticReader = this.textServiceProvider?.getPhoneticReader?.();
-    const languageService = this.textServiceProvider?.getLanguageService?.();
+  #createReferenceErrorContext(): EvalContext {
+    const dateTimeLocale = this.#localeProvider?.getDateTimeLocale();
+    const textLocale = this.#localeProvider?.getTextLocale?.();
+    const phoneticReader = this.#textServiceProvider?.getPhoneticReader?.();
+    const languageService = this.#textServiceProvider?.getLanguageService?.();
     const context: EvalContext = {
-      ...(this.dateSystemProvider === undefined ? {} : { dateSystem: this.dateSystemProvider.getDateSystem() }),
-      ...(this.formulaSource === undefined ? {} : { formulaSource: this.formulaSource }),
-      ...(this.externalServices === undefined ? {} : { externalServices: this.externalServices }),
+      ...(this.#dateSystemProvider === undefined ? {} : { dateSystem: this.#dateSystemProvider.getDateSystem() }),
+      ...(this.#formulaSource === undefined ? {} : { formulaSource: this.#formulaSource }),
+      ...(this.#externalServices === undefined ? {} : { externalServices: this.#externalServices }),
       isCellInBounds: (_row: number, _col: number): boolean => false,
-      currentDateTime: (): number => this.platform.currentDateTime(),
+      currentDateTime: (): number => this.#platform.currentDateTime(),
       ...(dateTimeLocale === void 0 ? {} : { dateTimeLocale }),
       ...(textLocale === void 0 ? {} : { textLocale }),
       ...(phoneticReader === void 0 ? {} : { phoneticReader }),

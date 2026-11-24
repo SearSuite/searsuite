@@ -39,7 +39,7 @@ export class OverlayRenderStrategy<
       else if (isRichTextNode(candidate, 'block')) textBlocks.push(candidate);
     }
 
-    if (overlayNodes.length === 0 && !this.hasStickyOverlays(node, positionRect.width, positionRect.height)) return;
+    if (overlayNodes.length === 0 && !this.#hasStickyOverlays(node, positionRect.width, positionRect.height)) return;
 
     this.renderContext.save();
     try {
@@ -56,26 +56,26 @@ export class OverlayRenderStrategy<
             clip ? new PositionRect<HexColor>(clip.x, clip.y, clip.width, clip.height) : visibleRect,
           );
           if (isRichTextSelection(overlayNode)) {
-            this.paintSelectedText(overlayNode, textBlocks, visibleRect);
+            this.#paintSelectedText(overlayNode, textBlocks, visibleRect);
           }
         } finally {
           this.renderContext.endNodeSemantics();
         }
       }
-      this.renderStickyOverlays(node, positionRect.width, positionRect.height);
+      this.#renderStickyOverlays(node, positionRect.width, positionRect.height);
     } finally {
       this.renderContext.setTransform(1, 0, 0, 1, 0, 0);
       this.renderContext.restore();
     }
   }
 
-  private hasStickyOverlays(node: Node<NodeTypeProperties>, width: number, height: number): boolean {
-    return this.stickyGroups(width, height).some(({ rect, accepts }) =>
+  #hasStickyOverlays(node: Node<NodeTypeProperties>, width: number, height: number): boolean {
+    return this.#stickyGroups(width, height).some(({ rect, accepts }) =>
       node.query(rect).some((candidate) => candidate.properties.isEdit && candidate.sticky && accepts(candidate)));
   }
 
-  private renderStickyOverlays(node: Node<NodeTypeProperties>, width: number, height: number): void {
-    for (const { rect, transform, accepts } of this.stickyGroups(width, height)) {
+  #renderStickyOverlays(node: Node<NodeTypeProperties>, width: number, height: number): void {
+    for (const { rect, transform, accepts } of this.#stickyGroups(width, height)) {
       const candidates = node.query(rect).filter((candidate) =>
         candidate.properties.isEdit && candidate.sticky && accepts(candidate));
       if (candidates.length === 0) continue;
@@ -96,7 +96,7 @@ export class OverlayRenderStrategy<
     }
   }
 
-  private stickyGroups(width: number, height: number): readonly {
+  #stickyGroups(width: number, height: number): readonly {
     rect: PositionRect<HexColor>;
     transform: [number, number, number, number, number, number];
     accepts: (candidate: Node<NodeTypeProperties>) => boolean;
@@ -112,7 +112,7 @@ export class OverlayRenderStrategy<
     ];
   }
 
-  private paintSelectedText(
+  #paintSelectedText(
     selection: Node<NodeTypeProperties> & { getSelectionRects(): readonly RichTextSelectionRect[] },
     textBlocks: readonly Node<NodeTypeProperties>[],
     visibleRect: PositionRect<HexColor>,

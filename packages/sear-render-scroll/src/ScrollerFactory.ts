@@ -4,7 +4,7 @@ import { Scroller } from './Scroller';
 /** Factory registry for host scroller adapters. */
 export class ScrollerFactory {
   /** Registered scroller creators keyed by host adapter type. */
-  private static scrollerMap = new Map<string | symbol, (args: unknown) => Scroller>();
+  static #scrollerMap = new Map<string | symbol, (args: unknown) => Scroller>();
 
   /**
    * Registers a scroller creator.
@@ -12,7 +12,7 @@ export class ScrollerFactory {
    * @param scrollerCreator - Factory invoked by createScroller().
    */
   static registerScroller(type: string | symbol, scrollerCreator: (args: unknown) => Scroller): void {
-    this.scrollerMap.set(type, scrollerCreator);
+    ScrollerFactory.#scrollerMap.set(type, scrollerCreator);
   }
 
   /**
@@ -22,7 +22,7 @@ export class ScrollerFactory {
    * @returns New scroller adapter.
    */
   static createScroller(type: string | symbol, args: unknown): Scroller {
-    const scrollerCreator = this.scrollerMap.get(type);
+    const scrollerCreator = ScrollerFactory.#scrollerMap.get(type);
     if (!scrollerCreator) {
       throw new SearError(`No scroller registered for type ${type.toString()}`);
     }

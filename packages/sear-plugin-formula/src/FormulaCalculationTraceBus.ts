@@ -18,6 +18,8 @@ import {
  */
 @Injectable()
 export class FormulaCalculationTraceBus implements IFormulaCalculationTraceProvider {
+  readonly #platform: Platform;
+
   /** DI token for resolving FormulaCalculationTraceBus. */
   public static readonly symbol = Symbol.for('FormulaCalculationTraceBus');
 
@@ -26,7 +28,9 @@ export class FormulaCalculationTraceBus implements IFormulaCalculationTraceProvi
   readonly #listeners = new Set<FormulaCalculationTraceListener>();
 
   /** Creates a trace hub bound to one editor instance. */
-  constructor(@Inject(Platform.symbol) private readonly platform: Platform) {}
+  constructor(@Inject(Platform.symbol) platform: Platform) {
+    this.#platform = platform;
+  }
 
   /** Seals event publication after initial formula data has been scanned. */
   public enforceCommandBoundary(isCommandExecuting: () => boolean): void {
@@ -62,7 +66,7 @@ export class FormulaCalculationTraceBus implements IFormulaCalculationTraceProvi
         try {
           listener(nextEvent);
         } catch (error) {
-          this.platform.warn('[Formula] Calculation trace listener failed.', error);
+          this.#platform.warn('[Formula] Calculation trace listener failed.', error);
         }
       });
     });

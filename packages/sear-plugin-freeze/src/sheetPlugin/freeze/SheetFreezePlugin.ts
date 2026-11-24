@@ -26,6 +26,8 @@ const key = new PluginKey('SheetFreezePlugin');
 /** Owns the persistent row and column prefix kept visible during scrolling. */
 @Injectable()
 export class SheetFreezePlugin extends Plugin<unknown, CellProperties, SheetFreezePluginState> {
+  readonly #shape: () => readonly [number, number];
+
   public static readonly symbol = Symbol.for('SheetFreezePlugin');
   public static readonly pluginKey = key;
   public override readonly warnOnDuplicateDepth = false;
@@ -51,8 +53,9 @@ export class SheetFreezePlugin extends Plugin<unknown, CellProperties, SheetFree
     MatrixOTActionName.ColInsert, MatrixOTActionName.ColDelete, MatrixOTActionName.ColMove,
   ];
 
-  public constructor(state: SheetFreezePluginState, private readonly shape: () => readonly [number, number]) {
+  public constructor(state: SheetFreezePluginState, shape: () => readonly [number, number]) {
     super({ key, state });
+    this.#shape = shape;
   }
 
   public registerCommands(commands: SheetCommandBus): void {
@@ -62,7 +65,7 @@ export class SheetFreezePlugin extends Plugin<unknown, CellProperties, SheetFree
         rows: this.getState().freeze.getItem(0, 0) ?? 0,
         columns: this.getState().freeze.getItem(0, 1) ?? 0,
       }),
-      shape: this.shape,
+      shape: this.#shape,
     });
   }
 

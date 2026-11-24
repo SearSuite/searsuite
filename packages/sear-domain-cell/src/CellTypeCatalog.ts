@@ -25,6 +25,12 @@ import { CellTypeDefinition } from './CellTypeDefinition';
  */
 @Injectable()
 export class CellTypeCatalog {
+  readonly #commitStrategies: CellCommitStrategyRegistry;
+  readonly #displayTexts: CellDisplayTextRegistry;
+  readonly #renderCoordinator: SheetRenderCoordinatorManager;
+  readonly #clipboardCodecs: CellClipboardCodecRegistry;
+  readonly #formatCodecs: CellFormatTransferRegistry | undefined;
+
   /** DI token for resolving the workbook cell type catalog. */
   public static readonly symbol = Symbol.for('CellTypeCatalog');
 
@@ -53,15 +59,21 @@ export class CellTypeCatalog {
   /** Creates a catalog over the specialised commit, display-text and renderer registries. */
   constructor(
     @Inject(CellCommitStrategyRegistry.symbol)
-    private readonly commitStrategies: CellCommitStrategyRegistry,
+    commitStrategies: CellCommitStrategyRegistry,
     @Inject(CellDisplayTextRegistry.symbol)
-    private readonly displayTexts: CellDisplayTextRegistry,
+    displayTexts: CellDisplayTextRegistry,
     @Inject(SheetRenderCoordinatorManager.symbol)
-    private readonly renderCoordinator: SheetRenderCoordinatorManager,
+    renderCoordinator: SheetRenderCoordinatorManager,
     @Inject(CellClipboardCodecRegistry.symbol)
-    private readonly clipboardCodecs: CellClipboardCodecRegistry,
-    @Inject(CellFormatTransferRegistry.symbol) private readonly formatCodecs?: CellFormatTransferRegistry,
-  ) {}
+    clipboardCodecs: CellClipboardCodecRegistry,
+    @Inject(CellFormatTransferRegistry.symbol) formatCodecs?: CellFormatTransferRegistry,
+  ) {
+    this.#commitStrategies = commitStrategies;
+    this.#displayTexts = displayTexts;
+    this.#renderCoordinator = renderCoordinator;
+    this.#clipboardCodecs = clipboardCodecs;
+    this.#formatCodecs = formatCodecs;
+  }
 
   /** Registers a definition atomically and returns a disposer that restores the previous definition. */
   register(definition: CellRenderDefinition): () => void {
@@ -81,14 +93,14 @@ export class CellTypeCatalog {
 
     const disposers = [
       ...(definition instanceof CellTypeDefinition
-        ? capabilities.commitStrategies.map((strategy) => this.commitStrategies.register(strategy))
+        ? capabilities.commitStrategies.map((strategy) => this.#commitStrategies.register(strategy))
         : []),
-      capabilities.formatCodec && this.formatCodecs?.register(capabilities.formatCodec),
-      capabilities.clipboardCodec && this.clipboardCodecs.register(capabilities.clipboardCodec),
-      capabilities.displayTextProvider && this.displayTexts.register(capabilities.displayTextProvider),
+      capabilities.formatCodec && this.#formatCodecs?.register(capabilities.formatCodec),
+      capabilities.clipboardCodec && this.#clipboardCodecs.register(capabilities.clipboardCodec),
+      capabilities.displayTextProvider && this.#displayTexts.register(capabilities.displayTextProvider),
       definition instanceof CellTypeDefinition &&
-        this.renderCoordinator.registerStoredValueValidator(type, definition.isStoredValue.bind(definition)),
-      capabilities.renderer.register(this.renderCoordinator),
+        this.#renderCoordinator.registerStoredValueValidator(type, definition.isStoredValue.bind(definition)),
+      capabilities.renderer.register(this.#renderCoordinator),
     ].filter((disposer): disposer is () => void => Boolean(disposer));
     Object.freeze(definition);
 
@@ -127,6 +139,6 @@ export class CellTypeCatalog {
 
   /** Resolves display text through the registered provider for a persisted cell type. */
   getDisplayText(cell: CellDisplayData, context: CellDisplayContext): string {
-    return this.displayTexts.getDisplayText(cell, context);
+    return this.#displayTexts.getDisplayText(cell, context);
   }
 }

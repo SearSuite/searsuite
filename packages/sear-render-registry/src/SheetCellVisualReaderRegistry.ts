@@ -25,7 +25,7 @@ export class SheetCellVisualReaderRegistry {
   /** Registers one reader and rejects duplicate ids or property ownership. */
   public register(reader: SheetCellVisualReader): () => void {
     assertCellExtensionWrite(this);
-    this.assertUniqueId(reader.id);
+    this.#assertUniqueId(reader.id);
     const registered: SheetCellVisualReader = Object.freeze({
       id: reader.id,
       properties: Object.freeze([...reader.properties]),
@@ -61,7 +61,7 @@ export class SheetCellVisualReaderRegistry {
   /** Registers explicit-priority overrides without acquiring base property ownership. */
   public registerOverride(reader: SheetCellVisualOverride): () => void {
     assertCellExtensionWrite(this);
-    this.assertUniqueId(reader.id);
+    this.#assertUniqueId(reader.id);
     if (!Number.isFinite(reader.priority)) {
       throw new SheetCellVisualReaderError(
         SheetCellVisualReaderErrorCode.InvalidPriority,
@@ -89,21 +89,21 @@ export class SheetCellVisualReaderRegistry {
       }
     }
     this.#overrides.set(registered.id, registered);
-    this.orderOverrides();
+    this.#orderOverrides();
     let disposed = false;
     return () => {
       assertCellExtensionWrite(this);
       if (disposed || this.#overrides.get(registered.id) !== registered) return;
       disposed = true;
       this.#overrides.delete(registered.id);
-      this.orderOverrides();
+      this.#orderOverrides();
     };
   }
 
   /** Registers a rule source whose matches are composed across feature plugins. */
   public registerConditional(reader: SheetCellConditionalVisualReader): () => void {
     assertCellExtensionWrite(this);
-    this.assertUniqueId(reader.id);
+    this.#assertUniqueId(reader.id);
     const registered: SheetCellConditionalVisualReader = Object.freeze({
       id: reader.id,
       properties: Object.freeze([...reader.properties]),
@@ -150,12 +150,12 @@ export class SheetCellVisualReaderRegistry {
     const result: Partial<CellProperties> = {};
     for (const reader of this.#readers.values()) {
       const contribution = reader.read(position);
-      this.assertDeclaredProperties(reader, contribution);
+      this.#assertDeclaredProperties(reader, contribution);
       Object.assign(result, contribution);
     }
     for (const reader of this.#orderedOverrides) {
       const contribution = reader.read(position);
-      this.assertDeclaredProperties(reader, contribution);
+      this.#assertDeclaredProperties(reader, contribution);
       for (const property of Reflect.ownKeys(contribution) as (keyof CellProperties)[]) {
         if (contribution[property] !== undefined) Object.assign(result, { [property]: contribution[property] });
       }
@@ -167,7 +167,7 @@ export class SheetCellVisualReaderRegistry {
     const layers = new Map<string, SheetCellVisualLayer>();
     for (const { reader, match } of matches) {
       if (match.properties) {
-        this.assertDeclaredProperties(reader, match.properties);
+        this.#assertDeclaredProperties(reader, match.properties);
         for (const property of Reflect.ownKeys(match.properties) as (keyof CellProperties)[]) {
           if (match.properties[property] !== undefined) Object.assign(result, { [property]: match.properties[property] });
         }
@@ -187,7 +187,7 @@ export class SheetCellVisualReaderRegistry {
     this.#orderedOverrides = [];
   }
 
-  private assertUniqueId(readerId: string): void {
+  #assertUniqueId(readerId: string): void {
     if (!this.#readers.has(readerId) && !this.#overrides.has(readerId) && !this.#conditionalReaders.has(readerId)) return;
     throw new SheetCellVisualReaderError(
       SheetCellVisualReaderErrorCode.DuplicateReader,
@@ -196,7 +196,7 @@ export class SheetCellVisualReaderRegistry {
     );
   }
 
-  private assertDeclaredProperties(
+  #assertDeclaredProperties(
     reader: Pick<SheetCellVisualReader, 'id' | 'properties'>,
     contribution: Readonly<Partial<CellProperties>>,
   ): void {
@@ -210,7 +210,7 @@ export class SheetCellVisualReaderRegistry {
     }
   }
 
-  private orderOverrides(): void {
+  #orderOverrides(): void {
     this.#orderedOverrides = [...this.#overrides.values()].sort((left, right) => left.priority - right.priority);
   }
 }

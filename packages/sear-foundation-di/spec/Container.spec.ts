@@ -12,16 +12,24 @@ class LazyService {
 
 @Injectable()
 class TestServiceA {
-  constructor(@Inject('TestServiceB') private getServiceB: () => TestServiceB) {}
+  #getServiceB: () => TestServiceB;
+
+  constructor(@Inject('TestServiceB') getServiceB: () => TestServiceB) {
+    this.#getServiceB = getServiceB;
+  }
 
   doSomething() {
-    return 'A' + this.getServiceB().doSomethingElse();
+    return 'A' + this.#getServiceB().doSomethingElse();
   }
 }
 
 @Injectable()
 class TestServiceB {
-  constructor(@Inject('TestServiceA') private getServiceA: () => TestServiceA) {}
+  #getServiceA: () => TestServiceA;
+
+  constructor(@Inject('TestServiceA') getServiceA: () => TestServiceA) {
+    this.#getServiceA = getServiceA;
+  }
 
   doSomethingElse() {
     return 'B';
@@ -37,10 +45,14 @@ class NoDependencyService {
 
 @Injectable()
 class DependentService {
-  constructor(@Inject('NoDependencyService') private noDepService: NoDependencyService) {}
+  #noDepService: NoDependencyService;
+
+  constructor(@Inject('NoDependencyService') noDepService: NoDependencyService) {
+    this.#noDepService = noDepService;
+  }
 
   perform() {
-    return this.noDepService.doWork();
+    return this.#noDepService.doWork();
   }
 }
 

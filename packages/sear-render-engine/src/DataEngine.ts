@@ -49,7 +49,6 @@ export abstract class DataEngine {
   /** DI token for resolving the abstract data engine singleton. */
   public static readonly symbol = Symbol.for('DataEngine');
 
-  // private dataTypeRegistry: Partial<Record<PluginKey, any>> = new Map();
   /** Plugin-owned data values keyed by PluginKey. */
   #dataTypeRegistry: Map<PluginKey, unknown> = new Map();
   /** Registration metadata keyed by PluginKey. */
@@ -57,7 +56,6 @@ export abstract class DataEngine {
   /** Data view field selectors grouped by named read model. */
   #dataViewFields: Map<string, Map<string, RegisteredDataEngineViewField>> = new Map();
   #writeToken: object | undefined;
-  // private stateRegistry: Record<string, unknown> = {};
 
   /** Initializes engine-owned registries or projections. */
   abstract initialize(): void;
@@ -68,7 +66,7 @@ export abstract class DataEngine {
     this.#writeToken = token;
   }
 
-  private assertWritable(token?: object): void {
+  #assertWritable(token?: object): void {
     if (this.#writeToken && token !== this.#writeToken) {
       throw new SearError('Committed Sheet data can only change through a command transaction.');
     }
@@ -85,7 +83,7 @@ export abstract class DataEngine {
     options: DataEngineRegistrationOptions<StateType> = {},
     token?: object,
   ): void {
-    this.assertWritable(token);
+    this.#assertWritable(token);
     const ownedOptions: DataEngineRegistrationOptions<StateType> = options.dataView
       ? Object.freeze({ dataView: Object.freeze(options.dataView.map((field) => Object.freeze({ ...field }))) })
       : Object.freeze({});
@@ -100,7 +98,7 @@ export abstract class DataEngine {
    * @param value - New data value.
    */
   replaceDataType(key: PluginKey, value: unknown, token?: object): void {
-    this.assertWritable(token);
+    this.#assertWritable(token);
     this.#dataTypeRegistry.set(key, value);
   }
 
@@ -155,7 +153,7 @@ export abstract class DataEngine {
     field: DataEngineViewFieldRegistration<StateType>,
     token?: object,
   ): void {
-    this.assertWritable(token);
+    this.#assertWritable(token);
     const viewFields = this.#dataViewFields.get(field.viewKey) ?? new Map<string, RegisteredDataEngineViewField>();
     const existing = viewFields.get(field.fieldKey);
     if (existing && existing.ownerKey.key !== ownerKey.key) {

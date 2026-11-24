@@ -20,6 +20,8 @@ const renderConfig = { defaultBorderColor: 'rgba(220, 221, 229, 1)' };
 /** Renders merged ranges owned by SheetCellMergePlugin. */
 @Injectable()
 export class SheetCellMergeRender extends Plugin<SearCoreSheet, CellProperties, Record<string, never>> {
+  readonly #cellVisualReaders: SheetCellVisualReaderRegistry;
+
   public static readonly symbol = Symbol.for('SheetCellMergeRender');
   public static readonly pluginKey = key;
   public override readonly depth = 1;
@@ -37,9 +39,10 @@ export class SheetCellMergeRender extends Plugin<SearCoreSheet, CellProperties, 
 
   public constructor(
     @Inject(SheetCellVisualReaderRegistry.symbol)
-    private readonly cellVisualReaders: SheetCellVisualReaderRegistry,
+    cellVisualReaders: SheetCellVisualReaderRegistry,
   ) {
     super({ key, state: {} });
+    this.#cellVisualReaders = cellVisualReaders;
   }
 
   public override registerState() {
@@ -95,7 +98,7 @@ export class SheetCellMergeRender extends Plugin<SearCoreSheet, CellProperties, 
       const stickyLeft = column < freeze.columns;
       const affix = { ...(stickyTop ? { top: positionRect.y } : {}),
         ...(stickyLeft ? { left: positionRect.x } : {}) };
-      const visual = this.cellVisualReaders.readVisual({ rowIndex: row, columnIndex: column });
+      const visual = this.#cellVisualReaders.readVisual({ rowIndex: row, columnIndex: column });
       const visualProperties = visual.properties;
       const property: CellProperties = {
         ...visualProperties,

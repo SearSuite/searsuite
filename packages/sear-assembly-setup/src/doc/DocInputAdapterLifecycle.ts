@@ -7,11 +7,16 @@ import { DocInputBindingRegistry } from './DocInputBindingRegistry';
 /** Owns standalone document text-input and keyboard adapter subscriptions. */
 @Injectable()
 export class DocInputAdapterLifecycle {
+  readonly #textInput: TextInput;
+  readonly #keyboardRouter: KeyboardRouter;
+  readonly #pointerCapture: PointerCapture;
+  readonly #inputBindings: DocInputBindingRegistry;
+
   /** DI token for resolving the document input adapter lifecycle. */
   public static readonly symbol = Symbol.for('DocInputAdapterLifecycle');
 
-  private started = false;
-  private destroyed = false;
+  #started = false;
+  #destroyed = false;
   #assertCommandWrite: (() => void) | undefined;
   #teardownToken: object | undefined;
 
@@ -25,39 +30,44 @@ export class DocInputAdapterLifecycle {
   /** Creates an input adapter lifecycle owner. */
   public constructor(
     @Inject(TextInput.symbol)
-    private readonly textInput: TextInput,
+    textInput: TextInput,
     @Inject(KeyboardRouter.symbol)
-    private readonly keyboardRouter: KeyboardRouter,
+    keyboardRouter: KeyboardRouter,
     @Inject(PointerCapture.symbol)
-    private readonly pointerCapture: PointerCapture,
+    pointerCapture: PointerCapture,
     @Inject(DocInputBindingRegistry.symbol)
-    private readonly inputBindings: DocInputBindingRegistry,
-  ) {}
+    inputBindings: DocInputBindingRegistry,
+  ) {
+    this.#textInput = textInput;
+    this.#keyboardRouter = keyboardRouter;
+    this.#pointerCapture = pointerCapture;
+    this.#inputBindings = inputBindings;
+  }
 
   /** Starts text and keyboard adapter subscriptions/listeners. */
   public start(): void {
-    if (this.destroyed) throw new SearError('Doc input lifecycle has been destroyed.');
-    if (this.started) return;
+    if (this.#destroyed) throw new SearError('Doc input lifecycle has been destroyed.');
+    if (this.#started) return;
     this.#assertCommandWrite?.();
-    this.started = true;
-    this.textInput.subscribe(this.inputBindings.createTextHandlers());
-    this.keyboardRouter.subscribe(this.inputBindings.createKeyboardHandlers());
-    this.textInput.startListener();
-    this.keyboardRouter.startListener();
+    this.#started = true;
+    this.#textInput.subscribe(this.#inputBindings.createTextHandlers());
+    this.#keyboardRouter.subscribe(this.#inputBindings.createKeyboardHandlers());
+    this.#textInput.startListener();
+    this.#keyboardRouter.startListener();
   }
 
   /** Releases input adapter listeners and binding state. */
   public destroy(teardownToken?: object): void {
-    if (this.destroyed) return;
+    if (this.#destroyed) return;
     if (this.#teardownToken && teardownToken !== this.#teardownToken) {
       throw new SearError('Doc input lifecycle cleanup requires its editor owner.');
     }
-    this.destroyed = true;
-    if (!this.started) return;
-    this.started = false;
-    this.textInput.stopListener();
-    this.pointerCapture.stop();
-    this.keyboardRouter.stopListener();
-    this.inputBindings.clear();
+    this.#destroyed = true;
+    if (!this.#started) return;
+    this.#started = false;
+    this.#textInput.stopListener();
+    this.#pointerCapture.stop();
+    this.#keyboardRouter.stopListener();
+    this.#inputBindings.clear();
   }
 }

@@ -18,16 +18,16 @@ export class SheetClipboardCutSession {
   }
 
   public begin(pending: PendingSheetCut): void {
-    this.assertCommand();
+    this.#assertCommand();
     this.#pending = pending;
   }
 
   public cancel(): void {
-    this.assertCommand();
+    this.#assertCommand();
     this.#pending = null;
   }
 
-  private assertCommand(): void {
+  #assertCommand(): void {
     if (!isInsideCommandExecution()) throw new SearError('Clipboard cut state must change through a command.');
   }
 }

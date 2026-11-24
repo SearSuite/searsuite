@@ -36,9 +36,9 @@ class CoordinationPublisherPlugin extends SheetPlugin<null> {
   public static readonly symbol = Symbol.for('CoordinationPublisherPlugin');
   public static current: CoordinationPublisherPlugin | null = null;
 
-  private readonly stateListeners = new Set<(value: number) => void>();
-  private readonly eventListeners = new Set<(value: string) => void>();
-  private value = 1;
+  readonly #stateListeners = new Set<(value: number) => void>();
+  readonly #eventListeners = new Set<(value: string) => void>();
+  #value = 1;
 
   public constructor() {
     super({ key: new PluginKey('CoordinationPublisherPlugin'), state: null });
@@ -47,32 +47,32 @@ class CoordinationPublisherPlugin extends SheetPlugin<null> {
 
   public registerObservations(observations: ObservationRegistry): void {
     observations.register(CoordinationStateObservation, {
-      getSnapshot: () => this.value,
+      getSnapshot: () => this.#value,
       subscribe: (listener) => {
-        this.stateListeners.add(listener);
-        return () => this.stateListeners.delete(listener);
+        this.#stateListeners.add(listener);
+        return () => this.#stateListeners.delete(listener);
       },
     });
     observations.register(CoordinationEventObservation, {
       subscribe: (listener) => {
-        this.eventListeners.add(listener);
-        return () => this.eventListeners.delete(listener);
+        this.#eventListeners.add(listener);
+        return () => this.#eventListeners.delete(listener);
       },
     });
   }
 
   public configure(_context: SheetPluginSetupContext): void {
-    this.publishEvent('before-subscribe');
+    this.#publishEvent('before-subscribe');
   }
 
   public publish(value: number, event: string): void {
-    this.value = value;
-    this.stateListeners.forEach((listener) => listener(value));
-    this.publishEvent(event);
+    this.#value = value;
+    this.#stateListeners.forEach((listener) => listener(value));
+    this.#publishEvent(event);
   }
 
   public get listenerCount(): number {
-    return this.stateListeners.size + this.eventListeners.size;
+    return this.#stateListeners.size + this.#eventListeners.size;
   }
 
   public registerState() {
@@ -91,8 +91,8 @@ class CoordinationPublisherPlugin extends SheetPlugin<null> {
     return null;
   }
 
-  private publishEvent(event: string): void {
-    this.eventListeners.forEach((listener) => listener(event));
+  #publishEvent(event: string): void {
+    this.#eventListeners.forEach((listener) => listener(event));
   }
 }
 
@@ -134,7 +134,7 @@ class CoordinationCommandPlugin extends SheetPlugin<null> {
 class CoordinationConsumerPlugin extends SheetPlugin<null> {
   public static readonly symbol = Symbol.for('CoordinationConsumerPlugin');
 
-  private readonly disposers: Array<() => void> = [];
+  readonly #disposers: Array<() => void> = [];
 
   public constructor() {
     super({ key: new PluginKey('CoordinationConsumerPlugin'), state: null });
@@ -150,7 +150,7 @@ class CoordinationConsumerPlugin extends SheetPlugin<null> {
     ) {
       throw new Error('CoordinationConsumerPlugin requires its coordination observations.');
     }
-    this.disposers.push(
+    this.#disposers.push(
       context.runtime.observations.subscribe(CoordinationStateObservation, (value) => {
         context.runtime.commands.run(RecordCoordinationCommand, { source: 'state', value: String(value) });
       }),
@@ -161,7 +161,7 @@ class CoordinationConsumerPlugin extends SheetPlugin<null> {
   }
 
   public onEditorDestroy(): void {
-    this.disposers.splice(0).forEach((dispose) => dispose());
+    this.#disposers.splice(0).forEach((dispose) => dispose());
   }
 
   public registerState() {

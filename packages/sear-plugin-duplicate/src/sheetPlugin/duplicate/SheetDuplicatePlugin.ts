@@ -42,6 +42,10 @@ const pluginKey = new PluginKey('SheetDuplicatePlugin');
 /** Plugin that owns duplicate-highlight data and duplicate row commands. */
 @Injectable()
 export class SheetDuplicatePlugin extends Plugin<unknown, CellProperties, SheetDuplicatePluginState> {
+  readonly #sheetData: SheetDataPlugin;
+  readonly #cellCodecs: CellClipboardCodecRegistry;
+  readonly #readDisplayText: ((row: number, column: number, cell: CellMatrixElement | null) => string) | undefined;
+
   #highlightRevision = 0;
   #visibleHighlights: Set<string> | null = null;
   #visibleHighlightsRevision = -1;
@@ -97,12 +101,15 @@ export class SheetDuplicatePlugin extends Plugin<unknown, CellProperties, SheetD
   /** Constructs the plugin around a shared sparse duplicate-highlight matrix. */
   public constructor(
     state: SheetDuplicatePluginState,
-    private readonly sheetData: SheetDataPlugin,
-    private readonly cellCodecs: CellClipboardCodecRegistry,
-    private readonly readDisplayText?: (row: number, column: number, cell: CellMatrixElement | null) => string,
+    sheetData: SheetDataPlugin,
+    cellCodecs: CellClipboardCodecRegistry,
+    readDisplayText?: (row: number, column: number, cell: CellMatrixElement | null) => string,
     displayedValueChanges?: SheetDisplayedValueChanges,
   ) {
     super({ key: pluginKey, state });
+    this.#sheetData = sheetData;
+    this.#cellCodecs = cellCodecs;
+    this.#readDisplayText = readDisplayText;
     displayedValueChanges?.subscribe(() => { this.#highlightRevision += 1; });
   }
 
@@ -114,11 +121,11 @@ export class SheetDuplicatePlugin extends Plugin<unknown, CellProperties, SheetD
       sheetDataTarget: SheetDataPlugin.pluginKey,
       getRowCount: () => plugin.getState().duplicates.shape[0],
       getColumnCount: () => plugin.getState().duplicates.shape[1],
-      readCell: (row, column) => plugin.sheetData.getState().sheetData.getItem(row, column),
-      readCellText: (cell, row, column) => plugin.readDisplayText?.(row, column, cell) ?? plugin.cellCodecs.toPlainText(cell),
+      readCell: (row, column) => plugin.#sheetData.getState().sheetData.getItem(row, column),
+      readCellText: (cell, row, column) => plugin.#readDisplayText?.(row, column, cell) ?? plugin.#cellCodecs.toPlainText(cell),
       readDisplayedText: (row, column) => {
-        const cell = plugin.sheetData.getState().sheetData.getItem(row, column);
-        return plugin.readDisplayText?.(row, column, cell) ?? (cell ? plugin.cellCodecs.toPlainText(cell) : '');
+        const cell = plugin.#sheetData.getState().sheetData.getItem(row, column);
+        return plugin.#readDisplayText?.(row, column, cell) ?? (cell ? plugin.#cellCodecs.toPlainText(cell) : '');
       },
       readDuplicateHighlight: (row, column) => plugin.getState().duplicates.getItem(row, column),
     });
@@ -133,13 +140,13 @@ export class SheetDuplicatePlugin extends Plugin<unknown, CellProperties, SheetD
       priority: 100,
       read({ rowIndex, columnIndex }) {
         const fill = plugin.getState().duplicates.getItem(rowIndex, columnIndex);
-        return fill != null && plugin.visibleHighlights().has(`${rowIndex}:${columnIndex}`) ? { fill } : {};
+        return fill != null && plugin.#getVisibleHighlights().has(`${rowIndex}:${columnIndex}`) ? { fill } : {};
       },
     });
   }
 
-  private visibleHighlights(): Set<string> {
-    const data = this.sheetData.getState().sheetData;
+  #getVisibleHighlights(): Set<string> {
+    const data = this.#sheetData.getState().sheetData;
     const highlights = this.getState().duplicates;
     if (this.#visibleHighlights && this.#visibleHighlightsRevision === this.#highlightRevision &&
       this.#visibleHighlightsData === data && this.#visibleHighlightsMatrix === highlights) {
@@ -149,7 +156,7 @@ export class SheetDuplicatePlugin extends Plugin<unknown, CellProperties, SheetD
     highlights.forEachStored((fill, row, column) => {
       const cell = data.getItem(row, column);
       if (!fill) return;
-      const value = this.readDisplayText?.(row, column, cell) ?? (cell ? this.cellCodecs.toPlainText(cell) : '');
+      const value = this.#readDisplayText?.(row, column, cell) ?? (cell ? this.#cellCodecs.toPlainText(cell) : '');
       if (!value) return;
       const key = JSON.stringify([fill, value.toLowerCase()]);
       const group = groups.get(key) ?? [];

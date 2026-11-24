@@ -80,34 +80,40 @@ const SETTLE_VELOCITY = 1;
  * then returned by a damped harmonic spring during wheel input or after touch release.
  */
 export class RubberBandController implements RubberBandMotion {
-  private config: Required<RubberBandConfig> = { ...DEFAULT_CONFIG };
-  private readonly x: AxisMotion = { excess: 0, offset: 0, velocity: 0 };
-  private readonly y: AxisMotion = { excess: 0, offset: 0, velocity: 0 };
-  private viewport: RubberBandOffset = { x: 1, y: 1 };
-  private overscrollScale = 1;
-  private overscrollSource: 'wheel' | 'touch' = 'touch';
-  private returnFrame: number | null = null;
-  private returnTimer: number | null = null;
-  private lastInputTime: number | null = null;
-  private previousFrameTime: number | null = null;
+  readonly #platform: Platform;
+  readonly #publishOffset: (offset: RubberBandOffset) => void;
+
+  #config: Required<RubberBandConfig> = { ...DEFAULT_CONFIG };
+  readonly #x: AxisMotion = { excess: 0, offset: 0, velocity: 0 };
+  readonly #y: AxisMotion = { excess: 0, offset: 0, velocity: 0 };
+  #viewport: RubberBandOffset = { x: 1, y: 1 };
+  #overscrollScale = 1;
+  #overscrollSource: 'wheel' | 'touch' = 'touch';
+  #returnFrame: number | null = null;
+  #returnTimer: number | null = null;
+  #lastInputTime: number | null = null;
+  #previousFrameTime: number | null = null;
 
   /** Creates one controller and publishes every visual displacement change. */
   public constructor(
-    private readonly platform: Platform,
-    private readonly publishOffset: (offset: RubberBandOffset) => void,
-  ) {}
+    platform: Platform,
+    publishOffset: (offset: RubberBandOffset) => void,
+  ) {
+    this.#platform = platform;
+    this.#publishOffset = publishOffset;
+  }
 
   /** Applies validated host overrides and resets immediately when disabled. */
   public configure(config: Partial<RubberBandConfig>): void {
-    const next = { ...this.config, ...config };
+    const next = { ...this.#config, ...config };
     validateConfig(next);
-    this.config = next;
+    this.#config = next;
     if (!next.enabled) this.reset();
   }
 
   /** Returns a copy of the current transient visual displacement. */
   public getOffset(): RubberBandOffset {
-    return { x: this.x.offset, y: this.y.offset };
+    return { x: this.#x.offset, y: this.#y.offset };
   }
 
   /**
@@ -115,11 +121,11 @@ export class RubberBandController implements RubberBandMotion {
    * Reversing direction first consumes existing excess before logical scrolling resumes.
    */
   public consume(input: RubberBandInput): RubberBandOffset {
-    this.viewport = {
+    this.#viewport = {
       x: Math.max(1, input.viewport.x),
       y: Math.max(1, input.viewport.y),
     };
-    if (!this.config.enabled) {
+    if (!this.#config.enabled) {
       return {
         x: clamp(input.position.x - input.displacement.x, 0, input.boundary.x),
         y: clamp(input.position.y - input.displacement.y, 0, input.boundary.y),
@@ -129,77 +135,77 @@ export class RubberBandController implements RubberBandMotion {
     const previousOffset = this.getOffset();
     const preserveReturn =
       input.continueReturnOnOutwardInput === true &&
-      this.returnFrame !== null &&
-      this.isOutwardInput(input.displacement);
-    if (preserveReturn) this.restoreExcessFromOffset();
-    else this.stopReturn(true);
+      this.#returnFrame !== null &&
+      this.#isOutwardInput(input.displacement);
+    if (preserveReturn) this.#restoreExcessFromOffset();
+    else this.#stopReturn(true);
     const nextSource = input.source === 'wheel' ? 'wheel' : 'touch';
-    const nextScale = nextSource === 'wheel' ? this.config.wheelResistanceScale : 1;
-    if (nextSource !== this.overscrollSource) {
-      this.x.excess =
-        inverseRubberBandDistance(this.x.offset, this.maximumOffset(this.viewport.x), this.config.resistance) /
+    const nextScale = nextSource === 'wheel' ? this.#config.wheelResistanceScale : 1;
+    if (nextSource !== this.#overscrollSource) {
+      this.#x.excess =
+        inverseRubberBandDistance(this.#x.offset, this.#maximumOffset(this.#viewport.x), this.#config.resistance) /
         nextScale;
-      this.y.excess =
-        inverseRubberBandDistance(this.y.offset, this.maximumOffset(this.viewport.y), this.config.resistance) /
+      this.#y.excess =
+        inverseRubberBandDistance(this.#y.offset, this.#maximumOffset(this.#viewport.y), this.#config.resistance) /
         nextScale;
-      this.overscrollScale = nextScale;
-      this.overscrollSource = nextSource;
+      this.#overscrollScale = nextScale;
+      this.#overscrollSource = nextSource;
     }
     const immediateWheelReverse = input.source === 'wheel';
-    const x = this.consumeAxis(
-      this.x,
+    const x = this.#consumeAxis(
+      this.#x,
       input.position.x,
       input.boundary.x,
       input.displacement.x,
-      this.viewport.x,
+      this.#viewport.x,
       immediateWheelReverse,
     );
-    const y = this.consumeAxis(
-      this.y,
+    const y = this.#consumeAxis(
+      this.#y,
       input.position.y,
       input.boundary.y,
       input.displacement.y,
-      this.viewport.y,
+      this.#viewport.y,
       immediateWheelReverse,
     );
-    if (preserveReturn) this.lastInputTime = this.platform.now();
-    else this.recordInputVelocity(previousOffset);
-    this.publish();
+    if (preserveReturn) this.#lastInputTime = this.#platform.now();
+    else this.#recordInputVelocity(previousOffset);
+    this.#publish();
     return { x, y };
   }
 
   /** Starts the boundary return after the configured input-settle delay. */
-  public release(delay: number = this.config.returnDelay, preserveVelocity: boolean = false): void {
-    if (!this.config.enabled || !this.hasDisplacement()) return;
-    if (this.returnFrame !== null) return;
-    if (this.returnTimer !== null) {
+  public release(delay: number = this.#config.returnDelay, preserveVelocity: boolean = false): void {
+    if (!this.#config.enabled || !this.#hasDisplacement()) return;
+    if (this.#returnFrame !== null) return;
+    if (this.#returnTimer !== null) {
       if (delay > 0) return;
-      this.platform.clearTimeout(this.returnTimer);
-      this.returnTimer = null;
+      this.#platform.clearTimeout(this.#returnTimer);
+      this.#returnTimer = null;
     }
     if (!preserveVelocity) {
-      this.x.velocity = inwardReturnVelocity(this.x.offset, this.config.springStiffness, this.config.springMass);
-      this.y.velocity = inwardReturnVelocity(this.y.offset, this.config.springStiffness, this.config.springMass);
+      this.#x.velocity = inwardReturnVelocity(this.#x.offset, this.#config.springStiffness, this.#config.springMass);
+      this.#y.velocity = inwardReturnVelocity(this.#y.offset, this.#config.springStiffness, this.#config.springMass);
     }
     if (delay <= 0) {
-      this.startReturn();
+      this.#startReturn();
       return;
     }
-    this.returnTimer = this.platform.setTimeout(this.startReturn.bind(this), delay);
+    this.#returnTimer = this.#platform.setTimeout(this.#startReturn.bind(this), delay);
   }
 
   /** Cancels pending work and restores the exact zero-displacement state. */
   public reset(): void {
-    this.stopReturn(false);
-    this.resetAxis(this.x);
-    this.resetAxis(this.y);
-    this.lastInputTime = null;
-    this.overscrollScale = 1;
-    this.overscrollSource = 'touch';
-    this.publish();
+    this.#stopReturn(false);
+    this.#resetAxis(this.#x);
+    this.#resetAxis(this.#y);
+    this.#lastInputTime = null;
+    this.#overscrollScale = 1;
+    this.#overscrollSource = 'touch';
+    this.#publish();
   }
 
-  private consumeAxis(
+  #consumeAxis(
     axis: AxisMotion,
     position: number,
     boundary: number,
@@ -222,9 +228,9 @@ export class RubberBandController implements RubberBandMotion {
       axis.offset =
         -Math.sign(axis.excess) *
         rubberBandDistanceWithMaximum(
-          Math.abs(axis.excess) * this.overscrollScale,
-          this.maximumOffset(viewport),
-          this.config.resistance,
+          Math.abs(axis.excess) * this.#overscrollScale,
+          this.#maximumOffset(viewport),
+          this.#config.resistance,
         );
     } else if (!immediateWheelReverse) {
       axis.offset = 0;
@@ -232,42 +238,42 @@ export class RubberBandController implements RubberBandMotion {
     return bounded;
   }
 
-  private recordInputVelocity(previous: RubberBandOffset): void {
-    const now = this.platform.now();
-    const elapsed = this.lastInputTime === null ? 1 / 60 : clamp((now - this.lastInputTime) / 1000, 1 / 240, 0.05);
-    this.x.velocity = smoothVelocity(this.x.velocity, (this.x.offset - previous.x) / elapsed);
-    this.y.velocity = smoothVelocity(this.y.velocity, (this.y.offset - previous.y) / elapsed);
-    if (this.x.offset === 0) this.x.velocity = 0;
-    if (this.y.offset === 0) this.y.velocity = 0;
-    this.lastInputTime = now;
+  #recordInputVelocity(previous: RubberBandOffset): void {
+    const now = this.#platform.now();
+    const elapsed = this.#lastInputTime === null ? 1 / 60 : clamp((now - this.#lastInputTime) / 1000, 1 / 240, 0.05);
+    this.#x.velocity = smoothVelocity(this.#x.velocity, (this.#x.offset - previous.x) / elapsed);
+    this.#y.velocity = smoothVelocity(this.#y.velocity, (this.#y.offset - previous.y) / elapsed);
+    if (this.#x.offset === 0) this.#x.velocity = 0;
+    if (this.#y.offset === 0) this.#y.velocity = 0;
+    this.#lastInputTime = now;
   }
 
-  private startReturn(): void {
-    this.returnTimer = null;
-    if (this.returnFrame !== null || !this.hasDisplacement()) return;
-    this.previousFrameTime = null;
-    this.returnFrame = this.platform.requestAnimationFrame(this.runReturnFrame.bind(this));
+  #startReturn(): void {
+    this.#returnTimer = null;
+    if (this.#returnFrame !== null || !this.#hasDisplacement()) return;
+    this.#previousFrameTime = null;
+    this.#returnFrame = this.#platform.requestAnimationFrame(this.#runReturnFrame.bind(this));
   }
 
-  private runReturnFrame(time: number): void {
-    this.returnFrame = null;
+  #runReturnFrame(time: number): void {
+    this.#returnFrame = null;
     const elapsed =
-      this.previousFrameTime === null ? 1 / 60 : clamp((time - this.previousFrameTime) / 1000, 0, MAX_FRAME_SECONDS);
-    this.previousFrameTime = time;
-    this.advanceSpring(this.x, elapsed);
-    this.advanceSpring(this.y, elapsed);
+      this.#previousFrameTime === null ? 1 / 60 : clamp((time - this.#previousFrameTime) / 1000, 0, MAX_FRAME_SECONDS);
+    this.#previousFrameTime = time;
+    this.#advanceSpring(this.#x, elapsed);
+    this.#advanceSpring(this.#y, elapsed);
 
-    if (isSettled(this.x) && isSettled(this.y)) {
+    if (isSettled(this.#x) && isSettled(this.#y)) {
       this.reset();
       return;
     }
-    this.publish();
-    this.returnFrame = this.platform.requestAnimationFrame(this.runReturnFrame.bind(this));
+    this.#publish();
+    this.#returnFrame = this.#platform.requestAnimationFrame(this.#runReturnFrame.bind(this));
   }
 
-  private advanceSpring(axis: AxisMotion, elapsed: number): void {
+  #advanceSpring(axis: AxisMotion, elapsed: number): void {
     if (elapsed <= 0) return;
-    const { springMass, springStiffness, springDamping } = this.config;
+    const { springMass, springStiffness, springDamping } = this.#config;
     const position = axis.offset;
     const velocity = axis.velocity;
     const naturalFrequency = Math.sqrt(springStiffness / springMass);
@@ -308,56 +314,56 @@ export class RubberBandController implements RubberBandMotion {
     axis.velocity = firstWeight * firstRate * firstEnvelope + secondWeight * secondRate * secondEnvelope;
   }
 
-  private stopReturn(preserveCurrentOffset: boolean): void {
-    const wasReturning = this.returnFrame !== null;
-    if (this.returnTimer !== null) this.platform.clearTimeout(this.returnTimer);
-    if (this.returnFrame !== null) this.platform.cancelAnimationFrame(this.returnFrame);
-    this.returnTimer = null;
-    this.returnFrame = null;
-    this.previousFrameTime = null;
+  #stopReturn(preserveCurrentOffset: boolean): void {
+    const wasReturning = this.#returnFrame !== null;
+    if (this.#returnTimer !== null) this.#platform.clearTimeout(this.#returnTimer);
+    if (this.#returnFrame !== null) this.#platform.cancelAnimationFrame(this.#returnFrame);
+    this.#returnTimer = null;
+    this.#returnFrame = null;
+    this.#previousFrameTime = null;
     if (preserveCurrentOffset && wasReturning) {
-      this.restoreExcessFromOffset();
+      this.#restoreExcessFromOffset();
       // A new gesture should derive velocity from its own samples, not from
       // the spring that was interrupted.
-      this.x.velocity = 0;
-      this.y.velocity = 0;
+      this.#x.velocity = 0;
+      this.#y.velocity = 0;
     }
   }
 
-  private isOutwardInput(displacement: RubberBandOffset): boolean {
+  #isOutwardInput(displacement: RubberBandOffset): boolean {
     return (
-      (this.x.offset !== 0 && displacement.x !== 0 && this.x.offset * displacement.x > 0) ||
-      (this.y.offset !== 0 && displacement.y !== 0 && this.y.offset * displacement.y > 0)
+      (this.#x.offset !== 0 && displacement.x !== 0 && this.#x.offset * displacement.x > 0) ||
+      (this.#y.offset !== 0 && displacement.y !== 0 && this.#y.offset * displacement.y > 0)
     );
   }
 
-  private hasDisplacement(): boolean {
-    return this.x.offset !== 0 || this.y.offset !== 0;
+  #hasDisplacement(): boolean {
+    return this.#x.offset !== 0 || this.#y.offset !== 0;
   }
 
-  private restoreExcessFromOffset(): void {
-    this.x.excess =
-      inverseRubberBandDistance(this.x.offset, this.maximumOffset(this.viewport.x), this.config.resistance) /
-      this.overscrollScale;
-    this.y.excess =
-      inverseRubberBandDistance(this.y.offset, this.maximumOffset(this.viewport.y), this.config.resistance) /
-      this.overscrollScale;
+  #restoreExcessFromOffset(): void {
+    this.#x.excess =
+      inverseRubberBandDistance(this.#x.offset, this.#maximumOffset(this.#viewport.x), this.#config.resistance) /
+      this.#overscrollScale;
+    this.#y.excess =
+      inverseRubberBandDistance(this.#y.offset, this.#maximumOffset(this.#viewport.y), this.#config.resistance) /
+      this.#overscrollScale;
   }
 
-  private maximumOffset(viewport: number): number {
-    return this.overscrollSource === 'wheel'
-      ? Math.max(1, viewport * this.config.wheelMaxViewportScale)
-      : resolveMaximumOffset(viewport, this.config.maxOffset);
+  #maximumOffset(viewport: number): number {
+    return this.#overscrollSource === 'wheel'
+      ? Math.max(1, viewport * this.#config.wheelMaxViewportScale)
+      : resolveMaximumOffset(viewport, this.#config.maxOffset);
   }
 
-  private resetAxis(axis: AxisMotion): void {
+  #resetAxis(axis: AxisMotion): void {
     axis.excess = 0;
     axis.offset = 0;
     axis.velocity = 0;
   }
 
-  private publish(): void {
-    this.publishOffset(this.getOffset());
+  #publish(): void {
+    this.#publishOffset(this.getOffset());
   }
 }
 

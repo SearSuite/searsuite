@@ -12,8 +12,8 @@ export class DocContentRenderPlugin extends DocPlugin<null> {
   /** DI token for resolving DocContentRenderPlugin. */
   public static readonly symbol = Symbol.for('DocContentRenderPlugin');
 
-  private runtime: DocPluginRuntime | null = null;
-  private lineRenderer: RichTextLineRenderer | null = null;
+  #runtime: DocPluginRuntime | null = null;
+  #lineRenderer: RichTextLineRenderer | null = null;
 
   /** Creates a DocContentRenderPlugin instance. */
   public constructor() {
@@ -36,24 +36,24 @@ export class DocContentRenderPlugin extends DocPlugin<null> {
     const layout = searCore.getDocRenderLayoutState();
     if (!layout) return null;
     const nodes: Node<NodeProperties>[] = [];
-    for (const block of layout.visibleBlocks) nodes.push(this.createRichTextBlockNode(layout, block));
+    for (const block of layout.visibleBlocks) nodes.push(this.#createRichTextBlockNode(layout, block));
     return nodes;
   }
 
   public configure(context: DocPluginSetupContext): void {
-    this.runtime = context.runtime;
-    this.lineRenderer = context.container.resolve(RichTextLineRenderer.symbol);
+    this.#runtime = context.runtime;
+    this.#lineRenderer = context.container.resolve(RichTextLineRenderer.symbol);
   }
 
   public onEditorDestroy(): void {
     this.assertRuntimeWriteAllowed();
-    this.runtime = null;
-    this.lineRenderer = null;
+    this.#runtime = null;
+    this.#lineRenderer = null;
   }
 
-  private createRichTextBlockNode(layout: DocRenderLayoutState, block: DocBlockLayout): RichTextBlockNode {
+  #createRichTextBlockNode(layout: DocRenderLayoutState, block: DocBlockLayout): RichTextBlockNode {
     // debugger;
-    const lineRenderer = this.lineRenderer;
+    const lineRenderer = this.#lineRenderer;
     if (!lineRenderer) throw new SearError('DocContentRenderPlugin is not configured.');
     const lines = layout.layoutCache.snapshot.lines.slice(block.lineStart, block.lineEnd);
     return new RichTextBlockNode({

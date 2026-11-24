@@ -101,7 +101,7 @@ export class HitRenderStrategy<NodeTypeProperties extends NodeProperties> extend
     if (this.renderDebounceTimer !== null) {
       this.platform.clearTimeout(this.renderDebounceTimer);
     }
-    this.renderDebounceTimer = this.platform.setTimeout(this.runDebouncedHitRender.bind(this), delay);
+    this.renderDebounceTimer = this.platform.setTimeout(this.#runDebouncedHitRender.bind(this), delay);
   }
 
   /**
@@ -140,7 +140,7 @@ export class HitRenderStrategy<NodeTypeProperties extends NodeProperties> extend
     this.pendingScrollNode = node;
     if (this.scrollFrameHandle !== null) return;
 
-    this.scrollFrameHandle = this.platform.requestAnimationFrame(this.runScheduledHitRender.bind(this));
+    this.scrollFrameHandle = this.platform.requestAnimationFrame(this.#runScheduledHitRender.bind(this));
   }
 
   /** Cancels deferred hit-layer work when the owning editor is destroyed. */
@@ -204,10 +204,10 @@ export class HitRenderStrategy<NodeTypeProperties extends NodeProperties> extend
     for (const child of nodes) child.drawHit(this.hitRenderContext);
 
     this.hitRenderContext.restore();
-    this.drawStickyHits(node, viewportWidth, viewportHeight);
+    this.#drawStickyHits(node, viewportWidth, viewportHeight);
   }
 
-  private drawStickyHits(node: Node<NodeTypeProperties>, width: number, height: number): void {
+  #drawStickyHits(node: Node<NodeTypeProperties>, width: number, height: number): void {
     const { x, y } = this.scrollState;
     const groups: readonly {
       rect: PositionRect<HexColor>;
@@ -232,7 +232,7 @@ export class HitRenderStrategy<NodeTypeProperties extends NodeProperties> extend
     }
   }
 
-  private runDebouncedHitRender(): void {
+  #runDebouncedHitRender(): void {
     if (this.pendingNode) {
       this.debouncedRender(this.pendingNode);
       this.pendingNode = null;
@@ -240,7 +240,7 @@ export class HitRenderStrategy<NodeTypeProperties extends NodeProperties> extend
     this.renderDebounceTimer = null;
   }
 
-  private runScheduledHitRender(): void {
+  #runScheduledHitRender(): void {
     const pendingNode = this.pendingScrollNode;
     this.pendingScrollNode = null;
     this.scrollFrameHandle = null;

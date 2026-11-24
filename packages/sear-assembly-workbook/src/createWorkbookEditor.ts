@@ -238,9 +238,13 @@ export function createWorkbookEditor(configuration: WorkbookEditorConfiguration)
 }
 
 class DefaultWorkbookEditor implements WorkbookCommandController {
-  private readonly formatPainterSession = new SheetFormatPainterSession();
-  private readonly clipboardCutSession = new SheetClipboardCutSession();
-  private preparedClipboardCut: {
+  readonly #container: Container;
+  readonly #configuration: WorkbookEditorConfiguration;
+  readonly #plugins: readonly WorkbookPlugin[];
+
+  readonly #formatPainterSession = new SheetFormatPainterSession();
+  readonly #clipboardCutSession = new SheetClipboardCutSession();
+  #preparedClipboardCut: {
     readonly id: string;
     readonly sourceId: WorkbookSheetId;
     readonly sourceSignature: string;
@@ -248,125 +252,128 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
   } | null = null;
   readonly #sessionLifecycleToken = {};
   readonly #formulaServiceTeardownToken = {};
-  private readonly commands: WorkbookCommandBus;
-  private readonly isCommandExecuting: () => boolean;
-  private readonly observations: ObservationRegistry;
-  private readonly session: SessionStateRegistry;
-  private readonly extensions: WorkbookRuntimeExtensionRegistry;
-  private readonly sessionStore: WorkbookSessionStore;
-  private readonly sheetEditorFactory: WorkbookSheetEditorFactory;
-  private readonly captureSheetState: WorkbookSheetStateCapture;
-  private readonly captureSheetSessionState: WorkbookSheetSessionStateCapture;
-  private readonly document: WorkbookDocumentApi;
-  private readonly publicDocument: WorkbookDocumentApi;
-  private readonly sheets: WorkbookSheetsApi;
-  private readonly documentStateListeners = new Set<(state: WorkbookDocumentState<SheetDocumentState>) => void>();
-  private readonly activeSheetEditorListeners = new Set<(snapshot: WorkbookActiveSheetEditorSnapshot) => void>();
-  private readonly pluginDisposers: WorkbookPluginDisposer[] = [];
-  private readonly pluginRuntime: WorkbookPluginRuntime;
-  private documentState: WorkbookDocumentState<SheetDocumentState>;
-  private activeSheetEditor: SheetEditor | null = null;
-  private destroyed = false;
-  private destroying = false;
-  private publicEditor: WorkbookEditor | null = null;
+  readonly #commands: WorkbookCommandBus;
+  readonly #isCommandExecuting: () => boolean;
+  readonly #observations: ObservationRegistry;
+  readonly #session: SessionStateRegistry;
+  readonly #extensions: WorkbookRuntimeExtensionRegistry;
+  readonly #sessionStore: WorkbookSessionStore;
+  readonly #sheetEditorFactory: WorkbookSheetEditorFactory;
+  readonly #captureSheetState: WorkbookSheetStateCapture;
+  readonly #captureSheetSessionState: WorkbookSheetSessionStateCapture;
+  readonly #document: WorkbookDocumentApi;
+  readonly #publicDocument: WorkbookDocumentApi;
+  readonly #sheets: WorkbookSheetsApi;
+  readonly #documentStateListeners = new Set<(state: WorkbookDocumentState<SheetDocumentState>) => void>();
+  readonly #activeSheetEditorListeners = new Set<(snapshot: WorkbookActiveSheetEditorSnapshot) => void>();
+  readonly #pluginDisposers: WorkbookPluginDisposer[] = [];
+  readonly #pluginRuntime: WorkbookPluginRuntime;
+  #documentState: WorkbookDocumentState<SheetDocumentState>;
+  #activeSheetEditor: SheetEditor | null = null;
+  #destroyed = false;
+  #destroying = false;
+  #publicEditor: WorkbookEditor | null = null;
 
   public constructor(
-    private readonly container: Container,
-    private readonly configuration: WorkbookEditorConfiguration,
-    private readonly plugins: readonly WorkbookPlugin[],
+    container: Container,
+    configuration: WorkbookEditorConfiguration,
+    plugins: readonly WorkbookPlugin[],
   ) {
-    this.documentState = cloneWorkbookEditorDocumentState(configuration.documentState);
-    lockCommittedSheetState(this.documentState);
+    this.#container = container;
+    this.#configuration = configuration;
+    this.#plugins = plugins;
+    this.#documentState = cloneWorkbookEditorDocumentState(configuration.documentState);
+    lockCommittedSheetState(this.#documentState);
     FormulaExternalServiceRegistry.prototype.enforceTeardownBoundary.call(
       container.resolve<IFormulaExternalServiceProvider>(IFormulaExternalServiceProvider.symbol),
       this.#formulaServiceTeardownToken,
     );
-    this.commands = container.resolve<WorkbookCommandBus>(WorkbookCommandBus.symbol);
-    this.isCommandExecuting = this.commands.isExecuting.bind(this.commands);
-    this.observations = container.resolve<ObservationRegistry>(ObservationRegistry.symbol);
-    this.session = container.resolve<SessionStateRegistry>(SessionStateRegistry.symbol);
-    this.extensions = container.resolve<WorkbookRuntimeExtensionRegistry>(WorkbookRuntimeExtensionRegistry.symbol);
-    this.sessionStore = container.resolve<WorkbookSessionStore>(WorkbookSessionStore.symbol);
-    this.sheetEditorFactory = configuration.sheetEditorFactory ?? createDefaultSheetEditor;
-    this.captureSheetState = configuration.captureSheetState ?? exportActiveSheetStateThroughCommand;
-    this.captureSheetSessionState =
+    this.#commands = container.resolve<WorkbookCommandBus>(WorkbookCommandBus.symbol);
+    this.#isCommandExecuting = this.#commands.isExecuting.bind(this.#commands);
+    this.#observations = container.resolve<ObservationRegistry>(ObservationRegistry.symbol);
+    this.#session = container.resolve<SessionStateRegistry>(SessionStateRegistry.symbol);
+    this.#extensions = container.resolve<WorkbookRuntimeExtensionRegistry>(WorkbookRuntimeExtensionRegistry.symbol);
+    this.#sessionStore = container.resolve<WorkbookSessionStore>(WorkbookSessionStore.symbol);
+    this.#sheetEditorFactory = configuration.sheetEditorFactory ?? createDefaultSheetEditor;
+    this.#captureSheetState = configuration.captureSheetState ?? exportActiveSheetStateThroughCommand;
+    this.#captureSheetSessionState =
       configuration.captureSheetSessionState ?? captureActiveSheetSessionStateThroughCommand;
-    this.document = {
+    this.#document = {
       getState: () => {
-        this.assertLive();
-        return this.documentState;
+        this.#assertLive();
+        return this.#documentState;
       },
     };
-    this.publicDocument = {
+    this.#publicDocument = {
       getState: () => {
-        this.assertLive();
-        return cloneWorkbookEditorDocumentState(this.documentState);
+        this.#assertLive();
+        return cloneWorkbookEditorDocumentState(this.#documentState);
       },
     };
-    this.sheets = {
+    this.#sheets = {
       getActiveId: () => {
-        this.assertLive();
-        return this.sessionStore.getActiveSheetId();
+        this.#assertLive();
+        return this.#sessionStore.getActiveSheetId();
       },
-      getActiveEditor: () => this.requireActiveSheetEditor(),
+      getActiveEditor: () => this.#requireActiveSheetEditor(),
       getEditor: (sheetId) => {
-        this.assertLive();
-        return sheetId === this.sessionStore.getActiveSheetId() ? this.requireActiveSheetEditor() : null;
+        this.#assertLive();
+        return sheetId === this.#sessionStore.getActiveSheetId() ? this.#requireActiveSheetEditor() : null;
       },
     };
-    this.pluginRuntime = this.createPluginRuntime();
+    this.#pluginRuntime = this.#createPluginRuntime();
   }
 
   public initialize(): WorkbookEditor {
-    registerDefaultWorkbookCommands(this.commands, this);
-    this.commands.register(CommitClipboardMoveCommand, (input) => this.commitClipboardMove(input));
-    this.commands.register(UnregisterWorkbookFormulaFunctionCommand, (id) =>
-      this.container.resolve<IFunctionRegistry>(IFunctionRegistry.symbol).unregisterRegistration(id));
-    this.commands.register(UnregisterWorkbookFormulaExternalServiceCommand, (id) =>
-      this.container.resolve<IFormulaExternalServiceProvider>(IFormulaExternalServiceProvider.symbol).unregisterRegistration(id));
-    this.commands.register(UnregisterWorkbookFormulaTextServiceCommand, (id) =>
-      this.container.resolve<IFormulaTextServiceProvider>(IFormulaTextServiceProvider.symbol).unregisterRegistration?.(id));
-    registerWorkbookStateCommands(this.commands, this.session, () => this.exportDocumentState());
-    this.registerObservations();
-    registerWorkbookPluginCommands(this.plugins, this.commands);
-    registerWorkbookPluginObservations(this.plugins, this.observations);
-    this.sessionStore.registerSessionState(this.session);
-    registerWorkbookPluginSessionStates(this.plugins, this.session);
-    this.registerDefaultCapabilities();
-    registerWorkbookPluginCapabilities(this.plugins, this.extensions);
-    this.sessionStore.bindActiveSheetCapture(() => this.captureLiveSheetSession());
-    this.session.loadSnapshot(this.configuration.sessionState ?? {});
-    this.session.restorePhase(SessionStateRestorePhase.BeforeInitialize);
-    this.sessionStore.validate(this.documentState);
-    this.activeSheetEditor = this.createSheetEditor(this.sessionStore.getActiveSheetId(), this.documentState);
-    this.session.restorePhase(SessionStateRestorePhase.AfterInitialize);
-    this.session.sealRestoration(this.#sessionLifecycleToken);
+    registerDefaultWorkbookCommands(this.#commands, this);
+    this.#commands.register(CommitClipboardMoveCommand, (input) => this.#commitClipboardMove(input));
+    this.#commands.register(UnregisterWorkbookFormulaFunctionCommand, (id) =>
+      this.#container.resolve<IFunctionRegistry>(IFunctionRegistry.symbol).unregisterRegistration(id));
+    this.#commands.register(UnregisterWorkbookFormulaExternalServiceCommand, (id) =>
+      this.#container.resolve<IFormulaExternalServiceProvider>(IFormulaExternalServiceProvider.symbol).unregisterRegistration(id));
+    this.#commands.register(UnregisterWorkbookFormulaTextServiceCommand, (id) =>
+      this.#container.resolve<IFormulaTextServiceProvider>(IFormulaTextServiceProvider.symbol).unregisterRegistration?.(id));
+    registerWorkbookStateCommands(this.#commands, this.#session, () => this.#exportDocumentState());
+    this.#registerObservations();
+    registerWorkbookPluginCommands(this.#plugins, this.#commands);
+    registerWorkbookPluginObservations(this.#plugins, this.#observations);
+    this.#sessionStore.registerSessionState(this.#session);
+    registerWorkbookPluginSessionStates(this.#plugins, this.#session);
+    this.#registerDefaultCapabilities();
+    registerWorkbookPluginCapabilities(this.#plugins, this.#extensions);
+    this.#sessionStore.bindActiveSheetCapture(() => this.#captureLiveSheetSession());
+    this.#session.loadSnapshot(this.#configuration.sessionState ?? {});
+    this.#session.restorePhase(SessionStateRestorePhase.BeforeInitialize);
+    this.#sessionStore.validate(this.#documentState);
+    this.#activeSheetEditor = this.#createSheetEditor(this.#sessionStore.getActiveSheetId(), this.#documentState);
+    this.#session.restorePhase(SessionStateRestorePhase.AfterInitialize);
+    this.#session.sealRestoration(this.#sessionLifecycleToken);
     WorkbookSessionStore.prototype.enforceCommandBoundary.call(
-      this.sessionStore, this.isCommandExecuting, this.#sessionLifecycleToken);
-    this.initializePlugins();
-    const functions = this.container.resolve<IFunctionRegistry>(IFunctionRegistry.symbol);
-    const removeFunction = (id: number) => this.commands.run(UnregisterWorkbookFormulaFunctionCommand, id);
+      this.#sessionStore, this.#isCommandExecuting, this.#sessionLifecycleToken);
+    this.#initializePlugins();
+    const functions = this.#container.resolve<IFunctionRegistry>(IFunctionRegistry.symbol);
+    const removeFunction = (id: number) => this.#commands.run(UnregisterWorkbookFormulaFunctionCommand, id);
     if (functions instanceof FunctionRegistry) {
-      FunctionRegistry.prototype.enforceCommandBoundary.call(functions, this.isCommandExecuting, removeFunction);
-    } else functions.enforceCommandBoundary(this.isCommandExecuting, removeFunction);
-    const externalServices = this.container.resolve<IFormulaExternalServiceProvider>(IFormulaExternalServiceProvider.symbol);
-    const removeExternalService = (id: number) => this.commands.run(UnregisterWorkbookFormulaExternalServiceCommand, id);
+      FunctionRegistry.prototype.enforceCommandBoundary.call(functions, this.#isCommandExecuting, removeFunction);
+    } else functions.enforceCommandBoundary(this.#isCommandExecuting, removeFunction);
+    const externalServices = this.#container.resolve<IFormulaExternalServiceProvider>(IFormulaExternalServiceProvider.symbol);
+    const removeExternalService = (id: number) => this.#commands.run(UnregisterWorkbookFormulaExternalServiceCommand, id);
     if (externalServices instanceof FormulaExternalServiceRegistry) {
       FormulaExternalServiceRegistry.prototype.enforceCommandBoundary.call(
-        externalServices, this.isCommandExecuting, removeExternalService);
-    } else externalServices.enforceCommandBoundary(this.isCommandExecuting, removeExternalService);
-    const textServices = this.container.resolve<IFormulaTextServiceProvider>(IFormulaTextServiceProvider.symbol);
-    const removeTextService = (id: number) => this.commands.run(UnregisterWorkbookFormulaTextServiceCommand, id);
+        externalServices, this.#isCommandExecuting, removeExternalService);
+    } else externalServices.enforceCommandBoundary(this.#isCommandExecuting, removeExternalService);
+    const textServices = this.#container.resolve<IFormulaTextServiceProvider>(IFormulaTextServiceProvider.symbol);
+    const removeTextService = (id: number) => this.#commands.run(UnregisterWorkbookFormulaTextServiceCommand, id);
     if (textServices instanceof FormulaTextServiceRegistry) {
-      FormulaTextServiceRegistry.prototype.enforceCommandBoundary.call(textServices, this.isCommandExecuting, removeTextService);
-    } else textServices.enforceCommandBoundary?.(this.isCommandExecuting, removeTextService);
+      FormulaTextServiceRegistry.prototype.enforceCommandBoundary.call(textServices, this.#isCommandExecuting, removeTextService);
+    } else textServices.enforceCommandBoundary?.(this.#isCommandExecuting, removeTextService);
     const assertExtensionCommand = (): void => {
-      if (!this.destroying && !this.isCommandExecuting()) {
+      if (!this.#destroying && !this.#isCommandExecuting()) {
         throw new SearContractViolationError('Workbook extensions must change through editor.commands.run(...).');
       }
     };
-    ObservationRegistry.prototype.enforceWriteBoundary.call(this.observations,
-      assertExtensionCommand, this.commands.runWithoutMutationAuthority.bind(this.commands),
+    ObservationRegistry.prototype.enforceWriteBoundary.call(this.#observations,
+      assertExtensionCommand, this.#commands.runWithoutMutationAuthority.bind(this.#commands),
       (value, definition) => {
         if (definition.id === WorkbookActiveSheetEditorObservation.id)
           return { ...(value as WorkbookActiveSheetEditorSnapshot) };
@@ -375,28 +382,28 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
         return cloneSessionStateValue(value);
       },
     );
-    RuntimeCapabilityRegistry.prototype.enforceWriteBoundary.call(this.extensions, assertExtensionCommand);
-    sealWorkbookPluginTeardownWrites(this.plugins, assertExtensionCommand);
-    const editor = this.createPublicEditor();
-    this.configuration.onCreated?.(editor);
-    WorkbookCommandBus.prototype.enforceRegistrationBoundary.call(this.commands, assertExtensionCommand);
+    RuntimeCapabilityRegistry.prototype.enforceWriteBoundary.call(this.#extensions, assertExtensionCommand);
+    sealWorkbookPluginTeardownWrites(this.#plugins, assertExtensionCommand);
+    const editor = this.#createPublicEditor();
+    this.#configuration.onCreated?.(editor);
+    WorkbookCommandBus.prototype.enforceRegistrationBoundary.call(this.#commands, assertExtensionCommand);
     return editor;
   }
 
   public addSheet(input: AddWorkbookSheetCommandInput): WorkbookCommandResult {
     const { activate = true, ...documentInput } = input;
-    const add = (): WorkbookCommandResult => this.executeStructuralTransaction('workbook.addSheet', (state) => ({
+    const add = (): WorkbookCommandResult => this.#executeStructuralTransaction('workbook.addSheet', (state) => ({
       documentState: addWorkbookSheet(state.documentState, documentInput),
       activeSheetId: activate ? input.sheet.id : state.activeSheetId,
     }));
     return activate
-      ? this.withSheetActivation({ sheetId: input.sheet.id },
-        () => { addWorkbookSheet(this.documentState, documentInput); }, add)
+      ? this.#withSheetActivation({ sheetId: input.sheet.id },
+        () => { addWorkbookSheet(this.#documentState, documentInput); }, add)
       : add();
   }
 
   public removeSheet(input: RemoveWorkbookSheetCommandInput): WorkbookCommandResult {
-    return this.executeStructuralTransaction('workbook.removeSheet', (state) => {
+    return this.#executeStructuralTransaction('workbook.removeSheet', (state) => {
       const documentState = removeWorkbookSheet(state.documentState, { sheetId: input.sheetId });
       const activeSheetId =
         state.activeSheetId === input.sheetId
@@ -407,7 +414,7 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
   }
 
   public renameSheet(input: RenameWorkbookSheetCommandInput): WorkbookCommandResult {
-    return this.executeStructuralTransaction('workbook.renameSheet', (state) => {
+    return this.#executeStructuralTransaction('workbook.renameSheet', (state) => {
       const previousName = getWorkbookSheetDescriptor(state.documentState, input.sheetId)?.name;
       const renamed = renameWorkbookSheet(state.documentState, input);
       const nextName = getWorkbookSheetDescriptor(renamed, input.sheetId)?.name;
@@ -417,7 +424,7 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
   }
 
   public activateSheet(input: ActivateWorkbookSheetCommandInput): WorkbookCommandResult {
-    return this.withSheetActivation(input, () => requireVisibleSheet(this.documentState, input.sheetId), () => {
+    return this.#withSheetActivation(input, () => requireVisibleSheet(this.#documentState, input.sheetId), () => {
       const transaction = new WorkbookTransaction('workbook.activateSheet');
       transaction.addStep('workbook.activateSheet:select', (state) => {
         requireVisibleSheet(state.documentState, input.sheetId);
@@ -427,17 +434,17 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
     });
   }
 
-  private withSheetActivation(
+  #withSheetActivation(
     input: ActivateWorkbookSheetCommandInput,
     validateTarget: () => void,
     action: () => WorkbookCommandResult,
   ): WorkbookCommandResult {
-    const changingSheet = this.sessionStore.getActiveSheetId() !== input.sheetId;
+    const changingSheet = this.#sessionStore.getActiveSheetId() !== input.sheetId;
     try {
       if (changingSheet) {
         validateTarget();
-        this.plugins.forEach((plugin) => plugin.onBeforeSheetActivation?.(input));
-        const current = this.requireActiveSheetEditor();
+        this.#plugins.forEach((plugin) => plugin.onBeforeSheetActivation?.(input));
+        const current = this.#requireActiveSheetEditor();
         if (current.queries.has(IsCellEditingQuery) && current.queries.run(IsCellEditingQuery, void 0)) {
           current.commands.run(CommitCellEditCommand, void 0);
           if (current.queries.run(IsCellEditingQuery, void 0)) {
@@ -448,8 +455,8 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
       return action();
     } catch (error) {
       if (changingSheet) {
-        const platform = this.container.resolve<Platform>(Platform.symbol);
-        this.plugins.forEach((plugin) => {
+        const platform = this.#container.resolve<Platform>(Platform.symbol);
+        this.#plugins.forEach((plugin) => {
           try {
             plugin.onSheetActivationFailed?.(input);
           } catch (restoreError) {
@@ -462,14 +469,14 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
   }
 
   public moveSheet(input: MoveWorkbookSheetCommandInput): WorkbookCommandResult {
-    return this.executeStructuralTransaction('workbook.moveSheet', (state) => ({
+    return this.#executeStructuralTransaction('workbook.moveSheet', (state) => ({
       ...state,
       documentState: moveWorkbookSheet(state.documentState, input),
     }));
   }
 
   public hideSheet(input: HideWorkbookSheetCommandInput): WorkbookCommandResult {
-    return this.executeStructuralTransaction('workbook.hideSheet', (state) => {
+    return this.#executeStructuralTransaction('workbook.hideSheet', (state) => {
       const documentState = setWorkbookSheetHidden(state.documentState, { sheetId: input.sheetId, hidden: true });
       const activeSheetId =
         state.activeSheetId === input.sheetId
@@ -480,23 +487,23 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
   }
 
   public unhideSheet(input: UnhideWorkbookSheetCommandInput): WorkbookCommandResult {
-    return this.executeStructuralTransaction('workbook.unhideSheet', (state) => ({
+    return this.#executeStructuralTransaction('workbook.unhideSheet', (state) => ({
       ...state,
       documentState: setWorkbookSheetHidden(state.documentState, { sheetId: input.sheetId, hidden: false }),
     }));
   }
 
   public executeTransaction(transaction: WorkbookTransaction): WorkbookCommandResult {
-    this.assertLive();
-    if (!this.isCommandExecuting()) {
+    this.#assertLive();
+    if (!this.#isCommandExecuting()) {
       throw new SearContractViolationError('Workbook transactions must run through editor.commands.run(...).', {
         transaction: transaction.id,
       });
     }
-    const captured = this.captureActiveRuntime();
+    const captured = this.#captureActiveRuntime();
     const before: WorkbookTransactionState = {
       documentState: captured.documentState,
-      activeSheetId: this.sessionStore.getActiveSheetId(),
+      activeSheetId: this.#sessionStore.getActiveSheetId(),
     };
     const after = transaction.stage(before);
     validateWorkbookDocumentState(after.documentState);
@@ -509,25 +516,25 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
     const committedDocumentState = cloneWorkbookEditorDocumentState(after.documentState);
     lockCommittedSheetState(committedDocumentState);
     let beforeDocumentState = before.documentState;
-    if (beforeDocumentState !== this.documentState) {
+    if (beforeDocumentState !== this.#documentState) {
       beforeDocumentState = cloneWorkbookEditorDocumentState(beforeDocumentState);
       lockCommittedSheetState(beforeDocumentState);
     }
 
     const activeSheetEditorChanged = after.activeSheetId !== before.activeSheetId ||
       after.documentState.sheetStates[after.activeSheetId] !== before.documentState.sheetStates[after.activeSheetId];
-    const previousEditor = this.requireActiveSheetEditor();
+    const previousEditor = this.#requireActiveSheetEditor();
     const replacingActiveContent = activeSheetEditorChanged && after.activeSheetId === before.activeSheetId;
     if (replacingActiveContent) previousEditor.destroy();
     let nextEditor: SheetEditor | null = null;
     try {
-      if (activeSheetEditorChanged) nextEditor = this.createSheetEditor(
+      if (activeSheetEditorChanged) nextEditor = this.#createSheetEditor(
         after.activeSheetId,
         committedDocumentState,
         replacingActiveContent ? { state: captured.sessionState } : undefined,
       );
     } catch (error) {
-      if (replacingActiveContent) this.activeSheetEditor = this.createSheetEditor(
+      if (replacingActiveContent) this.#activeSheetEditor = this.#createSheetEditor(
         before.activeSheetId,
         before.documentState,
         { state: captured.sessionState },
@@ -535,11 +542,11 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
       throw error;
     }
 
-    this.documentState = committedDocumentState;
-    this.sessionStore.setSheetSessionState(captured.sheetId, captured.sessionState, this.#sessionLifecycleToken);
-    this.sessionStore.setActiveSheetId(after.activeSheetId, this.#sessionLifecycleToken);
-    this.sessionStore.removeMissingSheets(new Set(after.documentState.sheets.map((sheet) => sheet.id)), this.#sessionLifecycleToken);
-    if (nextEditor) this.activeSheetEditor = nextEditor;
+    this.#documentState = committedDocumentState;
+    this.#sessionStore.setSheetSessionState(captured.sheetId, captured.sessionState, this.#sessionLifecycleToken);
+    this.#sessionStore.setActiveSheetId(after.activeSheetId, this.#sessionLifecycleToken);
+    this.#sessionStore.removeMissingSheets(new Set(after.documentState.sheets.map((sheet) => sheet.id)), this.#sessionLifecycleToken);
+    if (nextEditor) this.#activeSheetEditor = nextEditor;
     if (nextEditor && !replacingActiveContent) previousEditor.destroy();
 
     const event: WorkbookTransactionCommittedEvent = Object.freeze({
@@ -547,29 +554,29 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
       before: Object.freeze({ documentState: beforeDocumentState, activeSheetId: before.activeSheetId }),
       after: Object.freeze({ documentState: committedDocumentState, activeSheetId: after.activeSheetId }),
     });
-    this.notifyTransactionCommitted(event);
+    this.#notifyTransactionCommitted(event);
     if (after.documentState !== before.documentState) {
-      this.documentStateListeners.forEach((listener) => listener(cloneWorkbookEditorDocumentState(this.documentState)));
+      this.#documentStateListeners.forEach((listener) => listener(cloneWorkbookEditorDocumentState(this.#documentState)));
     }
     if (activeSheetEditorChanged) {
-      const snapshot = this.getActiveSheetEditorSnapshot();
-      this.activeSheetEditorListeners.forEach((listener) => listener(snapshot));
+      const snapshot = this.#getActiveSheetEditorSnapshot();
+      this.#activeSheetEditorListeners.forEach((listener) => listener(snapshot));
     }
     return this.createCommandResult(activeSheetEditorChanged);
   }
 
-  private commitClipboardMove(input: CommitClipboardMoveInput): WorkbookCommandResult {
-    const pending = this.clipboardCutSession.getPending();
-    const prepared = this.preparedClipboardCut;
+  #commitClipboardMove(input: CommitClipboardMoveInput): WorkbookCommandResult {
+    const pending = this.#clipboardCutSession.getPending();
+    const prepared = this.#preparedClipboardCut;
     if (!pending || pending.id !== input.cutId || pending.sourceId !== input.sourceId ||
       !prepared || prepared.id !== input.cutId || prepared.sourceId !== input.sourceId ||
       input.sourceId === input.targetId) {
       throw new SearError('The pending cross-sheet cut is no longer available.');
     }
-    const currentSource = getWorkbookSheetState(this.documentState, input.sourceId);
+    const currentSource = getWorkbookSheetState(this.#documentState, input.sourceId);
     if (!currentSource || JSON.stringify(serializeSheetDocumentState(currentSource)) !== prepared.sourceSignature) {
-      this.clipboardCutSession.cancel();
-      this.preparedClipboardCut = null;
+      this.#clipboardCutSession.cancel();
+      this.#preparedClipboardCut = null;
       throw new SearError('The cut source changed before paste; cut was cancelled to preserve the newer edits.');
     }
     const transaction = new WorkbookTransaction(
@@ -586,137 +593,137 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
       ),
     }));
     const result = this.executeTransaction(transaction);
-    this.clipboardCutSession.cancel();
-    this.preparedClipboardCut = null;
+    this.#clipboardCutSession.cancel();
+    this.#preparedClipboardCut = null;
     return result;
   }
 
   public createCommandResult(activeSheetEditorChanged: boolean): WorkbookCommandResult {
-    return { documentState: cloneWorkbookEditorDocumentState(this.documentState), activeSheetEditorChanged };
+    return { documentState: cloneWorkbookEditorDocumentState(this.#documentState), activeSheetEditorChanged };
   }
 
   public destroy(): void {
-    if (this.destroyed || this.destroying) return;
-    this.destroying = true;
+    if (this.#destroyed || this.#destroying) return;
+    this.#destroying = true;
     try {
-      if (this.activeSheetEditor) {
-        const captured = this.captureActiveRuntime();
-        this.documentState = captured.documentState;
-        this.sessionStore.setSheetSessionState(captured.sheetId, captured.sessionState, this.#sessionLifecycleToken);
+      if (this.#activeSheetEditor) {
+        const captured = this.#captureActiveRuntime();
+        this.#documentState = captured.documentState;
+        this.#sessionStore.setSheetSessionState(captured.sheetId, captured.sessionState, this.#sessionLifecycleToken);
       }
-      this.destroyPlugins();
-      this.destroyed = true;
+      this.#destroyPlugins();
+      this.#destroyed = true;
     } finally {
-      this.destroyed = true;
+      this.#destroyed = true;
       try {
-        this.activeSheetEditor?.destroy();
-        this.activeSheetEditor = null;
+        this.#activeSheetEditor?.destroy();
+        this.#activeSheetEditor = null;
       } finally {
-        this.observations.destroy();
-        this.commands.destroy();
-        this.extensions.destroy();
-        this.session.clear(this.#sessionLifecycleToken);
-        this.sessionStore.clear(this.#sessionLifecycleToken);
-        this.container.resolve<IFormulaExternalServiceProvider>(IFormulaExternalServiceProvider.symbol)
+        this.#observations.destroy();
+        this.#commands.destroy();
+        this.#extensions.destroy();
+        this.#session.clear(this.#sessionLifecycleToken);
+        this.#sessionStore.clear(this.#sessionLifecycleToken);
+        this.#container.resolve<IFormulaExternalServiceProvider>(IFormulaExternalServiceProvider.symbol)
           .destroy(this.#formulaServiceTeardownToken);
-        this.container.reset();
-        this.destroying = false;
+        this.#container.reset();
+        this.#destroying = false;
       }
     }
   }
 
   public destroyAfterFailedInitialization(): void {
-    if (this.destroyed || this.destroying) return;
-    this.destroying = true;
-    this.destroyed = true;
+    if (this.#destroyed || this.#destroying) return;
+    this.#destroying = true;
+    this.#destroyed = true;
     try {
-      this.destroyPlugins();
-      this.activeSheetEditor?.destroy();
+      this.#destroyPlugins();
+      this.#activeSheetEditor?.destroy();
     } finally {
-      this.activeSheetEditor = null;
-      this.extensions.destroy();
-      this.session.clear(this.#sessionLifecycleToken);
-      this.container.resolve<IFormulaExternalServiceProvider>(IFormulaExternalServiceProvider.symbol)
+      this.#activeSheetEditor = null;
+      this.#extensions.destroy();
+      this.#session.clear(this.#sessionLifecycleToken);
+      this.#container.resolve<IFormulaExternalServiceProvider>(IFormulaExternalServiceProvider.symbol)
         .destroy(this.#formulaServiceTeardownToken);
-      this.container.reset();
-      this.destroying = false;
+      this.#container.reset();
+      this.#destroying = false;
     }
   }
 
-  private createPublicEditor(): WorkbookEditor {
-    if (this.publicEditor) return this.publicEditor;
+  #createPublicEditor(): WorkbookEditor {
+    if (this.#publicEditor) return this.#publicEditor;
     const controller = this;
-    this.publicEditor = {
-      commands: this.commands,
-      observations: this.observations,
-      services: createRuntimeCapabilityReader(this.extensions, [
+    this.#publicEditor = {
+      commands: this.#commands,
+      observations: this.#observations,
+      services: createRuntimeCapabilityReader(this.#extensions, [
         WorkbookRuntimeCapability.Runtime,
         WorkbookRuntimeCapability.Session,
       ]),
-      document: this.publicDocument,
-      sheets: this.sheets,
+      document: this.#publicDocument,
+      sheets: this.#sheets,
       destroy: () => controller.destroy(),
     };
-    return this.publicEditor;
+    return this.#publicEditor;
   }
 
-  private createPluginRuntime(): WorkbookPluginRuntime {
+  #createPluginRuntime(): WorkbookPluginRuntime {
     return {
-      commands: this.commands,
-      observations: this.observations,
-      session: this.session,
-      extensions: this.extensions,
-      document: this.document,
-      sheets: this.sheets,
+      commands: this.#commands,
+      observations: this.#observations,
+      session: this.#session,
+      extensions: this.#extensions,
+      document: this.#document,
+      sheets: this.#sheets,
       formula: {
-        functions: this.container.resolve<IFunctionRegistry>(IFunctionRegistry.symbol),
-        textServices: this.container.resolve<IFormulaTextServiceProvider>(IFormulaTextServiceProvider.symbol),
-        externalServices: this.container.resolve<IFormulaExternalServiceProvider>(
+        functions: this.#container.resolve<IFunctionRegistry>(IFunctionRegistry.symbol),
+        textServices: this.#container.resolve<IFormulaTextServiceProvider>(IFormulaTextServiceProvider.symbol),
+        externalServices: this.#container.resolve<IFormulaExternalServiceProvider>(
           IFormulaExternalServiceProvider.symbol,
         ),
-        xmlXPath: this.container.resolve<XmlXPathEvaluator>(XmlXPathEvaluator.symbol),
-        webService: this.container.resolve<WebServiceClient>(WebServiceClient.symbol),
+        xmlXPath: this.#container.resolve<XmlXPathEvaluator>(XmlXPathEvaluator.symbol),
+        webService: this.#container.resolve<WebServiceClient>(WebServiceClient.symbol),
       },
       executeTransaction: (transaction) => this.executeTransaction(transaction),
       createCommandResult: (changed) => this.createCommandResult(changed),
     };
   }
 
-  private registerDefaultCapabilities(): void {
-    this.extensions.register(WorkbookRuntimeCapability.Platform, this.container.resolve(Platform.symbol));
-    this.extensions.register(WorkbookRuntimeCapability.Commands, this.commands);
-    this.extensions.register(WorkbookRuntimeCapability.Observations, this.observations);
-    this.extensions.register(WorkbookRuntimeCapability.Session, this.session);
-    this.extensions.register(WorkbookRuntimeCapability.Formula, this.pluginRuntime.formula);
-    this.extensions.register(WorkbookRuntimeCapability.Runtime, this.pluginRuntime);
+  #registerDefaultCapabilities(): void {
+    this.#extensions.register(WorkbookRuntimeCapability.Platform, this.#container.resolve(Platform.symbol));
+    this.#extensions.register(WorkbookRuntimeCapability.Commands, this.#commands);
+    this.#extensions.register(WorkbookRuntimeCapability.Observations, this.#observations);
+    this.#extensions.register(WorkbookRuntimeCapability.Session, this.#session);
+    this.#extensions.register(WorkbookRuntimeCapability.Formula, this.#pluginRuntime.formula);
+    this.#extensions.register(WorkbookRuntimeCapability.Runtime, this.#pluginRuntime);
   }
 
-  private createPluginContext(): WorkbookPluginContext {
-    return { container: this.container, runtime: this.pluginRuntime };
+  #createPluginContext(): WorkbookPluginContext {
+    return { container: this.#container, runtime: this.#pluginRuntime };
   }
 
-  private initializePlugins(): void {
-    const context = this.createPluginContext();
-    this.plugins.forEach((plugin) => {
+  #initializePlugins(): void {
+    const context = this.#createPluginContext();
+    this.#plugins.forEach((plugin) => {
       const disposer = plugin.initialize?.(context);
-      if (disposer) this.pluginDisposers.push(disposer);
+      if (disposer) this.#pluginDisposers.push(disposer);
     });
   }
 
-  private destroyPlugins(): void {
-    const context = this.createPluginContext();
-    for (let index = this.pluginDisposers.length - 1; index >= 0; index -= 1) {
-      this.pluginDisposers[index]?.();
+  #destroyPlugins(): void {
+    const context = this.#createPluginContext();
+    for (let index = this.#pluginDisposers.length - 1; index >= 0; index -= 1) {
+      this.#pluginDisposers[index]?.();
     }
-    this.pluginDisposers.length = 0;
-    for (let index = this.plugins.length - 1; index >= 0; index -= 1) {
-      this.plugins[index]?.onWorkbookDestroy?.(context);
+    this.#pluginDisposers.length = 0;
+    for (let index = this.#plugins.length - 1; index >= 0; index -= 1) {
+      this.#plugins[index]?.onWorkbookDestroy?.(context);
     }
   }
 
-  private notifyTransactionCommitted(event: WorkbookTransactionCommittedEvent): void {
-    const platform = this.container.resolve<Platform>(Platform.symbol);
-    this.plugins.forEach((plugin) => {
+  #notifyTransactionCommitted(event: WorkbookTransactionCommittedEvent): void {
+    const platform = this.#container.resolve<Platform>(Platform.symbol);
+    this.#plugins.forEach((plugin) => {
       try {
         plugin.onTransactionCommitted?.(event);
       } catch (error) {
@@ -725,19 +732,19 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
     });
   }
 
-  private registerObservations(): void {
-    this.observations.register(WorkbookDocumentStateObservation, {
-      getSnapshot: () => cloneWorkbookEditorDocumentState(this.documentState),
+  #registerObservations(): void {
+    this.#observations.register(WorkbookDocumentStateObservation, {
+      getSnapshot: () => cloneWorkbookEditorDocumentState(this.#documentState),
       subscribe: (listener) =>
-        this.subscribe(this.documentStateListeners, (state) => listener(cloneWorkbookEditorDocumentState(state))),
+        this.#subscribe(this.#documentStateListeners, (state) => listener(cloneWorkbookEditorDocumentState(state))),
     });
-    this.observations.register(WorkbookActiveSheetEditorObservation, {
-      getSnapshot: () => this.getActiveSheetEditorSnapshot(),
-      subscribe: (listener) => this.subscribe(this.activeSheetEditorListeners, listener),
+    this.#observations.register(WorkbookActiveSheetEditorObservation, {
+      getSnapshot: () => this.#getActiveSheetEditorSnapshot(),
+      subscribe: (listener) => this.#subscribe(this.#activeSheetEditorListeners, listener),
     });
   }
 
-  private executeStructuralTransaction(
+  #executeStructuralTransaction(
     id: string,
     reducer: (state: WorkbookTransactionState) => WorkbookTransactionState,
   ): WorkbookCommandResult {
@@ -746,74 +753,74 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
     return this.executeTransaction(transaction);
   }
 
-  private exportDocumentState(): WorkbookDocumentState<SheetDocumentState> {
-    this.assertLive();
-    return cloneWorkbookEditorDocumentState(this.captureActiveRuntime().documentState);
+  #exportDocumentState(): WorkbookDocumentState<SheetDocumentState> {
+    this.#assertLive();
+    return cloneWorkbookEditorDocumentState(this.#captureActiveRuntime().documentState);
   }
 
-  private captureActiveRuntime(): {
+  #captureActiveRuntime(): {
     readonly sheetId: WorkbookSheetId;
     readonly documentState: WorkbookDocumentState<SheetDocumentState>;
     readonly sessionState: SheetSessionState | undefined;
   } {
-    const sheetId = this.sessionStore.getActiveSheetId();
-    const editor = this.requireActiveSheetEditor();
-    const sheetState = getWorkbookSheetState(this.documentState, sheetId);
+    const sheetId = this.#sessionStore.getActiveSheetId();
+    const editor = this.#requireActiveSheetEditor();
+    const sheetState = getWorkbookSheetState(this.#documentState, sheetId);
     if (!sheetState) throw new SearError(`Workbook active sheet "${sheetId}" has no document state.`);
-    const capturedSheetState = this.captureSheetState({
+    const capturedSheetState = this.#captureSheetState({
       sheetId,
       editor,
       sheetState,
-      documentState: this.documentState,
+      documentState: this.#documentState,
     });
-    const sessionState = this.captureSheetSessionState({
+    const sessionState = this.#captureSheetSessionState({
       sheetId,
       editor,
-      sessionState: this.sessionStore.getSheetSessionState(sheetId),
+      sessionState: this.#sessionStore.getSheetSessionState(sheetId),
     });
     return {
       sheetId,
       documentState:
         capturedSheetState === sheetState
-          ? this.documentState
-          : updateWorkbookSheetState(this.documentState, { sheetId, sheetState: capturedSheetState }),
+          ? this.#documentState
+          : updateWorkbookSheetState(this.#documentState, { sheetId, sheetState: capturedSheetState }),
       sessionState,
     };
   }
 
-  private captureLiveSheetSession(): { readonly sheetId: WorkbookSheetId; readonly state?: SheetSessionState } {
-    const sheetId = this.sessionStore.getActiveSheetId();
-    if (!this.activeSheetEditor) {
-      const stored = this.sessionStore.getSheetSessionState(sheetId);
+  #captureLiveSheetSession(): { readonly sheetId: WorkbookSheetId; readonly state?: SheetSessionState } {
+    const sheetId = this.#sessionStore.getActiveSheetId();
+    if (!this.#activeSheetEditor) {
+      const stored = this.#sessionStore.getSheetSessionState(sheetId);
       return stored === void 0 ? { sheetId } : { sheetId, state: stored };
     }
-    const state = this.captureSheetSessionState({
+    const state = this.#captureSheetSessionState({
       sheetId,
-      editor: this.activeSheetEditor,
-      sessionState: this.sessionStore.getSheetSessionState(sheetId),
+      editor: this.#activeSheetEditor,
+      sessionState: this.#sessionStore.getSheetSessionState(sheetId),
     });
     return state === void 0 ? { sheetId } : { sheetId, state };
   }
 
-  private createSheetEditor(
+  #createSheetEditor(
     sheetId: WorkbookSheetId,
     documentState: WorkbookDocumentState<SheetDocumentState>,
     sessionOverride?: { readonly state: SheetSessionState | undefined },
   ): SheetEditor {
     const sheetState = getWorkbookSheetState(documentState, sheetId);
     if (!sheetState) throw new SearError(`Workbook sheet "${sheetId}" has no document state.`);
-    const plugins = [...(this.configuration.sheetPlugins ?? [])];
+    const plugins = [...(this.#configuration.sheetPlugins ?? [])];
     const services = new Map<symbol, unknown>([
-      [IFormulaExternalServiceProvider.symbol, this.pluginRuntime.formula.externalServices],
-      [SheetFormatPainterSession.symbol, this.formatPainterSession],
-      [SheetClipboardCutSession.symbol, this.clipboardCutSession],
+      [IFormulaExternalServiceProvider.symbol, this.#pluginRuntime.formula.externalServices],
+      [SheetFormatPainterSession.symbol, this.#formatPainterSession],
+      [SheetClipboardCutSession.symbol, this.#clipboardCutSession],
       [SheetClipboardSheetIdentity.symbol, new SheetClipboardSheetIdentity(sheetId)],
-      [SheetClipboardWorkbookBridgeSymbol, this.createClipboardBridge(sheetId)],
-      [SheetExternalHistory.symbol, this.createExternalSheetHistory()],
+      [SheetClipboardWorkbookBridgeSymbol, this.#createClipboardBridge(sheetId)],
+      [SheetExternalHistory.symbol, this.#createExternalSheetHistory()],
     ]);
-    const sessionState = sessionOverride ? sessionOverride.state : this.sessionStore.getSheetSessionState(sheetId);
-    const context = { ...this.createPluginContext(), sheetId, sheetState };
-    this.plugins.forEach((plugin) => {
+    const sessionState = sessionOverride ? sessionOverride.state : this.#sessionStore.getSheetSessionState(sheetId);
+    const context = { ...this.#createPluginContext(), sheetId, sheetState };
+    this.#plugins.forEach((plugin) => {
       const contributed = plugin.getSheetPlugins?.(context);
       if (contributed) plugins.push(...contributed);
       plugin.getSheetServices?.(context)?.forEach((service) => {
@@ -833,11 +840,11 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
     });
     const adapters =
       services.size === 0
-        ? this.configuration.adapters
+        ? this.#configuration.adapters
         : {
-            ...this.configuration.adapters,
+            ...this.#configuration.adapters,
             registerEnvironment: (container: Container): void => {
-              this.configuration.adapters.registerEnvironment?.(container);
+              this.#configuration.adapters.registerEnvironment?.(container);
               services.forEach((value, token) => {
                 if (container.hasBinding(token)) {
                   throw new SearError(`Workbook Sheet service ${String(token)} conflicts with a host binding.`, {
@@ -849,27 +856,27 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
               });
             },
           };
-    return this.sheetEditorFactory({
+    return this.#sheetEditorFactory({
       sheetId,
       configuration: {
         adapters,
         sheetState,
         ...(sessionState !== void 0 ? { sessionState } : {}),
-        ...(this.configuration.viewport ? { viewport: this.configuration.viewport } : {}),
+        ...(this.#configuration.viewport ? { viewport: this.#configuration.viewport } : {}),
         ...(plugins.length > 0 ? { plugins } : {}),
       },
     });
   }
 
-  private getActiveSheetEditorSnapshot(): WorkbookActiveSheetEditorSnapshot {
-    return { sheetId: this.sessionStore.getActiveSheetId(), editor: this.requireActiveSheetEditor() };
+  #getActiveSheetEditorSnapshot(): WorkbookActiveSheetEditorSnapshot {
+    return { sheetId: this.#sessionStore.getActiveSheetId(), editor: this.#requireActiveSheetEditor() };
   }
 
-  private createClipboardBridge(sheetId: WorkbookSheetId): SheetClipboardWorkbookBridge {
+  #createClipboardBridge(sheetId: WorkbookSheetId): SheetClipboardWorkbookBridge {
     return {
       prepareCut: (cutId, sourceId, sourceBefore, clearedSource) => {
         if (sourceId !== sheetId) throw new SearError('Clipboard cut source does not match the mounted sheet.');
-        this.preparedClipboardCut = {
+        this.#preparedClipboardCut = {
           id: cutId,
           sourceId,
           sourceSignature: JSON.stringify(serializeSheetDocumentState(sourceBefore)),
@@ -878,35 +885,35 @@ class DefaultWorkbookEditor implements WorkbookCommandController {
       },
       commitMove: async (cutId, sourceId, targetId, targetAfter) => {
         if (targetId !== sheetId) throw new SearError('Clipboard paste target does not match the mounted sheet.');
-        this.commands.run(CommitClipboardMoveCommand, { cutId, sourceId, targetId, targetAfter });
+        this.#commands.run(CommitClipboardMoveCommand, { cutId, sourceId, targetId, targetAfter });
       },
     };
   }
 
-  private createExternalSheetHistory(): SheetExternalHistory {
-    const history = this.container.resolve<WorkbookHistoryPlugin>(WorkbookHistoryPlugin.symbol);
+  #createExternalSheetHistory(): SheetExternalHistory {
+    const history = this.#container.resolve<WorkbookHistoryPlugin>(WorkbookHistoryPlugin.symbol);
     return {
       getStatus: () => ({ ...history.getStatus(), ...history.getOrderStatus() }),
       subscribe: (listener) => history.subscribe(listener),
-      undo: () => { this.commands.run(UndoWorkbookCommand, void 0); },
-      redo: () => { this.commands.run(RedoWorkbookCommand, void 0); },
+      undo: () => { this.#commands.run(UndoWorkbookCommand, void 0); },
+      redo: () => { this.#commands.run(RedoWorkbookCommand, void 0); },
       nextSequence: () => history.nextSequence(),
     };
   }
 
-  private requireActiveSheetEditor(): SheetEditor {
-    this.assertLive();
-    if (this.activeSheetEditor) return this.activeSheetEditor;
+  #requireActiveSheetEditor(): SheetEditor {
+    this.#assertLive();
+    if (this.#activeSheetEditor) return this.#activeSheetEditor;
     throw new SearError('WorkbookEditor has not mounted its active SheetEditor.');
   }
 
-  private subscribe<Value>(listeners: Set<(value: Value) => void>, listener: (value: Value) => void): () => void {
+  #subscribe<Value>(listeners: Set<(value: Value) => void>, listener: (value: Value) => void): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);
   }
 
-  private assertLive(): void {
-    if (this.destroyed) throw new SearError('WorkbookEditor has been destroyed.');
+  #assertLive(): void {
+    if (this.#destroyed) throw new SearError('WorkbookEditor has been destroyed.');
   }
 }
 

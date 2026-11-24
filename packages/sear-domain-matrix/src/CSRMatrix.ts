@@ -26,7 +26,6 @@ export class CSRMatrix<T> extends SparseMatrix<T> {
   protected indices: number[] = [0];
   /** The index pointer to the start of each row in the data array. */
   protected indptr: number[] = [];
-  private mutationsLocked = false;
 
   /** Prevents writes to a committed matrix while leaving clones mutable for transaction staging. */
   public lockMutations(): void {
@@ -65,8 +64,6 @@ export class CSRMatrix<T> extends SparseMatrix<T> {
     for (const key of ['data', 'indices', 'indptr', 'numRows', 'numCols', 'defaultValue', 'name', 'ndim'] as const) {
       Object.defineProperty(this, key, { writable: false, configurable: false });
     }
-    this.mutationsLocked = true;
-    Object.defineProperty(this, 'mutationsLocked', { writable: false, configurable: false });
     Object.preventExtensions(this);
     lockedMatrices.add(this);
   }
@@ -133,7 +130,6 @@ export class CSRMatrix<T> extends SparseMatrix<T> {
       else if (key === 'indices') value = [...this.indices];
       else if (key === 'indptr') value = [...this.indptr];
       else if (key === 'listeners') value = [];
-      else if (key === 'mutationsLocked') value = false;
       else value = cloneValue(descriptor.value);
       Object.defineProperty(copy, key, { ...descriptor, value, writable: true, configurable: true });
     }
@@ -612,7 +608,7 @@ const validatedFrozenValues = new WeakSet<object>();
 const adoptedStoredValues = new WeakSet<object>();
 const lockedMatrices = new WeakSet<object>();
 const csrRuntimeFields = new Set<PropertyKey>([
-  'data', 'indices', 'indptr', 'numRows', 'numCols', 'defaultValue', 'name', 'ndim', 'mutationsLocked', 'listeners',
+  'data', 'indices', 'indptr', 'numRows', 'numCols', 'defaultValue', 'name', 'ndim', 'listeners',
 ]);
 
 function validateSparseStorage(values: number[], field: string): void {

@@ -33,6 +33,8 @@ export type CollaborationExternalEvent =
  * It is the sole owner of transport, revision, pending submissions, ACK handling and rebase state.
  */
 export class CollaborationChannel implements CollaborationSession {
+  readonly #platform: Pick<Platform, 'warn' | 'createId'>;
+
   readonly #operations = new TransactionOTRegistry();
   readonly #contributors = new CollaborationContributorRegistry(this.#operations);
   readonly #engine = new CollaborationEngine(this.#contributors);
@@ -59,8 +61,9 @@ export class CollaborationChannel implements CollaborationSession {
 
   public constructor(
     transport: CollabTransport | (() => CollabTransport),
-    private readonly platform: Pick<Platform, 'warn' | 'createId'>,
+    platform: Pick<Platform, 'warn' | 'createId'>,
   ) {
+    this.#platform = platform;
     this.#transport = typeof transport === 'function' ? null : transport;
     this.#transportFactory = typeof transport === 'function' ? transport : () => transport;
   }
@@ -83,7 +86,7 @@ export class CollaborationChannel implements CollaborationSession {
 
   /** Installs one open OT owner contract for the lifetime of this channel. */
   public registerContributor(contribution: CollaborationContribution): void {
-    this.assertLive();
+    this.#assertLive();
     const existing = this.#registeredContributors.get(contribution.ownerId);
     if (existing) {
       if (existing.definition === contribution.definition) return;
@@ -105,7 +108,7 @@ export class CollaborationChannel implements CollaborationSession {
 
   /** Attaches the one currently mounted editor and replays queued remote effects in revision order. */
   public attachRemoteApplier(applier: CollaborationRemoteOperationApplier): () => void {
-    this.assertLive();
+    this.#assertLive();
     this.#assertWrite?.();
     if (this.#remoteApplier) {
       throw new CollaborationChannelError(
@@ -115,7 +118,7 @@ export class CollaborationChannel implements CollaborationSession {
       );
     }
     this.#remoteApplier = applier;
-    this.flushRemoteEffects();
+    this.#flushRemoteEffects();
     let attached = true;
     return () => {
       this.#assertWrite?.();
@@ -126,27 +129,27 @@ export class CollaborationChannel implements CollaborationSession {
   }
 
   public async connect(options: CollaborationConnectOptions): Promise<void> {
-    this.assertLive();
+    this.#assertLive();
     this.#assertWrite?.();
     const connectionEpoch = this.#connectionEpoch + 1;
     this.disconnect();
     if (connectionEpoch !== this.#connectionEpoch) return;
     const revision = options.revision ?? 0;
-    this.#engine.connect(options.resourceId, this.platform.createId('client'), revision);
-    this.updateStatus(CollaborationConnectionState.Connecting, options.resourceId, null);
+    this.#engine.connect(options.resourceId, this.#platform.createId('client'), revision);
+    this.#updateStatus(CollaborationConnectionState.Connecting, options.resourceId, null);
     if (connectionEpoch !== this.#connectionEpoch) return;
     try {
-      const transport = this.requireTransport();
+      const transport = this.#requireTransport();
       this.#disposeTransportListener = transport.subscribe((message) => {
-        this.dispatchExternalEvent({ kind: 'message', epoch: connectionEpoch, message });
+        this.#routeExternalEvent({ kind: 'message', epoch: connectionEpoch, message });
       });
       this.#transportActive = true;
       await transport.connect({ url: options.url, resourceId: options.resourceId, revision });
       if (connectionEpoch !== this.#connectionEpoch) return;
-      this.dispatchExternalEvent({ kind: 'connected', epoch: connectionEpoch, resourceId: options.resourceId });
+      this.#routeExternalEvent({ kind: 'connected', epoch: connectionEpoch, resourceId: options.resourceId });
     } catch (error) {
       if (connectionEpoch !== this.#connectionEpoch) throw error;
-      this.dispatchExternalEvent({ kind: 'failed', epoch: connectionEpoch, resourceId: options.resourceId, error });
+      this.#routeExternalEvent({ kind: 'failed', epoch: connectionEpoch, resourceId: options.resourceId, error });
       throw error;
     }
   }
@@ -154,15 +157,15 @@ export class CollaborationChannel implements CollaborationSession {
   public disconnect(): void {
     if (this.#destroyed) return;
     this.#assertWrite?.();
-    this.closeConnection();
+    this.#closeConnection();
   }
 
-  private closeConnection(): void {
+  #closeConnection(): void {
     this.#connectionEpoch += 1;
-    this.releaseTransport();
+    this.#releaseTransport();
     this.#engine.disconnect();
     this.#queuedRemoteEffects.length = 0;
-    this.updateStatus(CollaborationConnectionState.Disconnected, null, null);
+    this.#updateStatus(CollaborationConnectionState.Disconnected, null, null);
   }
 
   public getStatus(): CollaborationStatus {
@@ -170,7 +173,7 @@ export class CollaborationChannel implements CollaborationSession {
   }
 
   public subscribeStatus(listener: (status: CollaborationStatus) => void): () => void {
-    this.assertLive();
+    this.#assertLive();
     this.#statusListeners.add(listener);
     let subscribed = true;
     return () => {
@@ -182,17 +185,17 @@ export class CollaborationChannel implements CollaborationSession {
 
   /** Queues a committed local operation batch through the shared collaboration engine. */
   public submitLocal(ownerId: string, operations: readonly OTOperation[]): void {
-    this.assertLive();
+    this.#assertLive();
     this.#assertWrite?.();
     if (this.#status.state !== CollaborationConnectionState.Online || operations.length === 0) return;
-    this.processEffects(this.#engine.submitLocal(ownerId, operations));
+    this.#processEffects(this.#engine.submitLocal(ownerId, operations));
   }
 
   public destroy(): void {
     if (this.#destroyed) return;
     this.#assertWrite?.();
     this.#destroyed = true;
-    this.closeConnection();
+    this.#closeConnection();
     this.#remoteApplier = null;
     this.#statusListeners.clear();
     this.#registeredContributors.clear();
@@ -205,32 +208,32 @@ export class CollaborationChannel implements CollaborationSession {
     this.#assertWrite?.();
     if (this.#destroyed || event.epoch !== this.#connectionEpoch) return;
     if (event.kind === 'connected') {
-      this.updateStatus(CollaborationConnectionState.Online, event.resourceId, null);
+      this.#updateStatus(CollaborationConnectionState.Online, event.resourceId, null);
       return;
     }
     if (event.kind === 'failed') {
-      this.releaseTransport();
+      this.#releaseTransport();
       this.#engine.disconnect();
-      this.updateStatus(CollaborationConnectionState.Error, event.resourceId, event.error);
+      this.#updateStatus(CollaborationConnectionState.Error, event.resourceId, event.error);
       return;
     }
     try {
-      this.processEffects(this.#engine.receive(event.message));
+      this.#processEffects(this.#engine.receive(event.message));
     } catch (error) {
-      this.updateStatus(CollaborationConnectionState.Error, this.#status.resourceId, error);
-      this.platform.warn('Collaboration channel message failed.', error);
+      this.#updateStatus(CollaborationConnectionState.Error, this.#status.resourceId, error);
+      this.#platform.warn('Collaboration channel message failed.', error);
     }
   }
 
-  private dispatchExternalEvent(event: CollaborationExternalEvent): void {
+  #routeExternalEvent(event: CollaborationExternalEvent): void {
     if (this.#dispatchExternalEvent) this.#dispatchExternalEvent(event);
     else this.applyExternalEvent(event);
   }
 
-  private processEffects(effects: readonly CollaborationEngineEffect[]): void {
+  #processEffects(effects: readonly CollaborationEngineEffect[]): void {
     effects.forEach((effect) => {
       if (effect.kind === 'send') {
-        this.requireTransport().send(effect.submission);
+        this.#requireTransport().send(effect.submission);
         return;
       }
       this.#queuedRemoteEffects.push({
@@ -238,12 +241,12 @@ export class CollaborationChannel implements CollaborationSession {
         operations: effect.operations,
         serverRevision: effect.serverRevision,
       });
-      this.flushRemoteEffects();
+      this.#flushRemoteEffects();
     });
-    this.updateStatus(this.#status.state, this.#status.resourceId, this.#status.error);
+    this.#updateStatus(this.#status.state, this.#status.resourceId, this.#status.error);
   }
 
-  private flushRemoteEffects(): void {
+  #flushRemoteEffects(): void {
     while (this.#remoteApplier && this.#queuedRemoteEffects.length > 0) {
       const effect = this.#queuedRemoteEffects[0];
       if (!effect) return;
@@ -252,19 +255,19 @@ export class CollaborationChannel implements CollaborationSession {
     }
   }
 
-  private releaseTransport(): void {
+  #releaseTransport(): void {
     this.#disposeTransportListener?.();
     this.#disposeTransportListener = null;
     if (this.#transportActive) this.#transport?.disconnect();
     this.#transportActive = false;
   }
 
-  private requireTransport(): CollabTransport {
+  #requireTransport(): CollabTransport {
     if (!this.#transport) this.#transport = this.#transportFactory();
     return this.#transport;
   }
 
-  private updateStatus(state: CollaborationStatus['state'], resourceId: string | null, error: unknown | null): void {
+  #updateStatus(state: CollaborationStatus['state'], resourceId: string | null, error: unknown | null): void {
     this.#status = Object.freeze({
       state,
       resourceId,
@@ -277,13 +280,13 @@ export class CollaborationChannel implements CollaborationSession {
         try {
           listener(this.#status);
         } catch (listenerError) {
-          this.platform.warn('Collaboration status listener failed.', listenerError);
+          this.#platform.warn('Collaboration status listener failed.', listenerError);
         }
       });
     });
   }
 
-  private assertLive(): void {
+  #assertLive(): void {
     if (!this.#destroyed) return;
     throw new CollaborationChannelError(
       CollaborationChannelErrorCode.Destroyed,

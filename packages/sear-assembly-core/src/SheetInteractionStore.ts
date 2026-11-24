@@ -40,6 +40,9 @@ export interface SheetInteractionState {
  */
 @Injectable()
 export class SheetInteractionStore {
+  readonly #reducers: SheetInteractionReducerRegistry;
+  readonly #platform: Platform | undefined;
+
   /** DI token for resolving SheetInteractionStore. */
   public static readonly symbol = Symbol.for('SheetInteractionStore');
 
@@ -51,16 +54,19 @@ export class SheetInteractionStore {
   });
   #commandBoundaryCheck: (() => boolean) | undefined;
   #runWithoutMutationAuthority: <Value>(callback: () => Value) => Value = runOutsideCommandExecution;
-  private readonly listeners = new Set<
+  readonly #listeners = new Set<
     (state: Readonly<SheetInteractionState>, signal: SheetInteractionSignal) => void
   >();
 
   /** Creates a SheetInteractionStore instance. */
   constructor(
     @Inject(SheetInteractionReducerRegistry.symbol)
-    private readonly reducers: SheetInteractionReducerRegistry,
-    @Inject(Platform.symbol) private readonly platform?: Platform,
-  ) {}
+    reducers: SheetInteractionReducerRegistry,
+    @Inject(Platform.symbol) platform?: Platform,
+  ) {
+    this.#reducers = reducers;
+    this.#platform = platform;
+  }
 
   /** Requires an editor command for every assembled interaction-state commit. */
   public enforceCommandBoundary(
@@ -92,7 +98,7 @@ export class SheetInteractionStore {
    * @returns The prospective interaction state.
    */
   public reduce(state: Readonly<SheetInteractionState>, signal: SheetInteractionSignal): SheetInteractionState {
-    const reducer = this.reducers.get(signal.type);
+    const reducer = this.#reducers.get(signal.type);
     if (!reducer)
       throw new SearRegistryEntryNotFoundError(
         'interaction reducer',
@@ -123,11 +129,11 @@ export class SheetInteractionStore {
       }) : null,
     });
     signals.forEach((signal) => this.#runWithoutMutationAuthority(() => {
-      [...this.listeners].forEach((listener) => {
+      [...this.#listeners].forEach((listener) => {
         try {
           listener(this.#state, signal);
         } catch (error) {
-          this.platform?.warn?.(`Sheet interaction listener failed for ${signal.type}.`, error);
+          this.#platform?.warn?.(`Sheet interaction listener failed for ${signal.type}.`, error);
         }
       });
     }));
@@ -143,10 +149,10 @@ export class SheetInteractionStore {
   public subscribe(
     listener: (state: Readonly<SheetInteractionState>, signal: SheetInteractionSignal) => void,
   ): () => void {
-    this.listeners.add(listener);
+    this.#listeners.add(listener);
     const store = this;
     return function unsubscribeSheetInteractionListener(): void {
-      store.listeners.delete(listener);
+      store.#listeners.delete(listener);
     };
   }
 }

@@ -8,26 +8,29 @@ import { RenderNode } from './RenderNode';
 
 /** Draws a feature-contributed visual between a cell background and its content. */
 export class CellVisualLayerNode<T extends NodeProperties> extends RenderNode<T> {
-  constructor(rect: PositionRectProps, properties: Partial<T>, private readonly layer: CellVisualLayer) {
+  readonly #layer: CellVisualLayer;
+
+  constructor(rect: PositionRectProps, properties: Partial<T>, layer: CellVisualLayer) {
     super(rect, { ...properties, skipHit: true });
+    this.#layer = layer;
   }
 
   public drawScene(context: RenderContext): void {
-    const x = this.x + this.width * this.layer.x;
-    const y = this.y + this.height * this.layer.y;
-    const width = this.width * this.layer.width;
-    const height = this.height * this.layer.height;
+    const x = this.x + this.width * this.#layer.x;
+    const y = this.y + this.height * this.#layer.y;
+    const width = this.width * this.#layer.width;
+    const height = this.height * this.#layer.height;
     if (width <= 0 || height <= 0) return;
     context.save();
     context.beginPath();
     context.rect(this.x, this.y, this.width, this.height);
     context.clip();
-    if (this.layer.labels) {
+    if (this.#layer.labels) {
       const config = this.configEngine.getDefaultConfig() as Partial<SheetConfig>;
       drawCellVisualLabels(
         context,
         this.resolveRuntime<TextShaper>(TextShaper.symbol),
-        this.layer.labels,
+        this.#layer.labels,
         { x, y, width, height },
         createFontDescriptor({
           fontSize: config.sheetCellFontSize ?? 10,
@@ -37,16 +40,16 @@ export class CellVisualLayerNode<T extends NodeProperties> extends RenderNode<T>
       context.restore();
       return;
     }
-    if (this.layer.icon) {
+    if (this.#layer.icon) {
       const size = Math.min(16, Math.max(0, height - 4), Math.max(0, width - 4));
-      if (size > 0) drawIcon(context, x + 4, y + (height - size) / 2, size, this.layer.icon);
+      if (size > 0) drawIcon(context, x + 4, y + (height - size) / 2, size, this.#layer.icon);
       context.restore();
       return;
     }
-    const fill = this.layer.fill;
+    const fill = this.#layer.fill;
     if (typeof fill === 'string') {
       context.beginPath();
-      if (this.layer.shape === CellVisualLayerShape.TopLeftTriangle) {
+      if (this.#layer.shape === CellVisualLayerShape.TopLeftTriangle) {
         context.moveTo(x, y);
         context.lineTo(x + width, y);
         context.lineTo(x, y + height);

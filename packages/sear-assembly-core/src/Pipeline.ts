@@ -265,7 +265,7 @@ export class Pipeline {
   public readonly steps: PipelineStep[] = [];
   /** Dirty rectangles accumulated before the render phase. */
   public readonly dirtyRects: PositionRect<HexColor>[] = [];
-  private readonly hooks: PipelineLifecycle[] = [];
+  readonly #hooks: PipelineLifecycle[] = [];
 
   /** Creates a named pipeline for diagnostics and command results. */
   constructor(public readonly name: string) {}
@@ -274,7 +274,7 @@ export class Pipeline {
 
   /** Register a lifecycle hook (middleware).  Hooks fire in registration order. */
   use(hook: PipelineLifecycle): this {
-    this.hooks.push(hook);
+    this.#hooks.push(hook);
     return this;
   }
 
@@ -369,23 +369,23 @@ export class Pipeline {
 
   /** Notify all hooks that the pipeline is starting. */
   emitStart(): void {
-    for (const hook of this.hooks) hook.onStart?.(this);
+    for (const hook of this.#hooks) hook.onStart?.(this);
   }
 
   /** Notify all hooks that a step is starting. Provides auto-derived detail. */
   emitStepStart(step: PipelineStep): void {
     const detail = deriveStepDetail(step);
-    for (const hook of this.hooks) hook.onStepStart?.(step, this, detail);
+    for (const hook of this.#hooks) hook.onStepStart?.(step, this, detail);
   }
 
   /** Notify all hooks that a step has completed. */
   emitStepComplete(step: PipelineStep): void {
-    for (const hook of this.hooks) hook.onStepComplete?.(step, this);
+    for (const hook of this.#hooks) hook.onStepComplete?.(step, this);
   }
 
   /** Notify all hooks that the pipeline has completed. */
   emitComplete(rendered: boolean): void {
-    for (const hook of this.hooks) hook.onComplete?.(this, rendered);
+    for (const hook of this.#hooks) hook.onComplete?.(this, rendered);
   }
 
   // ─── Factory helpers ─────────────────────────────────────────────

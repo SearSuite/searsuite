@@ -10,7 +10,7 @@ export class SheetCellContextPlugin implements SheetEmbeddedEditorPlugin {
   public readonly key = 'sheet.cell-context';
 
   public initialize(context: SheetEmbeddedEditorPluginContext): void {
-    this.assertGeometry(context.editor);
+    this.#assertGeometry(context.editor);
   }
 
   public toLocalPoint(context: SheetEmbeddedEditorContext, point: SheetEditorPoint): SheetEditorPoint {
@@ -21,7 +21,7 @@ export class SheetCellContextPlugin implements SheetEmbeddedEditorPlugin {
     return context.geometry.toSheetPoint(point);
   }
 
-  private assertGeometry(context: SheetEmbeddedEditorContext): void {
+  #assertGeometry(context: SheetEmbeddedEditorContext): void {
     const { cellRect } = context.geometry;
     if (![cellRect.x, cellRect.y, cellRect.width, cellRect.height].every(Number.isFinite)) {
       throw new SearError('Sheet embedded editor requires finite cell geometry.');

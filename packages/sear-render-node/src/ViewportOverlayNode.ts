@@ -6,7 +6,7 @@ import { RichTextVisualNode } from './RichTextVisualNode';
 
 /** Viewport overlay node that draws transient UI under an identity transform. */
 export class ViewportOverlayNode extends RichTextVisualNode {
-  private readonly drawOverlay: (context: RenderContext) => void;
+  readonly #drawOverlay: (context: RenderContext) => void;
 
   /** Creates a viewport overlay render node. */
   public constructor(input: {
@@ -24,13 +24,13 @@ export class ViewportOverlayNode extends RichTextVisualNode {
       depth: input.depth ?? 10_000,
       isEdit: true,
     });
-    this.drawOverlay = input.drawOverlay;
+    this.#drawOverlay = input.drawOverlay;
   }
 
   /** Draws overlay content; the node owns transform isolation for viewport-space plugins. */
   public drawScene(context: RenderContext): void {
     this.beginScene(context, true);
-    this.drawOverlay(context);
+    this.#drawOverlay(context);
     this.endScene(context);
   }
 }

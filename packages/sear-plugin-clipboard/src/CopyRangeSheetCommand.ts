@@ -5,17 +5,25 @@ import { CopyRangeCommand, type SheetClipboardCommandResult, type SheetCopyRange
 import { resolveRange } from './SheetClipboardCommandHelpers';
 
 export class CopyRangeSheetCommand implements SheetCommand<SheetClipboardCommandResult> {
+  readonly #source: SheetClipboardDataSource;
+  readonly #codec: SheetClipboardCodec;
+  readonly #input: SheetCopyRangeInput | void;
+
   public readonly id = CopyRangeCommand.id;
 
   public constructor(
-    private readonly source: SheetClipboardDataSource,
-    private readonly codec: SheetClipboardCodec,
-    private readonly input: SheetCopyRangeInput | void,
-  ) {}
+    source: SheetClipboardDataSource,
+    codec: SheetClipboardCodec,
+    input: SheetCopyRangeInput | void,
+  ) {
+    this.#source = source;
+    this.#codec = codec;
+    this.#input = input;
+  }
 
   public execute(_context: SheetCommandContext): SheetClipboardCommandResult {
-    const range = resolveRange(this.input?.range, this.source);
-    this.source.cutSession?.cancel();
-    return { pipeline: new Pipeline(this.id), range, payload: this.codec.encode(range, this.source, true) };
+    const range = resolveRange(this.#input?.range, this.#source);
+    this.#source.cutSession?.cancel();
+    return { pipeline: new Pipeline(this.id), range, payload: this.#codec.encode(range, this.#source, true) };
   }
 }

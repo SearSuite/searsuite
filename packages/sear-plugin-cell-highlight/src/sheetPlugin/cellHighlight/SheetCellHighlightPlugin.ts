@@ -48,11 +48,13 @@ const pluginKey = new PluginKey('SheetCellHighlightPlugin');
 
 @Injectable()
 export class SheetCellHighlightPlugin extends Plugin<unknown, CellProperties, SheetCellHighlightPluginState> {
+  readonly #dependencies: CellHighlightDependencies;
+
   readonly #occurrenceCounts = new Map<string, {
     counts: Map<string, number>; wildcardPatterns: string[]; resolved: Map<string, number>;
   }>();
   readonly #rangeThresholds = new Map<string, number | null>();
-  private readonly disposeValueChanges: (() => void) | undefined;
+  readonly #disposeValueChanges: (() => void) | undefined;
   public static readonly symbol = Symbol.for('SheetCellHighlightPlugin');
   public static readonly pluginKey = pluginKey;
   public static readonly documentState: PluginDocumentStateContribution<SheetCellHighlightPluginState, SheetCellHighlightPluginState> = {
@@ -78,15 +80,16 @@ export class SheetCellHighlightPlugin extends Plugin<unknown, CellProperties, Sh
     MatrixOTActionName.RowMove, MatrixOTActionName.ColInsert, MatrixOTActionName.ColDelete, MatrixOTActionName.ColMove,
   ];
 
-  public constructor(state: SheetCellHighlightPluginState, private readonly dependencies: CellHighlightDependencies) {
+  public constructor(state: SheetCellHighlightPluginState, dependencies: CellHighlightDependencies) {
     super({ key: pluginKey, state });
-    this.disposeValueChanges = dependencies.displayedValueChanges?.subscribe((cells) => this.invalidateRangeStatistics(cells));
+    this.#dependencies = dependencies;
+    this.#disposeValueChanges = dependencies.displayedValueChanges?.subscribe((cells) => this.invalidateRangeStatistics(cells));
   }
 
   public registerCommands(commands: SheetCommandBus): void {
     registerCellHighlightCommands(commands, {
-      target: this.key, readMatrix: () => this.getState().cellHighlights, createId: this.dependencies.createId,
-      nextPriority: this.dependencies.nextPriority,
+      target: this.key, readMatrix: () => this.getState().cellHighlights, createId: this.#dependencies.createId,
+      nextPriority: this.#dependencies.nextPriority,
     });
   }
 
@@ -103,21 +106,21 @@ export class SheetCellHighlightPlugin extends Plugin<unknown, CellProperties, Sh
         const matrix = this.getState().cellHighlights;
         const entries = matrix.findRules(rowIndex, columnIndex);
         if (!entries.length) return [];
-        const value = this.dependencies.readValue(rowIndex, columnIndex);
+        const value = this.#dependencies.readValue(rowIndex, columnIndex);
         let numericValue: number | null | undefined;
         let numericRead = false;
         const matched: { id: string; priority: number; properties: Partial<CellProperties> }[] = [];
         for (const { row, column, rule } of entries) {
           const statistic = isCellHighlightRangeStatisticKind(rule.condition.kind);
           if (statistic && !numericRead) {
-            numericValue = this.dependencies.readNumericValue(rowIndex, columnIndex);
+            numericValue = this.#dependencies.readNumericValue(rowIndex, columnIndex);
             numericRead = true;
           }
           if (statistic && numericValue === null) continue;
           const occurrences = rule.condition.kind === CellHighlightKind.Duplicate || rule.condition.kind === CellHighlightKind.Unique
-            ? this.countOccurrences(row, column, rule, value) : 0;
-          const threshold = statistic ? this.rangeThreshold(row, column, rule) : null;
-          if (evaluateCellHighlight(rule.condition, statistic ? numericValue : value, this.dependencies.platform, occurrences, threshold)) {
+            ? this.#countOccurrences(row, column, rule, value) : 0;
+          const threshold = statistic ? this.#rangeThreshold(row, column, rule) : null;
+          if (evaluateCellHighlight(rule.condition, statistic ? numericValue : value, this.#dependencies.platform, occurrences, threshold)) {
             matched.push({ id: rule.id, priority: rule.priority, properties: styleProperties(rule.style) });
           }
         }
@@ -126,12 +129,12 @@ export class SheetCellHighlightPlugin extends Plugin<unknown, CellProperties, Sh
     });
   }
 
-  private countOccurrences(row: number, column: number, rule: CellHighlightRule, value: unknown): number {
+  #countOccurrences(row: number, column: number, rule: CellHighlightRule, value: unknown): number {
     const text = cellHighlightText(value);
     if (text === '') return 0;
     let cache = this.#occurrenceCounts.get(rule.id);
     if (!cache) {
-      const counts = countCellHighlightOccurrences(row, column, rule.endRow, rule.endColumn, this.dependencies.forEachValueInRange);
+      const counts = countCellHighlightOccurrences(row, column, rule.endRow, rule.endColumn, this.#dependencies.forEachValueInRange);
       cache = { counts, wildcardPatterns: [...counts.keys()].filter(hasCellHighlightWildcard), resolved: new Map() };
       this.#occurrenceCounts.set(rule.id, cache);
     }
@@ -142,8 +145,8 @@ export class SheetCellHighlightPlugin extends Plugin<unknown, CellProperties, Sh
     const candidates = hasCellHighlightWildcard(text) ? cache.counts.keys() : cache.wildcardPatterns;
     for (const candidate of candidates) {
       if (candidate === text) continue;
-      if (matchesCellHighlightWildcard(candidate, text, this.dependencies.platform) ||
-        matchesCellHighlightWildcard(text, candidate, this.dependencies.platform)) {
+      if (matchesCellHighlightWildcard(candidate, text, this.#dependencies.platform) ||
+        matchesCellHighlightWildcard(text, candidate, this.#dependencies.platform)) {
         occurrences += cache.counts.get(candidate) ?? 0;
       }
     }
@@ -151,10 +154,10 @@ export class SheetCellHighlightPlugin extends Plugin<unknown, CellProperties, Sh
     return occurrences;
   }
 
-  private rangeThreshold(row: number, column: number, rule: CellHighlightRule): number | null {
+  #rangeThreshold(row: number, column: number, rule: CellHighlightRule): number | null {
     if (!this.#rangeThresholds.has(rule.id)) {
       this.#rangeThresholds.set(rule.id, computeCellHighlightRangeThreshold(
-        rule.condition, row, column, rule.endRow, rule.endColumn, this.dependencies.forEachNumericValueInRange,
+        rule.condition, row, column, rule.endRow, rule.endColumn, this.#dependencies.forEachNumericValueInRange,
       ));
     }
     return this.#rangeThresholds.get(rule.id) ?? null;
@@ -178,7 +181,7 @@ export class SheetCellHighlightPlugin extends Plugin<unknown, CellProperties, Sh
 
   public dispose(): void {
     this.assertRuntimeWriteAllowed();
-    this.disposeValueChanges?.();
+    this.#disposeValueChanges?.();
     this.#occurrenceCounts.clear();
     this.#rangeThresholds.clear();
   }
@@ -195,7 +198,7 @@ export class SheetCellHighlightPlugin extends Plugin<unknown, CellProperties, Sh
 
   public registerFormatTransfers(registry: SheetFormatTransferRegistry): void {
     registry.register(createCellHighlightFormatTransfer(
-      this.key, () => this.getState().cellHighlights, this.dependencies.createId, this.dependencies.nextPriority,
+      this.key, () => this.getState().cellHighlights, this.#dependencies.createId, this.#dependencies.nextPriority,
     ));
   }
 
@@ -228,7 +231,7 @@ export class SheetCellHighlightPlugin extends Plugin<unknown, CellProperties, Sh
         const preservedIds = new Set<string>();
         for (const { original, range } of fragments) {
           const originalRule = original.rule.rule;
-          const id = preservedIds.has(originalRule.id) ? this.dependencies.createId() : originalRule.id;
+          const id = preservedIds.has(originalRule.id) ? this.#dependencies.createId() : originalRule.id;
           preservedIds.add(originalRule.id);
           getUpdate(range.start[0], range.start[1]).next.push({
             ...originalRule, id, endRow: range.end[0], endColumn: range.end[1],

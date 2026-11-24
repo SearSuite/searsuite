@@ -15,7 +15,7 @@ export class RichTextCellCommitStrategy extends CellCommitStrategy {
 
   /** Reports whether the input is a rich-document snapshot. */
   matches(context: CellCommitContext): boolean {
-    return RichTextCellCommitStrategy.hasPersistentRichText(context.richText);
+    return RichTextCellCommitStrategy.#hasPersistentRichText(context.richText);
   }
 
   /** Persists a cloned rich-document snapshot. */
@@ -26,11 +26,11 @@ export class RichTextCellCommitStrategy extends CellCommitStrategy {
     };
   }
 
-  private static hasPersistentRichText(nodes: RichDocNode[]): boolean {
-    return Array.isArray(nodes) && nodes.some((node) => RichTextCellCommitStrategy.hasPersistentRichDocumentNode(node));
+  static #hasPersistentRichText(nodes: RichDocNode[]): boolean {
+    return Array.isArray(nodes) && nodes.some((node) => RichTextCellCommitStrategy.#hasPersistentRichDocumentNode(node));
   }
 
-  private static hasPersistentRichDocumentNode(node: RichDocNode): boolean {
+  static #hasPersistentRichDocumentNode(node: RichDocNode): boolean {
     if (!node || typeof node !== 'object') return false;
     if (Object.keys(node.attrs ?? {}).length > 0) return true;
     if (!DocNodeRegistry.isBlockType(node.type) && !isTextNode(node)) return true;
@@ -39,7 +39,7 @@ export class RichTextCellCommitStrategy extends CellCommitStrategy {
     // guarded rather than assuming every node owns an array.
     return (
       Array.isArray(node.content) &&
-      node.content.some((child) => RichTextCellCommitStrategy.hasPersistentRichDocumentNode(child))
+      node.content.some((child) => RichTextCellCommitStrategy.#hasPersistentRichDocumentNode(child))
     );
   }
 }

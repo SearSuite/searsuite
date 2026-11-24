@@ -37,14 +37,18 @@ export interface CellDisplayTextProvider {
 /** Maps persisted cell types to their display-text semantics without creating render Cells. */
 @Injectable()
 export class CellDisplayTextRegistry {
+  readonly #platform: Platform;
+
   /** DI token for resolving CellDisplayTextRegistry. */
   public static readonly symbol = Symbol.for('CellDisplayTextRegistry');
 
   readonly #providers = new Map<string | symbol, CellDisplayTextProvider>();
-  private readonly warnedTypes = new Set<string>();
+  readonly #warnedTypes = new Set<string>();
 
   /** Creates a CellDisplayTextRegistry instance. */
-  constructor(@Inject(Platform.symbol) private readonly platform: Platform) {}
+  constructor(@Inject(Platform.symbol) platform: Platform) {
+    this.#platform = platform;
+  }
 
   /** Registers the value. */
   register(provider: CellDisplayTextProvider): () => void {
@@ -70,9 +74,9 @@ export class CellDisplayTextRegistry {
     if (provider) return provider.getDisplayText(cell, context);
 
     const typeName = typeof cell.type === 'symbol' ? cell.type.toString() : cell.type;
-    if (!this.warnedTypes.has(typeName)) {
-      this.warnedTypes.add(typeName);
-      this.platform.warn(
+    if (!this.#warnedTypes.has(typeName)) {
+      this.#warnedTypes.add(typeName);
+      this.#platform.warn(
         `[Display] No display-text provider registered for cell type "${typeName}". Falling back to String(value).`,
       );
     }

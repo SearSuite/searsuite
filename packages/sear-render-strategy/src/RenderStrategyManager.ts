@@ -48,7 +48,7 @@ export class RenderStrategyManager<NodeTypeProperties extends NodeProperties> {
     name: string | Symbol,
     strategy: RenderStrategy<NodeTypeProperties>,
   ): void {
-    this.insertStrategy(reference, name, strategy, 'before');
+    this.#insertStrategy(reference, name, strategy, 'before');
   }
 
   /** Inserts a strategy immediately after an existing strategy. */
@@ -57,10 +57,10 @@ export class RenderStrategyManager<NodeTypeProperties extends NodeProperties> {
     name: string | Symbol,
     strategy: RenderStrategy<NodeTypeProperties>,
   ): void {
-    this.insertStrategy(reference, name, strategy, 'after');
+    this.#insertStrategy(reference, name, strategy, 'after');
   }
 
-  private insertStrategy(
+  #insertStrategy(
     reference: string | Symbol,
     name: string | Symbol,
     strategy: RenderStrategy<NodeTypeProperties>,

@@ -109,7 +109,7 @@ export class WorkbookHistoryPlugin extends WorkbookPlugin {
         );
         this.#sequence = Math.max(state.sequence ?? 0, ...[...this.#undoStack, ...this.#redoStack]
           .flatMap((entry) => [entry.undoOrder ?? 0, entry.redoOrder ?? 0]));
-        this.emitStatus();
+        this.#emitStatus();
       },
     });
   }
@@ -158,7 +158,7 @@ export class WorkbookHistoryPlugin extends WorkbookPlugin {
       default:
         return;
     }
-    this.emitStatus();
+    this.#emitStatus();
   }
 
   public onWorkbookDestroy(): void {
@@ -226,7 +226,7 @@ export class WorkbookHistoryPlugin extends WorkbookPlugin {
     return () => this.#listeners.delete(listener);
   }
 
-  private emitStatus(): void {
+  #emitStatus(): void {
     const status = this.getStatus();
     runOutsideCommandExecution(() => this.#listeners.forEach((listener) => listener(status)));
   }

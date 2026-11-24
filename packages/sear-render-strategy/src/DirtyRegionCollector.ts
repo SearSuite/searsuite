@@ -42,12 +42,16 @@ export interface DirtyRegionSource<T = unknown> {
  * @typeParam T Optional key type attached to collected rectangles.
  */
 export class DirtyRegionCollector<T = unknown> {
+  readonly #source: DirtyRegionSource<T>;
+
   /**
    * Creates a collector around a frame-scoped dirty source.
    *
    * @param source Dirty source owned by the host renderer.
    */
-  public constructor(private readonly source: DirtyRegionSource<T>) {}
+  public constructor(source: DirtyRegionSource<T>) {
+    this.#source = source;
+  }
 
   /**
    * Returns all dirty rectangles accumulated for the current frame.
@@ -56,12 +60,12 @@ export class DirtyRegionCollector<T = unknown> {
    * the frame's redraw work has succeeded or has been intentionally skipped.
    */
   public collect(): PositionRect<T>[] {
-    return this.source.query(this.source.getBoundary());
+    return this.#source.query(this.#source.getBoundary());
   }
 
   /** Clears all dirty rectangles from the underlying source. */
   public clear(): void {
-    this.source.clear();
+    this.#source.clear();
   }
 
   /**
@@ -102,8 +106,8 @@ export class DirtyRegionCollector<T = unknown> {
     const expandedRect = DirtyRegionCollector.expand(dirtyRect, strokeWidth / 2);
     if (!useUnionClip) return expandedRect;
 
-    const dirtyBounds = DirtyRegionCollector.toBounds(expandedRect);
-    const nodeBounds = DirtyRegionCollector.toBounds(DirtyRegionCollector.expand(nodeRect, strokeWidth / 2));
+    const dirtyBounds = DirtyRegionCollector.#toBounds(expandedRect);
+    const nodeBounds = DirtyRegionCollector.#toBounds(DirtyRegionCollector.expand(nodeRect, strokeWidth / 2));
     const outerCorners = DirtyRegionCollector.traceUnionBoundary(dirtyBounds, nodeBounds);
     return outerCorners.length >= 3 ? outerCorners : expandedRect;
   }
@@ -144,7 +148,7 @@ export class DirtyRegionCollector<T = unknown> {
       const prev = points[(i - 1 + points.length) % points.length];
       const curr = points[i];
       const next = points[(i + 1) % points.length];
-      if (DirtyRegionCollector.cross(prev, curr, next) !== 0) {
+      if (DirtyRegionCollector.#cross(prev, curr, next) !== 0) {
         cleaned.push(curr);
       }
     }
@@ -193,8 +197,8 @@ export class DirtyRegionCollector<T = unknown> {
 
     const directedBoundaryEdges = new Map<string, [number, number]>();
     const addOrCancelEdge = (a: [number, number], b: [number, number]): void => {
-      const fw = DirtyRegionCollector.edgeKey(a, b);
-      const rv = DirtyRegionCollector.edgeKey(b, a);
+      const fw = DirtyRegionCollector.#edgeKey(a, b);
+      const rv = DirtyRegionCollector.#edgeKey(b, a);
       if (directedBoundaryEdges.has(rv)) {
         directedBoundaryEdges.delete(rv);
         return;
@@ -232,12 +236,12 @@ export class DirtyRegionCollector<T = unknown> {
       const [startPoint] = edge.split('->');
       const [sx, sy] = startPoint.split(',').map(Number);
       const start: [number, number] = [sx, sy];
-      nextByStart.set(DirtyRegionCollector.pointKey(start), end);
+      nextByStart.set(DirtyRegionCollector.#pointKey(start), end);
       starts.push(start);
     });
 
     const start = starts.sort(([ax, ay], [bx, by]) => (ay !== by ? ay - by : ax - bx))[0];
-    const startKey = DirtyRegionCollector.pointKey(start);
+    const startKey = DirtyRegionCollector.#pointKey(start);
 
     const loop: [number, number][] = [];
     let current = start;
@@ -252,17 +256,17 @@ export class DirtyRegionCollector<T = unknown> {
       const next = nextByStart.get(currentKey);
       if (!next) break;
 
-      const nextKey = DirtyRegionCollector.pointKey(next);
+      const nextKey = DirtyRegionCollector.#pointKey(next);
       if (nextKey === startKey) break;
 
-      current = DirtyRegionCollector.parsePoint(nextKey);
+      current = DirtyRegionCollector.#parsePoint(nextKey);
       currentKey = nextKey;
     }
 
     return DirtyRegionCollector.removeCollinear(loop);
   }
 
-  private static toBounds<T>(rect: PositionRect<T>): DirtyRegionBounds {
+  static #toBounds<T>(rect: PositionRect<T>): DirtyRegionBounds {
     return {
       x1: rect.x,
       y1: rect.y,
@@ -271,19 +275,19 @@ export class DirtyRegionCollector<T = unknown> {
     };
   }
 
-  private static cross(o: [number, number], a: [number, number], b: [number, number]): number {
+  static #cross(o: [number, number], a: [number, number], b: [number, number]): number {
     return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
   }
 
-  private static edgeKey(a: [number, number], b: [number, number]): string {
+  static #edgeKey(a: [number, number], b: [number, number]): string {
     return `${a[0]},${a[1]}->${b[0]},${b[1]}`;
   }
 
-  private static pointKey([x, y]: [number, number]): string {
+  static #pointKey([x, y]: [number, number]): string {
     return `${x},${y}`;
   }
 
-  private static parsePoint(key: string): [number, number] {
+  static #parsePoint(key: string): [number, number] {
     const [x, y] = key.split(',').map(Number);
     return [x, y];
   }

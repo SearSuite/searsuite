@@ -53,7 +53,7 @@ import {
 import { Platform } from '@searsuite/sear-foundation-platform';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { cellKey, fromCellKey } from '@searsuite/sear-domain-formula-engine-ts';
-import { isFormulaError, isFormulaText } from '@searsuite/sear-foundation-utils';
+import { isFormulaError } from '@searsuite/sear-foundation-utils';
 import { columnIndexToLabel } from '@searsuite/sear-foundation-utils';
 import { FormulaResultStore } from './FormulaResultStore';
 import { FormulaRenderInvalidator } from './FormulaRenderInvalidator';
@@ -70,36 +70,57 @@ import {
 /** Schedules dependency-aware formula recalculation with visible-cell priority. */
 @Injectable()
 export class RecalcScheduler {
+  #graph: IDependencyGraph;
+  #evaluator: IFormulaEvaluator;
+  #resultStore: FormulaResultStore;
+  #aggCache: IAggregationCache;
+  #dataSource: FormulaSchedulerDataSource;
+  #platform: Platform;
+  #renderInvalidator: FormulaRenderInvalidator;
+  #trace: FormulaCalculationTraceBus;
+  #functionRegistry: IFunctionRegistry | undefined;
+  #iterationSettings: IFormulaIterationSettingsProvider | undefined;
+
   /** DI token for resolving RecalcScheduler. */
   public static readonly symbol = Symbol.for('RecalcScheduler');
 
   /** Creates a RecalcScheduler instance. */
   constructor(
-    @Inject(IDependencyGraph.symbol) private graph: IDependencyGraph,
-    @Inject(IFormulaEvaluator.symbol) private evaluator: IFormulaEvaluator,
-    @Inject(FormulaResultStore.symbol) private resultStore: FormulaResultStore,
-    @Inject(IAggregationCache.symbol) private aggCache: IAggregationCache,
+    @Inject(IDependencyGraph.symbol) graph: IDependencyGraph,
+    @Inject(IFormulaEvaluator.symbol) evaluator: IFormulaEvaluator,
+    @Inject(FormulaResultStore.symbol) resultStore: FormulaResultStore,
+    @Inject(IAggregationCache.symbol) aggCache: IAggregationCache,
     @Inject(FormulaSchedulerDataSource.symbol)
-    private dataSource: FormulaSchedulerDataSource,
-    @Inject(Platform.symbol) private platform: Platform,
+    dataSource: FormulaSchedulerDataSource,
+    @Inject(Platform.symbol) platform: Platform,
     @Inject(FormulaRenderInvalidator.symbol)
-    private renderInvalidator: FormulaRenderInvalidator,
+    renderInvalidator: FormulaRenderInvalidator,
     @Inject(FormulaCalculationTraceBus.symbol)
-    private trace: FormulaCalculationTraceBus,
-    @Inject(IFunctionRegistry.symbol) private functionRegistry?: IFunctionRegistry,
+    trace: FormulaCalculationTraceBus,
+    @Inject(IFunctionRegistry.symbol) functionRegistry?: IFunctionRegistry,
     @Inject(IFormulaIterationSettingsProvider.symbol)
-    private iterationSettings?: IFormulaIterationSettingsProvider,
+    iterationSettings?: IFormulaIterationSettingsProvider,
   ) {
+    this.#graph = graph;
+    this.#evaluator = evaluator;
+    this.#resultStore = resultStore;
+    this.#aggCache = aggCache;
+    this.#dataSource = dataSource;
+    this.#platform = platform;
+    this.#renderInvalidator = renderInvalidator;
+    this.#trace = trace;
+    this.#functionRegistry = functionRegistry;
+    this.#iterationSettings = iterationSettings;
     // A formula can remain dirty when a previous batch yielded for its time
     // budget.  Scrolling must therefore wake the scheduler as well as change
     // the priority used by its next batch.
-    this.#disposers.push(this.dataSource.onViewportChanged(this.handleViewportChanged.bind(this)));
-    const disposeExternalService = this.dataSource.onExternalServiceInvalidated?.((names) => {
+    this.#disposers.push(this.#dataSource.onViewportChanged(this.#handleViewportChanged.bind(this)));
+    const disposeExternalService = this.#dataSource.onExternalServiceInvalidated?.((names) => {
       this.markFunctionsDirty(names);
     });
     if (disposeExternalService) this.#disposers.push(disposeExternalService);
-    if (this.functionRegistry) {
-      this.#disposers.push(this.functionRegistry.subscribe((names) => {
+    if (this.#functionRegistry) {
+      this.#disposers.push(this.#functionRegistry.subscribe((names) => {
         this.invalidateFunctionCallIndexes();
         this.markFunctionsDirty(names);
       }));
@@ -178,13 +199,13 @@ export class RecalcScheduler {
       .splice(0)
       .reverse()
       .forEach((dispose) => dispose());
-    this.resolveIdleWaiters();
+    this.#resolveIdleWaiters();
   }
 
   /** Resolves when the scheduler has no running or pending formula work. */
   public waitForIdle(): Promise<void> {
     if (this.#disposed) return Promise.resolve();
-    if (!this.#isRunning && this.graph.pendingCount === 0) return Promise.resolve();
+    if (!this.#isRunning && this.#graph.pendingCount === 0) return Promise.resolve();
     const scheduler = this;
     return new Promise<void>((resolve) => {
       scheduler.#idleWaiters.add(resolve);
@@ -206,35 +227,35 @@ export class RecalcScheduler {
     }
     this.#currentGeneration++;
 
-    const volatileKeys = this.getVolatileFormulaKeys();
+    const volatileKeys = this.#getVolatileFormulaKeys();
 
     // Phase 1: mark dirty by BFS.
-    this.graph.markDirty([...new Set([...changedKeys, ...volatileKeys])]);
+    this.#graph.markDirty([...new Set([...changedKeys, ...volatileKeys])]);
 
     // Resolve circular nodes with the editor's calculation policy.
-    const cycleKeys = this.graph.getLastCycleKeys();
+    const cycleKeys = this.#graph.getLastCycleKeys();
     if (cycleKeys.length > 0) {
-      const context = this.createEvalContext();
-      const settings = this.iterationSettings?.getSettings();
-      this.flushResults(
+      const context = this.#createEvalContext();
+      const settings = this.#iterationSettings?.getSettings();
+      this.#flushResults(
         settings?.enabled && settings.maxIterations > 0 && settings.maxChange >= 0
-          ? this.evaluateCycle(cycleKeys, context, settings.maxIterations, settings.maxChange)
+          ? this.#evaluateCycle(cycleKeys, context, settings.maxIterations, settings.maxChange)
           : cycleKeys.map((key) => ({
             key,
             value: createFormulaError(FormulaErrorCode.Reference),
           })),
         context,
       );
-      for (const key of cycleKeys) this.graph.markClean(key);
+      for (const key of cycleKeys) this.#graph.markClean(key);
     }
 
     // Start the scheduling loop when it is not already running and formulas are pending.
-    if (!this.#isRunning && this.graph.pendingCount > 0) {
-      this.schedule();
+    if (!this.#isRunning && this.#graph.pendingCount > 0) {
+      this.#schedule();
     }
   }
 
-  private evaluateCycle(
+  #evaluateCycle(
     keys: CellKey[],
     context: EvalContext,
     maxIterations: number,
@@ -249,7 +270,7 @@ export class RecalcScheduler {
     context.getCellValue = (row, col) => previous.get(cellKey(row, col)) ?? readCell(row, col);
     try {
       for (let iteration = 0; iteration < maxIterations; iteration++) {
-        const results = this.evaluator.evaluateBatch(formulas, context);
+        const results = this.#evaluator.evaluateBatch(formulas, context);
         const next = new Map(results.map(({ key, value }) => [key, value]));
         const converged = results.every(({ key, value }) =>
           typeof value === 'number' && typeof previous.get(key) === 'number'
@@ -276,51 +297,51 @@ export class RecalcScheduler {
     if (this.#disposed) return;
     const names = new Set(functionNames.map((name) => name.toUpperCase()));
     const keys = [...this.#readAstCache().entries()]
-      .filter(([, ast]) => this.containsFunctionCall(ast, names))
+      .filter(([, ast]) => this.#containsFunctionCall(ast, names))
       .map(([key]) => key);
     if (keys.length > 0) this.markDirty(keys);
   }
 
-  private containsVolatileCall(ast: FormulaAST): boolean {
+  #containsVolatileCall(ast: FormulaAST): boolean {
     switch (ast.kind) {
       case FormulaNodeKind.Call:
         return (
-          Boolean(this.functionRegistry?.get(ast.name)?.volatile) ||
-          ast.args.some((arg) => this.containsVolatileCall(arg))
+          Boolean(this.#functionRegistry?.get(ast.name)?.volatile) ||
+          ast.args.some((arg) => this.#containsVolatileCall(arg))
         );
       case FormulaNodeKind.Invoke:
-        return this.containsVolatileCall(ast.callee) || ast.args.some((arg) => this.containsVolatileCall(arg));
+        return this.#containsVolatileCall(ast.callee) || ast.args.some((arg) => this.#containsVolatileCall(arg));
       case FormulaNodeKind.Array:
-        return ast.rows.some((row) => row.some((item) => this.containsVolatileCall(item)));
+        return ast.rows.some((row) => row.some((item) => this.#containsVolatileCall(item)));
       case FormulaNodeKind.Tuple:
-        return ast.items.some((item) => this.containsVolatileCall(item));
+        return ast.items.some((item) => this.#containsVolatileCall(item));
       case FormulaNodeKind.Binary:
       case FormulaNodeKind.Intersection:
-        return this.containsVolatileCall(ast.left) || this.containsVolatileCall(ast.right);
+        return this.#containsVolatileCall(ast.left) || this.#containsVolatileCall(ast.right);
       case FormulaNodeKind.Unary:
-        return this.containsVolatileCall(ast.operand);
+        return this.#containsVolatileCall(ast.operand);
       default:
         return false;
     }
   }
 
-  private containsFunctionCall(ast: FormulaAST, names: ReadonlySet<string>): boolean {
+  #containsFunctionCall(ast: FormulaAST, names: ReadonlySet<string>): boolean {
     switch (ast.kind) {
       case FormulaNodeKind.Call:
-        return names.has(ast.name.toUpperCase()) || ast.args.some((arg) => this.containsFunctionCall(arg, names));
+        return names.has(ast.name.toUpperCase()) || ast.args.some((arg) => this.#containsFunctionCall(arg, names));
       case FormulaNodeKind.Invoke:
         return (
-          this.containsFunctionCall(ast.callee, names) || ast.args.some((arg) => this.containsFunctionCall(arg, names))
+          this.#containsFunctionCall(ast.callee, names) || ast.args.some((arg) => this.#containsFunctionCall(arg, names))
         );
       case FormulaNodeKind.Array:
-        return ast.rows.some((row) => row.some((item) => this.containsFunctionCall(item, names)));
+        return ast.rows.some((row) => row.some((item) => this.#containsFunctionCall(item, names)));
       case FormulaNodeKind.Tuple:
-        return ast.items.some((item) => this.containsFunctionCall(item, names));
+        return ast.items.some((item) => this.#containsFunctionCall(item, names));
       case FormulaNodeKind.Binary:
       case FormulaNodeKind.Intersection:
-        return this.containsFunctionCall(ast.left, names) || this.containsFunctionCall(ast.right, names);
+        return this.#containsFunctionCall(ast.left, names) || this.#containsFunctionCall(ast.right, names);
       case FormulaNodeKind.Unary:
-        return this.containsFunctionCall(ast.operand, names);
+        return this.#containsFunctionCall(ast.operand, names);
       default:
         return false;
     }
@@ -335,7 +356,7 @@ export class RecalcScheduler {
     }
     this.#currentGeneration++;
     this.#isRunning = false;
-    if (this.graph.pendingCount === 0) this.resolveIdleWaiters();
+    if (this.#graph.pendingCount === 0) this.#resolveIdleWaiters();
   }
 
   /**
@@ -343,11 +364,11 @@ export class RecalcScheduler {
    *
    * Uses Platform.queueMicrotask to run at the microtask phase of the current macrotask.
    */
-  private schedule(): void {
+  #schedule(): void {
     if (this.#disposed) return;
     this.#assertCommandWrite();
     this.#isRunning = true;
-    this.platform.queueMicrotask(this.runScheduledFormulaBatch.bind(this));
+    this.#platform.queueMicrotask(this.#runScheduledFormulaBatch.bind(this));
   }
 
   /**
@@ -359,35 +380,35 @@ export class RecalcScheduler {
    * 4. When over budget, continue on the next frame via Platform.requestAnimationFrame.
    * 5. Stop when nothing is pending.
    */
-  private runBatch(): void {
+  #runBatch(): void {
     this.#assertCommandWrite();
     // Capture the current generation; new edits make gen !== currentGeneration.
     const gen = this.#currentGeneration;
-    const startTime = this.platform.now();
-    const context = this.createEvalContext();
+    const startTime = this.#platform.now();
+    const context = this.#createEvalContext();
 
-    while (this.graph.pendingCount > 0) {
+    while (this.#graph.pendingCount > 0) {
       // Generation check: a new edit arrived, so stop this loop and let the new cycle take over.
       if (gen !== this.#currentGeneration) {
         // The previous implementation returned here while keeping isRunning
         // true.  That left the new generation's dirty formulas permanently
         // queued because markDirty() correctly refused to start a second loop.
         this.#isRunning = false;
-        if (this.graph.pendingCount > 0) this.schedule();
+        if (this.#graph.pendingCount > 0) this.#schedule();
         return;
       }
 
       // Time-budget check: if over budget, yield and continue on the next frame.
-      if (this.platform.now() - startTime > this.#budgetMs) {
-        this.platform.requestAnimationFrame(this.runScheduledFormulaBatch.bind(this));
+      if (this.#platform.now() - startTime > this.#budgetMs) {
+        this.#platform.requestAnimationFrame(this.#runScheduledFormulaBatch.bind(this));
         return;
       }
 
-      const viewport = this.getViewportKeys();
+      const viewport = this.#getViewportKeys();
 
       // Take one batch of ready formulas: dirty with all dependencies clean.
       // Prioritize the viewport, capped by batchMaxCount.
-      const readyKeys = this.graph.getNextReadyBatch(viewport, this.#batchMaxCount);
+      const readyKeys = this.#graph.getNextReadyBatch(viewport, this.#batchMaxCount);
 
       if (readyKeys.length === 0) {
         // No ready formulas: either everything finished or all remaining formulas are cycle-blocked.
@@ -403,24 +424,24 @@ export class RecalcScheduler {
 
       // Batch evaluation.
       if (batch.length > 0) {
-        const results = this.evaluator.evaluateBatch(batch, context);
-        this.flushResults(results, context);
+        const results = this.#evaluator.evaluateBatch(batch, context);
+        this.#flushResults(results, context);
       }
 
       // Mark clean -> unlock downstream dependencies.
       // Downstream formula dirtyDepCount -= 1; when it reaches 0, the formula becomes ready.
       for (const key of readyKeys) {
-        this.graph.markClean(key);
+        this.#graph.markClean(key);
       }
       if (this.#pendingSpillKeys.size > 0) {
-        this.graph.markDirty([...this.#pendingSpillKeys]);
+        this.#graph.markDirty([...this.#pendingSpillKeys]);
         this.#pendingSpillKeys.clear();
       }
     }
 
     // All dirty formulas are clean, or no ready formulas can be evaluated.
-    if (this.graph.pendingCount === 0) {
-      this.trace.emit({
+    if (this.#graph.pendingCount === 0) {
+      this.#trace.emit({
         type: FormulaRecalculationCompletedEventType,
         generation: gen,
         batchCount: this.#flushedBatchCount,
@@ -431,7 +452,7 @@ export class RecalcScheduler {
       this.#flushedCellCount = 0;
     }
     this.#isRunning = false;
-    if (this.graph.pendingCount === 0) this.resolveIdleWaiters();
+    if (this.#graph.pendingCount === 0) this.#resolveIdleWaiters();
   }
 
   /**
@@ -439,17 +460,17 @@ export class RecalcScheduler {
    * We iterate the formula index rather than every cell in the viewport, so
    * sparse, very large sheets do not allocate a key for each empty cell.
    */
-  private getViewportKeys(): Set<CellKey> {
-    return this.dataSource.getViewportFormulaKeys(this.#readAstCache().keys());
+  #getViewportKeys(): Set<CellKey> {
+    return this.#dataSource.getViewportFormulaKeys(this.#readAstCache().keys());
   }
 
   /** Resume pending work after the visible formula set changes. */
-  private handleViewportChanged(): void {
+  #handleViewportChanged(): void {
     if (this.#disposed) return;
-    const origin = this.dataSource.getVisibleOrigin?.();
+    const origin = this.#dataSource.getVisibleOrigin?.();
     if (origin && (origin.row !== this.#visibleOrigin?.row || origin.col !== this.#visibleOrigin?.col)) {
       this.#visibleOrigin = origin;
-      const keys = this.getViewportDependentFormulaKeys();
+      const keys = this.#getViewportDependentFormulaKeys();
       if (keys.size > 0) this.markDirty([...keys]);
     }
     if (this.#commands && !this.#commands.isExecuting()) {
@@ -459,25 +480,25 @@ export class RecalcScheduler {
     this.resumePendingWork();
   }
 
-  private getViewportDependentFormulaKeys(): ReadonlySet<CellKey> {
+  #getViewportDependentFormulaKeys(): ReadonlySet<CellKey> {
     if (this.#viewportDependentFormulaKeys) return this.#viewportDependentFormulaKeys;
-    const names = new Set(this.functionRegistry?.list().filter((name) =>
-      this.functionRegistry?.get(name)?.volatileOnViewport).map((name) => name.toUpperCase()) ?? []);
+    const names = new Set(this.#functionRegistry?.list().filter((name) =>
+      this.#functionRegistry?.get(name)?.volatileOnViewport).map((name) => name.toUpperCase()) ?? []);
     const keys = new Set<CellKey>();
     if (this.#astCache && names.size > 0) {
       for (const [key, ast] of this.#astCache) {
-        if (this.containsFunctionCall(ast, names)) keys.add(key);
+        if (this.#containsFunctionCall(ast, names)) keys.add(key);
       }
     }
     this.#viewportDependentFormulaKeys = keys;
     return keys;
   }
 
-  private getVolatileFormulaKeys(): ReadonlySet<CellKey> {
+  #getVolatileFormulaKeys(): ReadonlySet<CellKey> {
     if (this.#volatileFormulaKeys) return this.#volatileFormulaKeys;
     const keys = new Set<CellKey>();
     for (const [key, ast] of this.#readAstCache()) {
-      if (this.containsVolatileCall(ast)) keys.add(key);
+      if (this.#containsVolatileCall(ast)) keys.add(key);
     }
     this.#volatileFormulaKeys = keys;
     return keys;
@@ -487,10 +508,10 @@ export class RecalcScheduler {
   public resumePendingWork(): void {
     if (this.#disposed) return;
     this.#assertCommandWrite();
-    if (!this.#isRunning && this.graph.pendingCount > 0) this.schedule();
+    if (!this.#isRunning && this.#graph.pendingCount > 0) this.#schedule();
   }
 
-  private runScheduledFormulaBatch(): void {
+  #runScheduledFormulaBatch(): void {
     if (this.#disposed) return;
     if (this.#commands) {
       this.#commands.run(RunFormulaBatchCommand, void 0);
@@ -503,7 +524,7 @@ export class RecalcScheduler {
   public processScheduledBatch(): void {
     if (this.#disposed) return;
     this.#assertCommandWrite();
-    this.runBatch();
+    this.#runBatch();
   }
 
   #assertCommandWrite(): void {
@@ -512,7 +533,7 @@ export class RecalcScheduler {
     }
   }
 
-  private resolveIdleWaiters(): void {
+  #resolveIdleWaiters(): void {
     this.#idleWaiters.forEach((resolve) => resolve());
     this.#idleWaiters.clear();
   }
@@ -526,8 +547,8 @@ export class RecalcScheduler {
    * Each runBatch call reads the latest sheetData snapshot because OT may modify
    * cells between batches.
    */
-  private createEvalContext(): EvalContext {
-    return this.dataSource.createEvalContext(this.resultStore);
+  #createEvalContext(): EvalContext {
+    return this.#dataSource.createEvalContext(this.#resultStore);
   }
 
   /**
@@ -543,7 +564,7 @@ export class RecalcScheduler {
    * 2. Write resultStore.
    * 3. Notify the render invalidator bound by the assembly layer so new results become visible.
    */
-  private flushResults(results: EvalResult[], context: EvalContext): void {
+  #flushResults(results: EvalResult[], context: EvalContext): void {
     this.#assertCommandWrite();
     if (results.length === 0) return;
     const changedKeys: CellKey[] = [];
@@ -551,22 +572,22 @@ export class RecalcScheduler {
 
     for (const { key, value, richResult } of results) {
       const [row, col] = fromCellKey(key);
-      const previousResult = this.resultStore.get(key);
+      const previousResult = this.#resultStore.get(key);
       const oldVal = previousResult ?? 0;
       const previousErrorCode = getFormulaErrorCode(previousResult);
       const spillChangedKeys =
-        typeof this.resultStore.setFormulaResult === 'function'
-          ? this.resultStore.setFormulaResult(key, value, context)
-          : (this.resultStore.set(key, value), [key]);
+        typeof this.#resultStore.setFormulaResult === 'function'
+          ? this.#resultStore.setFormulaResult(key, value, context)
+          : (this.#resultStore.set(key, value), [key]);
       changedKeys.push(...spillChangedKeys);
       spillChangedKeys.forEach((changedKey) => {
         if (changedKey !== key) this.#pendingSpillKeys.add(changedKey);
       });
-      const storedResult = this.resultStore.get(key) ?? value;
+      const storedResult = this.#resultStore.get(key) ?? value;
       if (spillChangedKeys.length > 1 || Array.isArray(previousResult) || Array.isArray(storedResult)) {
-        this.aggCache.clear();
+        this.#aggCache.clear();
       }
-      this.resultStore.setRichResult(key, getFormulaErrorCode(storedResult) ? undefined : richResult);
+      this.#resultStore.setRichResult(key, getFormulaErrorCode(storedResult) ? undefined : richResult);
       const errorCode = getFormulaErrorCode(storedResult);
       flushedResults.push({
         key,
@@ -579,10 +600,10 @@ export class RecalcScheduler {
 
       // Notify aggregation cache that a formula result changed, allowing incremental SUM/COUNT updates.
       // apply passes (old, old) for formula-to-formula edits; the real delta is supplied here.
-      this.aggCache.onCellChanged(row, col, oldVal, storedResult);
+      this.#aggCache.onCellChanged(row, col, oldVal, storedResult);
 
       if (previousErrorCode !== errorCode) {
-        this.trace.emit({
+        this.#trace.emit({
           type: FormulaErrorChangedEventType,
           generation: this.#currentGeneration,
           key,
@@ -597,40 +618,20 @@ export class RecalcScheduler {
 
     this.#flushedBatchCount++;
     this.#flushedCellCount += flushedResults.length;
-    this.trace.emit({
+    this.#trace.emit({
       type: FormulaBatchFlushedEventType,
       generation: this.#currentGeneration,
       results: flushedResults,
-      pendingCount: this.graph.pendingCount,
+      pendingCount: this.#graph.pendingCount,
     });
-    this.renderInvalidator.invalidateFormulaResults(changedKeys);
-  }
-
-  /**
-   * Converts FormulaValue to a display string.
-   *
-   * - number: String(n)
-   * - string: unchanged
-   * - boolean: "TRUE" / "FALSE"
-   * - FormulaError: error code, such as "#DIV/0!"
-   */
-  private formulaValueToDisplay(value: FormulaValue): string {
-    if (typeof value === 'number') return String(value);
-    if (typeof value === 'string') return value;
-    if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
-    if (isFormulaError(value)) return value.code;
-    if (isFormulaText(value)) return value.value;
-    if (Array.isArray(value)) return value.join(', ');
-    if (value === null) return '';
-    if (value.kind === 'cube-member' || value.kind === 'cube-set') return value.caption;
-    return '';
+    this.#renderInvalidator.invalidateFormulaResults(changedKeys);
   }
 
   /**
    * Converts [row, col] to a readable cell reference string, such as "A1" or "B2".
    * Used only for console logging.
    */
-  private cellRefStr(row: number, col: number): string {
+  #cellRefStr(row: number, col: number): string {
     return `${columnIndexToLabel(col)}${row + 1}`;
   }
 }

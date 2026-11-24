@@ -12,7 +12,7 @@ export class TextCellCommitStrategy extends CellCommitStrategy {
 
   /** Reports whether the input is explicitly typed as text. */
   matches(context: CellCommitContext): boolean {
-    return context.plainText.startsWith("'") || TextCellCommitStrategy.isTextFormat(context.format);
+    return context.plainText.startsWith("'") || TextCellCommitStrategy.#isTextFormat(context.format);
   }
 
   /** Persists input as an explicit text cell. */
@@ -21,7 +21,7 @@ export class TextCellCommitStrategy extends CellCommitStrategy {
     return { type: CellType.String, value };
   }
 
-  private static isTextFormat(format: unknown): boolean {
+  static #isTextFormat(format: unknown): boolean {
     return normalizeCellFormat(format).kind === 'text';
   }
 }

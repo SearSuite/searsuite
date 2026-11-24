@@ -19,6 +19,8 @@ import { CursorToken } from './CursorToken';
  */
 @Injectable()
 export class CursorRegistry {
+  readonly #platform: Platform | undefined;
+
   /** DI token for resolving CursorRegistry. */
   public static readonly symbol: symbol = Symbol.for('CursorRegistry');
 
@@ -30,7 +32,9 @@ export class CursorRegistry {
   readonly #warnedPositionConflicts = new Set<string>();
 
   /** Creates a registry and optionally enables position-rule conflict diagnostics. */
-  constructor(@Inject(Platform.symbol) private readonly platform?: Platform) {}
+  constructor(@Inject(Platform.symbol) platform?: Platform) {
+    this.#platform = platform;
+  }
 
   /**
    * Registers a cursor rule and returns an idempotent disposer that restores
@@ -40,16 +44,16 @@ export class CursorRegistry {
     assertSheetContributionWrite(this);
     const entry = Object.freeze({ ...rule }) as CursorRule;
     if (rule.kind === CursorRuleKind.Region) {
-      return this.replace(this.#regionRules, rule.region, entry);
+      return this.#replace(this.#regionRules, rule.region, entry);
     }
     if (rule.kind === CursorRuleKind.Type) {
-      return this.replace(this.#typeRules, rule.cellType, entry);
+      return this.#replace(this.#typeRules, rule.cellType, entry);
     }
     if (rule.kind === CursorRuleKind.Position) {
-      return this.replace(this.#positionRules, rule.key, entry);
+      return this.#replace(this.#positionRules, rule.key, entry);
     }
     const bucket = rule.priority === CursorRulePriority.High ? this.#highPreds : this.#lowPreds;
-    return this.replace(bucket, rule.key ?? rule, entry);
+    return this.#replace(bucket, rule.key ?? rule, entry);
   }
 
   /**
@@ -68,7 +72,7 @@ export class CursorRegistry {
    * @param position - Pointer context used by registered coordinate rules.
    */
   resolve(properties: CellProperties | null, position?: CursorPosition): CursorToken {
-    const positionToken = position ? this.resolvePosition(position) : null;
+    const positionToken = position ? this.#resolvePosition(position) : null;
     if (positionToken) return positionToken;
     // 2. High-priority predicates (reverse order: last registered wins).
     for (const rule of [...this.#highPreds.values()].reverse()) {
@@ -89,7 +93,7 @@ export class CursorRegistry {
     return CursorToken.Default;
   }
 
-  private resolvePosition(position: CursorPosition): CursorToken | null {
+  #resolvePosition(position: CursorPosition): CursorToken | null {
     const matches = [...this.#positionRules.values()]
       .filter((rule): rule is Extract<CursorRule, { kind: typeof CursorRuleKind.Position }> => {
         return rule.kind === CursorRuleKind.Position && rule.test(position);
@@ -99,23 +103,23 @@ export class CursorRegistry {
     if (!winner) return null;
 
     const conflicts = matches.filter((rule) => rule.layer === winner.layer);
-    if (conflicts.length > 1) this.warnPositionConflict(conflicts);
+    if (conflicts.length > 1) this.#warnPositionConflict(conflicts);
     return winner.cursor;
   }
 
-  private warnPositionConflict(rules: Extract<CursorRule, { kind: typeof CursorRuleKind.Position }>[]): void {
+  #warnPositionConflict(rules: Extract<CursorRule, { kind: typeof CursorRuleKind.Position }>[]): void {
     const ids = rules.map((rule) => String(rule.key)).sort();
     const conflictId = `${rules[0].layer}:${ids.join(',')}`;
     if (this.#warnedPositionConflicts.has(conflictId)) return;
     this.#warnedPositionConflicts.add(conflictId);
-    this.platform?.warn(
+    this.#platform?.warn(
       `CursorRegistry position-rule conflict at layer ${rules[0].layer}: ${ids.join(
         ', ',
       )} all matched; the last registered rule wins.`,
     );
   }
 
-  private replace<Key>(registry: Map<Key, CursorRule>, key: Key, rule: CursorRule): () => void {
+  #replace<Key>(registry: Map<Key, CursorRule>, key: Key, rule: CursorRule): () => void {
     const previous = registry.get(key);
     registry.set(key, rule);
     const owner = this;

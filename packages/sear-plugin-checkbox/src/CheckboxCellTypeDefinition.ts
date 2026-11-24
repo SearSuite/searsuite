@@ -4,11 +4,14 @@ import { CheckboxCellCommitStrategy } from './CheckboxCellCommitStrategy';
 import { CheckboxCell } from './render/CheckboxCell';
 /** Atomic catalog contribution for rendering, editing, display and clipboard behavior. */
 export class CheckboxCellTypeDefinition extends CellTypeDefinition {
+  readonly #hasRule: ((row: number, column: number) => boolean) | undefined;
+
   /** Persisted feature identifier. */ public readonly type = CheckboxCellType;
   /** Binds rule-aware edit conversion to one editor. */ public constructor(
-    private readonly hasRule?: (row: number, column: number) => boolean,
+    hasRule?: (row: number, column: number) => boolean,
   ) {
     super();
+    this.#hasRule = hasRule;
   }
   /** Validates persisted booleans before creating a glyph. */ public override isStoredValue(cell: {
     value?: unknown;
@@ -16,7 +19,7 @@ export class CheckboxCellTypeDefinition extends CellTypeDefinition {
     return typeof cell.value === 'boolean';
   }
   /** Creates the checkbox edit strategy. */ public override createCommitStrategies() {
-    return [new CheckboxCellCommitStrategy(this.hasRule)];
+    return [new CheckboxCellCommitStrategy(this.#hasRule)];
   }
   /** Registers portable glyph rendering. */ public override createRenderer() {
     return defineCellRenderer(CheckboxCellType, CheckboxCell);

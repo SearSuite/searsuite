@@ -5,7 +5,7 @@ import {
 
 /** Case-insensitive lexical scope for LET bindings. */
 export class FormulaLexicalScope implements FormulaEvaluationScope {
-  private readonly values = new Map<string, FormulaValue>();
+  readonly #values = new Map<string, FormulaValue>();
   public readonly parent?: FormulaEvaluationScope;
 
   public constructor(parent?: FormulaEvaluationScope) {
@@ -13,11 +13,11 @@ export class FormulaLexicalScope implements FormulaEvaluationScope {
   }
 
   public get(name: string): FormulaValue | undefined {
-    return this.values.get(normalizeName(name)) ?? this.parent?.get(name);
+    return this.#values.get(normalizeName(name)) ?? this.parent?.get(name);
   }
 
   public set(name: string, value: FormulaValue): void {
-    this.values.set(normalizeName(name), value);
+    this.#values.set(normalizeName(name), value);
   }
 }
 

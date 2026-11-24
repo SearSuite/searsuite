@@ -67,6 +67,12 @@ export class SheetHistoryPlugin
   extends Plugin<SearCoreSheet, CellProperties, null>
   implements SheetLifecycleController, SheetHistoryStatusProvider
 {
+  readonly #plugins: PluginManager<SearCoreSheet, CellProperties>;
+  readonly #interaction: SheetInteractionStore;
+  readonly #keyboard: KeyboardRouter;
+  readonly #platform: Platform;
+  readonly #externalHistory: SheetExternalHistory;
+
   /** DI token for resolving the default Sheet history plugin. */
   public static readonly symbol = Symbol.for('SheetHistoryPlugin');
   /** Stable owner key for the private history state. */
@@ -74,7 +80,7 @@ export class SheetHistoryPlugin
 
   public override readonly warnOnDuplicateDepth = false;
 
-  private readonly listeners = new Set<(status: SheetHistoryStatus) => void>();
+  readonly #listeners = new Set<(status: SheetHistoryStatus) => void>();
   #disposeCommandListener: (() => void) | null = null;
   #disposeInteractionListener: (() => void) | null = null;
   #disposeExternalHistory: (() => void) | null = null;
@@ -85,19 +91,24 @@ export class SheetHistoryPlugin
 
   public constructor(
     @Inject(PluginManager.symbol)
-    private readonly plugins: PluginManager<SearCoreSheet, CellProperties>,
+    plugins: PluginManager<SearCoreSheet, CellProperties>,
     @Inject(SheetInteractionStore.symbol)
-    private readonly interaction: SheetInteractionStore,
+    interaction: SheetInteractionStore,
     @Inject(KeyboardRouter.symbol)
-    private readonly keyboard: KeyboardRouter,
+    keyboard: KeyboardRouter,
     @Inject(Platform.symbol)
-    private readonly platform: Platform,
+    platform: Platform,
     @Inject(SheetCommandBus.symbol)
     commands: SheetCommandBus,
     @Inject(SheetExternalHistory.symbol)
-    private readonly externalHistory: SheetExternalHistory,
+    externalHistory: SheetExternalHistory,
   ) {
     super({ key: pluginKey, state: null });
+    this.#plugins = plugins;
+    this.#interaction = interaction;
+    this.#keyboard = keyboard;
+    this.#platform = platform;
+    this.#externalHistory = externalHistory;
     this.#commands = commands;
   }
 
@@ -147,9 +158,9 @@ export class SheetHistoryPlugin
   public start(_context: SheetLifecycleContext): void {
     if (this.#disposeCommandListener) return;
     this.#disposeCommandListener = this.#commands.subscribe(this.#handleCommandEvent.bind(this));
-    this.#disposeInteractionListener = this.interaction.subscribe(() => this.#emitStatus());
-    this.#disposeExternalHistory = this.externalHistory.subscribe(() => this.#emitStatus());
-    this.keyboard.subscribe({
+    this.#disposeInteractionListener = this.#interaction.subscribe(() => this.#emitStatus());
+    this.#disposeExternalHistory = this.#externalHistory.subscribe(() => this.#emitStatus());
+    this.#keyboard.subscribe({
       onUndo: () => this.#commands.run(UndoSheetCommand, void 0),
       onRedo: () => this.#commands.run(RedoSheetCommand, void 0),
     });
@@ -164,13 +175,13 @@ export class SheetHistoryPlugin
     this.#disposeInteractionListener = null;
     this.#disposeExternalHistory?.();
     this.#disposeExternalHistory = null;
-    this.listeners.clear();
+    this.#listeners.clear();
   }
 
   /** Returns current undo and redo availability. */
   public getStatus(): SheetHistoryStatus {
     const state = this.#historyState;
-    const editing = this.interaction.getState().editSession !== null;
+    const editing = this.#interaction.getState().editSession !== null;
     return {
       canUndo: !editing && (state.undoStack.length > 0 || this.#useExternalUndo()),
       canRedo: !editing && (state.redoStack.length > 0 || this.#useExternalRedo()),
@@ -178,7 +189,7 @@ export class SheetHistoryPlugin
   }
 
   #useExternalUndo(): boolean {
-    const external = this.externalHistory.getStatus();
+    const external = this.#externalHistory.getStatus();
     if (!external.canUndo) return false;
     const local = this.#historyState.undoStack.at(-1);
     return !local || (local.undoOrder !== void 0 && external.undoOrder !== void 0 &&
@@ -186,7 +197,7 @@ export class SheetHistoryPlugin
   }
 
   #useExternalRedo(): boolean {
-    const external = this.externalHistory.getStatus();
+    const external = this.#externalHistory.getStatus();
     if (!external.canRedo) return false;
     const local = this.#historyState.redoStack.at(-1);
     return !local || (local.redoOrder !== void 0 && external.redoOrder !== void 0 &&
@@ -194,7 +205,7 @@ export class SheetHistoryPlugin
   }
 
   #nextOrder(): number {
-    this.#localSequence = Math.max(this.#localSequence + 1, this.externalHistory.nextSequence());
+    this.#localSequence = Math.max(this.#localSequence + 1, this.#externalHistory.nextSequence());
     return this.#localSequence;
   }
 
@@ -204,7 +215,7 @@ export class SheetHistoryPlugin
       id,
       execute: () => ({
         pipeline: new Pipeline(id),
-        completion: Promise.resolve().then(() => this.externalHistory[direction]()),
+        completion: Promise.resolve().then(() => this.#externalHistory[direction]()),
       }),
     };
   }
@@ -229,8 +240,8 @@ export class SheetHistoryPlugin
 
   /** Subscribes to future history availability changes. */
   public subscribe(listener: (status: SheetHistoryStatus) => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
   }
 
   /** History state is private runtime state and is never persisted or synchronized. */
@@ -297,7 +308,7 @@ export class SheetHistoryPlugin
         .filter(
           (transaction) =>
             transaction.operations.length > 0 &&
-            this.plugins.getTransactionOTContribution(transaction)?.definition.invert !== void 0,
+            this.#plugins.getTransactionOTContribution(transaction)?.definition.invert !== void 0,
         ) ?? []
     );
   }
@@ -307,18 +318,18 @@ export class SheetHistoryPlugin
     const undo: Transaction[] = [];
     for (let index = transactions.length - 1; index >= 0; index--) {
       const transaction = transactions[index];
-      const contribution = this.plugins.getTransactionOTContribution(transaction);
+      const contribution = this.#plugins.getTransactionOTContribution(transaction);
       if (!contribution?.definition.invert) {
-        this.platform.warn(
+        this.#platform.warn(
           `SheetHistoryPlugin skipped command history because "${transaction.pluginKey.key}" has no invertible transaction OT definition.`,
         );
         this.#clearHistory();
         return;
       }
       try {
-        const inverse = this.plugins.invertTransaction(transaction);
+        const inverse = this.#plugins.invertTransaction(transaction);
         if (!inverse) {
-          this.platform.warn(
+          this.#platform.warn(
             `SheetHistoryPlugin cleared history because "${transaction.pluginKey.key}" could not invert a committed transaction.`,
           );
           this.#clearHistory();
@@ -327,7 +338,7 @@ export class SheetHistoryPlugin
         Object.entries(transaction.meta).forEach(([key, value]) => inverse.setMeta(key, value));
         undo.push(inverse);
       } catch (error) {
-        this.platform.warn(
+        this.#platform.warn(
           `SheetHistoryPlugin cleared history because "${transaction.pluginKey.key}" failed to invert a committed transaction.`,
           error,
         );
@@ -359,7 +370,7 @@ export class SheetHistoryPlugin
     const state = this.#historyState;
     const entry = direction === 'undo' ? state.undoStack.at(-1) : state.redoStack.at(-1);
     const pipeline = new Pipeline(direction === 'undo' ? UndoSheetCommand.id : RedoSheetCommand.id);
-    if (this.interaction.getState().editSession !== null) return pipeline;
+    if (this.#interaction.getState().editSession !== null) return pipeline;
     const transactions = entry?.[direction] ?? [];
     transactions.forEach((transaction, index) => {
       const historyTransaction = cloneTransaction(transaction).setMeta(
@@ -399,7 +410,7 @@ export class SheetHistoryPlugin
       undoStack = this.#rebaseStack(state.undoStack, transactions);
       redoStack = this.#rebaseStack(state.redoStack, transactions);
     } catch (error) {
-      this.platform.warn(
+      this.#platform.warn(
         'SheetHistoryPlugin cleared history because retained transactions could not be rebased.',
         error,
       );
@@ -428,13 +439,13 @@ export class SheetHistoryPlugin
       let transformed: Transaction | null = transaction;
       for (const other of committed) {
         if (!transformed) break;
-        const contribution = this.plugins.getTransactionOTContribution(transformed);
+        const contribution = this.#plugins.getTransactionOTContribution(transformed);
         if (!contribution) {
           throw new SearError(
             `"${transformed.pluginKey.key}" no longer has a transaction OT definition for retained history.`,
           );
         }
-        transformed = this.plugins.transformTransaction(transformed, other);
+        transformed = this.#plugins.transformTransaction(transformed, other);
       }
       return transformed ? [transformed] : [];
     });
@@ -443,7 +454,7 @@ export class SheetHistoryPlugin
   #emitStatus(): void {
     const status = this.getStatus();
     runOutsideCommandExecution(() => {
-      this.listeners.forEach((listener) => this.#notifyStatusListener(listener, status));
+      this.#listeners.forEach((listener) => this.#notifyStatusListener(listener, status));
     });
   }
 
@@ -451,7 +462,7 @@ export class SheetHistoryPlugin
     try {
       listener(status);
     } catch (error) {
-      this.platform.warn('SheetHistoryPlugin status listener failed.', error);
+      this.#platform.warn('SheetHistoryPlugin status listener failed.', error);
     }
   }
 

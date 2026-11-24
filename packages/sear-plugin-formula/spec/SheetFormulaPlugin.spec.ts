@@ -41,7 +41,7 @@ function createPlugin(sourceCell: unknown = { type: CellType.Formula, formula: '
     set: jest.fn(),
   };
   const scheduler = {
-    bindAstCache: jest.fn(),
+    bindAstCache: jest.fn<void, [Map<number, unknown>]>(),
     invalidateFunctionCallIndexes: jest.fn(),
     markDirty: jest.fn(),
     discardPendingWork: jest.fn(),
@@ -64,6 +64,7 @@ function createPlugin(sourceCell: unknown = { type: CellType.Formula, formula: '
   );
   return {
     plugin,
+    astCache: scheduler.bindAstCache.mock.calls[0][0] as Map<number, unknown>,
     parser,
     graph,
     aggCache,
@@ -79,18 +80,13 @@ function createPlugin(sourceCell: unknown = { type: CellType.Formula, formula: '
   };
 }
 
-function astCacheOf(plugin: SheetFormulaPlugin): Map<number, unknown> {
-  const scheduler = (plugin as unknown as { scheduler: { bindAstCache: jest.Mock } }).scheduler;
-  return scheduler.bindAstCache.mock.calls[0][0] as Map<number, unknown>;
-}
-
 describe('SheetFormulaPlugin', () => {
   it('keeps derived ASTs out of plugin state and leaves them unchanged during staging', () => {
-    const { plugin, parser } = createPlugin();
+    const { astCache, plugin, parser } = createPlugin();
     const key = cellKey(0, 1);
     const previous = { type: 'previous' };
     const next = { type: 'next' };
-    astCacheOf(plugin).set(key, previous);
+    astCache.set(key, previous);
     parser.parse.mockReturnValue(next);
     const transaction = {
       pluginKey: SheetDataPlugin.pluginKey,
@@ -106,16 +102,16 @@ describe('SheetFormulaPlugin', () => {
     expect(plugin.getState()).toBeNull();
     expect(plugin.registerState().dataEngine.enabled).toBe(false);
     expect(plugin.apply(plugin.getState(), transaction)).toBeNull();
-    expect(astCacheOf(plugin).get(key)).toBe(previous);
+    expect(astCache.get(key)).toBe(previous);
     plugin.onTransactionCommitted(transaction);
-    expect(astCacheOf(plugin).get(key)).toBe(next);
+    expect(astCache.get(key)).toBe(next);
   });
 
   it('ignores cell-format updates that share the update-cell operation name', () => {
-    const { plugin, graph, resultStore } = createPlugin();
+    const { astCache, plugin, graph, resultStore } = createPlugin();
     const state = plugin.getState();
     const key = cellKey(0, 1);
-    astCacheOf(plugin).set(key, { kind: FormulaNodeKind.Cell, row: 0, col: 0, absRow: false, absCol: false });
+    astCache.set(key, { kind: FormulaNodeKind.Cell, row: 0, col: 0, absRow: false, absCol: false });
     const transaction = {
       pluginKey: { key: 'cell-format' },
       operations: [{ p: [0, 1], [MatrixOTActionName.UpdateCell]: { value: null, prev: null } }],
@@ -123,7 +119,7 @@ describe('SheetFormulaPlugin', () => {
 
     expect(plugin.apply(state, transaction)).toBeNull();
     plugin.onTransactionCommitted(transaction);
-    expect(astCacheOf(plugin).has(key)).toBe(true);
+    expect(astCache.has(key)).toBe(true);
     expect(graph.clear).not.toHaveBeenCalled();
     expect(resultStore.clear).not.toHaveBeenCalled();
   });
@@ -170,9 +166,9 @@ describe('SheetFormulaPlugin', () => {
   });
 
   it('removes derived formula state when a formula update cannot be parsed', () => {
-    const { plugin, parser, graph, aggCache, resultStore, scheduler } = createPlugin();
+    const { astCache, plugin, parser, graph, aggCache, resultStore, scheduler } = createPlugin();
     const state = plugin.getState();
-    astCacheOf(plugin).set(1, { type: 'old' } as never);
+    astCache.set(1, { type: 'old' } as never);
     parser.parse.mockImplementation(() => {
       throw new Error('invalid formula');
     });
@@ -192,14 +188,14 @@ describe('SheetFormulaPlugin', () => {
     expect(plugin.apply(state, transaction as never)).toBe(state);
     plugin.onTransactionCommitted(transaction as never);
     expect(aggCache.clear).toHaveBeenCalledTimes(1);
-    expect(astCacheOf(plugin).has(1)).toBe(false);
+    expect(astCache.has(1)).toBe(false);
     expect(graph.clear).toHaveBeenCalledTimes(1);
     expect(resultStore.clear).toHaveBeenCalledTimes(1);
     expect(scheduler.markDirty).toHaveBeenCalledWith([]);
   });
 
   it('updates formula dependencies and retains the parsed AST for a valid formula edit', () => {
-    const { plugin, parser, graph, resultStore, scheduler } = createPlugin();
+    const { astCache, plugin, parser, graph, resultStore, scheduler } = createPlugin();
     const state = plugin.getState();
     const parsedAst = { type: 'new-formula' };
     parser.parse.mockReturnValue(parsedAst);
@@ -219,18 +215,18 @@ describe('SheetFormulaPlugin', () => {
     plugin.apply(state, transaction as never);
     plugin.onTransactionCommitted(transaction as never);
 
-    expect(astCacheOf(plugin).get(65538)).toBe(parsedAst);
+    expect(astCache.get(65538)).toBe(parsedAst);
     expect(graph.updateCell).toHaveBeenCalledWith(65538, expect.any(Array));
     expect(resultStore.clear).toHaveBeenCalledTimes(1);
     expect(scheduler.markDirty).toHaveBeenCalledWith([65538]);
   });
 
   it('emits dependency-change trace after committed formula dependency rebuilds', () => {
-    const { plugin, graph, parser, trace } = createPlugin();
+    const { astCache, plugin, graph, parser, trace } = createPlugin();
     const target = cellKey(0, 1);
     const previousDependencies = [{ kind: FormulaNodeKind.Cell, row: 0, col: 0 }];
     const dependencies = [{ kind: FormulaNodeKind.Cell, row: 0, col: 2 }];
-    astCacheOf(plugin).set(target, { type: 'formula' } as never);
+    astCache.set(target, { type: 'formula' } as never);
     graph.getFormulaKeys.mockReturnValue([target]);
     graph.getDependencies.mockReturnValueOnce(previousDependencies).mockReturnValueOnce(dependencies);
     parser.extractDependencies.mockReturnValue(dependencies);
@@ -259,9 +255,9 @@ describe('SheetFormulaPlugin', () => {
   });
 
   it('removes cached formula state when a formula cell is overwritten by a non-formula value', () => {
-    const { plugin, graph, resultStore, scheduler } = createPlugin();
+    const { astCache, plugin, graph, resultStore, scheduler } = createPlugin();
     const state = plugin.getState();
-    astCacheOf(plugin).set(42, { type: 'formula' } as never);
+    astCache.set(42, { type: 'formula' } as never);
 
     const transaction = {
       pluginKey: SheetDataPlugin.pluginKey,
@@ -278,16 +274,16 @@ describe('SheetFormulaPlugin', () => {
     plugin.apply(state, transaction);
     plugin.onTransactionCommitted(transaction);
 
-    expect(astCacheOf(plugin).has(42)).toBe(false);
+    expect(astCache.has(42)).toBe(false);
     expect(graph.clear).toHaveBeenCalledTimes(1);
     expect(resultStore.clear).toHaveBeenCalledTimes(1);
     expect(scheduler.markDirty).toHaveBeenCalledWith([]);
   });
 
   it('shifts formula dependencies and invalidates aggregate results after a structural edit', () => {
-    const { plugin, parser, graph, aggCache, scheduler, refShifter } = createPlugin();
+    const { astCache, plugin, parser, graph, aggCache, scheduler, refShifter } = createPlugin();
     const state = plugin.getState();
-    astCacheOf(plugin).set(1, { type: 'original' } as never);
+    astCache.set(1, { type: 'original' } as never);
     const shiftedAst = { type: 'shifted' };
     refShifter.shiftAll.mockReturnValue([{ key: 65537, newAst: shiftedAst }] as never);
     const transaction = {
@@ -298,10 +294,10 @@ describe('SheetFormulaPlugin', () => {
     plugin.apply(state, transaction as never);
     plugin.onTransactionCommitted(transaction as never);
 
-    expect(refShifter.shiftAll).toHaveBeenCalledWith(astCacheOf(plugin), [
+    expect(refShifter.shiftAll).toHaveBeenCalledWith(astCache, [
       { type: MatrixOTActionName.RowInsert, index: 1, count: 1 },
     ]);
-    expect(astCacheOf(plugin).get(65537)).toBe(shiftedAst);
+    expect(astCache.get(65537)).toBe(shiftedAst);
     expect(parser.extractDependencies).toHaveBeenCalledWith(shiftedAst);
     expect(graph.updateCell).toHaveBeenCalledWith(65537, expect.any(Array));
     expect(graph.clear).toHaveBeenCalledTimes(1);
@@ -310,12 +306,12 @@ describe('SheetFormulaPlugin', () => {
   });
 
   it('rebases formula cache keys when structural edits move formula cells', () => {
-    const { plugin, graph, scheduler } = createPlugin();
+    const { astCache, plugin, graph, scheduler } = createPlugin();
     const state = plugin.getState();
     const oldKey = cellKey(2, 1);
     const newKey = cellKey(3, 1);
     const ast = { type: 'formula' };
-    astCacheOf(plugin).set(oldKey, ast as never);
+    astCache.set(oldKey, ast as never);
 
     const transaction = {
       pluginKey: SheetDataPlugin.pluginKey,
@@ -325,14 +321,14 @@ describe('SheetFormulaPlugin', () => {
     plugin.apply(state, transaction as never);
     plugin.onTransactionCommitted(transaction as never);
 
-    expect(astCacheOf(plugin).has(oldKey)).toBe(false);
-    expect(astCacheOf(plugin).get(newKey)).toBe(ast);
+    expect(astCache.has(oldKey)).toBe(false);
+    expect(astCache.get(newKey)).toBe(ast);
     expect(graph.updateCell).toHaveBeenCalledWith(newKey, expect.any(Array));
     expect(scheduler.markDirty).toHaveBeenCalledWith([newKey]);
   });
 
   it('indexes formulas carried by inserted structural payloads', () => {
-    const { plugin, parser, graph, scheduler } = createPlugin();
+    const { astCache, plugin, parser, graph, scheduler } = createPlugin();
     const state = plugin.getState();
     const ast = { type: 'restored-formula' };
     parser.parse.mockReturnValue(ast);
@@ -351,13 +347,13 @@ describe('SheetFormulaPlugin', () => {
     plugin.apply(state, transaction as never);
     plugin.onTransactionCommitted(transaction as never);
 
-    expect(astCacheOf(plugin).get(formulaKey)).toBe(ast);
+    expect(astCache.get(formulaKey)).toBe(ast);
     expect(graph.updateCell).toHaveBeenCalledWith(formulaKey, expect.any(Array));
     expect(scheduler.markDirty).toHaveBeenCalledWith([formulaKey]);
   });
 
   it('clears inserted formula payloads that fail parsing', () => {
-    const { plugin, parser, graph, scheduler } = createPlugin();
+    const { astCache, plugin, parser, graph, scheduler } = createPlugin();
     const state = plugin.getState();
     const formulaKey = cellKey(2, 1);
     parser.parse.mockImplementation(() => {
@@ -377,15 +373,15 @@ describe('SheetFormulaPlugin', () => {
     plugin.apply(state, transaction as never);
     plugin.onTransactionCommitted(transaction as never);
 
-    expect(astCacheOf(plugin).has(formulaKey)).toBe(false);
+    expect(astCache.has(formulaKey)).toBe(false);
     expect(graph.updateCell).not.toHaveBeenCalled();
     expect(scheduler.markDirty).toHaveBeenCalledWith([]);
   });
 
   it('removes formula cache entries when structural edits delete formula cells', () => {
-    const { plugin, graph, scheduler } = createPlugin();
+    const { astCache, plugin, graph, scheduler } = createPlugin();
     const state = plugin.getState();
-    astCacheOf(plugin).set(cellKey(2, 1), { type: 'formula' } as never);
+    astCache.set(cellKey(2, 1), { type: 'formula' } as never);
 
     const transaction = {
       pluginKey: SheetDataPlugin.pluginKey,
@@ -395,13 +391,13 @@ describe('SheetFormulaPlugin', () => {
     plugin.apply(state, transaction as never);
     plugin.onTransactionCommitted(transaction as never);
 
-    expect(astCacheOf(plugin).size).toBe(0);
+    expect(astCache.size).toBe(0);
     expect(graph.updateCell).not.toHaveBeenCalled();
     expect(scheduler.markDirty).toHaveBeenCalledWith([]);
   });
 
   it('rebases formula cache keys around deleted columns', () => {
-    const { plugin } = createPlugin();
+    const { astCache, plugin } = createPlugin();
     const state = plugin.getState();
     const beforeKey = cellKey(2, 0);
     const deletedKey = cellKey(2, 1);
@@ -410,9 +406,9 @@ describe('SheetFormulaPlugin', () => {
     const beforeAst = { type: 'before' };
     const deletedAst = { type: 'deleted' };
     const shiftedAst = { type: 'shifted' };
-    astCacheOf(plugin).set(beforeKey, beforeAst as never);
-    astCacheOf(plugin).set(deletedKey, deletedAst as never);
-    astCacheOf(plugin).set(shiftedKey, shiftedAst as never);
+    astCache.set(beforeKey, beforeAst as never);
+    astCache.set(deletedKey, deletedAst as never);
+    astCache.set(shiftedKey, shiftedAst as never);
 
     const transaction = {
       pluginKey: SheetDataPlugin.pluginKey,
@@ -421,17 +417,17 @@ describe('SheetFormulaPlugin', () => {
     plugin.apply(state, transaction);
     plugin.onTransactionCommitted(transaction);
 
-    expect(astCacheOf(plugin).get(beforeKey)).toBe(beforeAst);
-    expect(astCacheOf(plugin).has(deletedKey)).toBe(false);
-    expect(astCacheOf(plugin).get(nextShiftedKey)).toBe(shiftedAst);
+    expect(astCache.get(beforeKey)).toBe(beforeAst);
+    expect(astCache.has(deletedKey)).toBe(false);
+    expect(astCache.get(nextShiftedKey)).toBe(shiftedAst);
   });
 
   it('keeps formulas before deleted rows and swaps cache-key coordinates for moves', () => {
-    const { plugin } = createPlugin();
+    const { astCache, plugin } = createPlugin();
     const state = plugin.getState();
     const key = cellKey(1, 1);
     const ast = { type: 'formula' };
-    astCacheOf(plugin).set(key, ast as never);
+    astCache.set(key, ast as never);
 
     const transaction = {
       pluginKey: SheetDataPlugin.pluginKey,
@@ -440,30 +436,24 @@ describe('SheetFormulaPlugin', () => {
     plugin.apply(state, transaction);
     plugin.onTransactionCommitted(transaction);
 
-    expect(astCacheOf(plugin).get(key)).toBe(ast);
-    expect(
-      (
-        plugin as unknown as {
-          shiftFormulaCoordinate(
-            row: number,
-            col: number,
-            change: { type: MatrixOTActionName.RowMove; fromIndex: number; toIndex: number },
-          ): { row: number; col: number } | null;
-        }
-      ).shiftFormulaCoordinate(1, 1, { type: MatrixOTActionName.RowMove, fromIndex: 1, toIndex: 3 }),
-    ).toEqual({ row: 3, col: 1 });
+    expect(astCache.get(key)).toBe(ast);
+    const move = { pluginKey: SheetDataPlugin.pluginKey, operations: [{ p: [1], [MatrixOTActionName.RowMove]: [3] }] };
+    plugin.apply(state, move as never);
+    plugin.onTransactionCommitted(move as never);
+    expect(astCache.get(cellKey(3, 1))).toBe(ast);
+    expect(astCache.has(key)).toBe(false);
   });
 
   it('rebases formula cache keys below deleted rows and before inserted columns', () => {
-    const { plugin } = createPlugin();
+    const { astCache, plugin } = createPlugin();
     const state = plugin.getState();
     const shiftedRowKey = cellKey(4, 1);
     const nextShiftedRowKey = cellKey(3, 1);
     const beforeColumnKey = cellKey(1, 1);
     const shiftedRowAst = { type: 'shifted-row' };
     const beforeColumnAst = { type: 'before-column' };
-    astCacheOf(plugin).set(shiftedRowKey, shiftedRowAst as never);
-    astCacheOf(plugin).set(beforeColumnKey, beforeColumnAst as never);
+    astCache.set(shiftedRowKey, shiftedRowAst as never);
+    astCache.set(beforeColumnKey, beforeColumnAst as never);
 
     const transaction = {
       pluginKey: SheetDataPlugin.pluginKey,
@@ -475,12 +465,12 @@ describe('SheetFormulaPlugin', () => {
     plugin.apply(state, transaction);
     plugin.onTransactionCommitted(transaction);
 
-    expect(astCacheOf(plugin).get(nextShiftedRowKey)).toBe(shiftedRowAst);
-    expect(astCacheOf(plugin).get(beforeColumnKey)).toBe(beforeColumnAst);
+    expect(astCache.get(nextShiftedRowKey)).toBe(shiftedRowAst);
+    expect(astCache.get(beforeColumnKey)).toBe(beforeColumnAst);
   });
 
   it('ignores non-formula updates without stale formula cache and unrelated commits', () => {
-    const { plugin, graph, resultStore, scheduler } = createPlugin();
+    const { astCache, plugin, graph, resultStore, scheduler } = createPlugin();
     const state = plugin.getState();
 
     plugin.apply(state, {
@@ -497,7 +487,7 @@ describe('SheetFormulaPlugin', () => {
     } as never);
     plugin.onTransactionCommitted({ pluginKey: SheetDataPlugin.pluginKey, operations: [{ p: [0] }] } as never);
 
-    expect(astCacheOf(plugin).size).toBe(0);
+    expect(astCache.size).toBe(0);
     expect(graph.clear).not.toHaveBeenCalled();
     expect(resultStore.clear).not.toHaveBeenCalled();
     expect(scheduler.markDirty).not.toHaveBeenCalled();
@@ -670,7 +660,7 @@ describe('SheetFormulaPlugin', () => {
   });
 
   it('ignores empty initial-dirty queue and applies row and column move operations', () => {
-    const { plugin, scheduler, refShifter } = createPlugin();
+    const { astCache, plugin, scheduler, refShifter } = createPlugin();
     plugin.onInitialDataComplete({} as never);
     expect(scheduler.markDirty).not.toHaveBeenCalled();
 
@@ -684,18 +674,18 @@ describe('SheetFormulaPlugin', () => {
     plugin.apply(plugin.getState(), transaction);
     plugin.onTransactionCommitted(transaction);
 
-    expect(refShifter.shiftAll).toHaveBeenNthCalledWith(1, astCacheOf(plugin), [
+    expect(refShifter.shiftAll).toHaveBeenNthCalledWith(1, astCache, [
       { type: MatrixOTActionName.RowMove, fromIndex: 0, toIndex: 2 },
     ]);
-    expect(refShifter.shiftAll).toHaveBeenNthCalledWith(2, astCacheOf(plugin), [
+    expect(refShifter.shiftAll).toHaveBeenNthCalledWith(2, astCache, [
       { type: MatrixOTActionName.ColMove, fromIndex: 0, toIndex: 3 },
     ]);
   });
 
   it('handles row-delete, col-insert, and col-delete structural changes', () => {
-    const { plugin, refShifter, graph, aggCache, scheduler } = createPlugin();
+    const { astCache, plugin, refShifter, graph, aggCache, scheduler } = createPlugin();
     const state = plugin.getState();
-    astCacheOf(plugin).set(10, { type: 'old' } as never);
+    astCache.set(10, { type: 'old' } as never);
     refShifter.shiftAll.mockReturnValue([{ key: 11, newAst: { type: 'new' } }] as never);
 
     const transaction = {

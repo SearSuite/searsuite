@@ -70,6 +70,9 @@ export interface DocInputDispatchResult {
 /** Plugin that applies rich-document text input and cursor navigation commands. */
 @Injectable()
 export class DocInputPlugin extends Plugin<SearCoreDoc, NodeProperties, DocInputState> {
+  readonly #docLayoutEngine: DocLayoutEngine;
+  readonly #platform: Platform | undefined;
+
   /** DI token for resolving the document input plugin. */
   public static readonly symbol: symbol = Symbol.for('DocInputPlugin');
   /** Stable plugin key for document input state. */
@@ -80,8 +83,8 @@ export class DocInputPlugin extends Plugin<SearCoreDoc, NodeProperties, DocInput
     definition: RichDocTransactionOT,
     relations: [RichDocTransactionOTRelation],
   } as const;
-  private readonly documentListeners = new Set<() => void>();
-  private readonly selectionListeners = new Set<() => void>();
+  readonly #documentListeners = new Set<() => void>();
+  readonly #selectionListeners = new Set<() => void>();
   #lastSnapshot: LayoutSnapshot | null = null;
   #isCommandExecuting: (() => boolean) | null = null;
   #runWithoutMutationAuthority: <Value>(callback: () => Value) => Value = runOutsideCommandExecution;
@@ -91,9 +94,9 @@ export class DocInputPlugin extends Plugin<SearCoreDoc, NodeProperties, DocInput
   /** Constructs the document input plugin with editor-session state only. */
   constructor(
     @Inject(DocLayoutEngine.symbol)
-    private readonly docLayoutEngine: DocLayoutEngine,
+    docLayoutEngine: DocLayoutEngine,
     @Inject(Platform.symbol)
-    private readonly platform?: Platform,
+    platform?: Platform,
   ) {
     super({
       key: DocInputPlugin.pluginKey,
@@ -106,6 +109,8 @@ export class DocInputPlugin extends Plugin<SearCoreDoc, NodeProperties, DocInput
         preferredX: null,
       },
     });
+    this.#docLayoutEngine = docLayoutEngine;
+    this.#platform = platform;
   }
 
   /** Binds the owning editor's command and commit boundary after initial state registration. */
@@ -191,26 +196,26 @@ export class DocInputPlugin extends Plugin<SearCoreDoc, NodeProperties, DocInput
   public onTransactionCommitted(transaction: Transaction): void {
     if (transaction.pluginKey?.key !== this.pluginKey.key) return;
     const documentChanged = transaction.operations.length > 0;
-    if (documentChanged) this.notifyDocumentListeners();
-    this.notifySelectionListeners();
+    if (documentChanged) this.#notifyDocumentListeners();
+    this.#notifySelectionListeners();
   }
 
   /** Subscribes to committed document projection changes. */
   public subscribeDocument(listener: () => void): () => void {
-    this.documentListeners.add(listener);
-    return () => this.documentListeners.delete(listener);
+    this.#documentListeners.add(listener);
+    return () => this.#documentListeners.delete(listener);
   }
 
   /** Subscribes to committed selection projection changes. */
   public subscribeSelection(listener: () => void): () => void {
-    this.selectionListeners.add(listener);
-    return () => this.selectionListeners.delete(listener);
+    this.#selectionListeners.add(listener);
+    return () => this.#selectionListeners.delete(listener);
   }
 
   /** Replaces local selection during session restoration without changing document content. */
   public restoreSelection(selection: DocSelection): void {
     this.#replaceSessionState({ ...this.getState(), docSelection: cloneSelection(selection), preferredX: null });
-    this.notifySelectionListeners();
+    this.#notifySelectionListeners();
   }
 
   /** Replaces the current edit session document and selection. */
@@ -229,8 +234,8 @@ export class DocInputPlugin extends Plugin<SearCoreDoc, NodeProperties, DocInput
       preferredX: null,
     });
     this.#lastSnapshot = null;
-    this.notifyDocumentListeners();
-    this.notifySelectionListeners();
+    this.#notifyDocumentListeners();
+    this.#notifySelectionListeners();
   }
 
   /** Clears the current edit session state. */
@@ -247,22 +252,22 @@ export class DocInputPlugin extends Plugin<SearCoreDoc, NodeProperties, DocInput
     this.#lastSnapshot = null;
   }
 
-  private notifyDocumentListeners(): void {
-    this.#runWithoutMutationAuthority(() => this.documentListeners.forEach((listener) => {
+  #notifyDocumentListeners(): void {
+    this.#runWithoutMutationAuthority(() => this.#documentListeners.forEach((listener) => {
       try {
         listener();
       } catch (error) {
-        this.platform?.warn('Doc document listener failed.', error);
+        this.#platform?.warn('Doc document listener failed.', error);
       }
     }));
   }
 
-  private notifySelectionListeners(): void {
-    this.#runWithoutMutationAuthority(() => this.selectionListeners.forEach((listener) => {
+  #notifySelectionListeners(): void {
+    this.#runWithoutMutationAuthority(() => this.#selectionListeners.forEach((listener) => {
       try {
         listener();
       } catch (error) {
-        this.platform?.warn('Doc selection listener failed.', error);
+        this.#platform?.warn('Doc selection listener failed.', error);
       }
     }));
   }
@@ -349,10 +354,10 @@ export class DocInputPlugin extends Plugin<SearCoreDoc, NodeProperties, DocInput
 
   /** Builds a transaction for arrow-key cursor navigation. */
   public createArrowTransaction(direction: DocCursorDirection, shiftKey: boolean): Transaction {
-    return this.createTransaction(moveCursorCommand(direction, shiftKey, this.docLayoutEngine));
+    return this.createTransaction(moveCursorCommand(direction, shiftKey, this.#docLayoutEngine));
   }
 
-  private applyLocalTransaction(transaction: Transaction): DocInputDispatchResult {
+  #applyLocalTransaction(transaction: Transaction): DocInputDispatchResult {
     if (this.#stateCommitToken) {
       throw new SearError('Assembled Doc input must commit through the editor command pipeline.');
     }
@@ -367,27 +372,27 @@ export class DocInputPlugin extends Plugin<SearCoreDoc, NodeProperties, DocInput
 
   /** Handles committed text input. */
   public handleInput(text: string): DocInputDispatchResult {
-    return this.applyLocalTransaction(this.createInputTransaction(text));
+    return this.#applyLocalTransaction(this.createInputTransaction(text));
   }
 
   /** Handles soft-enter paragraph splitting. */
   public handleSoftEnter(): DocInputDispatchResult {
-    return this.applyLocalTransaction(this.createSoftEnterTransaction());
+    return this.#applyLocalTransaction(this.createSoftEnterTransaction());
   }
 
   /** Handles Backspace deletion. */
   public handleDelete(): DocInputDispatchResult {
-    return this.applyLocalTransaction(this.createDeleteTransaction());
+    return this.#applyLocalTransaction(this.createDeleteTransaction());
   }
 
   /** Selects all content in the current document session. */
   public handleSelectAll(): DocInputDispatchResult {
-    return this.applyLocalTransaction(this.createSelectAllTransaction());
+    return this.#applyLocalTransaction(this.createSelectAllTransaction());
   }
 
   /** Handles arrow-key cursor navigation. */
   public handleArrow(direction: DocCursorDirection, shiftKey: boolean): DocInputDispatchResult {
-    return this.applyLocalTransaction(this.createArrowTransaction(direction, shiftKey));
+    return this.#applyLocalTransaction(this.createArrowTransaction(direction, shiftKey));
   }
 
   #replaceSessionState(state: DocInputState): void {

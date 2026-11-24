@@ -7,7 +7,7 @@ import { KDTreeNode } from './KDTreeNode';
 /** KD-tree spatial index for rectangular scene data. */
 export class KDTree<T extends { rect: PositionRect<HexColor> }> extends Tree<T> {
   /** Root KD-tree node. */
-  private root: KDTreeNode<T> | null = null;
+  #root: KDTreeNode<T> | null = null;
 
   /**
    * Constructs a KD-tree.
@@ -35,19 +35,19 @@ export class KDTree<T extends { rect: PositionRect<HexColor> }> extends Tree<T> 
       return node;
     };
 
-    this.root = insertRecursively(this.root, data, 0);
+    this.#root = insertRecursively(this.#root, data, 0);
     return true;
   }
 
   /** Removes one item by object identity and rebuilds the experimental tree. */
   remove(data: T): boolean {
     const items: T[] = [];
-    this.collect(this.root, items);
+    this.#collect(this.#root, items);
     const index = items.indexOf(data);
     if (index < 0) return false;
 
     items.splice(index, 1);
-    this.root = null;
+    this.#root = null;
     items.forEach((item) => this.insert(item));
     return true;
   }
@@ -79,20 +79,20 @@ export class KDTree<T extends { rect: PositionRect<HexColor> }> extends Tree<T> 
       }
     };
 
-    queryRecursively(this.root, 0);
+    queryRecursively(this.#root, 0);
     return results;
   }
 
   /** Removes all indexed items. */
   clear(): void {
-    this.root = null;
+    this.#root = null;
   }
 
-  private collect(node: KDTreeNode<T> | null, items: T[]): void {
+  #collect(node: KDTreeNode<T> | null, items: T[]): void {
     if (!node) return;
     items.push(node.data);
-    this.collect(node.left, items);
-    this.collect(node.right, items);
+    this.#collect(node.left, items);
+    this.#collect(node.right, items);
   }
 
   /** Returns the current tree boundary. */

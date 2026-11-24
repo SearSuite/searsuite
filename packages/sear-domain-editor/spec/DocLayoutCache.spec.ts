@@ -21,8 +21,8 @@ function block(id: string, index: number, y: number): DocBlockLayout {
 }
 
 class ReverseIndexedSnapshot extends IndexedSnapshot<LayoutSnapshot, DocBlockLayout, DocNodeId> {
-  private readonly byKey = new Map<DocNodeId, DocBlockLayout>();
-  private readonly byIndex = new Map<number, DocBlockLayout>();
+  readonly #byKey = new Map<DocNodeId, DocBlockLayout>();
+  readonly #byIndex = new Map<number, DocBlockLayout>();
 
   public constructor(
     inputSnapshot: LayoutSnapshot,
@@ -30,22 +30,22 @@ class ReverseIndexedSnapshot extends IndexedSnapshot<LayoutSnapshot, DocBlockLay
   ) {
     super(inputSnapshot);
     items.forEach((item) => {
-      this.byKey.set(item.id, item);
-      this.byIndex.set(item.index, item);
+      this.#byKey.set(item.id, item);
+      this.#byIndex.set(item.index, item);
     });
   }
 
   public getByKey(key: DocNodeId): DocBlockLayout | null {
-    return this.byKey.get(key) ?? null;
+    return this.#byKey.get(key) ?? null;
   }
 
   public getByIndex(index: number): DocBlockLayout | null {
-    return this.byIndex.get(index) ?? null;
+    return this.#byIndex.get(index) ?? null;
   }
 
   public getKeysByIndexes(indexes: readonly number[]): readonly DocNodeId[] {
     return indexes
-      .map((index) => this.byIndex.get(index)?.id)
+      .map((index) => this.#byIndex.get(index)?.id)
       .filter((id): id is DocNodeId => id !== void 0)
       .reverse();
   }

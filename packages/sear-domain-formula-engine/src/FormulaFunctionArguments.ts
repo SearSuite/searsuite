@@ -11,25 +11,31 @@ import { type ResolvedFormulaRange } from './ResolvedFormulaRange';
 
 /** Public coercion and argument-reading SDK for built-in and third-party formula functions. */
 export class FormulaFunctionArguments {
-  public constructor(private readonly args: readonly FormulaArg[], private readonly context: EvalContext) {}
+  readonly #args: readonly FormulaArg[];
+  readonly #context: EvalContext;
+
+  public constructor(args: readonly FormulaArg[], context: EvalContext) {
+    this.#args = args;
+    this.#context = context;
+  }
 
   /** Reads one scalar argument while preserving formula errors. */
   public value(index: number): FormulaValue | FormulaError {
-    const arg = this.args[index];
+    const arg = this.#args[index];
     if (!arg || isFormulaArgumentKind(arg, 'missing')) return valueError();
     if (isFormulaArgumentKind(arg, 'value')) return arg.value;
-    if (isFormulaArgumentKind(arg, 'expression')) return this.context.evaluateFormula?.(arg.ast) ?? valueError();
-    if (isFormulaArgumentKind(arg, FormulaNodeKind.Cell)) return this.context.getCellValue(arg.row, arg.col);
+    if (isFormulaArgumentKind(arg, 'expression')) return this.#context.evaluateFormula?.(arg.ast) ?? valueError();
+    if (isFormulaArgumentKind(arg, FormulaNodeKind.Cell)) return this.#context.getCellValue(arg.row, arg.col);
     if (isFormulaArgumentKind(arg, FormulaNodeKind.WorkbookCell)) {
-      return this.context.getWorkbookCellValue?.(arg.sheetName, arg.row, arg.col) ?? valueError();
+      return this.#context.getWorkbookCellValue?.(arg.sheetName, arg.row, arg.col) ?? valueError();
     }
-    if (isFormulaArgumentKind(arg, 'reference')) return this.context.readReference?.(arg.reference) ?? valueError();
+    if (isFormulaArgumentKind(arg, 'reference')) return this.#context.readReference?.(arg.reference) ?? valueError();
     return valueError();
   }
 
   /** Reads a reference argument without materializing it. */
   public reference(index: number): ResolvedFormulaRange | FormulaError {
-    const arg = this.args[index];
+    const arg = this.#args[index];
     if (!arg || isFormulaArgumentKind(arg, 'missing')) return valueError();
     if (isFormulaArgumentKind(arg, 'reference')) return arg.reference;
     if (isFormulaArgumentKind(arg, FormulaNodeKind.Range)) {
@@ -118,7 +124,7 @@ export class FormulaFunctionArguments {
 
   /** Returns whether an argument was omitted. */
   public isMissing(index: number): boolean {
-    const arg = this.args[index];
+    const arg = this.#args[index];
     return !arg || isFormulaArgumentKind(arg, 'missing');
   }
 }

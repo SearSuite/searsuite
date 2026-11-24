@@ -105,6 +105,25 @@ export class SheetFormulaPlugin
   extends Plugin<SearCoreSheet, CellProperties, FormulaPluginState>
   implements IFormulaResultProvider, IFormulaRichResultProvider, IFormulaSourceProvider, IFormulaStatusProvider
 {
+  #parser: IFormulaParser;
+  #graph: IDependencyGraph;
+  #aggCache: IAggregationCache;
+  #resultStore: FormulaResultStore;
+  #scheduler: RecalcScheduler;
+  #refShifter: FormulaRefShifter;
+  #trace: FormulaCalculationTraceBus;
+  readonly #dataEngine: DataEngine | undefined;
+  readonly #platform: Platform | undefined;
+  readonly #results: IFormulaResultProvider | undefined;
+  readonly #resultProviders: FormulaResultProviderRegistry | undefined;
+  readonly #richResultProviders: FormulaRichResultProviderRegistry | undefined;
+  readonly #sourceProviders: FormulaSourceProviderRegistry | undefined;
+  readonly #functions: IFunctionRegistry | undefined;
+  readonly #externalServices: IFormulaExternalServiceProvider | undefined;
+  readonly #textServices: IFormulaTextServiceProvider | undefined;
+  readonly #inputValidation: SheetCellInputValidationRegistry | undefined;
+  readonly #schedulerDataSource: FormulaSchedulerDataSource | undefined;
+
   /** DI token for resolving SheetFormulaPlugin. */
   public static readonly symbol = Symbol.for('SheetFormulaPlugin');
   /** Stable plugin key for SheetFormulaPlugin. */
@@ -129,31 +148,49 @@ export class SheetFormulaPlugin
 
   /** Creates a SheetFormulaPlugin instance. */
   constructor(
-    @Inject(IFormulaParser.symbol) private parser: IFormulaParser,
-    @Inject(IDependencyGraph.symbol) private graph: IDependencyGraph,
-    @Inject(IAggregationCache.symbol) private aggCache: IAggregationCache,
-    @Inject(FormulaResultStore.symbol) private resultStore: FormulaResultStore,
-    @Inject(RecalcScheduler.symbol) private scheduler: RecalcScheduler,
-    @Inject(FormulaRefShifter.symbol) private refShifter: FormulaRefShifter,
-    @Inject(FormulaCalculationTraceBus.symbol) private trace: FormulaCalculationTraceBus,
-    @Inject(DataEngine.symbol) private readonly dataEngine?: DataEngine,
-    @Inject(Platform.symbol) private readonly platform?: Platform,
-    @Inject(IFormulaResultProvider.symbol) private readonly results?: IFormulaResultProvider,
-    @Inject(FormulaResultProviderRegistry.symbol) private readonly resultProviders?: FormulaResultProviderRegistry,
-    @Inject(FormulaRichResultProviderRegistry.symbol) private readonly richResultProviders?: FormulaRichResultProviderRegistry,
-    @Inject(FormulaSourceProviderRegistry.symbol) private readonly sourceProviders?: FormulaSourceProviderRegistry,
-    @Inject(IFunctionRegistry.symbol) private readonly functions?: IFunctionRegistry,
-    @Inject(IFormulaExternalServiceProvider.symbol) private readonly externalServices?: IFormulaExternalServiceProvider,
-    @Inject(IFormulaTextServiceProvider.symbol) private readonly textServices?: IFormulaTextServiceProvider,
+    @Inject(IFormulaParser.symbol) parser: IFormulaParser,
+    @Inject(IDependencyGraph.symbol) graph: IDependencyGraph,
+    @Inject(IAggregationCache.symbol) aggCache: IAggregationCache,
+    @Inject(FormulaResultStore.symbol) resultStore: FormulaResultStore,
+    @Inject(RecalcScheduler.symbol) scheduler: RecalcScheduler,
+    @Inject(FormulaRefShifter.symbol) refShifter: FormulaRefShifter,
+    @Inject(FormulaCalculationTraceBus.symbol) trace: FormulaCalculationTraceBus,
+    @Inject(DataEngine.symbol) dataEngine?: DataEngine,
+    @Inject(Platform.symbol) platform?: Platform,
+    @Inject(IFormulaResultProvider.symbol) results?: IFormulaResultProvider,
+    @Inject(FormulaResultProviderRegistry.symbol) resultProviders?: FormulaResultProviderRegistry,
+    @Inject(FormulaRichResultProviderRegistry.symbol) richResultProviders?: FormulaRichResultProviderRegistry,
+    @Inject(FormulaSourceProviderRegistry.symbol) sourceProviders?: FormulaSourceProviderRegistry,
+    @Inject(IFunctionRegistry.symbol) functions?: IFunctionRegistry,
+    @Inject(IFormulaExternalServiceProvider.symbol) externalServices?: IFormulaExternalServiceProvider,
+    @Inject(IFormulaTextServiceProvider.symbol) textServices?: IFormulaTextServiceProvider,
     @Inject(SheetCellInputValidationRegistry.symbol)
-    private readonly inputValidation?: SheetCellInputValidationRegistry,
+    inputValidation?: SheetCellInputValidationRegistry,
     @Inject(FormulaSchedulerDataSource.symbol)
-    private readonly schedulerDataSource?: FormulaSchedulerDataSource,
+    schedulerDataSource?: FormulaSchedulerDataSource,
   ) {
     super({
       key: pluginKey,
       state: null,
     });
+    this.#parser = parser;
+    this.#graph = graph;
+    this.#aggCache = aggCache;
+    this.#resultStore = resultStore;
+    this.#scheduler = scheduler;
+    this.#refShifter = refShifter;
+    this.#trace = trace;
+    this.#dataEngine = dataEngine;
+    this.#platform = platform;
+    this.#results = results;
+    this.#resultProviders = resultProviders;
+    this.#richResultProviders = richResultProviders;
+    this.#sourceProviders = sourceProviders;
+    this.#functions = functions;
+    this.#externalServices = externalServices;
+    this.#textServices = textServices;
+    this.#inputValidation = inputValidation;
+    this.#schedulerDataSource = schedulerDataSource;
 
     for (const name of [
       'parser', 'graph', 'aggCache', 'resultStore', 'scheduler', 'refShifter', 'trace',
@@ -163,7 +200,7 @@ export class SheetFormulaPlugin
       'schedulerDataSource',
     ]) Object.defineProperty(this, name, { writable: false, configurable: false });
 
-    this.scheduler.bindAstCache(this.#astCache);
+    this.#scheduler.bindAstCache(this.#astCache);
   }
 
   /**
@@ -175,26 +212,26 @@ export class SheetFormulaPlugin
       throw new SearError('Sheet formula commands are already bound to an editor.');
     }
     this.#commands = commands;
-    if (this.inputValidation && !this.#spillValidatorRegistered) {
-      this.inputValidation.register('sheet.formula.spill', (row, col) => {
-        const reject = this.resultStore.isSpillCell(row, col);
+    if (this.#inputValidation && !this.#spillValidatorRegistered) {
+      this.#inputValidation.register('sheet.formula.spill', (row, col) => {
+        const reject = this.#resultStore.isSpillCell(row, col);
         return reject
           ? { valid: false, reject: true, message: 'Spilled array cells cannot be edited directly. Edit or clear the anchor formula first.' }
           : { valid: true, reject: false };
       }, { protectClear: true });
       this.#spillValidatorRegistered = true;
     }
-    registerFormulaStatusCommands(commands, this, this.scheduler);
-    if (this.functions) registerSheetFormulaFunctionCommands(commands, this.functions);
-    if (this.externalServices && this.textServices) {
-      registerSheetFormulaServiceCommands(commands, this.externalServices, this.textServices);
+    registerFormulaStatusCommands(commands, this, this.#scheduler);
+    if (this.#functions) registerSheetFormulaFunctionCommands(commands, this.#functions);
+    if (this.#externalServices && this.#textServices) {
+      registerSheetFormulaServiceCommands(commands, this.#externalServices, this.#textServices);
     }
-    if (typeof this.scheduler.bindCommandBus === 'function') registerFormulaRecalculationCommands(commands, this.scheduler);
-    if (this.resultProviders && this.richResultProviders && this.sourceProviders) {
+    if (typeof this.#scheduler.bindCommandBus === 'function') registerFormulaRecalculationCommands(commands, this.#scheduler);
+    if (this.#resultProviders && this.#richResultProviders && this.#sourceProviders) {
       registerFormulaProviderCommands(commands, {
-        results: this.resultProviders,
-        richResults: this.richResultProviders,
-        sources: this.sourceProviders,
+        results: this.#resultProviders,
+        richResults: this.#richResultProviders,
+        sources: this.#sourceProviders,
       });
     }
   }
@@ -206,62 +243,62 @@ export class SheetFormulaPlugin
   ): void {
     this.#initialDataComplete = true;
     const isExecuting = commands.isExecuting.bind(commands);
-    FormulaCalculationTraceBus.prototype.enforceCommandBoundary.call(this.trace, isExecuting);
-    if (this.graph instanceof DependencyGraph) {
-      DependencyGraph.prototype.enforceCommandBoundary.call(this.graph, isExecuting);
-    } else this.graph.enforceCommandBoundary(isExecuting);
-    if (this.aggCache instanceof AggregationCache) {
-      AggregationCache.prototype.enforceCommandBoundary.call(this.aggCache, isExecuting);
-    } else this.aggCache.enforceCommandBoundary(isExecuting);
-    FormulaResultStore.prototype.enforceCommandBoundary.call(this.resultStore, isExecuting);
-    if (this.functions && !workbookOwnership?.functions) {
+    FormulaCalculationTraceBus.prototype.enforceCommandBoundary.call(this.#trace, isExecuting);
+    if (this.#graph instanceof DependencyGraph) {
+      DependencyGraph.prototype.enforceCommandBoundary.call(this.#graph, isExecuting);
+    } else this.#graph.enforceCommandBoundary(isExecuting);
+    if (this.#aggCache instanceof AggregationCache) {
+      AggregationCache.prototype.enforceCommandBoundary.call(this.#aggCache, isExecuting);
+    } else this.#aggCache.enforceCommandBoundary(isExecuting);
+    FormulaResultStore.prototype.enforceCommandBoundary.call(this.#resultStore, isExecuting);
+    if (this.#functions && !workbookOwnership?.functions) {
       const remove = (id: number) => commands.run(UnregisterSheetFormulaFunctionCommand, id);
-      if (this.functions instanceof FunctionRegistry) {
-        FunctionRegistry.prototype.enforceCommandBoundary.call(this.functions, isExecuting, remove);
-      } else this.functions.enforceCommandBoundary(isExecuting, remove);
+      if (this.#functions instanceof FunctionRegistry) {
+        FunctionRegistry.prototype.enforceCommandBoundary.call(this.#functions, isExecuting, remove);
+      } else this.#functions.enforceCommandBoundary(isExecuting, remove);
     }
-    if (this.externalServices && !workbookOwnership?.externalServices) {
+    if (this.#externalServices && !workbookOwnership?.externalServices) {
       const remove = (id: number) => commands.run(UnregisterSheetFormulaExternalServiceCommand, id);
-      if (this.externalServices instanceof FormulaExternalServiceRegistry) {
-        FormulaExternalServiceRegistry.prototype.enforceCommandBoundary.call(this.externalServices, isExecuting, remove);
-      } else this.externalServices.enforceCommandBoundary(isExecuting, remove);
+      if (this.#externalServices instanceof FormulaExternalServiceRegistry) {
+        FormulaExternalServiceRegistry.prototype.enforceCommandBoundary.call(this.#externalServices, isExecuting, remove);
+      } else this.#externalServices.enforceCommandBoundary(isExecuting, remove);
     }
-    if (this.textServices && !workbookOwnership?.textServices) {
-      if ((this.textServices.registerLanguageService || this.textServices.registerPhoneticReader) &&
-          (!this.textServices.enforceCommandBoundary || !this.textServices.unregisterRegistration)) {
+    if (this.#textServices && !workbookOwnership?.textServices) {
+      if ((this.#textServices.registerLanguageService || this.#textServices.registerPhoneticReader) &&
+          (!this.#textServices.enforceCommandBoundary || !this.#textServices.unregisterRegistration)) {
         throw new SearError('Mutable formula text providers must enforce the editor command boundary.');
       }
       const remove = (id: number) => commands.run(UnregisterSheetFormulaTextServiceCommand, id);
-      if (this.textServices instanceof FormulaTextServiceRegistry) {
-        FormulaTextServiceRegistry.prototype.enforceCommandBoundary.call(this.textServices, isExecuting, remove);
-      } else this.textServices.enforceCommandBoundary?.(isExecuting, remove);
+      if (this.#textServices instanceof FormulaTextServiceRegistry) {
+        FormulaTextServiceRegistry.prototype.enforceCommandBoundary.call(this.#textServices, isExecuting, remove);
+      } else this.#textServices.enforceCommandBoundary?.(isExecuting, remove);
     }
-    if (!this.resultProviders || !this.richResultProviders || !this.sourceProviders) return;
+    if (!this.#resultProviders || !this.#richResultProviders || !this.#sourceProviders) return;
     sealFormulaProviderRegistries(commands, {
-      results: this.resultProviders,
-      richResults: this.richResultProviders,
-      sources: this.sourceProviders,
+      results: this.#resultProviders,
+      richResults: this.#richResultProviders,
+      sources: this.#sourceProviders,
     });
   }
 
   /** Contributes formula identity updates to the same atomic cell-move plan. */
   public registerRangeMoves(registry: SheetRangeMoveRegistry): void {
-    if (this.dataEngine) registerFormulaRangeMoves(registry, this.parser, this.dataEngine);
+    if (this.#dataEngine) registerFormulaRangeMoves(registry, this.#parser, this.#dataEngine);
   }
 
   public registerRangeReorders(registry: SheetRangeReorderRegistry): void {
-    if (this.dataEngine) registerFormulaRangeReorders(registry, this.parser, this.dataEngine, this.resultStore);
+    if (this.#dataEngine) registerFormulaRangeReorders(registry, this.#parser, this.#dataEngine, this.#resultStore);
   }
 
   /** Plans persisted reference rewrites for complete row and column reordering. */
   public registerStructureMoves(registry: SheetStructureMoveRegistry): void {
-    if (this.dataEngine) registerFormulaStructureMoves(registry, this.parser, this.dataEngine);
+    if (this.#dataEngine) registerFormulaStructureMoves(registry, this.#parser, this.#dataEngine);
   }
 
   /** Registers formula calculation trace as an editor-local host observation. */
   public registerObservations(observations: ObservationRegistry): void {
     observations.register(FormulaCalculationTraceObservation, {
-      subscribe: this.trace.subscribeFormulaCalculationTrace.bind(this.trace),
+      subscribe: this.#trace.subscribeFormulaCalculationTrace.bind(this.#trace),
     });
   }
 
@@ -292,16 +329,16 @@ export class SheetFormulaPlugin
 
     const key = cellKey(row, col);
     try {
-      const ast = this.parser.parse(cell.formula);
+      const ast = this.#parser.parse(cell.formula);
       this.#astCache.set(key, ast);
-      const deps = this.parser.extractDependencies(ast);
-      const previousDependencies = this.graph.getDependencies(key);
-      this.graph.updateCell(key, deps);
-      this.emitDependencyChange(key, previousDependencies, this.graph.getDependencies(key));
+      const deps = this.#parser.extractDependencies(ast);
+      const previousDependencies = this.#graph.getDependencies(key);
+      this.#graph.updateCell(key, deps);
+      this.#emitDependencyChange(key, previousDependencies, this.#graph.getDependencies(key));
       this.#initialDirtyKeys.push(key);
     } catch (e) {
       // Parse failure: skip this formula, matching apply behavior.
-      this.platform?.warn?.(`[Formula] Failed to parse initial formula at (${row},${col}):`, e);
+      this.#platform?.warn?.(`[Formula] Failed to parse initial formula at (${row},${col}):`, e);
     }
   }
 
@@ -312,7 +349,7 @@ export class SheetFormulaPlugin
     }
     this.#initialDataComplete = true;
     if (this.#initialDirtyKeys.length > 0) {
-      this.scheduler.markDirty(this.#initialDirtyKeys);
+      this.#scheduler.markDirty(this.#initialDirtyKeys);
       this.#initialDirtyKeys = [];
     }
   }
@@ -360,9 +397,9 @@ export class SheetFormulaPlugin
         if (newCell && newCell.type === CellType.Formula && newCell.formula) {
           // Formula cell: parse and register.
           try {
-            const ast = this.parser.parse(newCell.formula);
+            const ast = this.#parser.parse(newCell.formula);
             astCache.set(key, ast);
-            this.parser.extractDependencies(ast);
+            this.#parser.extractDependencies(ast);
           } catch (e) {
             // Parse failure: clear formula-related state.
             astCache.delete(key);
@@ -374,9 +411,9 @@ export class SheetFormulaPlugin
       } else {
         const change = matrixOperationToStructureChange(op);
         if (change) {
-          if (hasPersistedReferenceRewrites) this.rebaseAstCacheKeys(astCache, change);
-          else this.shiftAstCache(change, astCache);
-          this.indexInsertedFormulas(op, change, astCache);
+          if (hasPersistedReferenceRewrites) this.#rebaseAstCacheKeys(astCache, change);
+          else this.#shiftAstCache(change, astCache);
+          this.#indexInsertedFormulas(op, change, astCache);
         }
       }
     }
@@ -391,10 +428,10 @@ export class SheetFormulaPlugin
     if (this.#commands && !this.#commands.isExecuting()) {
       throw new SearError('Sheet formula changes must run through editor.commands.run(...).');
     }
-    if (this.schedulerDataSource?.isSpillObstacleTransaction?.(transaction)) {
-      this.aggCache.clear();
-      this.resultStore.clear();
-      this.scheduler.markDirty([...this.#astCache.keys()]);
+    if (this.#schedulerDataSource?.isSpillObstacleTransaction?.(transaction)) {
+      this.#aggCache.clear();
+      this.#resultStore.clear();
+      this.#scheduler.markDirty([...this.#astCache.keys()]);
       return;
     }
     if (transaction.pluginKey !== SheetDataPlugin.pluginKey) return;
@@ -406,18 +443,18 @@ export class SheetFormulaPlugin
     if (transaction.operations.some((operation) => matrixOperationToStructureChange(operation) !== null)) {
       this.#reindexPersistedFormulas();
     }
-    this.scheduler.invalidateFunctionCallIndexes();
+    this.#scheduler.invalidateFunctionCallIndexes();
     this.#rebuildDependencyGraph(this.#astCache);
-    this.aggCache.clear();
-    this.resultStore.clear();
-    this.scheduler.markDirty([...this.#astCache.keys()]);
+    this.#aggCache.clear();
+    this.#resultStore.clear();
+    this.#scheduler.markDirty([...this.#astCache.keys()]);
   }
 
   #reindexPersistedFormulas(): void {
-    const sheetData = this.dataEngine ? readSheetDataMatrix(this.dataEngine) : null;
+    const sheetData = this.#dataEngine ? readSheetDataMatrix(this.#dataEngine) : null;
     if (!sheetData?.forEachStored) return;
     this.#astCache.clear();
-    sheetData.forEachStored((cell, row, col) => this.indexFormulaCell(cell, row, col, this.#astCache));
+    sheetData.forEachStored((cell, row, col) => this.#indexFormulaCell(cell, row, col, this.#astCache));
   }
 
   /**
@@ -441,16 +478,16 @@ export class SheetFormulaPlugin
    * 3. After commit, rebuildDependencyGraph rebuilds reverse dependency indexes.
    * 4. After commit, derived caches are cleared and a full recalculation starts.
    */
-  private shiftAstCache(change: StructureChange, astCache: Map<CellKey, FormulaAST>): void {
-    this.rebaseAstCacheKeys(astCache, change);
-    const shifted = this.refShifter.shiftAll(astCache, [change]);
+  #shiftAstCache(change: StructureChange, astCache: Map<CellKey, FormulaAST>): void {
+    this.#rebaseAstCacheKeys(astCache, change);
+    const shifted = this.#refShifter.shiftAll(astCache, [change]);
     for (const { key, newAst } of shifted) {
       astCache.set(key, newAst);
-      this.parser.extractDependencies(newAst);
+      this.#parser.extractDependencies(newAst);
     }
   }
 
-  private indexInsertedFormulas(
+  #indexInsertedFormulas(
     operation: OTOperation,
     change: StructureChange,
     astCache: Map<CellKey, FormulaAST>,
@@ -460,33 +497,33 @@ export class SheetFormulaPlugin
     const insertedCells = Reflect.get(operation, change.type) as Array<CellMatrixElement | null> | undefined;
     if (!Array.isArray(insertedCells)) return;
     if (getStructureChangeAxis(change) === StructureChangeAxis.Row) {
-      this.indexInsertedRowFormulas(insertedCells, change.index, astCache);
+      this.#indexInsertedRowFormulas(insertedCells, change.index, astCache);
     } else {
-      this.indexInsertedColumnFormulas(insertedCells, change.index, astCache);
+      this.#indexInsertedColumnFormulas(insertedCells, change.index, astCache);
     }
   }
 
-  private indexInsertedRowFormulas(
+  #indexInsertedRowFormulas(
     cells: Array<CellMatrixElement | null>,
     row: number,
     astCache: Map<CellKey, FormulaAST>,
   ): void {
     for (let col = 0; col < cells.length; col++) {
-      this.indexFormulaCell(cells[col], row, col, astCache);
+      this.#indexFormulaCell(cells[col], row, col, astCache);
     }
   }
 
-  private indexInsertedColumnFormulas(
+  #indexInsertedColumnFormulas(
     cells: Array<CellMatrixElement | null>,
     col: number,
     astCache: Map<CellKey, FormulaAST>,
   ): void {
     for (let row = 0; row < cells.length; row++) {
-      this.indexFormulaCell(cells[row], row, col, astCache);
+      this.#indexFormulaCell(cells[row], row, col, astCache);
     }
   }
 
-  private indexFormulaCell(
+  #indexFormulaCell(
     cell: CellMatrixElement | null | undefined,
     row: number,
     col: number,
@@ -495,16 +532,16 @@ export class SheetFormulaPlugin
     if (!cell || cell.type !== CellType.Formula || !cell.formula) return;
 
     try {
-      astCache.set(cellKey(row, col), this.parser.parse(cell.formula));
+      astCache.set(cellKey(row, col), this.#parser.parse(cell.formula));
     } catch (e) {
       astCache.delete(cellKey(row, col));
     }
   }
 
-  private rebaseAstCacheKeys(astCache: Map<CellKey, FormulaAST>, change: StructureChange): void {
+  #rebaseAstCacheKeys(astCache: Map<CellKey, FormulaAST>, change: StructureChange): void {
     const rebased = new Map<CellKey, FormulaAST>();
     astCache.forEach((ast, key) => {
-      const nextKey = this.shiftFormulaKey(key, change);
+      const nextKey = this.#shiftFormulaKey(key, change);
       if (nextKey !== null) rebased.set(nextKey, ast);
     });
 
@@ -512,13 +549,13 @@ export class SheetFormulaPlugin
     rebased.forEach((ast, key) => astCache.set(key, ast));
   }
 
-  private shiftFormulaKey(key: CellKey, change: StructureChange): CellKey | null {
+  #shiftFormulaKey(key: CellKey, change: StructureChange): CellKey | null {
     const [row, col] = fromCellKey(key);
-    const shifted = this.shiftFormulaCoordinate(row, col, change);
+    const shifted = this.#shiftFormulaCoordinate(row, col, change);
     return shifted ? cellKey(shifted.row, shifted.col) : null;
   }
 
-  private shiftFormulaCoordinate(
+  #shiftFormulaCoordinate(
     row: number,
     col: number,
     change: StructureChange,
@@ -530,12 +567,12 @@ export class SheetFormulaPlugin
   }
 
   #rebuildDependencyGraph(astCache: Map<CellKey, FormulaAST>): void {
-    const previousDependencies = this.snapshotDependencies();
-    this.graph.clear();
+    const previousDependencies = this.#snapshotDependencies();
+    this.#graph.clear();
     astCache.forEach((ast, key) => {
-      this.graph.updateCell(key, this.parser.extractDependencies(ast));
+      this.#graph.updateCell(key, this.#parser.extractDependencies(ast));
     });
-    this.emitDependencyChanges(previousDependencies);
+    this.#emitDependencyChanges(previousDependencies);
   }
 
   /**
@@ -545,14 +582,14 @@ export class SheetFormulaPlugin
    * calculated yet. The rendering layer (FormulaCell) converts it to display text.
    */
   public getFormulaResult(row: number, col: number): FormulaValue | undefined {
-    return typeof this.resultStore.getAt === 'function'
-      ? this.resultStore.getAt(row, col)
-      : this.resultStore.get(cellKey(row, col));
+    return typeof this.#resultStore.getAt === 'function'
+      ? this.#resultStore.getAt(row, col)
+      : this.#resultStore.get(cellKey(row, col));
   }
 
   /** Returns rich metadata derived during the current formula evaluation. */
   public getFormulaRichResult(row: number, col: number): FormulaRichResult | undefined {
-    return this.resultStore.getRichAt(row, col);
+    return this.#resultStore.getRichAt(row, col);
   }
 
   /** Activates a host-backed hyperlink after a primary-button cell click. */
@@ -563,9 +600,9 @@ export class SheetFormulaPlugin
     const row = properties.startRowIndex;
     const col = properties.startColIndex;
     if (row === undefined || col === undefined) return;
-    const rich = this.richResultProviders?.getFormulaRichResult(row, col);
+    const rich = this.#richResultProviders?.getFormulaRichResult(row, col);
     if (rich?.kind !== 'hyperlink') return;
-    const opener = this.externalServices?.get(FormulaHyperlinkServiceDefinition);
+    const opener = this.#externalServices?.get(FormulaHyperlinkServiceDefinition);
     if (!opener?.openTarget) return;
     opener.openTarget(rich.target);
     event.origin.preventDefault();
@@ -575,7 +612,7 @@ export class SheetFormulaPlugin
   public getFormulaResultFormat(row: number, col: number) {
     if (typeof this.getFormulaResult(row, col) !== 'number') return void 0;
     const ast = this.#astCache.get(cellKey(row, col));
-    return ast?.kind === FormulaNodeKind.Call ? this.functions?.get(ast.name)?.defaultCellFormat : void 0;
+    return ast?.kind === FormulaNodeKind.Call ? this.#functions?.get(ast.name)?.defaultCellFormat : void 0;
   }
 
   /** Exposes derived spill coordinates to sparse range consumers. */
@@ -583,12 +620,12 @@ export class SheetFormulaPlugin
     startRow: number, startColumn: number, endRow: number, endColumn: number,
     visit: (row: number, column: number) => void,
   ): void {
-    this.resultStore.forEachSpillInRange(startRow, startColumn, endRow, endColumn, visit);
+    this.#resultStore.forEachSpillInRange(startRow, startColumn, endRow, endColumn, visit);
   }
 
   /** IFormulaSourceProvider implementation used by editors to read persisted formula text. */
   public getFormulaSource(row: number, col: number): string | undefined {
-    const cell = this.readSourceCell(row, col);
+    const cell = this.#readSourceCell(row, col);
     return cell?.type === CellType.Formula && typeof cell.formula === 'string' ? cell.formula : void 0;
   }
 
@@ -599,10 +636,10 @@ export class SheetFormulaPlugin
    */
   public getFormulaCellStatus(row: number, col: number): FormulaCellStatus {
     const key = cellKey(row, col);
-    const cell = this.readSourceCell(row, col);
+    const cell = this.#readSourceCell(row, col);
     const isFormulaCell = cell?.type === CellType.Formula;
     const formula = this.getFormulaSource(row, col);
-    const result = isFormulaCell ? this.results?.getFormulaResult(row, col) ?? this.resultStore.get(key) : void 0;
+    const result = isFormulaCell ? this.#results?.getFormulaResult(row, col) ?? this.#resultStore.get(key) : void 0;
     return {
       row,
       col,
@@ -610,40 +647,40 @@ export class SheetFormulaPlugin
       formula,
       result,
       errorCode: getFormulaErrorCode(result),
-      dirty: isFormulaCell && this.graph.isDirty(key),
-      dependencies: isFormulaCell ? this.graph.getDependencies(key) : [],
-      dependents: this.graph.getDependents(key),
+      dirty: isFormulaCell && this.#graph.isDirty(key),
+      dependencies: isFormulaCell ? this.#graph.getDependencies(key) : [],
+      dependents: this.#graph.getDependents(key),
     };
   }
 
-  private readSourceCell(row: number, col: number): CellMatrixElement | null | undefined {
-    const sheetData = this.dataEngine ? readSheetDataMatrix(this.dataEngine) : null;
+  #readSourceCell(row: number, col: number): CellMatrixElement | null | undefined {
+    const sheetData = this.#dataEngine ? readSheetDataMatrix(this.#dataEngine) : null;
     return sheetData?.getItem(row, col);
   }
 
-  private snapshotDependencies(): Map<CellKey, readonly Dependency[]> {
+  #snapshotDependencies(): Map<CellKey, readonly Dependency[]> {
     const snapshot = new Map<CellKey, readonly Dependency[]>();
-    for (const key of this.graph.getFormulaKeys()) {
-      snapshot.set(key, this.graph.getDependencies(key));
+    for (const key of this.#graph.getFormulaKeys()) {
+      snapshot.set(key, this.#graph.getDependencies(key));
     }
     return snapshot;
   }
 
-  private emitDependencyChanges(previousDependencies: Map<CellKey, readonly Dependency[]>): void {
-    const keys = new Set<CellKey>([...previousDependencies.keys(), ...this.graph.getFormulaKeys()]);
+  #emitDependencyChanges(previousDependencies: Map<CellKey, readonly Dependency[]>): void {
+    const keys = new Set<CellKey>([...previousDependencies.keys(), ...this.#graph.getFormulaKeys()]);
     for (const key of keys) {
-      this.emitDependencyChange(key, previousDependencies.get(key) ?? [], this.graph.getDependencies(key));
+      this.#emitDependencyChange(key, previousDependencies.get(key) ?? [], this.#graph.getDependencies(key));
     }
   }
 
-  private emitDependencyChange(
+  #emitDependencyChange(
     key: CellKey,
     previousDependencies: readonly Dependency[],
     dependencies: readonly Dependency[],
   ): void {
     if (dependenciesAreEqual(previousDependencies, dependencies)) return;
     const [row, col] = fromCellKey(key);
-    this.trace.emit({
+    this.#trace.emit({
       type: FormulaDependenciesChangedEventType,
       key,
       row,

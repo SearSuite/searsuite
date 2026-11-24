@@ -330,7 +330,7 @@ export class RichDocOT extends BaseOT {
     for (const other of otherOperation) {
       const next: RichDocOTOperation[] = [];
       for (const op of result) {
-        const transformed = RichDocOT.transformComponent(OTClone(op), other, type);
+        const transformed = RichDocOT.#transformComponent(OTClone(op), other, type);
         if (transformed !== null) next.push(transformed);
       }
       result = next;
@@ -346,7 +346,7 @@ export class RichDocOT extends BaseOT {
    * @param type - Tie-break side for equal-position edits.
    * @returns The transformed operation, or null when the operation becomes a no-op.
    */
-  private static transformComponent(
+  static #transformComponent(
     op: RichDocOTOperation,
     other: RichDocOTOperation,
     type: OTTransformPriority,
@@ -388,7 +388,7 @@ export class RichDocOT extends BaseOT {
         }
       } else {
         // si / sd / ua / cross-tree: adjust any path segment that crosses the insertion
-        op = RichDocOT.adjustPathForNodeInsert(op, other.p, otherIdx);
+        op = RichDocOT.#adjustPathForNodeInsert(op, other.p, otherIdx);
       }
       return op;
     }
@@ -436,7 +436,7 @@ export class RichDocOT extends BaseOT {
         }
       } else {
         // si / sd / ua / cross-tree: check if the op's path is affected
-        const adjusted = RichDocOT.adjustPathForNodeDelete(op, other.p, otherIdx);
+        const adjusted = RichDocOT.#adjustPathForNodeDelete(op, other.p, otherIdx);
         if (adjusted === null) return null;
         op = adjusted;
       }
@@ -479,7 +479,7 @@ export class RichDocOT extends BaseOT {
 
       // Attribute/string operations below a replaced node no longer have a
       // valid target. Path adjustment handles the ancestor case.
-      const adjusted = RichDocOT.adjustPathForNodeDelete(op, other.p, otherIdx);
+      const adjusted = RichDocOT.#adjustPathForNodeDelete(op, other.p, otherIdx);
       if (adjusted === null) return null;
       return adjusted;
     }
@@ -504,12 +504,12 @@ export class RichDocOT extends BaseOT {
           const opFrom = opIdx;
           const opTo = nmOp[RichDocOTActionName.NodeMove][0];
 
-          const newFrom = RichDocOT.transformIdxForMove(opFrom, otherFrom, otherTo);
-          const newTo = RichDocOT.transformIdxForMove(opTo, otherFrom, otherTo);
+          const newFrom = RichDocOT.#transformIdxForMove(opFrom, otherFrom, otherTo);
+          const newTo = RichDocOT.#transformIdxForMove(opTo, otherFrom, otherTo);
           op.p = [...op.p.slice(0, -1), newFrom];
           nmOp[RichDocOTActionName.NodeMove] = [newTo];
         } else {
-          const newIdx = RichDocOT.transformIdxForMove(opIdx, otherFrom, otherTo);
+          const newIdx = RichDocOT.#transformIdxForMove(opIdx, otherFrom, otherTo);
           op.p = [...op.p.slice(0, -1), newIdx];
         }
       }
@@ -632,7 +632,7 @@ export class RichDocOT extends BaseOT {
    * @param insertedIdx - Sibling index inserted by the concurrent operation.
    * @returns The operation with its path rebased over the insertion.
    */
-  private static adjustPathForNodeInsert(
+  static #adjustPathForNodeInsert(
     op: RichDocOTOperation,
     insertedPath: RichDocOTOperationPath,
     insertedIdx: number,
@@ -647,7 +647,7 @@ export class RichDocOT extends BaseOT {
    * @param deletedIdx - Sibling index removed by the concurrent operation.
    * @returns The adjusted operation, or null when its target was deleted.
    */
-  private static adjustPathForNodeDelete(
+  static #adjustPathForNodeDelete(
     op: RichDocOTOperation,
     deletedPath: RichDocOTOperationPath,
     deletedIdx: number,
@@ -662,7 +662,7 @@ export class RichDocOT extends BaseOT {
    * @param to - Destination index of the concurrent move.
    * @returns The index rebased over the move.
    */
-  private static transformIdxForMove(idx: number, from: number, to: number): number {
+  static #transformIdxForMove(idx: number, from: number, to: number): number {
     return transformIndexForMove(idx, from, to);
   }
 }

@@ -23,6 +23,8 @@ export interface RegisteredPluginDocumentStateContribution {
 /** Ordered registry that owns plugin instances for one core/editor runtime. */
 @Injectable()
 export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperties> {
+  readonly #platform: Platform | undefined;
+
   /** DI token for resolving the runtime plugin manager. */
   public static readonly symbol: symbol = Symbol.for('PluginManager');
 
@@ -33,7 +35,9 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
   #writeToken: object | undefined;
 
   /** Creates a PluginManager bound to the host diagnostics channel when available. */
-  constructor(private readonly platform?: Platform) {}
+  constructor(platform?: Platform) {
+    this.#platform = platform;
+  }
 
   /** Gives the owning runtime exclusive registry write access after assembly. */
   public enforceWriteBoundary(token: object): void {
@@ -42,7 +46,7 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
     Object.preventExtensions(this);
   }
 
-  private assertWritable(token?: object): void {
+  #assertWritable(token?: object): void {
     if (this.#writeToken && token !== this.#writeToken) {
       throw new SearError('Plugin registry changes require the owning runtime.');
     }
@@ -55,7 +59,7 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
 
   /** Removes all registered plugins during host teardown. */
   public clearPlugins(token?: object): void {
-    this.assertWritable(token);
+    this.#assertWritable(token);
     for (const plugin of this.#plugins.values()) clearPluginState(plugin);
     [...this.#transactionOTDisposers.values()]
       .reverse()
@@ -67,23 +71,23 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
 
   /** Registers a plugin under its key and rejects duplicate ownership. */
   public registerPlugin<T>(plugin: Plugin<SearCoreType, NodeTypeProperties, T>, token?: object): void {
-    this.assertWritable(token);
+    this.#assertWritable(token);
     if (Plugin.prototype.hasStateWriteBoundary.call(plugin)) {
       throw new SearError('Plugin state is already owned by another editor.');
     }
     if (this.#plugins.has(plugin.key.key)) throw new SearError(`Plugin with key ${plugin.key.key} already exists.`);
-    this.warnSameDepthRegistration(plugin);
-    this.registerTransactionOT(plugin);
+    this.#warnSameDepthRegistration(plugin);
+    this.#registerTransactionOT(plugin);
     this.#plugins.set(plugin.key.key, plugin);
   }
 
   /** Unregisters a plugin and clears the manager-owned state reference. */
   public unregisterPlugin(pluginOrKey: Plugin<SearCoreType, NodeTypeProperties, any> | PluginKey | string, token?: object): void {
-    this.assertWritable(token);
+    this.#assertWritable(token);
     const key = getPluginKeyString(pluginOrKey);
     const plugin = this.#plugins.get(key);
     if (!plugin) return;
-    this.disposeTransactionOT(plugin);
+    this.#disposeTransactionOT(plugin);
     clearPluginState(plugin);
     this.#plugins.delete(key);
   }
@@ -126,15 +130,15 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
 
   /** Inverts a transaction through its owner's registered OT definition. */
   public invertTransaction(transaction: Transaction): Transaction | null {
-    const contribution = this.getRequiredTransactionOT(transaction);
+    const contribution = this.#getRequiredTransactionOT(transaction);
     const inverted = this.#transactionOTRegistry.invert(contribution.definition, transaction.operations);
     return inverted.length > 0 ? createTransaction(transaction.pluginKey, inverted as Operation[]) : null;
   }
 
   /** Rebases a retained transaction over another committed transaction through the shared registry. */
   public transformTransaction(transaction: Transaction, other: Transaction): Transaction | null {
-    const contribution = this.getRequiredTransactionOT(transaction);
-    const otherContribution = this.getRequiredTransactionOT(other);
+    const contribution = this.#getRequiredTransactionOT(transaction);
+    const otherContribution = this.#getRequiredTransactionOT(other);
     const transformed = this.#transactionOTRegistry.transformPair(
       contribution.definition,
       transaction.operations,
@@ -153,14 +157,14 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
     for (const plugin of plugins) callbackfn(plugin);
   }
 
-  private warnSameDepthRegistration(plugin: Plugin<SearCoreType, NodeTypeProperties, any>): void {
+  #warnSameDepthRegistration(plugin: Plugin<SearCoreType, NodeTypeProperties, any>): void {
     if (!plugin.warnOnDuplicateDepth) return;
     const depth = plugin.depth ?? 0;
     const existing = [...this.#plugins.values()].filter(function hasSamePluginDepth(registered) {
       return registered.warnOnDuplicateDepth && (registered.depth ?? 0) === depth;
     });
     if (existing.length === 0) return;
-    this.platform?.warn?.(
+    this.#platform?.warn?.(
       `Plugin ${plugin.key.key} has the same depth ${depth} as ${existing
         .map(function readPluginKey(registered) {
           return registered.key.key;
@@ -171,7 +175,7 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
     );
   }
 
-  private registerTransactionOT(plugin: Plugin<SearCoreType, NodeTypeProperties, any>): void {
+  #registerTransactionOT(plugin: Plugin<SearCoreType, NodeTypeProperties, any>): void {
     const contribution = plugin.transactionOT;
     if (!contribution) return;
     const disposers: Array<() => void> = [this.#transactionOTRegistry.registerType(contribution.definition)];
@@ -179,7 +183,7 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
       disposers.push(this.#transactionOTRegistry.registerRelation(relation)),
     );
     if (contribution.collaborative) {
-      this.warnMissingCollaborativeDocumentState(plugin, contribution.ownerId);
+      this.#warnMissingCollaborativeDocumentState(plugin, contribution.ownerId);
       const existing = this.#collaborationOwners.get(contribution.ownerId);
       if (existing && existing !== plugin) {
         disposers.reverse().forEach((dispose) => dispose());
@@ -190,17 +194,17 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
     this.#transactionOTDisposers.set(plugin.key.key, disposers);
   }
 
-  private warnMissingCollaborativeDocumentState(
+  #warnMissingCollaborativeDocumentState(
     plugin: Plugin<SearCoreType, NodeTypeProperties, any>,
     ownerId: string,
   ): void {
     if (readPluginDocumentStateContributions(plugin).length > 0) return;
-    this.platform?.warn?.(
+    this.#platform?.warn?.(
       `Collaborative plugin ${plugin.key.key} (${ownerId}) has no sear-plugin-export document-state contribution.`,
     );
   }
 
-  private disposeTransactionOT(plugin: Plugin<SearCoreType, NodeTypeProperties, any>): void {
+  #disposeTransactionOT(plugin: Plugin<SearCoreType, NodeTypeProperties, any>): void {
     const contribution = plugin.transactionOT;
     if (contribution && this.#collaborationOwners.get(contribution.ownerId) === plugin) {
       this.#collaborationOwners.delete(contribution.ownerId);
@@ -210,7 +214,7 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
     this.#transactionOTDisposers.delete(plugin.key.key);
   }
 
-  private getRequiredTransactionOT(transaction: Transaction): {
+  #getRequiredTransactionOT(transaction: Transaction): {
     readonly definition: TransactionOTDefinition<OTOperation>;
   } {
     const contribution = this.getTransactionOTContribution(transaction);

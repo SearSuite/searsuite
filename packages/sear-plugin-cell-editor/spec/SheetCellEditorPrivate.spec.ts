@@ -1,3 +1,4 @@
+import { buildSelectionUpdate, resolveReferenceHighlightBounds } from '../src/SheetCellEditorGeometry';
 import { Rect } from '@searsuite/sear-foundation-rect';
 import { Container } from '@searsuite/sear-foundation-di';
 import { SheetDataPlugin, SheetDataFieldNamespace, SheetDataMatrixFieldKey } from '@searsuite/sear-render-engine';
@@ -9,7 +10,7 @@ import {
   SheetRowSizesFieldKey,
 } from '@searsuite/sear-plugin-resize';
 import { CellRegion } from '@searsuite/sear-render-registry';
-import { DocNodeRegistry, stringToRichDoc } from '@searsuite/sear-domain-doc';
+import { DocNodeRegistry } from '@searsuite/sear-domain-doc';
 import { CellRangeHighlightKind } from '../src/Highlighter';
 import { SheetCellEditorPlugin } from '../src/SheetCellEditor';
 import { LocalActionCommand, SheetCommandBus } from '@searsuite/sear-assembly-commands';
@@ -17,10 +18,19 @@ import { EnsureSelectionVisibleCommand } from '@searsuite/sear-plugin-selection'
 import { ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 import { Pipeline } from '@searsuite/sear-assembly-core';
 import { FakeSheetEmbeddedEditor } from '@searsuite/sear-sheet-editor-contract';
-import { BeginCellEditorDragSelectionCommand, HandleCellEditorPointerCommand } from '../src/SheetCellEditorCommands';
+import { CancelCellEditCommand, HandleDocumentInputCommand, BeginCellEditorDragSelectionCommand, HandleCellEditorPointerCommand } from '../src/SheetCellEditorCommands';
 import { FormulaInputAssistObservation } from '../src/formulaAssist/FormulaInputAssistObservation';
 
 let container: Container;
+
+let commandBus: SheetCommandBus;
+let commitStrategies: { commitWithFormat: jest.Mock };
+
+function commit(editor: object, core: object): Pipeline {
+  const execute = createExecutePipelineSpy();
+  (editor as SheetCellEditorPlugin).commitEdit(core as never);
+  return execute.mock.calls[0][0];
+}
 
 let currentExecutePipeline: jest.Mock | null = null;
 
@@ -68,20 +78,6 @@ function createEditorStub(
     applyEffect: () => void 0,
   });
 
-  editor.selectionPlugin = {
-    pluginKey: 'SelectionPlugin',
-    getState: () => [
-      new Rect([
-        [-1, -1],
-        [-1, -1],
-      ]),
-    ],
-    onFillHandleDoubleClick: () => false,
-  } as never;
-  editor.commitStrategies = {
-    commitWithFormat: jest.fn(() => ({ cell: { type: 'text', value: 'abc' }, format: null })),
-  };
-  editor.performCleanup = jest.fn(() => ({ transaction: { operations: [] }, dirtyRects: [] }));
   editor.registerCommands(commands);
   const core = {
     getDataEngine: () => createSheetDataEngine({ sheetData: { getItem: () => ({ type: 'string', value }) } }),
@@ -104,9 +100,12 @@ function createConstructedEditorStub(
   inputValidation?: unknown,
   textShaper?: unknown,
 ): SheetCellEditorPlugin {
+  if (commands) commandBus = commands;
+  commitStrategies = { commitWithFormat: jest.fn(() => ({ cell: { type: 'text', value: 'abc' }, format: null })) };
   return new SheetCellEditorPlugin(
     { isMergedCell: jest.fn(() => null) } as never,
     {
+      onFillHandleDoubleClick: () => false,
       getState: () => [
         new Rect([
           [-1, -1],
@@ -114,13 +113,13 @@ function createConstructedEditorStub(
         ]),
       ],
     } as never,
-    { subscribe: jest.fn(), startListener: jest.fn(), refocus: jest.fn() } as never,
-    { subscribe: jest.fn(), startListener: jest.fn() } as never,
-    {} as never,
+    { subscribe: jest.fn(), startListener: jest.fn(), stopListener: jest.fn(), refocus: jest.fn() } as never,
+    { subscribe: jest.fn(), startListener: jest.fn(), stopListener: jest.fn() } as never,
+    { start: jest.fn(() => jest.fn()) } as never,
     { register: jest.fn(), resolve: jest.fn(() => 'default') } as never,
     { override: jest.fn() } as never,
     { setInterval: jest.fn(), clearInterval: jest.fn() } as never,
-    {} as never,
+    commitStrategies as never,
     { clear: jest.fn() } as never,
     {} as never,
     { register: jest.fn(), get: jest.fn() } as never,
@@ -139,8 +138,8 @@ function createSheetViewDataTypeReader(sheetState: { sheetData?: unknown; rowSiz
   const view = {
     sheetData: sheetState.sheetData ?? { getItem: () => null },
     cellAlignments: {},
-    rowSizes: sheetState.rowSizes ?? { shape: [1, 1] },
-    columnSizes: sheetState.columnSizes ?? { shape: [1, 1] },
+    rowSizes: sheetState.rowSizes ?? { shape: [1, 1], getDimensionLeftBoundaryByIndex: () => 0, getDimensionRightBoundaryByIndex: () => 24 },
+    columnSizes: sheetState.columnSizes ?? { shape: [1, 1], getDimensionLeftBoundaryByIndex: () => 0, getDimensionRightBoundaryByIndex: () => 24 },
     rowHiddenOriginalSizes: {},
     columnHiddenOriginalSizes: {},
   };
@@ -156,8 +155,8 @@ function createSheetDataEngine(sheetState: { sheetData?: unknown; rowSizes?: unk
   const view = {
     sheetData: sheetState.sheetData ?? { getItem: () => null },
     cellAlignments: {},
-    rowSizes: sheetState.rowSizes ?? { shape: [1, 1] },
-    columnSizes: sheetState.columnSizes ?? { shape: [1, 1] },
+    rowSizes: sheetState.rowSizes ?? { shape: [1, 1], getDimensionLeftBoundaryByIndex: () => 0, getDimensionRightBoundaryByIndex: () => 24 },
+    columnSizes: sheetState.columnSizes ?? { shape: [1, 1], getDimensionLeftBoundaryByIndex: () => 0, getDimensionRightBoundaryByIndex: () => 24 },
     rowHiddenOriginalSizes: {},
     columnHiddenOriginalSizes: {},
   };
@@ -214,9 +213,8 @@ describe('SheetCellEditorPlugin private branch coverage', () => {
     const editor = createConstructedEditorStub();
     editor.enforceStateWriteBoundary({});
 
-    expect(() => (editor as unknown as { performCleanup(core: unknown): unknown }).performCleanup({})).toThrow(
-      'must run through editor.commands.run',
-    );
+    expect(Reflect.has(editor, 'performCleanup')).toBe(false);
+    expect(() => editor.setState(editor.getState())).toThrow();
   });
 
   it('publishes rejected commit diagnostics inside a Sheet command', () => {
@@ -288,8 +286,7 @@ describe('SheetCellEditorPlugin private branch coverage', () => {
 
   it('buildCommitPipeline computes plain text and appends commit operation', () => {
     const editor = createEditorStub();
-    editor.lastEditorRect = { x: 0, y: 0, width: 100, height: 24 };
-    editor.executeEditorInput({ kind: 'text', text: 'X' });
+    commandBus.run(HandleDocumentInputCommand, { kind: 'text', text: 'X' });
     const editorState = [
       new Rect([
         [1, 2],
@@ -315,12 +312,12 @@ describe('SheetCellEditorPlugin private branch coverage', () => {
       }),
     };
 
-    editor.buildCommitPipeline(core as never);
+    const pipeline = commit(editor, core);
 
-    expect(editor.commitStrategies.commitWithFormat).toHaveBeenCalledWith(
+    expect(commitStrategies.commitWithFormat).toHaveBeenCalledWith(
       expect.objectContaining({ row: 1, col: 2, plainText: 'abcX' }),
     );
-    expect(editor.performCleanup).toHaveBeenCalledTimes(1);
+    expect(pipeline.steps.some((step) => step.name === 'cell-editor.exit-edit-mode')).toBe(true);
   });
 
   it('buildCommitPipeline skips value inference when a reopened cell is unchanged', () => {
@@ -338,19 +335,18 @@ describe('SheetCellEditorPlugin private branch coverage', () => {
       }),
     };
 
-    const pipeline = editor.buildCommitPipeline(core as never) as Pipeline;
+    const pipeline = commit(editor, core as never) as Pipeline;
 
-    expect(editor.commitStrategies.commitWithFormat).not.toHaveBeenCalled();
+    expect(commitStrategies.commitWithFormat).not.toHaveBeenCalled();
     expect(pipeline.steps.some((step) => step.name === 'cell-editor.commit-value')).toBe(false);
-    expect(editor.performCleanup).toHaveBeenCalledTimes(1);
+    expect(pipeline.steps.some((step) => step.name === 'cell-editor.exit-edit-mode')).toBe(true);
   });
 
   it('BUG-959 commits a multiline value and the needed row growth in one pipeline', () => {
     const editor = createEditorStub('one\ntwo\nthree', undefined, undefined, {
       shape: () => ({ width: 20, height: 12 }),
     });
-    editor.lastEditorRect = { x: 0, y: 0, width: 100, height: 24 };
-    editor.executeEditorInput({ kind: 'text', text: 'X' });
+    commandBus.run(HandleDocumentInputCommand, { kind: 'text', text: 'X' });
     const editorState = [
       new Rect([
         [19, 1],
@@ -374,7 +370,7 @@ describe('SheetCellEditorPlugin private branch coverage', () => {
       }),
       configEngine: { getDefaultConfig: () => ({ sheetCellFontSize: 10 }) },
     };
-    const pipeline = editor.buildCommitPipeline(core as never) as Pipeline;
+    const pipeline = commit(editor, core as never) as Pipeline;
     const valueStep = pipeline.steps.find((step) => step.name === 'cell-editor.commit-value');
     const resizeStep = pipeline.steps.find((step) => step.name === 'expand-multiline-rows');
     expect(valueStep?.transaction?.operations).toHaveLength(1);
@@ -385,8 +381,7 @@ describe('SheetCellEditorPlugin private branch coverage', () => {
 
   it('buildCommitPipeline uses empty plain text for semantically empty docs', () => {
     const editor = createEditorStub('x');
-    editor.lastEditorRect = { x: 0, y: 0, width: 100, height: 24 };
-    editor.executeEditorInput({ kind: 'delete' });
+    commandBus.run(HandleDocumentInputCommand, { kind: 'delete' });
     const editorState = [
       new Rect([
         [0, 0],
@@ -411,9 +406,9 @@ describe('SheetCellEditorPlugin private branch coverage', () => {
       }),
     };
 
-    editor.buildCommitPipeline(core as never);
+    commit(editor, core);
 
-    expect(editor.commitStrategies.commitWithFormat).toHaveBeenCalledWith(expect.objectContaining({ plainText: '' }));
+    expect(commitStrategies.commitWithFormat).toHaveBeenCalledWith(expect.objectContaining({ plainText: '' }));
   });
 
   it('buildCommitPipeline skips commit step when editor state is missing', () => {
@@ -424,14 +419,13 @@ describe('SheetCellEditorPlugin private branch coverage', () => {
       }),
     };
 
-    editor.buildCommitPipeline(core as never);
+    const pipeline = commit(editor, core);
 
-    expect(editor.commitStrategies.commitWithFormat).not.toHaveBeenCalled();
-    expect(editor.performCleanup).toHaveBeenCalledTimes(1);
+    expect(commitStrategies.commitWithFormat).not.toHaveBeenCalled();
+    expect(pipeline.steps.some((step) => step.name === 'cell-editor.exit-edit-mode')).toBe(true);
   });
 
   it('buildSelectionUpdate maps row/column headers and handles missing data safely', () => {
-    const editor = createEditorStub();
     const state = {
       rowSizes: { shape: [1, 8] },
       columnSizes: { shape: [1, 10] },
@@ -442,7 +436,7 @@ describe('SheetCellEditorPlugin private branch coverage', () => {
       }),
     };
 
-    const row = editor.buildSelectionUpdate(
+    const row = buildSelectionUpdate(
       core as never,
       {
         target: {
@@ -453,7 +447,7 @@ describe('SheetCellEditorPlugin private branch coverage', () => {
     expect(row?.anchor).toEqual([2, 0]);
     expect(row?.focus).toEqual([3, 9]);
 
-    const col = editor.buildSelectionUpdate(
+    const col = buildSelectionUpdate(
       core as never,
       {
         target: {
@@ -464,29 +458,29 @@ describe('SheetCellEditorPlugin private branch coverage', () => {
     expect(col?.anchor).toEqual([0, 1]);
     expect(col?.focus).toEqual([7, 2]);
 
-    const normal = editor.buildSelectionUpdate(
+    const normal = buildSelectionUpdate(
       core as never,
       { target: { properties: { startRowIndex: 4, startColIndex: 5 } } } as never,
     );
     expect(normal?.anchor).toEqual([4, 5]);
     expect(normal?.focus).toEqual([4, 5]);
 
-    const noTarget = editor.buildSelectionUpdate(core as never, {} as never);
+    const noTarget = buildSelectionUpdate(core as never, {} as never);
     expect(noTarget).toBeNull();
 
-    const missingCell = editor.buildSelectionUpdate(
+    const missingCell = buildSelectionUpdate(
       core as never,
       { target: { properties: { startRowIndex: void 0, startColIndex: 1 } } } as never,
     );
     expect(missingCell).toBeNull();
 
-    const noState = editor.buildSelectionUpdate(
+    const noState = buildSelectionUpdate(
       { getDataEngine: () => ({ getDataType: () => void 0 }) } as never,
       { target: { properties: { region: CellRegion.RowHeader, startRowIndex: 1 } } } as never,
     );
     expect(noState).toBeNull();
 
-    const noColumnState = editor.buildSelectionUpdate(
+    const noColumnState = buildSelectionUpdate(
       { getDataEngine: () => ({ getDataType: () => void 0 }) } as never,
       { target: { properties: { region: CellRegion.ColumnHeader, startRowIndex: 0, startColIndex: 1 } } } as never,
     );
@@ -502,8 +496,7 @@ describe('SheetCellEditorPlugin private branch coverage', () => {
     };
 
     editor.pointerCapture = { start: jest.fn(() => jest.fn()) };
-    editor.getCommandBus().run(BeginCellEditorDragSelectionCommand, void 0);
-    editor.lastEditorRect = null;
+    commandBus.run(BeginCellEditorDragSelectionCommand, void 0);
     expect(editor.onMouseMove({} as never, { origin: { offsetX: 0, offsetY: 0 } } as never)).toBe(false);
   });
 
@@ -538,51 +531,26 @@ describe('SheetCellEditorPlugin private branch coverage', () => {
     expect(() => editor.bindReferencePickService({} as never)).toThrow('after command registration');
   });
 
-  it('createCancelCellEditCommand marks dirty when cleanup returns dirty rects', () => {
-    const plugin = createConstructedEditorStub();
-    plugin.bindCore({} as never);
-    const editor = plugin as unknown as {
-      createCancelCellEditCommand(input: object): { execute(context: object): { pipeline: Pipeline } };
-      performCleanup: jest.Mock;
-      appendEditExitInteraction: jest.Mock;
-    };
-
-    editor.performCleanup = jest.fn(() => ({
-      transaction: { operations: [] },
-      dirtyRects: [{ x: 1, y: 2, width: 3, height: 4 }],
-    }));
-    editor.appendEditExitInteraction = jest.fn();
-
-    const result = editor.createCancelCellEditCommand({});
-    expect(result.execute({}).pipeline.dirtyRects).toHaveLength(1);
+  it('stages cancellation before the session is disposed', () => {
+    createEditorStub();
+    const execute = createExecutePipelineSpy();
+    commandBus.run(CancelCellEditCommand, { restoreOriginalDocument: true });
+    const pipeline: Pipeline = execute.mock.calls[0][0];
+    expect(pipeline.steps.some((step) => step.name === 'cell-editor.exit-edit-mode')).toBe(true);
+    expect(pipeline.dirtyRects).toEqual([]);
   });
 
-  it('resolveReferenceHighlightBounds returns null for empty shapes', () => {
-    const editor = createEditorStub() as unknown as {
-      resolveReferenceHighlightBounds(
-        reference: {
-          kind: string;
-          startCol?: number;
-          endCol?: number;
-          startRow?: number;
-          endRow?: number;
-          start?: [number, number];
-          end?: [number, number];
-        },
-        shape: { rowCount: number; colCount: number },
-      ): { start: [number, number]; end: [number, number] } | null;
-    };
-
+  it('skips reference highlights when the sheet has no rows or columns', () => {
     expect(
-      editor.resolveReferenceHighlightBounds(
-        { kind: CellRangeHighlightKind.ColumnRange, startCol: 0, endCol: 1 },
+      resolveReferenceHighlightBounds(
+        { kind: CellRangeHighlightKind.ColumnRange, startCol: 0, endCol: 1 } as never,
         { rowCount: 0, colCount: 5 },
       ),
     ).toBeNull();
 
     expect(
-      editor.resolveReferenceHighlightBounds(
-        { kind: CellRangeHighlightKind.RowRange, startRow: 0, endRow: 1 },
+      resolveReferenceHighlightBounds(
+        { kind: CellRangeHighlightKind.RowRange, startRow: 0, endRow: 1 } as never,
         { rowCount: 5, colCount: 0 },
       ),
     ).toBeNull();

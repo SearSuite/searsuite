@@ -7,13 +7,13 @@ import { PositionRectProps } from '@searsuite/sear-foundation-rect';
 /** Scene node that renders one dashed line segment. */
 export class DashedLineNode<T extends NodeProperties> extends RenderNode<T> {
   /** Start x-coordinate. */
-  private readonly lineX1: number;
+  readonly #lineX1: number;
   /** Start y-coordinate. */
-  private readonly lineY1: number;
+  readonly #lineY1: number;
   /** End x-coordinate. */
-  private readonly lineX2: number;
+  readonly #lineX2: number;
   /** End y-coordinate. */
-  private readonly lineY2: number;
+  readonly #lineY2: number;
 
   /**
    * Constructs a dashed line node.
@@ -27,10 +27,10 @@ export class DashedLineNode<T extends NodeProperties> extends RenderNode<T> {
     line: { x1: number; y1: number; x2: number; y2: number },
   ) {
     super(positionRect, props);
-    this.lineX1 = line.x1;
-    this.lineY1 = line.y1;
-    this.lineX2 = line.x2;
-    this.lineY2 = line.y2;
+    this.#lineX1 = line.x1;
+    this.#lineY1 = line.y1;
+    this.#lineX2 = line.x2;
+    this.#lineY2 = line.y2;
   }
 
   /**
@@ -40,8 +40,8 @@ export class DashedLineNode<T extends NodeProperties> extends RenderNode<T> {
   public drawScene(context: RenderContext, clipRegion?: ClipRegion): void {
     context.save();
     context.beginPath();
-    context.moveTo(this.lineX1, this.lineY1);
-    context.lineTo(this.lineX2, this.lineY2);
+    context.moveTo(this.#lineX1, this.#lineY1);
+    context.lineTo(this.#lineX2, this.#lineY2);
     if (this.stroke) context.setStrokeStyle(this.stroke);
     if (this.strokeWidth) context.setLineWidth(this.strokeWidth);
     if (this.lineDash) context.setLineDash(this.lineDash);

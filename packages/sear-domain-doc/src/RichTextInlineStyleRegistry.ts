@@ -63,7 +63,7 @@ export class RichTextInlineStyleRegistry {
       apply: mutation.apply,
     }));
     for (const mutation of mutations ?? []) {
-      const existing = this.findMutation(mutation.styleKey);
+      const existing = this.#findMutation(mutation.styleKey);
       if (existing) {
         throw new SearError(`Rich-text inline style mutation "${mutation.styleKey}" already exists.`);
       }
@@ -100,14 +100,14 @@ export class RichTextInlineStyleRegistry {
 
   /** Resolves a plugin-owned persisted inline style mutation by style key. */
   public requireMutation(styleKey: string): RichTextInlineStyleMutation {
-    const mutation = this.findMutation(styleKey);
+    const mutation = this.#findMutation(styleKey);
     if (!mutation) throw new SearError(`Rich-text inline style mutation "${styleKey}" is not registered.`);
     return mutation;
   }
 
   /** Resolves a plugin-owned persisted inline style mutation by style key when registered. */
   public getMutation(styleKey: string): RichTextInlineStyleMutation | undefined {
-    return this.findMutation(styleKey);
+    return this.#findMutation(styleKey);
   }
 
   /** Returns all registered persisted inline-style mutation keys in registration order. */
@@ -119,7 +119,7 @@ export class RichTextInlineStyleRegistry {
     return keys;
   }
 
-  private findMutation(styleKey: string): RichTextInlineStyleMutation | undefined {
+  #findMutation(styleKey: string): RichTextInlineStyleMutation | undefined {
     for (const contribution of this.#contributions.values()) {
       const mutation = contribution.mutations?.find((candidate) => candidate.styleKey === styleKey);
       if (mutation) return mutation;

@@ -19,6 +19,8 @@ import { lockSheetEmbeddedEditorContext } from './lockSheetEmbeddedEditorContext
 
 /** Sheet adapter that owns one lightweight SearCoreDoc for all embedded cells. */
 export class SearCoreEditorAdapter implements SheetEmbeddedEditor {
+  readonly #options: SearCoreEditorAdapterOptions;
+
   public readonly observations = new ObservationRegistry();
   #runtime: SearCoreEditorRuntime | null = null;
   #renderSessions: SearCoreRenderSessionManager | null = null;
@@ -33,32 +35,34 @@ export class SearCoreEditorAdapter implements SheetEmbeddedEditor {
   #editingSessionActive = false;
   #disposed = false;
 
-  public constructor(private readonly options: SearCoreEditorAdapterOptions = {}) {}
+  public constructor(options: SearCoreEditorAdapterOptions = {}) {
+    this.#options = options;
+  }
 
   public readonly formatting = createSheetDocumentFormatTransfer(() => {
-    this.assertInitialized();
+    this.#assertInitialized();
     return this.#runtime!.inlineStyles;
   });
 
   public measureUnwrapped(document: readonly SheetDocumentNode[], font: string): { width: number; height: number } {
-    this.assertInitialized();
+    this.#assertInitialized();
     return this.#runtime!.measureUnwrapped(document, font);
   }
 
   public initialize(context: SheetEmbeddedEditorContext): void {
-    this.assertLive();
+    this.#assertLive();
     lockSheetEmbeddedEditorContext(context);
     if (this.#runtime) {
       if (context.isCommandExecuting && context.isCommandExecuting !== this.#isCommandExecuting) {
         if (this.#isCommandExecuting) throw new SearError('Sheet edit command boundary is already bound to an editor.');
         SearCoreEditorRuntime.prototype.enforceCommandBoundary.call(this.#runtime, context.isCommandExecuting);
         this.#isCommandExecuting = context.isCommandExecuting;
-        this.sealObservations();
+        this.#sealObservations();
       }
       return;
     }
     this.#isCommandExecuting = context.isCommandExecuting;
-    this.#runtime = new SearCoreEditorRuntime(context, this.options);
+    this.#runtime = new SearCoreEditorRuntime(context, this.#options);
     this.#runtime.bindTeardownToken(this.#sessionOwnerToken);
     this.#renderSessions = new SearCoreRenderSessionManager(this.#runtime);
     this.#inlineStyleObservation = registerSheetEmbeddedInlineStyleObservation(
@@ -75,17 +79,17 @@ export class SearCoreEditorAdapter implements SheetEmbeddedEditor {
         return () => this.#historyListeners.delete(listener);
       },
     });
-    this.sealObservations();
+    this.#sealObservations();
   }
 
   public createRenderSession(context: SheetEmbeddedEditorContext): SheetRenderSession {
-    this.assertInitialized();
+    this.#assertInitialized();
     lockSheetEmbeddedEditorContext(context);
     return this.#renderSessions!.create(context, cloneSheetDocument(context.documentAccessor.read()));
   }
 
   public createEditSession(context: SheetEmbeddedEditorContext): SheetEditSession {
-    this.assertInitialized();
+    this.#assertInitialized();
     lockSheetEmbeddedEditorContext(context);
     const isCommandExecuting = this.#isCommandExecuting ?? context.isCommandExecuting;
     if (isCommandExecuting && !isCommandExecuting()) {
@@ -145,13 +149,13 @@ export class SearCoreEditorAdapter implements SheetEmbeddedEditor {
     this.#isCommandExecuting = undefined;
   }
 
-  private assertInitialized(): void {
-    this.assertLive();
+  #assertInitialized(): void {
+    this.#assertLive();
     if (!this.#runtime || !this.#renderSessions)
       throw new SearError('SearCoreEditorAdapter must be initialized before use.');
   }
 
-  private sealObservations(): void {
+  #sealObservations(): void {
     if (!this.#isCommandExecuting || this.#observationsBoundaryInstalled) return;
     ObservationRegistry.prototype.enforceWriteBoundary.call(this.observations, () => {
       if (!this.#disposed && !this.#isCommandExecuting?.()) {
@@ -161,7 +165,7 @@ export class SearCoreEditorAdapter implements SheetEmbeddedEditor {
     this.#observationsBoundaryInstalled = true;
   }
 
-  private assertLive(): void {
+  #assertLive(): void {
     if (this.#disposed) throw new SearError('SearCoreEditorAdapter has been disposed.');
   }
 }

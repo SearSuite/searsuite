@@ -10,30 +10,14 @@ describe('CellMergeRangeIndex', () => {
       endColumn: (index % 100) * 5 + 2,
     }));
     const index = new CellMergeRangeIndex(ranges);
-    interface InspectedBranch {
-      startRow: number;
-      left?: InspectedBranch;
-      right?: InspectedBranch;
-    }
     let examined = 0;
-    function instrument(branch: InspectedBranch | undefined): void {
-      if (!branch) return;
-      const startRow = branch.startRow;
-      Object.defineProperty(branch, 'startRow', {
-        get: () => {
-          examined += 1;
-          return startRow;
-        },
-      });
-      instrument(branch.left);
-      instrument(branch.right);
-    }
-    instrument((index as unknown as { root: InspectedBranch }).root);
-    expect(index.find(252, 252)).toMatchObject(ranges[5050]!);
+    // Count row comparisons performed by the spatial query.
+    const row = (value: number) => ({ valueOf() { examined++; return value; } }) as unknown as number;
+    expect(index.find(row(252), 252)).toMatchObject(ranges[5050]!);
     expect(examined).toBeGreaterThan(0);
     expect(examined).toBeLessThan(128);
     examined = 0;
-    expect(index.find(253, 253)).toBeNull();
+    expect(index.find(row(253), 253)).toBeNull();
     expect(examined).toBeLessThan(128);
   });
 

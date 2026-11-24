@@ -216,8 +216,8 @@ class StrategyPluginAfter extends SheetPlugin<null> {
 class ThirdPartyObservationPlugin extends SheetPlugin<null> {
   public static readonly symbol = Symbol.for('ThirdPartyObservationPlugin');
 
-  private readonly listeners = new Set<(value: number) => void>();
-  private value = 1;
+  readonly #listeners = new Set<(value: number) => void>();
+  #value = 1;
 
   public constructor() {
     super({ key: new PluginKey('ThirdPartyObservationPlugin'), state: null });
@@ -225,21 +225,21 @@ class ThirdPartyObservationPlugin extends SheetPlugin<null> {
 
   public registerObservations(observations: ObservationRegistry): void {
     observations.register(thirdPartyStatusObservation, {
-      getSnapshot: () => this.value,
+      getSnapshot: () => this.#value,
       subscribe: (listener) => {
-        this.listeners.add(listener);
-        return () => this.listeners.delete(listener);
+        this.#listeners.add(listener);
+        return () => this.#listeners.delete(listener);
       },
     });
   }
 
   public publish(value: number): void {
-    this.value = value;
-    this.listeners.forEach((listener) => listener(value));
+    this.#value = value;
+    this.#listeners.forEach((listener) => listener(value));
   }
 
   public get listenerCount(): number {
-    return this.listeners.size;
+    return this.#listeners.size;
   }
 
   public registerState() {
@@ -263,7 +263,7 @@ class ThirdPartyObservationPlugin extends SheetPlugin<null> {
 class ThirdPartySessionPlugin extends SheetPlugin<null> {
   public static readonly symbol = Symbol.for('ThirdPartySessionPlugin');
 
-  private session = { open: false, selectedId: null as string | null };
+  #session = { open: false, selectedId: null as string | null };
 
   public constructor() {
     super({ key: new PluginKey('ThirdPartySessionPlugin'), state: null });
@@ -272,19 +272,19 @@ class ThirdPartySessionPlugin extends SheetPlugin<null> {
   public registerSessionState(registry: SessionStateRegistry): void {
     registry.register(thirdPartySessionState, {
       restorePhase: SessionStateRestorePhase.BeforeInitialize,
-      capture: () => ({ ...this.session }),
+      capture: () => ({ ...this.#session }),
       restore: (state) => {
-        this.session = { ...state };
+        this.#session = { ...state };
       },
     });
   }
 
   public setSession(open: boolean, selectedId: string | null): void {
-    this.session = { open, selectedId };
+    this.#session = { open, selectedId };
   }
 
   public getSession(): { open: boolean; selectedId: string | null } {
-    return { ...this.session };
+    return { ...this.#session };
   }
 
   public registerState() {
@@ -2681,19 +2681,15 @@ describe('createSheetEditor', () => {
     });
     const graph = editorContainer!.resolve<IDependencyGraph>(IDependencyGraph.symbol);
     const aggregates = editorContainer!.resolve<IAggregationCache>(IAggregationCache.symbol);
-    const scheduler = editorContainer!.resolve<RecalcScheduler>(RecalcScheduler.symbol) as unknown as {
-      schedule(): void;
-      runBatch(): void;
-      flushResults(results: unknown[], context: unknown): void;
-    };
+    const scheduler = editorContainer!.resolve<RecalcScheduler>(RecalcScheduler.symbol);
     const key = cellKey(0, 0);
     expect(() => graph.updateCell(key, [])).toThrow('editor.commands.run');
     expect(() => graph.markDirty([key])).toThrow('editor.commands.run');
     expect(() => aggregates.setSum(0, 0, 0, 0, 1)).toThrow('editor.commands.run');
     expect(() => aggregates.clear()).toThrow('editor.commands.run');
-    expect(() => scheduler.schedule()).toThrow('editor.commands.run');
-    expect(() => scheduler.runBatch()).toThrow('editor.commands.run');
-    expect(() => scheduler.flushResults([], {})).toThrow('editor.commands.run');
+    expect(() => scheduler.resumePendingWork()).toThrow('editor.commands.run');
+    expect(() => scheduler.processScheduledBatch()).toThrow('editor.commands.run');
+    expect(scheduler).not.toHaveProperty('flushResults');
 
     editor.commands.run(updateDerivedState, undefined);
     expect(graph.size).toBe(1);
@@ -3071,12 +3067,12 @@ it('guards input validators retained by a Sheet plugin after assembly', () => {
   @Injectable()
   class RetainedValidatorPlugin extends SheetPlugin<null> {
     public static readonly symbol = Symbol.for('RetainedValidatorPlugin');
-    private disposeInitial: (() => void) | undefined;
+    #disposeInitial: (() => void) | undefined;
     public constructor() { super({ key: new PluginKey('RetainedValidatorPlugin'), state: null }); }
     public configure(context: SheetPluginSetupContext): void {
       const registry = context.container.resolve<SheetCellInputValidationRegistry>(SheetCellInputValidationRegistry.symbol);
       retained = registry;
-      this.disposeInitial = registry.register('test.initial', () => ({ valid: true, reject: false }));
+      this.#disposeInitial = registry.register('test.initial', () => ({ valid: true, reject: false }));
     }
     public registerCommands(commands: SheetCommandBus): void {
       commands.register(RegisterValidatorCommand, () => new LocalActionCommand(RegisterValidatorCommand.id, () => {
@@ -3087,7 +3083,7 @@ it('guards input validators retained by a Sheet plugin after assembly', () => {
     public getPluginConfig(): null { return null; }
     public apply(): null { return null; }
     public render(): null { return null; }
-    public dispose(): void { this.disposeInitial?.(); }
+    public dispose(): void { this.#disposeInitial?.(); }
   }
 
   const editor = createSheetEditor({

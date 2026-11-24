@@ -10,6 +10,8 @@ export type SheetDisplayedValueChangeListener = (cells: readonly SheetDisplayedV
 
 /** Editor-local fanout for changes to displayed cell values. */
 export class SheetDisplayedValueChanges {
+  readonly #warn: (error: unknown) => void;
+
   public static readonly symbol = Symbol.for('SheetDisplayedValueChanges');
 
   readonly #listeners = new Map<SheetDisplayedValueChangeListener, boolean>();
@@ -17,7 +19,9 @@ export class SheetDisplayedValueChanges {
   #runWithoutMutationAuthority: (<Value>(callback: () => Value) => Value) | null = null;
   #disposed = false;
 
-  public constructor(private readonly warn: (error: unknown) => void) {}
+  public constructor(warn: (error: unknown) => void) {
+    this.#warn = warn;
+  }
 
   public subscribe(listener: SheetDisplayedValueChangeListener): () => void {
     this.#listeners.set(listener, this.#isCommandExecuting === null);
@@ -45,7 +49,7 @@ export class SheetDisplayedValueChanges {
         try {
           listener(cells);
         } catch (error) {
-          this.warn(error);
+          this.#warn(error);
         }
       };
       if (registeredDuringStartup) notify();

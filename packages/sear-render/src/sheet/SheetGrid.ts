@@ -23,6 +23,11 @@ const key = new PluginKey('SheetGrid');
 /** Composite plugin that assembles sheet chrome, body grid, and merged-cell nodes. */
 @Injectable()
 export class SheetGridPlugin extends Plugin<SearCoreSheet, CellProperties, SheetGridState> {
+  #sheetCornerPlugin: SheetCornerPlugin;
+  #sheetColumnLabelPlugin: SheetColumnLabelPlugin;
+  #sheetRowNumberPlugin: SheetRowNumberPlugin;
+  #sheetGridRender: SheetGridRender;
+
   /** Composite grid configuration is delegated to child render plugins. */
   public getPluginConfig(searCore: SearCoreSheet): null {
     return null;
@@ -47,17 +52,21 @@ export class SheetGridPlugin extends Plugin<SearCoreSheet, CellProperties, Sheet
   /** Constructs the grid plugin from its child sheet render plugins. */
   constructor(
     @Inject(SheetCornerPlugin.symbol)
-    private sheetCornerPlugin: SheetCornerPlugin,
+    sheetCornerPlugin: SheetCornerPlugin,
     @Inject(SheetColumnLabelPlugin.symbol)
-    private sheetColumnLabelPlugin: SheetColumnLabelPlugin,
+    sheetColumnLabelPlugin: SheetColumnLabelPlugin,
     @Inject(SheetRowNumberPlugin.symbol)
-    private sheetRowNumberPlugin: SheetRowNumberPlugin,
-    @Inject(SheetGridRender.symbol) private sheetGridRender: SheetGridRender,
+    sheetRowNumberPlugin: SheetRowNumberPlugin,
+    @Inject(SheetGridRender.symbol) sheetGridRender: SheetGridRender,
   ) {
     super({
       key: key,
       state: {},
     });
+    this.#sheetCornerPlugin = sheetCornerPlugin;
+    this.#sheetColumnLabelPlugin = sheetColumnLabelPlugin;
+    this.#sheetRowNumberPlugin = sheetRowNumberPlugin;
+    this.#sheetGridRender = sheetGridRender;
   }
 
   /** Registers only the composite grid state; merged ranges have their own plugin owner. */
@@ -68,16 +77,16 @@ export class SheetGridPlugin extends Plugin<SearCoreSheet, CellProperties, Sheet
   /** Registers configuration contributed by every child sheet render plugin. */
   public registerConfig() {
     return [
-      this.sheetCornerPlugin.registerConfig(),
-      this.sheetColumnLabelPlugin.registerConfig(),
-      this.sheetRowNumberPlugin.registerConfig(),
-      this.sheetGridRender.registerConfig(),
+      this.#sheetCornerPlugin.registerConfig(),
+      this.#sheetColumnLabelPlugin.registerConfig(),
+      this.#sheetRowNumberPlugin.registerConfig(),
+      this.#sheetGridRender.registerConfig(),
     ].flat();
   }
 
   /** Forwards double-click handling to the body grid renderer. */
   public onDblClick(earCore: SearCoreSheet, event: EventWithOffsetAndTarget<CellProperties>): void {
-    this.sheetGridRender.onDblClick(earCore, event);
+    this.#sheetGridRender.onDblClick(earCore, event);
   }
 
   /** Keeps composite state unchanged when data transactions cause a re-render. */
@@ -105,25 +114,25 @@ export class SheetGridPlugin extends Plugin<SearCoreSheet, CellProperties, Sheet
    * @returns Render nodes for corner, headers, merged cells, and grid cells.
    */
   public render(searCore: SearCoreSheet): Node<CellProperties>[] {
-    const conrnerNodes = this.sheetCornerPlugin.render(searCore);
-    const conrnerConfig = this.sheetCornerPlugin.getPluginConfig(searCore);
+    const conrnerNodes = this.#sheetCornerPlugin.render(searCore);
+    const conrnerConfig = this.#sheetCornerPlugin.getPluginConfig(searCore);
     const { width, height } = conrnerConfig;
 
-    const columnLabelNodes = this.sheetColumnLabelPlugin.render(searCore, {
+    const columnLabelNodes = this.#sheetColumnLabelPlugin.render(searCore, {
       x: width,
       y: 0,
     });
 
-    const rowLabelNodes = this.sheetRowNumberPlugin.render(searCore, {
+    const rowLabelNodes = this.#sheetRowNumberPlugin.render(searCore, {
       x: 0,
       y: height,
     });
 
-    const gridNodes = this.sheetGridRender.render(searCore, {
+    const gridNodes = this.#sheetGridRender.render(searCore, {
       x: width,
       y: height,
     });
-    const boundaryNodes = this.renderFreezeBoundaries(searCore, width, height);
+    const boundaryNodes = this.#renderFreezeBoundaries(searCore, width, height);
 
     return [
       ...conrnerNodes,
@@ -134,7 +143,7 @@ export class SheetGridPlugin extends Plugin<SearCoreSheet, CellProperties, Sheet
     ];
   }
 
-  private renderFreezeBoundaries(searCore: SearCoreSheet, headerWidth: number, headerHeight: number): Node<CellProperties>[] {
+  #renderFreezeBoundaries(searCore: SearCoreSheet, headerWidth: number, headerHeight: number): Node<CellProperties>[] {
     const dataEngine = searCore.dataEngine;
     if (!dataEngine) return [];
     const freeze = readSheetFreeze(dataEngine);

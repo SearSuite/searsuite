@@ -21,15 +21,18 @@ import { SheetFormatPainterSession } from '../../SheetFormatPainterSession';
 /** Owns only a local captured-format session; document formats remain with their owners. */
 @Injectable()
 export class SheetFormatPainterPlugin extends Plugin<unknown, CellProperties, null> {
+  readonly #options: SheetFormatPainterOptions;
+
   public static readonly symbol = Symbol.for('SheetFormatPainterPlugin');
   public override readonly warnOnDuplicateDepth = false;
-  private readonly session: SheetFormatPainterSession;
+  readonly #session: SheetFormatPainterSession;
   #commands: SheetCommandBus | null = null;
-  private readonly listeners = new Set<(state: FormatPainterState) => void>();
+  readonly #listeners = new Set<(state: FormatPainterState) => void>();
 
-  public constructor(private readonly options: SheetFormatPainterOptions) {
+  public constructor(options: SheetFormatPainterOptions) {
     super({ key: new PluginKey('SheetFormatPainterPlugin'), state: null });
-    this.session = options.session ?? new SheetFormatPainterSession();
+    this.#options = options;
+    this.#session = options.session ?? new SheetFormatPainterSession();
   }
 
   public registerCommands(commands: SheetCommandBus): void {
@@ -38,13 +41,13 @@ export class SheetFormatPainterPlugin extends Plugin<unknown, CellProperties, nu
     }
     this.#commands = commands;
     commands.register(StartFormatPainterCommand, (input) => {
-      const source = normalizeFormatPainterRange(input.source, this.options.readShape());
+      const source = normalizeFormatPainterRange(input.source, this.#options.readShape());
       const mode = input.mode ?? FormatPainterMode.Once;
       if (!Object.values(FormatPainterMode).includes(mode))
         throw new SearError('Invalid format painter mode.', { mode });
-      const snapshot = this.options.formats.capture(source);
+      const snapshot = this.#options.formats.capture(source);
       return new LocalActionCommand(StartFormatPainterCommand.id, () => {
-        this.session.start(this.options.formats, snapshot, Object.freeze({ mode, source }));
+        this.#session.start(this.#options.formats, snapshot, Object.freeze({ mode, source }));
         this.#publish();
       });
     });
@@ -54,23 +57,23 @@ export class SheetFormatPainterPlugin extends Plugin<unknown, CellProperties, nu
     );
     commands.register(ApplyFormatPainterCommand, (input) => {
       const pipeline = new Pipeline(ApplyFormatPainterCommand.id);
-      if (this.session.snapshot && this.session.state.source) {
-        const shape = this.options.readShape();
+      if (this.#session.snapshot && this.#session.state.source) {
+        const shape = this.#options.readShape();
         let destination = normalizeFormatPainterRange(input.destination, shape);
         if (destination.start[0] === destination.end[0] && destination.start[1] === destination.end[1]) {
           destination = normalizeFormatPainterRange(
             {
               start: destination.start,
               end: [
-                Math.min(shape[0] - 1, destination.start[0] + this.session.state.source.end[0] - this.session.state.source.start[0]),
-                Math.min(shape[1] - 1, destination.start[1] + this.session.state.source.end[1] - this.session.state.source.start[1]),
+                Math.min(shape[0] - 1, destination.start[0] + this.#session.state.source.end[0] - this.#session.state.source.start[0]),
+                Math.min(shape[1] - 1, destination.start[1] + this.#session.state.source.end[1] - this.#session.state.source.start[1]),
               ],
             },
             shape,
           );
         }
-        const captured = this.session.snapshot;
-        captured.plan(destination, this.options.formats).forEach((plan) => {
+        const captured = this.#session.snapshot;
+        captured.plan(destination, this.#options.formats).forEach((plan) => {
           if (plan.operations.length)
             pipeline.addTransaction(
               'formatPainter.applyOwner',
@@ -78,7 +81,7 @@ export class SheetFormatPainterPlugin extends Plugin<unknown, CellProperties, nu
             );
         });
         // Complete the local session only after Core has committed and rendered the pipeline.
-        if (this.session.state.mode === FormatPainterMode.Once) pipeline.use({ onComplete: () => this.#clear() });
+        if (this.#session.state.mode === FormatPainterMode.Once) pipeline.use({ onComplete: () => this.#clear() });
       }
       return { id: ApplyFormatPainterCommand.id, execute: () => ({ pipeline }) };
     });
@@ -86,11 +89,11 @@ export class SheetFormatPainterPlugin extends Plugin<unknown, CellProperties, nu
 
   public registerObservations(observations: ObservationRegistry): void {
     observations.register(FormatPainterObservation, {
-      getSnapshot: () => this.session.visibleState(this.options.formats),
+      getSnapshot: () => this.#session.visibleState(this.#options.formats),
       subscribe: (listener) => {
-        this.listeners.add(listener);
+        this.#listeners.add(listener);
         return () => {
-          this.listeners.delete(listener);
+          this.#listeners.delete(listener);
         };
       },
     });
@@ -110,22 +113,22 @@ export class SheetFormatPainterPlugin extends Plugin<unknown, CellProperties, nu
   }
   public destroy(): void {
     this.assertRuntimeWriteAllowed();
-    if (!this.options.session) this.session.clear();
-    this.listeners.clear();
+    if (!this.#options.session) this.#session.clear();
+    this.#listeners.clear();
   }
 
   #clear(): void {
-    this.session.clear();
+    this.#session.clear();
     this.#publish();
   }
   #publish(): void {
-    const state = this.session.visibleState(this.options.formats);
+    const state = this.#session.visibleState(this.#options.formats);
     runOutsideCommandExecution(() => {
-      [...this.listeners].forEach((listener) => {
+      [...this.#listeners].forEach((listener) => {
         try {
           listener(state);
         } catch (error) {
-          this.options.platform.warn('Format painter listener failed.', error);
+          this.#options.platform.warn('Format painter listener failed.', error);
         }
       });
     });

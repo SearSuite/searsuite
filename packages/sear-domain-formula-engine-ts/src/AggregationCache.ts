@@ -42,13 +42,13 @@ export class AggregationCache implements IAggregationCache {
   #cache: Map<number, RangeAggregate> = new Map();
 
   getSum(startRow: number, startCol: number, endRow: number, endCol: number): number {
-    const entry = this.#cache.get(this.computeRangeKey(startRow, startCol, endRow, endCol));
+    const entry = this.#cache.get(this.#computeRangeKey(startRow, startCol, endRow, endCol));
     if (entry && !entry.isSumDirty && entry.sum !== void 0) return entry.sum;
     return NaN;
   }
 
   getCount(startRow: number, startCol: number, endRow: number, endCol: number): number {
-    const entry = this.#cache.get(this.computeRangeKey(startRow, startCol, endRow, endCol));
+    const entry = this.#cache.get(this.#computeRangeKey(startRow, startCol, endRow, endCol));
     if (entry && !entry.isCountDirty && entry.count !== void 0) return entry.count;
     return NaN;
   }
@@ -81,7 +81,7 @@ export class AggregationCache implements IAggregationCache {
         ) {
           entry.isSumDirty = true;
         } else {
-          entry.sum += this.toNumericValue(newVal) - this.toNumericValue(oldVal);
+          entry.sum += this.#toNumericValue(newVal) - this.#toNumericValue(oldVal);
         }
       }
 
@@ -102,7 +102,7 @@ export class AggregationCache implements IAggregationCache {
   }
 
   #getOrCreateEntry(startRow: number, startCol: number, endRow: number, endCol: number): RangeAggregate {
-    const key = this.computeRangeKey(startRow, startCol, endRow, endCol);
+    const key = this.#computeRangeKey(startRow, startCol, endRow, endCol);
     let entry = this.#cache.get(key);
     if (!entry) {
       entry = {
@@ -118,11 +118,11 @@ export class AggregationCache implements IAggregationCache {
     return entry;
   }
 
-  private computeRangeKey(startRow: number, startCol: number, endRow: number, endCol: number): number {
+  #computeRangeKey(startRow: number, startCol: number, endRow: number, endCol: number): number {
     return startRow * 281474976710656 + startCol * 4294967296 + endRow * 65536 + endCol;
   }
 
-  private toNumericValue(v: FormulaValue): number {
+  #toNumericValue(v: FormulaValue): number {
     return isNumber(v) ? v : 0;
   }
 }

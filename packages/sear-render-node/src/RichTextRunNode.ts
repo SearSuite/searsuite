@@ -10,13 +10,13 @@ import { RichTextRunRenderer } from './RichTextRunRenderer';
 
 /** Scene node that draws one contiguous styled rich-text run in world coordinates. */
 export class RichTextRunNode extends RichTextVisualNode {
-  private readonly text: string;
-  private readonly baselineY: number;
-  private readonly font: string;
-  private readonly fontAscent: number;
-  private readonly fontDescent: number;
-  private readonly textStyle: RichTextInlineStyle | undefined;
-  private readonly runRenderer: RichTextRunRenderer;
+  readonly #text: string;
+  readonly #baselineY: number;
+  readonly #font: string;
+  readonly #fontAscent: number;
+  readonly #fontDescent: number;
+  readonly #textStyle: RichTextInlineStyle | undefined;
+  readonly #runRenderer: RichTextRunRenderer;
 
   /** Creates a text-run scene node. */
   public constructor(input: {
@@ -41,30 +41,30 @@ export class RichTextRunNode extends RichTextVisualNode {
       blockIndex: input.properties.blockIndex,
     });
     Object.assign(this.properties, input.properties);
-    this.text = input.text;
-    this.baselineY = input.baselineY;
-    this.font = input.font;
-    this.fontAscent = input.fontAscent;
-    this.fontDescent = input.fontDescent;
-    this.textStyle = input.style;
-    this.runRenderer = input.runRenderer;
+    this.#text = input.text;
+    this.#baselineY = input.baselineY;
+    this.#font = input.font;
+    this.#fontAscent = input.fontAscent;
+    this.#fontDescent = input.fontDescent;
+    this.#textStyle = input.style;
+    this.#runRenderer = input.runRenderer;
   }
 
   /** Draws the text run into the active world-space transform. */
   public drawScene(context: RenderContext, clipRegion?: ClipRegion): void {
-    if (!this.text) return;
+    if (!this.#text) return;
     context.save();
     applyClip(context, clipRegion);
-    this.runRenderer.paint(context, {
-      text: this.text,
-      style: this.textStyle,
-      font: this.font,
+    this.#runRenderer.paint(context, {
+      text: this.#text,
+      style: this.#textStyle,
+      font: this.#font,
       x: this.x,
-      baselineY: this.baselineY,
+      baselineY: this.#baselineY,
       width: this.width,
       height: this.height,
-      fontAscent: this.fontAscent,
-      fontDescent: this.fontDescent,
+      fontAscent: this.#fontAscent,
+      fontDescent: this.#fontDescent,
     });
     context.restore();
   }

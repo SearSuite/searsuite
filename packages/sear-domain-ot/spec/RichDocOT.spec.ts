@@ -1,3 +1,4 @@
+import { adjustPathForNodeInsert, adjustPathForNodeDelete } from '../src/RichDocOTHelpers';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { RichDocOT, RichDocOTActionName } from '../src/RichDocOT';
 import { OTTransformPriority } from '../src/BaseOT';
@@ -1031,75 +1032,13 @@ describe('RichDocOT transform – other=sd', () => {
 });
 
 describe('RichDocOT transformComponent coverage branches', () => {
-  function createStatefulHasProxy(path: number[], script: Record<string, boolean[]>) {
-    const counters = new Map<string, number>();
-    const target: Record<string, unknown> = { p: path };
-    return new Proxy(target, {
-      has(_obj, key) {
-        const k = String(key);
-        const sequence = script[k];
-        if (!sequence || sequence.length === 0) return false;
-        const idx = counters.get(k) ?? 0;
-        counters.set(k, idx + 1);
-        return sequence[Math.min(idx, sequence.length - 1)];
-      },
-    });
-  }
-
-  it('covers false branch of NodeMove else-if under other=ni/nd decision chain', () => {
-    const transformComponent = (RichDocOT as any).transformComponent as (
-      op: RichDocOTOperation,
-      other: RichDocOTOperation,
-      type: OTTransformPriority,
-    ) => RichDocOTOperation | null;
-
-    const opForInsert = createStatefulHasProxy([0], {
-      // outer: (ni || nd || nm) => true via first ni check
-      ni: [true, false],
-      nd: [false],
-      nm: [false],
-    }) as unknown as RichDocOTOperation;
-    const otherInsert = { p: [0], [RichDocOTActionName.NodeInsert]: makeText('x') } as RichDocOTOperation;
-
-    const resultInsert = transformComponent(opForInsert, otherInsert, OTTransformPriority.LEFT);
-    expect(resultInsert).not.toBeNull();
-
-    const opForDelete = createStatefulHasProxy([0], {
-      nd: [true, false],
-      ni: [false],
-      nm: [false],
-    }) as unknown as RichDocOTOperation;
-    const otherDelete = { p: [0], [RichDocOTActionName.NodeDelete]: makeText('x') } as RichDocOTOperation;
-
-    const resultDelete = transformComponent(opForDelete, otherDelete, OTTransformPriority.LEFT);
-    expect(resultDelete).not.toBeNull();
-  });
-
-  it('covers false branch of StringDelete else-if under other=si/sd decision chain', () => {
-    const transformComponent = (RichDocOT as any).transformComponent as (
-      op: RichDocOTOperation,
-      other: RichDocOTOperation,
-      type: OTTransformPriority,
-    ) => RichDocOTOperation | null;
-
-    const opForStringInsert = createStatefulHasProxy([0, 0, 1], {
-      // outer: (si || sd) => true via first si check
-      si: [true, false],
-      sd: [false],
-    }) as unknown as RichDocOTOperation;
-    const otherSi = { p: [0, 0, 0], [RichDocOTActionName.StringInsert]: 'x' } as RichDocOTOperation;
-
-    const resultSi = transformComponent(opForStringInsert, otherSi, OTTransformPriority.LEFT);
-    expect(resultSi).not.toBeNull();
-
-    const opForStringDelete = createStatefulHasProxy([0, 0, 1], {
-      sd: [true, false],
-      si: [false],
-    }) as unknown as RichDocOTOperation;
-    const otherSd = { p: [0, 0, 0], [RichDocOTActionName.StringDelete]: 'x' } as RichDocOTOperation;
-
-    const resultSd = transformComponent(opForStringDelete, otherSd, OTTransformPriority.LEFT);
-    expect(resultSd).not.toBeNull();
+  it('rebases an attribute across a sibling insert and delete', () => {
+    const op: UpdateAttrsOTOperation = { p: [1, 'align'], [RichDocOTActionName.UpdateAttrs]: { value: 'center', prev: 'left' } };
+    const insert = { p: [0], ni: makeText('x') };
+    const del = { p: [0], nd: makeText('x') };
+    const shifted = RichDocOT.transform([op], [insert], OTTransformPriority.LEFT);
+    expect(shifted[0].p).toEqual([2, 'align']);
+    expect(RichDocOT.transform(shifted, [del], OTTransformPriority.LEFT)).toEqual([op]);
   });
 });
 
@@ -1242,15 +1181,7 @@ describe('RichDocOT private helpers through transform', () => {
       p: [0, 2, 'align'],
       [RichDocOTActionName.UpdateAttrs]: { value: 1, prev: 0 },
     } as UpdateAttrsOTOperation;
-    const adjusted = (
-      RichDocOT as unknown as {
-        adjustPathForNodeDelete: (
-          o: RichDocOTOperation,
-          p: (string | number)[],
-          idx: number,
-        ) => RichDocOTOperation | null;
-      }
-    ).adjustPathForNodeDelete(clone(op), [0, 2], 2);
+    const adjusted = adjustPathForNodeDelete(clone(op), [0, 2], 2);
     expect(adjusted).toBeNull();
   });
 
@@ -1259,15 +1190,7 @@ describe('RichDocOT private helpers through transform', () => {
       p: [9],
       [RichDocOTActionName.UpdateAttrs]: { value: 1, prev: 0 },
     } as UpdateAttrsOTOperation;
-    const adjusted = (
-      RichDocOT as unknown as {
-        adjustPathForNodeDelete: (
-          o: RichDocOTOperation,
-          p: (string | number)[],
-          idx: number,
-        ) => RichDocOTOperation | null;
-      }
-    ).adjustPathForNodeDelete(clone(op), [0, 0], 0);
+    const adjusted = adjustPathForNodeDelete(clone(op), [0, 0], 0);
     expect(adjusted).toEqual(op);
   });
 
@@ -1276,15 +1199,7 @@ describe('RichDocOT private helpers through transform', () => {
       p: [1, 0, 2],
       [RichDocOTActionName.StringInsert]: 'x',
     } as InsertStringOTOperation;
-    const adjusted = (
-      RichDocOT as unknown as {
-        adjustPathForNodeDelete: (
-          o: RichDocOTOperation,
-          p: (string | number)[],
-          idx: number,
-        ) => RichDocOTOperation | null;
-      }
-    ).adjustPathForNodeDelete(clone(op), [0, 0], 0);
+    const adjusted = adjustPathForNodeDelete(clone(op), [0, 0], 0);
     expect(adjusted).toEqual(op);
   });
 
@@ -1293,37 +1208,21 @@ describe('RichDocOT private helpers through transform', () => {
       p: ['x', 'align'],
       [RichDocOTActionName.UpdateAttrs]: { value: 1, prev: 0 },
     } as unknown as RichDocOTOperation;
-    const adjusted = (
-      RichDocOT as unknown as {
-        adjustPathForNodeDelete: (
-          o: RichDocOTOperation,
-          p: (string | number)[],
-          idx: number,
-        ) => RichDocOTOperation | null;
-      }
-    ).adjustPathForNodeDelete(clone(op), [0], 0);
+    const adjusted = adjustPathForNodeDelete(clone(op), [0], 0);
     expect(adjusted).toEqual(op);
   });
 
   it('H9: transform hits adjusted===null branch when path delete-adjuster returns null', () => {
-    const adjustSpy = jest
-      .spyOn(
-        RichDocOT as unknown as { adjustPathForNodeDelete: (...args: unknown[]) => unknown },
-        'adjustPathForNodeDelete',
-      )
-      .mockReturnValue(null);
-
     const op: UpdateAttrsOTOperation[] = [
       {
         p: [0, 'align'],
         [RichDocOTActionName.UpdateAttrs]: { value: 'center', prev: 'left' },
       },
     ];
-    const other: DeleteNodeOTOperation[] = [{ p: [1], [RichDocOTActionName.NodeDelete]: makeText('x') }];
+    const other: DeleteNodeOTOperation[] = [{ p: [0], [RichDocOTActionName.NodeDelete]: makeText('x') }];
     const result = RichDocOT.transform(op, other, OTTransformPriority.LEFT);
 
     expect(result).toEqual([]);
-    adjustSpy.mockRestore();
   });
 
   it('H10: covers remaining transformComponent false branches for node/string operations', () => {
@@ -1377,32 +1276,13 @@ describe('RichDocOT private helpers through transform', () => {
   });
 
   it('H11: hits string-delete overlap branch that returns null when rewritten text becomes empty', () => {
-    const fakeDelete = {
-      length: 3,
-      slice: jest.fn(() => ''),
-    } as unknown as string;
-
-    const op = { p: [0, 0, 1], [RichDocOTActionName.StringDelete]: fakeDelete } as unknown as DeleteStringOTOperation;
-    const other = { p: [0, 0, 0], [RichDocOTActionName.StringDelete]: 'zzz' } as DeleteStringOTOperation;
-    const result = (
-      RichDocOT as unknown as {
-        transformComponent: (
-          op: RichDocOTOperation,
-          other: RichDocOTOperation,
-          type: OTTransformPriority,
-        ) => RichDocOTOperation | null;
-      }
-    ).transformComponent(op, other, OTTransformPriority.LEFT);
-
-    expect(result).toBeNull();
+    const op: DeleteStringOTOperation = { p: [0, 0, 1], sd: 'zz' };
+    const other: DeleteStringOTOperation = { p: [0, 0, 0], sd: 'zzz' };
+    expect(RichDocOT.transform([op], [other], OTTransformPriority.LEFT)).toEqual([]);
   });
 
   it('H12: covers direct helper branches for adjustPathForNodeInsert/Delete', () => {
-    const adjustInsert = (
-      RichDocOT as unknown as {
-        adjustPathForNodeInsert: (o: RichDocOTOperation, p: (string | number)[], idx: number) => RichDocOTOperation;
-      }
-    ).adjustPathForNodeInsert;
+    const adjustInsert = adjustPathForNodeInsert;
 
     const adjustedInsert = adjustInsert(
       { p: [2, 5, 'x'], [RichDocOTActionName.UpdateAttrs]: { value: 1, prev: 0 } } as unknown as RichDocOTOperation,
@@ -1411,15 +1291,7 @@ describe('RichDocOT private helpers through transform', () => {
     );
     expect(adjustedInsert.p).toEqual([2, 6, 'x']);
 
-    const adjustDelete = (
-      RichDocOT as unknown as {
-        adjustPathForNodeDelete: (
-          o: RichDocOTOperation,
-          p: (string | number)[],
-          idx: number,
-        ) => RichDocOTOperation | null;
-      }
-    ).adjustPathForNodeDelete;
+    const adjustDelete = adjustPathForNodeDelete;
 
     const adjustedDelete = adjustDelete(
       { p: [0, 1], [RichDocOTActionName.StringInsert]: 'x' } as unknown as RichDocOTOperation,

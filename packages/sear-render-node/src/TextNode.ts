@@ -23,11 +23,11 @@ export class TextNode<T extends NodeProperties> extends RenderNode<T> {
   public readonly value: string | RichTextContentNode;
   /** Text draws above the box background by default. */
   public override depth: number = 1;
-  private measuredWidth: number | null = null;
+  #measuredWidth: number | null = null;
 
   /** Returns measured text width once attached, otherwise the declared width. */
   public override get width(): number {
-    return this.measuredWidth ?? super.width;
+    return this.#measuredWidth ?? super.width;
   }
 
   /**
@@ -63,7 +63,7 @@ export class TextNode<T extends NodeProperties> extends RenderNode<T> {
     const textShaper = this.resolveRuntime<TextShaper>(TextShaper.symbol);
     const config = this.configEngine.getDefaultConfig() as Partial<SheetConfig>;
     const font = createSheetCellFont(config);
-    this.measuredWidth = textShaper.shape({ text: String(this.value), font }).width;
+    this.#measuredWidth = textShaper.shape({ text: String(this.value), font }).width;
   }
 
   /**

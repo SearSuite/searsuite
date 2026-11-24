@@ -66,6 +66,19 @@ export interface DocRenderLayout {
 /** Owns Doc layout cache, page map, and viewport range derivation. */
 @Injectable()
 export class DocRenderLayoutService {
+  readonly #inputPlugin: DocInputPlugin;
+  readonly #extensions: DocRuntimeExtensionRegistry;
+  readonly #renderContext: RenderContext;
+  readonly #scrollManager: ScrollManager;
+  readonly #sceneTree: Tree<PositionRect<HexColor>>;
+  readonly #configuration: DocEditorRuntimeConfiguration;
+  readonly #configEngine: ConfigEngine;
+  readonly #cursorManager: DocCursorManager;
+  readonly #compositionProvider: DocCompositionProvider;
+  readonly #layoutEngine: DocLayoutEngine;
+  readonly #virtualLayouts: DocVirtualLayoutStore;
+  readonly #commands: DocCommandBus;
+
   /** DI token for resolving the render-layout service. */
   public static readonly symbol = Symbol.for('DocRenderLayoutService');
 
@@ -80,39 +93,53 @@ export class DocRenderLayoutService {
   /** Creates a render-layout service for one standalone document editor. */
   public constructor(
     @Inject(DocInputPlugin.symbol)
-    private readonly inputPlugin: DocInputPlugin,
+    inputPlugin: DocInputPlugin,
     @Inject(DocRuntimeExtensionRegistry.symbol)
-    private readonly extensions: DocRuntimeExtensionRegistry,
+    extensions: DocRuntimeExtensionRegistry,
     @Inject(RenderContext.symbol)
-    private readonly renderContext: RenderContext,
+    renderContext: RenderContext,
     @Inject(ScrollManager.symbol)
-    private readonly scrollManager: ScrollManager,
+    scrollManager: ScrollManager,
     @Inject(Tree.symbol)
-    private readonly sceneTree: Tree<PositionRect<HexColor>>,
+    sceneTree: Tree<PositionRect<HexColor>>,
     @Inject(DocEditorRuntimeConfigurationSymbol)
-    private readonly configuration: DocEditorRuntimeConfiguration,
+    configuration: DocEditorRuntimeConfiguration,
     @Inject(ConfigEngine.symbol)
-    private readonly configEngine: ConfigEngine,
+    configEngine: ConfigEngine,
     @Inject(DocCursorManager.symbol)
-    private readonly cursorManager: DocCursorManager,
+    cursorManager: DocCursorManager,
     @Inject(DocCompositionManager.symbol)
-    private readonly compositionProvider: DocCompositionProvider,
+    compositionProvider: DocCompositionProvider,
     @Inject(DocLayoutEngine.symbol)
-    private readonly layoutEngine: DocLayoutEngine,
+    layoutEngine: DocLayoutEngine,
     @Inject(DocVirtualLayoutStore.symbol)
-    private readonly virtualLayouts: DocVirtualLayoutStore,
+    virtualLayouts: DocVirtualLayoutStore,
     @Inject(DocCommandBus.symbol)
-    private readonly commands: DocCommandBus,
-  ) { Object.freeze(this); }
+    commands: DocCommandBus,
+  ) {
+    this.#inputPlugin = inputPlugin;
+    this.#extensions = extensions;
+    this.#renderContext = renderContext;
+    this.#scrollManager = scrollManager;
+    this.#sceneTree = sceneTree;
+    this.#configuration = configuration;
+    this.#configEngine = configEngine;
+    this.#cursorManager = cursorManager;
+    this.#compositionProvider = compositionProvider;
+    this.#layoutEngine = layoutEngine;
+    this.#virtualLayouts = virtualLayouts;
+    this.#commands = commands;
+    Object.freeze(this);
+  }
 
   #assertCommandWrite(): void {
-    if (!this.commands.isExecuting()) throw new SearError('Doc layout changes must run through editor.commands.run(...).');
+    if (!this.#commands.isExecuting()) throw new SearError('Doc layout changes must run through editor.commands.run(...).');
   }
 
   /** Clears cached layout and page state. */
   public reset(): void {
     this.#assertCommandWrite();
-    this.virtualLayouts.reset();
+    this.#virtualLayouts.reset();
     this.#latestVirtualLayoutSummary = null;
     this.#latestRenderLayout = null;
     this.#initialLoadMs = null;
@@ -120,7 +147,7 @@ export class DocRenderLayoutService {
   }
 
   public getLatestVirtualLayoutSummary(): DocVirtualLayoutSummary | null {
-    return this.#latestVirtualLayoutSummary ?? this.virtualLayouts.getLatestSummary();
+    return this.#latestVirtualLayoutSummary ?? this.#virtualLayouts.getLatestSummary();
   }
 
   public subscribeVirtualLayoutSummary(listener: DocVirtualLayoutSummaryListener): () => void {
@@ -150,7 +177,7 @@ export class DocRenderLayoutService {
       },
     });
     this.#renderedSummaryCount += 1;
-    this.publishVirtualLayoutSummary();
+    this.#publishVirtualLayoutSummary();
   }
 
   /** Records block-render reuse/debug stats for the latest render frame. */
@@ -162,7 +189,7 @@ export class DocRenderLayoutService {
       ...latestSummary,
       blockRender: snapshot,
     });
-    this.publishVirtualLayoutSummary();
+    this.#publishVirtualLayoutSummary();
   }
 
   /** Builds the current render layout before plugins produce render nodes. */
@@ -172,34 +199,34 @@ export class DocRenderLayoutService {
     renderOperations: DocRenderOperations = EMPTY_RENDER_OPERATIONS,
   ): DocRenderLayout {
     this.#assertCommandWrite();
-    const doc = this.inputPlugin.session.pendingDoc;
-    const defaultConfig = this.configEngine.getDefaultConfig();
+    const doc = this.#inputPlugin.session.pendingDoc;
+    const defaultConfig = this.#configEngine.getDefaultConfig();
     const reflowBlockIds = collectDocReflowBlockIds(renderOperations, doc);
     const repaintBlockIds = collectDocRepaintBlockIds(renderOperations, doc);
-    const layout = this.virtualLayouts.prepare({
+    const layout = this.#virtualLayouts.prepare({
       contentRect,
       viewport,
       document: doc,
-      selection: this.inputPlugin.session.docSelection,
+      selection: this.#inputPlugin.session.docSelection,
       verticalAlign: defaultConfig.docVerticalAlign,
       font: createDocFontDescriptor(defaultConfig),
       paragraphLayoutDefaults: {
         lineSpacing: { mode: 'multiple', value: defaultConfig.docLineHeightMultiplier },
         spacingAfter: defaultConfig.docParagraphSpacingAfter,
       } satisfies RichTextParagraphLayoutDefaults,
-      cursorVisible: this.extensions.get(DocPluginRuntimeCapability.CaretState)?.isVisible() ?? true,
+      cursorVisible: this.#extensions.get(DocPluginRuntimeCapability.CaretState)?.isVisible() ?? true,
       reflowBlockIds,
       repaintBlockIds,
     });
-    this.updateContentBoundary(
+    this.#updateContentBoundary(
       Math.max(0, layout.documentRect.width - contentRect.width),
       Math.max(0, layout.documentRect.height - contentRect.height),
     );
-    this.updateSceneBoundary(
+    this.#updateSceneBoundary(
       layout.documentRect.x + layout.documentRect.width,
       layout.documentRect.y + layout.documentRect.height,
     );
-    this.#latestVirtualLayoutSummary = this.virtualLayouts.getLatestSummary();
+    this.#latestVirtualLayoutSummary = this.#virtualLayouts.getLatestSummary();
     const blockLayoutDiff = DocBlockLayoutDiff.compare(
       this.#latestRenderLayout?.layoutCache ?? null,
       layout.layoutCache,
@@ -235,19 +262,19 @@ export class DocRenderLayoutService {
     this.#assertCommandWrite();
     const latest = this.#latestRenderLayout;
     if (!latest || !isSameContentRect(latest.documentRect, contentRect)) return null;
-    const selection = this.inputPlugin.session.docSelection;
-    const cursorRelative = this.layoutEngine.cursorToPoint(selection.head, latest.layoutCache.snapshot);
-    const composingCaretPixelOffset = this.compositionProvider.measure(
-      createDocFontDescriptor(this.configEngine.getDefaultConfig()),
+    const selection = this.#inputPlugin.session.docSelection;
+    const cursorRelative = this.#layoutEngine.cursorToPoint(selection.head, latest.layoutCache.snapshot);
+    const composingCaretPixelOffset = this.#compositionProvider.measure(
+      createDocFontDescriptor(this.#configEngine.getDefaultConfig()),
     ).caretPixelOffset;
-    this.cursorManager.setCursor({
+    this.#cursorManager.setCursor({
       x: latest.documentRect.x + cursorRelative.x,
       y: latest.documentRect.y + cursorRelative.y,
       height: cursorRelative.height,
-      visible: this.extensions.get(DocPluginRuntimeCapability.CaretState)?.isVisible() ?? true,
+      visible: this.#extensions.get(DocPluginRuntimeCapability.CaretState)?.isVisible() ?? true,
     });
-    this.cursorManager.setSelectionRects(
-      this.layoutEngine.getSelectionRects(
+    this.#cursorManager.setSelectionRects(
+      this.#layoutEngine.getSelectionRects(
         selection,
         latest.layoutCache.snapshot,
         latest.documentRect.x,
@@ -264,14 +291,14 @@ export class DocRenderLayoutService {
     return result;
   }
 
-  private updateContentBoundary(maxWidth: number, maxHeight: number): void {
+  #updateContentBoundary(maxWidth: number, maxHeight: number): void {
     const next: readonly [number, number] = [maxWidth, maxHeight];
     if (this.#previousContentBoundary?.[0] === next[0] && this.#previousContentBoundary[1] === next[1]) return;
-    this.scrollManager.setContentBoundary(next[0], next[1]);
+    this.#scrollManager.setContentBoundary(next[0], next[1]);
     this.#previousContentBoundary = next;
   }
 
-  private publishVirtualLayoutSummary(): void {
+  #publishVirtualLayoutSummary(): void {
     const latestSummary = this.getLatestVirtualLayoutSummary();
     if (!latestSummary) return;
     this.#virtualLayoutSummaryListeners.forEach(function notifyVirtualLayoutSummary(listener) {
@@ -279,10 +306,10 @@ export class DocRenderLayoutService {
     });
   }
 
-  private updateSceneBoundary(width: number, height: number): void {
+  #updateSceneBoundary(width: number, height: number): void {
     const next: readonly [number, number] = [Math.max(1, width), Math.max(1, height)];
     if (this.#previousSceneBoundary?.[0] === next[0] && this.#previousSceneBoundary[1] === next[1]) return;
-    this.sceneTree.updateBoundary(new PositionRect<HexColor>(0, 0, next[0], next[1]));
+    this.#sceneTree.updateBoundary(new PositionRect<HexColor>(0, 0, next[0], next[1]));
     this.#previousSceneBoundary = next;
   }
 }

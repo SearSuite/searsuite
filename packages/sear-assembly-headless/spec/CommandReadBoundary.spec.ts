@@ -96,10 +96,11 @@ class RetainedMatrixPlugin extends SheetPlugin<{ matrix: RetainedMatrix }> {
   public render(): null { return null; }
 }
 
+const registeredKey = new PluginKey('PrivateStatePlugin.extra');
+
 @Injectable()
 class PrivateStatePlugin extends SheetPlugin<{ nested: { value: number } }> {
   public static readonly symbol = Symbol.for('PrivateStatePlugin');
-  private static readonly registeredKey = new PluginKey('PrivateStatePlugin.extra');
 
   public constructor() {
     super({ key: new PluginKey('PrivateStatePlugin'), state: { nested: { value: 1 } } });
@@ -109,7 +110,7 @@ class PrivateStatePlugin extends SheetPlugin<{ nested: { value: number } }> {
     retainedRegisteredState = { nested: { value: 3 } };
     return [
       { key: this.key, state: this.getState(), dataEngine: { enabled: false } },
-      { key: PrivateStatePlugin.registeredKey, state: retainedRegisteredState },
+      { key: registeredKey, state: retainedRegisteredState },
     ];
   }
   public registerCommands(commands: SheetCommandBus): void {

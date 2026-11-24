@@ -1,3 +1,18 @@
+import {
+  type ResizeSheetFields,
+  type ResizePointer,
+  type DragTarget,
+  ResizeAxis,
+  HEADER_WIDTH,
+  HEADER_HEIGHT,
+  MIN_ROW_HEIGHT,
+  MIN_COL_WIDTH,
+  readResizeSheetFields,
+  getSelectedIndices,
+  detectResizeHandle,
+  detectHiddenMarkerClick,
+  getResizePointer,
+} from './SheetResizeGeometry';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { Plugin, PluginKey, type PluginDocumentStateContribution } from '@searsuite/sear-assembly-plugin';
@@ -9,16 +24,8 @@ import {
   SheetColumnSizesFieldKey,
   SheetRowHiddenOriginalSizesFieldKey,
   SheetRowSizesFieldKey,
-  readSheetColumnHiddenOriginalSizes,
-  readSheetColumnSizes,
-  readSheetDataMatrix,
-  readSheetRowHiddenOriginalSizes,
-  readSheetRawRowSizes,
-  readSheetRowSizes,
 } from '@searsuite/sear-render-engine';
-import { readSheetCellAlignments } from '@searsuite/sear-plugin-alignment';
-import { readSheetCellFormats, type CellFormatMatrix } from '@searsuite/sear-plugin-cell-format';
-import { CellProperties, CellRegion } from '@searsuite/sear-render-registry';
+import { CellProperties } from '@searsuite/sear-render-registry';
 import { EventWithOffsetAndTarget } from '@searsuite/sear-render-event-engine';
 import { SheetCommandBus, type SheetCommandDefinition } from '@searsuite/sear-assembly-commands';
 import { type SheetConfig } from '@searsuite/sear-assembly-config';
@@ -101,16 +108,6 @@ export interface SheetResizeProjectedCells {
   ): void;
 }
 
-interface ResizeSheetFields {
-  sheetData: SheetMatrix;
-  rowSizes: DimensionsCSRMatrix;
-  columnSizes: DimensionsCSRMatrix;
-  cellAlignments: { getItem(row: number, col: number): string | null };
-  rowHiddenOriginalSizes: CSRMatrix<number>;
-  columnHiddenOriginalSizes: CSRMatrix<number>;
-  cellFormats: CellFormatMatrix | null;
-}
-
 /** Resize-owned dimension matrices accepted by SheetResizePlugin during setup. */
 export interface SheetResizeDimensions {
   /** Row dimension matrix used for row height state. */
@@ -153,18 +150,6 @@ const ResizeCursorRuleKey = {
   RowHandle: Symbol('SheetResizePlugin.row-handle'),
   ColumnHandle: Symbol('SheetResizePlugin.column-handle'),
 } as const;
-const ResizeAxis = {
-  Row: 'row',
-  Column: 'col',
-} as const;
-
-type ResizeAxis = (typeof ResizeAxis)[keyof typeof ResizeAxis];
-
-interface DragTarget {
-  type: ResizeAxis;
-  primaryIndex: number;
-  initialSizes: Map<number, number>;
-}
 
 interface ResizeState {
   dimensions: SheetResizeDimensions | null;
@@ -193,16 +178,20 @@ interface ColumnHiddenOriginalSizesDocumentState {
   columnHiddenOriginalSizes?: CSRMatrix<number>;
 }
 
-/** Pointer expressed in both sheet-world and viewport coordinates. */
-interface ResizePointer {
-  world: { x: number; y: number };
-  view: { x: number; y: number };
-  region?: CellProperties['region'];
-}
-
 /** Owns row and column resize state, interaction, and visual feedback. */
 @Injectable()
 export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, ResizeState> {
+  readonly #coordEngine: CoordinateEngine;
+  readonly #cursorEngine: CursorEngine;
+  readonly #textShaper: TextShaper;
+  readonly #displayTextRegistry: CellDisplayTextReader;
+  readonly #pointerCapture: PointerCapture;
+  readonly #commands: SheetCommandBus | undefined;
+  readonly #platform: Platform | undefined;
+  readonly #commandDataEngine: DataEngine | undefined;
+  readonly #embeddedEditor: SheetEmbeddedEditor | undefined;
+  readonly #keyboardRouter: KeyboardRouter | undefined;
+
   /** DI token for resolving SheetResizePlugin. */
   public static readonly symbol: symbol = Symbol.for('SheetResizePlugin');
   /** Stable plugin key shared by all resize plugin instances. */
@@ -296,12 +285,7 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
     MatrixOTActionName.ColMove,
   ];
 
-  private readonly HEADER_WIDTH = 50;
-  private readonly HEADER_HEIGHT = 24;
-  private readonly HANDLE_SIZE = 8;
-  private readonly MIN_ROW_HEIGHT = 0;
-  private readonly MIN_COL_WIDTH = 0;
-  private readonly MARKER_STROKE = 'rgba(56, 110, 246, 0.9)';
+  readonly #MARKER_STROKE = 'rgba(56, 110, 246, 0.9)';
   readonly #unregisterCursorPositionRules: (() => void)[];
   #shouldConsumeNextDoubleClick = false;
   #commandCore: SearCoreSheet | null = null;
@@ -318,34 +302,44 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
   /** Creates a SheetResizePlugin instance. */
   constructor(
     @Inject(CoordinateEngine.symbol)
-    private readonly coordEngine: CoordinateEngine,
+    coordEngine: CoordinateEngine,
     @Inject(CursorEngine.symbol)
-    private readonly cursorEngine: CursorEngine,
+    cursorEngine: CursorEngine,
     @Inject(TextShaper.symbol)
-    private readonly textShaper: TextShaper,
+    textShaper: TextShaper,
     @Inject(cellDisplayTextRegistrySymbol)
-    private readonly displayTextRegistry: CellDisplayTextReader,
+    displayTextRegistry: CellDisplayTextReader,
     @Inject(PointerCapture.symbol)
-    private readonly pointerCapture: PointerCapture,
+    pointerCapture: PointerCapture,
     @Inject(SheetCommandBus.symbol)
-    private readonly commands?: SheetCommandBus,
+    commands?: SheetCommandBus,
     @Inject(Platform.symbol)
-    private readonly platform?: Platform,
+    platform?: Platform,
     @Inject(CursorRegistry.symbol)
     cursorRegistry?: CursorRegistry,
     dimensions: SheetResizeDimensions | null = null,
     @Inject(DataEngine.symbol)
-    private readonly commandDataEngine?: DataEngine,
+    commandDataEngine?: DataEngine,
     @Inject(SheetEmbeddedEditor.symbol)
-    private readonly embeddedEditor?: SheetEmbeddedEditor,
+    embeddedEditor?: SheetEmbeddedEditor,
     @Inject(KeyboardRouter.symbol)
-    private readonly keyboardRouter?: KeyboardRouter,
+    keyboardRouter?: KeyboardRouter,
   ) {
     super({
       key,
       state: { dimensions },
     });
-    this.#unregisterCursorPositionRules = this.registerCursorPositionRules(cursorRegistry);
+    this.#coordEngine = coordEngine;
+    this.#cursorEngine = cursorEngine;
+    this.#textShaper = textShaper;
+    this.#displayTextRegistry = displayTextRegistry;
+    this.#pointerCapture = pointerCapture;
+    this.#commands = commands;
+    this.#platform = platform;
+    this.#commandDataEngine = commandDataEngine;
+    this.#embeddedEditor = embeddedEditor;
+    this.#keyboardRouter = keyboardRouter;
+    this.#unregisterCursorPositionRules = this.#registerCursorPositionRules(cursorRegistry);
   }
 
   /** Registers the commands. */
@@ -354,15 +348,15 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
       throw new SearError('Sheet resize commands are already bound to an editor.');
     }
     this.#registeredCommandBus = commands;
-    registerSheetResizeCommands(commands, this.createResizeDimensionCommandDataSource(), this);
-    this.keyboardRouter?.subscribe({
-      onHideRows: () => this.hideSelectedAxis('row'),
-      onHideColumns: () => this.hideSelectedAxis('column'),
+    registerSheetResizeCommands(commands, this.#createResizeDimensionCommandDataSource(), this);
+    this.#keyboardRouter?.subscribe({
+      onHideRows: () => this.#hideSelectedAxis('row'),
+      onHideColumns: () => this.#hideSelectedAxis('column'),
     });
   }
 
-  private hideSelectedAxis(axis: 'row' | 'column'): void {
-    const range = this.commandDataEngine?.getDataType<[RectRange, RectRange]>(SheetSelectionPlugin.pluginKey)?.[1];
+  #hideSelectedAxis(axis: 'row' | 'column'): void {
+    const range = this.#commandDataEngine?.getDataType<[RectRange, RectRange]>(SheetSelectionPlugin.pluginKey)?.[1];
     if (!range || !this.#registeredCommandBus) return;
     const start = range.getPoint(0)[axis === 'row' ? 0 : 1];
     const end = range.getPoint(1)[axis === 'row' ? 0 : 1];
@@ -443,12 +437,12 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
     searCore: SearCoreSheet,
     _event: EventWithOffsetAndTarget<CellProperties>,
   ): boolean | void {
-    const pointer = this.getResizePointer(_event);
+    const pointer = getResizePointer(this.#coordEngine, _event);
     const { world } = pointer;
     const state = this.#dragState;
 
     if (state.isDragging && state.dragTarget && state.dragStartWorld) {
-      this.runCommand(searCore, UpdateSheetResizeDragCommand, { world: { x: world.x, y: world.y } });
+      this.#runCommand(searCore, UpdateSheetResizeDragCommand, { world: { x: world.x, y: world.y } });
       return false;
     }
 
@@ -462,56 +456,56 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
     searCore: SearCoreSheet,
     _event: EventWithOffsetAndTarget<CellProperties>,
   ): boolean | void {
-    const pointer = this.getResizePointer(_event);
+    const pointer = getResizePointer(this.#coordEngine, _event);
     const { world } = pointer;
 
-    const unhideIndex = this.detectHiddenMarkerClick(searCore, pointer);
+    const unhideIndex = detectHiddenMarkerClick(searCore, pointer, this.getState().dimensions);
     if (unhideIndex !== null) {
-      this.dispatchUnhide(searCore, unhideIndex.type, unhideIndex.index);
+      this.#dispatchUnhide(searCore, unhideIndex.type, unhideIndex.index);
       return false;
     }
 
-    const handle = this.detectResizeHandle(searCore, pointer);
+    const handle = detectResizeHandle(searCore, pointer, this.getState().dimensions);
 
     if (handle) {
       if ((_event.clickCount ?? 0) >= 2) {
-        this.dispatchAutoFit(searCore, handle);
+        this.#dispatchAutoFit(searCore, handle);
         this.#shouldConsumeNextDoubleClick = true;
         return false;
       }
 
       const cursor: CursorToken = handle.type === ResizeAxis.Row ? CursorToken.RowResize : CursorToken.ColumnResize;
-      this.cursorEngine.override(cursor);
+      this.#cursorEngine.override(cursor);
 
-      const selectedIndices = this.getSelectedIndices(searCore, handle.type, handle.primaryIndex);
+      const selectedIndices = getSelectedIndices(searCore, handle.type, handle.primaryIndex, this.getState().dimensions);
       const initialSizes = new Map<number, number>();
-      const sheetFields = this.readResizeSheetFields(searCore);
+      const sheetFields = readResizeSheetFields(searCore, this.getState().dimensions);
       if (selectedIndices) {
         const sizes = handle.type === ResizeAxis.Row ? sheetFields?.rowSizes : sheetFields?.columnSizes;
-        const fallback = handle.type === ResizeAxis.Row ? this.MIN_ROW_HEIGHT : this.MIN_COL_WIDTH;
+        const fallback = handle.type === ResizeAxis.Row ? MIN_ROW_HEIGHT : MIN_COL_WIDTH;
         for (const idx of selectedIndices) {
           initialSizes.set(idx, sizes?.getItem(0, idx) || fallback);
         }
       } else {
         const sizes = handle.type === ResizeAxis.Row ? sheetFields?.rowSizes : sheetFields?.columnSizes;
-        const fallback = handle.type === ResizeAxis.Row ? this.MIN_ROW_HEIGHT : this.MIN_COL_WIDTH;
+        const fallback = handle.type === ResizeAxis.Row ? MIN_ROW_HEIGHT : MIN_COL_WIDTH;
         initialSizes.set(handle.primaryIndex, sizes?.getItem(0, handle.primaryIndex) || fallback);
       }
 
-      this.runCommand(searCore, BeginSheetResizeDragCommand, {
+      this.#runCommand(searCore, BeginSheetResizeDragCommand, {
         axis: handle.type,
         primaryIndex: handle.primaryIndex,
         initialSizes: Array.from(initialSizes, ([index, size]) => ({ index, size })),
         world: { x: world.x, y: world.y },
       });
-      this.startResizePointerCapture(searCore);
+      this.#startResizePointerCapture(searCore);
       return false;
     }
   }
 
   /** @inheritdoc */
   public override onMouseUp(searCore: SearCoreSheet, event: EventWithOffsetAndTarget<CellProperties>): void {
-    this.finishResizeDrag(searCore, this.getResizePointer(event).world);
+    this.#finishResizeDrag(searCore, getResizePointer(this.#coordEngine, event).world);
   }
 
   /** @inheritdoc */
@@ -524,119 +518,15 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
       return false;
     }
 
-    const pointer = this.getResizePointer(_event);
-    const handle = this.detectResizeHandle(searCore, pointer);
+    const pointer = getResizePointer(this.#coordEngine, _event);
+    const handle = detectResizeHandle(searCore, pointer, this.getState().dimensions);
     if (!handle) return;
 
-    this.dispatchAutoFit(searCore, handle);
+    this.#dispatchAutoFit(searCore, handle);
     return false;
   }
 
-  private getSelectedIndices(searCore: SearCoreSheet, type: ResizeAxis, draggedIndex: number): number[] | null {
-    const selectionState = searCore.pluginManager.getPluginState<[RectRange, RectRange]>(
-      SheetSelectionPlugin.pluginKey,
-    );
-    if (!selectionState) return null;
-
-    const bounds = selectionState[1];
-    if (!bounds) return null;
-    const [start, end] = [bounds.getPoint(0), bounds.getPoint(1)];
-    if (!start || !end) return null;
-
-    const sheetFields = this.readResizeSheetFields(searCore);
-    if (!sheetFields) return null;
-
-    if (type === ResizeAxis.Row) {
-      const lastCol = sheetFields.columnSizes.shape[1] - 1;
-      if (start[1] !== 0 || end[1] !== lastCol) return null;
-      if (draggedIndex < start[0] || draggedIndex > end[0]) return null;
-      const indices: number[] = [];
-      for (let r = start[0]; r <= end[0]; r++) indices.push(r);
-      return indices;
-    }
-
-    const lastRow = sheetFields.rowSizes.shape[1] - 1;
-    if (start[0] !== 0 || end[0] !== lastRow) return null;
-    if (draggedIndex < start[1] || draggedIndex > end[1]) return null;
-    const indices: number[] = [];
-    for (let c = start[1]; c <= end[1]; c++) indices.push(c);
-    return indices;
-  }
-
-  private detectResizeHandle(searCore: SearCoreSheet, pointer: ResizePointer): DragTarget | null {
-    const sheetFields = this.readResizeSheetFields(searCore);
-    if (!sheetFields) return null;
-
-    const { rowSizes, columnSizes } = sheetFields;
-    const { world, view, region } = pointer;
-
-    // Row and column headers are affixed on one axis.  Header membership
-    // must be checked in viewport coordinates on that fixed axis, while
-    // row/column boundaries remain sheet-world coordinates on the scroll
-    // axis.  Using world coordinates for both made the header unreachable
-    // after horizontal/vertical scrolling respectively.
-    const isRowHeader = region === CellRegion.RowHeader || (view.x < this.HEADER_WIDTH && view.y >= this.HEADER_HEIGHT);
-    const isColumnHeader =
-      region === CellRegion.ColumnHeader || (view.y < this.HEADER_HEIGHT && view.x >= this.HEADER_WIDTH);
-
-    if (isRowHeader) {
-      const dataY = world.y - this.HEADER_HEIGHT;
-      try {
-        const rowIndex = rowSizes.getRightBoundaryColIndexByDimension(dataY);
-        const rowBottom = rowSizes.getDimensionRightBoundaryByIndex(rowIndex) + this.HEADER_HEIGHT;
-        if (Math.abs(world.y - rowBottom) <= this.HANDLE_SIZE) {
-          const currentHeight = rowSizes.getItem(0, rowIndex) || this.MIN_ROW_HEIGHT;
-          return {
-            type: ResizeAxis.Row,
-            primaryIndex: rowIndex,
-            initialSizes: new Map([[rowIndex, currentHeight]]),
-          };
-        }
-        if (rowIndex > 0) {
-          const prevRowBottom = rowSizes.getDimensionRightBoundaryByIndex(rowIndex - 1) + this.HEADER_HEIGHT;
-          if (Math.abs(world.y - prevRowBottom) <= this.HANDLE_SIZE) {
-            const prevHeight = rowSizes.getItem(0, rowIndex - 1) || this.MIN_ROW_HEIGHT;
-            return {
-              type: ResizeAxis.Row,
-              primaryIndex: rowIndex - 1,
-              initialSizes: new Map([[rowIndex - 1, prevHeight]]),
-            };
-          }
-        }
-      } catch {}
-    }
-
-    if (isColumnHeader) {
-      const dataX = world.x - this.HEADER_WIDTH;
-      try {
-        const colIndex = columnSizes.getRightBoundaryColIndexByDimension(dataX);
-        const colRight = columnSizes.getDimensionRightBoundaryByIndex(colIndex) + this.HEADER_WIDTH;
-        if (Math.abs(world.x - colRight) <= this.HANDLE_SIZE) {
-          const currentWidth = columnSizes.getItem(0, colIndex) || this.MIN_COL_WIDTH;
-          return {
-            type: ResizeAxis.Column,
-            primaryIndex: colIndex,
-            initialSizes: new Map([[colIndex, currentWidth]]),
-          };
-        }
-        if (colIndex > 0) {
-          const prevColRight = columnSizes.getDimensionRightBoundaryByIndex(colIndex - 1) + this.HEADER_WIDTH;
-          if (Math.abs(world.x - prevColRight) <= this.HANDLE_SIZE) {
-            const prevWidth = columnSizes.getItem(0, colIndex - 1) || this.MIN_COL_WIDTH;
-            return {
-              type: ResizeAxis.Column,
-              primaryIndex: colIndex - 1,
-              initialSizes: new Map([[colIndex - 1, prevWidth]]),
-            };
-          }
-        }
-      } catch {}
-    }
-
-    return null;
-  }
-
-  private dispatchResize(
+  #dispatchResize(
     searCore: SearCoreSheet,
     dragTarget: DragTarget,
     dragStartWorld: { x: number; y: number },
@@ -644,7 +534,7 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
   ): void {
     const { type, primaryIndex, initialSizes } = dragTarget;
     const delta = type === ResizeAxis.Row ? currentWorld.y - dragStartWorld.y : currentWorld.x - dragStartWorld.x;
-    const minSize = type === ResizeAxis.Row ? this.MIN_ROW_HEIGHT : this.MIN_COL_WIDTH;
+    const minSize = type === ResizeAxis.Row ? MIN_ROW_HEIGHT : MIN_COL_WIDTH;
     const primarySize = initialSizes.get(primaryIndex);
     if (primarySize === undefined) return;
     const newSize = Math.max(minSize, primarySize + delta);
@@ -655,119 +545,55 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
     }
 
     if (sizes.length === 0) return;
-    this.runCommand(searCore, type === ResizeAxis.Row ? ResizeSheetRowsCommand : ResizeSheetColumnsCommand, { sizes });
+    this.#runCommand(searCore, type === ResizeAxis.Row ? ResizeSheetRowsCommand : ResizeSheetColumnsCommand, { sizes });
   }
 
-  private dispatchUnhide(searCore: SearCoreSheet, type: ResizeAxis, index: number): void {
-    const sheetFields = this.readResizeSheetFields(searCore);
+  #dispatchUnhide(searCore: SearCoreSheet, type: ResizeAxis, index: number): void {
+    const sheetFields = readResizeSheetFields(searCore, this.getState().dimensions);
     const originalSize =
       type === ResizeAxis.Row
         ? sheetFields?.rowHiddenOriginalSizes.getItem(0, index)
         : sheetFields?.columnHiddenOriginalSizes.getItem(0, index);
     if (originalSize === void 0 || originalSize === null || originalSize === 0) return;
-    this.runCommand(searCore, type === ResizeAxis.Row ? UnhideSheetRowsCommand : UnhideSheetColumnsCommand, { index });
+    this.#runCommand(searCore, type === ResizeAxis.Row ? UnhideSheetRowsCommand : UnhideSheetColumnsCommand, { index });
   }
 
-  private detectHiddenMarkerClick(
-    searCore: SearCoreSheet,
-    pointer: ResizePointer,
-  ): { type: ResizeAxis; index: number } | null {
-    const sheetFields = this.readResizeSheetFields(searCore);
-    if (!sheetFields) return null;
-
-    const { rowSizes, columnSizes } = sheetFields;
-    const { world, view, region } = pointer;
-
-    const isRowHeader = region === CellRegion.RowHeader || (view.x < this.HEADER_WIDTH && view.y >= this.HEADER_HEIGHT);
-    const isColumnHeader =
-      region === CellRegion.ColumnHeader || (view.y < this.HEADER_HEIGHT && view.x >= this.HEADER_WIDTH);
-
-    if (isRowHeader) {
-      const rowHidden = sheetFields.rowHiddenOriginalSizes;
-      let hit: { type: ResizeAxis; index: number } | null = null;
-      rowHidden.forEachStored((_value, _row, rowIndex) => {
-        if (hit) return;
-        const rowBoundary = rowSizes.getDimensionRightBoundaryByIndex(rowIndex) + this.HEADER_HEIGHT;
-        if (Math.abs(world.y - rowBoundary) <= 6) {
-          hit = { type: ResizeAxis.Row, index: rowIndex };
-        }
-      });
-      if (hit) return hit;
-    }
-
-    if (isColumnHeader) {
-      const columnHidden = sheetFields.columnHiddenOriginalSizes;
-      let hit: { type: ResizeAxis; index: number } | null = null;
-      columnHidden.forEachStored((_value, _row, colIndex) => {
-        if (hit) return;
-        const colBoundary = columnSizes.getDimensionRightBoundaryByIndex(colIndex) + this.HEADER_WIDTH;
-        if (Math.abs(world.x - colBoundary) <= 6) {
-          hit = { type: ResizeAxis.Column, index: colIndex };
-        }
-      });
-      if (hit) return hit;
-    }
-
-    return null;
-  }
-
-  /**
-   * Resolves an input point for mixed-coordinate header interactions.
-   * Sticky header axes use view coordinates; the scrolling axes use world
-   * coordinates so dimension boundaries still refer to the sheet model.
-   */
-  private getResizePointer(event?: EventWithOffsetAndTarget<CellProperties>): ResizePointer {
-    if (event) {
-      const { offsetX, offsetY } = event.origin;
-      return {
-        world: this.coordEngine.screenToWorld(offsetX, offsetY),
-        view: this.coordEngine.screenToView(offsetX, offsetY),
-        region: event.target?.properties.region,
-      };
-    }
-
-    return {
-      world: this.coordEngine.getCurrentMouseWorld(),
-      view: this.coordEngine.getCurrentMouseView(),
-    };
-  }
-
-  private startResizePointerCapture(searCore: SearCoreSheet): void {
+  #startResizePointerCapture(searCore: SearCoreSheet): void {
     this.#disposePointerCapture?.();
-    this.#disposePointerCapture = this.pointerCapture.start({
-      onMove: (capturedEvent) => this.updateCapturedResizeDrag(searCore, capturedEvent),
-      onRelease: (capturedEvent) => this.finishResizeDrag(searCore, this.getCapturedWorld(capturedEvent)),
+    this.#disposePointerCapture = this.#pointerCapture.start({
+      onMove: (capturedEvent) => this.#updateCapturedResizeDrag(searCore, capturedEvent),
+      onRelease: (capturedEvent) => this.#finishResizeDrag(searCore, this.#getCapturedWorld(capturedEvent)),
     });
   }
 
-  private updateCapturedResizeDrag(searCore: SearCoreSheet, event: PointerCapturePoint): void {
-    const world = this.getCapturedWorld(event);
+  #updateCapturedResizeDrag(searCore: SearCoreSheet, event: PointerCapturePoint): void {
+    const world = this.#getCapturedWorld(event);
     if (!world) return;
     const state = this.#dragState;
     if (!state.isDragging || !state.dragTarget || !state.dragStartWorld) return;
     if (state.currentWorld && state.currentWorld.x === world.x && state.currentWorld.y === world.y) return;
-    this.runCommand(searCore, UpdateSheetResizeDragCommand, { world });
+    this.#runCommand(searCore, UpdateSheetResizeDragCommand, { world });
   }
 
-  private getCapturedWorld(event: PointerCapturePoint): { x: number; y: number } {
-    return this.coordEngine.screenToWorld(event.view.x, event.view.y);
+  #getCapturedWorld(event: PointerCapturePoint): { x: number; y: number } {
+    return this.#coordEngine.screenToWorld(event.view.x, event.view.y);
   }
 
-  private finishResizeDrag(searCore: SearCoreSheet, currentWorld: { x: number; y: number } | null): void {
+  #finishResizeDrag(searCore: SearCoreSheet, currentWorld: { x: number; y: number } | null): void {
     const state = this.#dragState;
     this.#disposePointerCapture?.();
     this.#disposePointerCapture = null;
 
     if (state.isDragging && state.dragTarget && state.dragStartWorld && currentWorld) {
-      this.dispatchResize(searCore, state.dragTarget, state.dragStartWorld, currentWorld);
-      this.cursorEngine.override(null);
+      this.#dispatchResize(searCore, state.dragTarget, state.dragStartWorld, currentWorld);
+      this.#cursorEngine.override(null);
     }
 
-    this.runCommand(searCore, EndSheetResizeDragCommand, void 0);
+    this.#runCommand(searCore, EndSheetResizeDragCommand, void 0);
   }
 
   /** Converts a registry pointer context into the mixed-coordinate resize pointer representation. */
-  private toResizePointer(position: {
+  #toResizePointer(position: {
     world: { x: number; y: number };
     view: { x: number; y: number };
     target: CellProperties | null;
@@ -780,22 +606,22 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
   }
 
   /** Registers all resize-owned position rules through the central cursor registry. */
-  private registerCursorPositionRules(cursorRegistry?: CursorRegistry): (() => void)[] {
+  #registerCursorPositionRules(cursorRegistry?: CursorRegistry): (() => void)[] {
     if (!cursorRegistry) return [];
     return [
       cursorRegistry.registerPosition({
         key: ResizeCursorRuleKey.HiddenMarker,
         layer: 102,
         cursor: CursorToken.Pointer,
-        test: this.isHiddenMarkerCursorTarget.bind(this),
+        test: this.#isHiddenMarkerCursorTarget.bind(this),
       }),
-      this.registerResizeHandleCursorRule(
+      this.#registerResizeHandleCursorRule(
         cursorRegistry,
         ResizeCursorRuleKey.RowHandle,
         ResizeAxis.Row,
         CursorToken.RowResize,
       ),
-      this.registerResizeHandleCursorRule(
+      this.#registerResizeHandleCursorRule(
         cursorRegistry,
         ResizeCursorRuleKey.ColumnHandle,
         ResizeAxis.Column,
@@ -805,7 +631,7 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
   }
 
   /** Registers one axis-specific resize-handle rule using shared coordinate matching. */
-  private registerResizeHandleCursorRule(
+  #registerResizeHandleCursorRule(
     cursorRegistry: CursorRegistry,
     key: PositionCursorRule['key'],
     axis: ResizeAxis,
@@ -817,23 +643,23 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
       layer: 101,
       cursor,
       test: function isResizeHandleCursorTarget(position): boolean {
-        return resizePlugin.getResizeHandleAtPosition(position)?.type === axis;
+        return resizePlugin.#getResizeHandleAtPosition(position)?.type === axis;
       },
     });
   }
 
-  private isHiddenMarkerCursorTarget(position: CursorPosition): boolean {
-    return this.detectHiddenMarkerClick(position.core, this.toResizePointer(position)) !== null;
+  #isHiddenMarkerCursorTarget(position: CursorPosition): boolean {
+    return detectHiddenMarkerClick(position.core, this.#toResizePointer(position), this.getState().dimensions) !== null;
   }
 
   /** Resolves a resize handle from the cursor registry's shared pointer context. */
-  private getResizeHandleAtPosition(position: CursorPosition): DragTarget | null {
-    return this.detectResizeHandle(position.core, this.toResizePointer(position));
+  #getResizeHandleAtPosition(position: CursorPosition): DragTarget | null {
+    return detectResizeHandle(position.core, this.#toResizePointer(position), this.getState().dimensions);
   }
 
-  private dispatchAutoFit(searCore: SearCoreSheet, handle: DragTarget): void {
-    if (!this.textShaper) return;
-    const sheetFields = this.readResizeSheetFields(searCore);
+  #dispatchAutoFit(searCore: SearCoreSheet, handle: DragTarget): void {
+    if (!this.#textShaper) return;
+    const sheetFields = readResizeSheetFields(searCore, this.getState().dimensions);
     if (!sheetFields) return;
 
     const { sheetData } = sheetFields;
@@ -842,7 +668,7 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
       fontSize: config?.sheetCellFontSize ?? 10,
       fontFamily: config?.sheetCellFontFamily ?? 'sans-serif',
     });
-    const selectedIndices = this.getSelectedIndices(searCore, handle.type, handle.primaryIndex);
+    const selectedIndices = getSelectedIndices(searCore, handle.type, handle.primaryIndex, this.getState().dimensions);
     const indices = selectedIndices ?? [handle.primaryIndex];
     if (indices.length === 0) return;
     const PADDING = 16;
@@ -854,14 +680,14 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
     ) => {
       const context = searCore.renderEngine.renderCoordinatorManager.createCellContext(row, col);
       const format = sheetFields.cellFormats?.getItem(row, col);
-      const text = this.displayTextRegistry.getDisplayText(
+      const text = this.#displayTextRegistry.getDisplayText(
         format === null ? cellData : { ...cellData, format },
         context,
       );
       if (!text) return null;
-      const plainMetrics = this.measureCellMetrics(text, font);
+      const plainMetrics = this.#measureCellMetrics(text, font);
       if (cellData.type !== CellType.RichText || !Array.isArray(cellData.value)) return plainMetrics;
-      const richMetrics = this.embeddedEditor?.measureUnwrapped?.(cellData.value as SheetDocumentNode[], font);
+      const richMetrics = this.#embeddedEditor?.measureUnwrapped?.(cellData.value as SheetDocumentNode[], font);
       return richMetrics ? {
         width: Math.max(plainMetrics.width, richMetrics.width),
         height: Math.max(plainMetrics.height, richMetrics.height),
@@ -914,25 +740,25 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
     }
 
     if (sizes.length === 0) return;
-    this.runCommand(searCore, handle.type === ResizeAxis.Row ? ResizeSheetRowsCommand : ResizeSheetColumnsCommand, {
+    this.#runCommand(searCore, handle.type === ResizeAxis.Row ? ResizeSheetRowsCommand : ResizeSheetColumnsCommand, {
       sizes,
     });
   }
 
-  private measureCellMetrics(text: string, font: string): { width: number; height: number } {
+  #measureCellMetrics(text: string, font: string): { width: number; height: number } {
     const lines = text.split('\n');
     let width = 0;
     let height = 0;
     for (const line of lines) {
-      const shaped = this.textShaper.shape({ text: line || ' ', font });
+      const shaped = this.#textShaper.shape({ text: line || ' ', font });
       if (line) width = Math.max(width, shaped.width);
       height += shaped.height;
     }
     return { width, height };
   }
 
-  private runCommand<Input>(_searCore: SearCoreSheet, definition: SheetCommandDefinition<Input>, input: Input): void {
-    const commands = this.resolveCommandBus('runCommand');
+  #runCommand<Input>(_searCore: SearCoreSheet, definition: SheetCommandDefinition<Input>, input: Input): void {
+    const commands = this.#resolveCommandBus('runCommand');
     if (!commands) return;
     this.#commandCore = _searCore;
     try {
@@ -942,55 +768,55 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
     }
   }
 
-  private resolveCommandBus(method: string): SheetCommandBus | null {
+  #resolveCommandBus(method: string): SheetCommandBus | null {
     if (this.#registeredCommandBus) return this.#registeredCommandBus;
-    if (this.commands) return this.commands;
-    this.platform?.warn(`SheetResizePlugin ${method} skipped: SheetCommandBus is missing.`);
+    if (this.#commands) return this.#commands;
+    this.#platform?.warn(`SheetResizePlugin ${method} skipped: SheetCommandBus is missing.`);
     return null;
   }
 
-  private createResizeDimensionCommandDataSource(): SheetResizeDimensionCommandDataSource {
+  #createResizeDimensionCommandDataSource(): SheetResizeDimensionCommandDataSource {
     const resizePlugin = this;
     return {
       target: SheetResizePlugin.pluginKey,
       getRowCount(): number {
-        const fields = resizePlugin.readRequiredResizeCommandFields();
+        const fields = resizePlugin.#readRequiredResizeCommandFields();
         return readDimensionCount(fields.rowSizes, readSheetDataAxisCount(fields.sheetData, 0));
       },
       getColumnCount(): number {
-        const fields = resizePlugin.readRequiredResizeCommandFields();
+        const fields = resizePlugin.#readRequiredResizeCommandFields();
         return readDimensionCount(fields.columnSizes, readSheetDataAxisCount(fields.sheetData, 1));
       },
       getDefaultRowSize(): number {
-        return resizePlugin.readRequiredResizeCommandFields().rowSizes.getDefaultValue() ?? 24;
+        return resizePlugin.#readRequiredResizeCommandFields().rowSizes.getDefaultValue() ?? 24;
       },
       getDefaultColumnSize(): number {
-        return resizePlugin.readRequiredResizeCommandFields().columnSizes.getDefaultValue() ?? 80;
+        return resizePlugin.#readRequiredResizeCommandFields().columnSizes.getDefaultValue() ?? 80;
       },
       readRowSize(index: number): number {
-        const rowSizes = resizePlugin.readRequiredResizeCommandFields().rowSizes;
+        const rowSizes = resizePlugin.#readRequiredResizeCommandFields().rowSizes;
         return readDimensionValue(rowSizes, index, 24);
       },
       readColumnSize(index: number): number {
-        const columnSizes = resizePlugin.readRequiredResizeCommandFields().columnSizes;
+        const columnSizes = resizePlugin.#readRequiredResizeCommandFields().columnSizes;
         return readDimensionValue(columnSizes, index, 80);
       },
       readRowHiddenOriginalSize(index: number): number | null {
-        return resizePlugin.readRequiredResizeCommandFields().rowHiddenOriginalSizes.getItem(0, index);
+        return resizePlugin.#readRequiredResizeCommandFields().rowHiddenOriginalSizes.getItem(0, index);
       },
       readColumnHiddenOriginalSize(index: number): number | null {
-        return resizePlugin.readRequiredResizeCommandFields().columnHiddenOriginalSizes.getItem(0, index);
+        return resizePlugin.#readRequiredResizeCommandFields().columnHiddenOriginalSizes.getItem(0, index);
       },
     };
   }
 
-  private readRequiredResizeCommandFields(): ResizeSheetFields {
+  #readRequiredResizeCommandFields(): ResizeSheetFields {
     if (this.#commandCore) {
-      const fields = this.readResizeSheetFields(this.#commandCore, true);
+      const fields = readResizeSheetFields(this.#commandCore, this.getState().dimensions, true);
       if (fields) return fields;
     }
-    if (this.commandDataEngine) {
-      const fields = this.readResizeSheetFields({ getDataEngine: () => this.commandDataEngine } as SearCoreSheet, true);
+    if (this.#commandDataEngine) {
+      const fields = readResizeSheetFields({ getDataEngine: () => this.#commandDataEngine } as SearCoreSheet, this.getState().dimensions, true);
       if (fields) return fields;
     }
     const dimensions = this.getState().dimensions;
@@ -1006,46 +832,6 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
       };
     }
     throw new SearError('SheetResizePlugin resize command cannot read dimension fields.');
-  }
-
-  private readResizeSheetFields(searCore: SearCoreSheet, rawRows = false): ResizeSheetFields | null {
-    const coreWithDataEngine = searCore as SearCoreSheet & {
-      dataEngine?: DataEngine;
-    };
-    const dataEngine = searCore.getDataEngine?.() ?? coreWithDataEngine.dataEngine;
-    if (dataEngine) {
-      const sheetData = readSheetDataMatrix(dataEngine);
-      const rowSizes = rawRows ? readSheetRawRowSizes(dataEngine) : readSheetRowSizes(dataEngine);
-      const columnSizes = readSheetColumnSizes(dataEngine);
-      const cellAlignments = readSheetCellAlignments(dataEngine);
-      const cellFormats = readSheetCellFormats(dataEngine);
-      const rowHiddenOriginalSizes = readSheetRowHiddenOriginalSizes(dataEngine);
-      const columnHiddenOriginalSizes = readSheetColumnHiddenOriginalSizes(dataEngine);
-      if (sheetData && rowSizes && columnSizes && rowHiddenOriginalSizes && columnHiddenOriginalSizes) {
-        return {
-          sheetData,
-          rowSizes,
-          columnSizes,
-          cellAlignments: cellAlignments ?? { getItem: () => null },
-          cellFormats,
-          rowHiddenOriginalSizes,
-          columnHiddenOriginalSizes,
-        } as ResizeSheetFields;
-      }
-    }
-    const dimensions = this.getState().dimensions;
-    if (dimensions) {
-      return {
-        sheetData: new SheetMatrix(void 0, [dimensions.rowSizes.shape[1], dimensions.columnSizes.shape[1]]),
-        rowSizes: dimensions.rowSizes,
-        columnSizes: dimensions.columnSizes,
-        cellAlignments: { getItem: () => null },
-        cellFormats: null,
-        rowHiddenOriginalSizes: dimensions.rowHiddenOriginalSizes,
-        columnHiddenOriginalSizes: dimensions.columnHiddenOriginalSizes,
-      };
-    }
-    return null;
   }
 
   /**
@@ -1078,7 +864,7 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
   /** Renders SheetResizePlugin scene output. */
   public render(searCore: SearCoreSheet): Node<CellProperties>[] | null {
     const nodes: Node<CellProperties>[] = [];
-    const markerNodes = this.renderHiddenMarkers(searCore);
+    const markerNodes = this.#renderHiddenMarkers(searCore);
     if (markerNodes) nodes.push(...markerNodes);
 
     const state = this.#dragState;
@@ -1090,14 +876,14 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
       const scrollState = scrollManager.getState();
 
       let line: { x1: number; y1: number; x2: number; y2: number };
-      const sheetFields = this.readResizeSheetFields(searCore);
+      const sheetFields = readResizeSheetFields(searCore, this.getState().dimensions);
       if (!sheetFields) return nodes.length > 0 ? nodes : null;
 
       if (type === ResizeAxis.Row) {
         const deltaY = state.currentWorld.y - state.dragStartWorld.y;
-        const newSize = Math.max(this.MIN_ROW_HEIGHT, initialSize + deltaY);
+        const newSize = Math.max(MIN_ROW_HEIGHT, initialSize + deltaY);
 
-        const rowTop = sheetFields.rowSizes.getDimensionLeftBoundaryByIndex(primaryIndex) + this.HEADER_HEIGHT;
+        const rowTop = sheetFields.rowSizes.getDimensionLeftBoundaryByIndex(primaryIndex) + HEADER_HEIGHT;
         const lineY = rowTop + newSize;
 
         line = {
@@ -1108,9 +894,9 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
         };
       } else {
         const deltaX = state.currentWorld.x - state.dragStartWorld.x;
-        const newSize = Math.max(this.MIN_COL_WIDTH, initialSize + deltaX);
+        const newSize = Math.max(MIN_COL_WIDTH, initialSize + deltaX);
 
-        const colLeft = sheetFields.columnSizes.getDimensionLeftBoundaryByIndex(primaryIndex) + this.HEADER_WIDTH;
+        const colLeft = sheetFields.columnSizes.getDimensionLeftBoundaryByIndex(primaryIndex) + HEADER_WIDTH;
         const lineX = colLeft + newSize;
 
         line = {
@@ -1132,8 +918,8 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
     return nodes.length > 0 ? nodes : null;
   }
 
-  private renderHiddenMarkers(searCore: SearCoreSheet): Node<CellProperties>[] | null {
-    const sheetFields = this.readResizeSheetFields(searCore);
+  #renderHiddenMarkers(searCore: SearCoreSheet): Node<CellProperties>[] | null {
+    const sheetFields = readResizeSheetFields(searCore, this.getState().dimensions);
     if (!sheetFields) return null;
 
     const { rowSizes, columnSizes } = sheetFields;
@@ -1142,8 +928,8 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
 
     sheetFields.rowHiddenOriginalSizes.forEachStored((_value, _row, rowIndex) => {
       const rowBoundary = rowSizes.getDimensionRightBoundaryByIndex(rowIndex);
-      const cy = rowBoundary + this.HEADER_HEIGHT;
-      const cx = Math.round(this.HEADER_WIDTH / 2);
+      const cy = rowBoundary + HEADER_HEIGHT;
+      const cx = Math.round(HEADER_WIDTH / 2);
 
       const triW = 8;
       const triH = 4;
@@ -1159,7 +945,7 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
           new PositionRect(cx - Math.round(triW / 2), cy - gap - triH, triW, triH),
           {
             type: 'hidden-row-up',
-            fill: this.MARKER_STROKE,
+            fill: this.#MARKER_STROKE,
             depth: markerDepth + 1,
             left: 0,
             skipHit: true,
@@ -1178,7 +964,7 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
           new PositionRect(cx - Math.round(triW / 2), cy + gap, triW, triH),
           {
             type: 'hidden-row-down',
-            fill: this.MARKER_STROKE,
+            fill: this.#MARKER_STROKE,
             depth: markerDepth + 1,
             left: 0,
             skipHit: true,
@@ -1190,8 +976,8 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
 
     sheetFields.columnHiddenOriginalSizes.forEachStored((_value, _row, colIndex) => {
       const colBoundary = columnSizes.getDimensionRightBoundaryByIndex(colIndex);
-      const cx = colBoundary + this.HEADER_WIDTH;
-      const cy = Math.round(this.HEADER_HEIGHT / 2);
+      const cx = colBoundary + HEADER_WIDTH;
+      const cy = Math.round(HEADER_HEIGHT / 2);
 
       const triW = 4;
       const triH = 8;
@@ -1207,7 +993,7 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
           new PositionRect(cx - gap - triW, cy - Math.round(triH / 2), triW, triH),
           {
             type: 'hidden-col-left',
-            fill: this.MARKER_STROKE,
+            fill: this.#MARKER_STROKE,
             depth: markerDepth + 1,
             top: 0,
             skipHit: true,
@@ -1226,7 +1012,7 @@ export class SheetResizePlugin extends Plugin<SearCoreSheet, CellProperties, Res
           new PositionRect(cx + gap, cy - Math.round(triH / 2), triW, triH),
           {
             type: 'hidden-col-right',
-            fill: this.MARKER_STROKE,
+            fill: this.#MARKER_STROKE,
             depth: markerDepth + 1,
             top: 0,
             skipHit: true,

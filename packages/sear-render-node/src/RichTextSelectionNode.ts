@@ -16,9 +16,9 @@ export interface RichTextSelectionRect {
 
 /** Scene node that draws rich-text selection rectangles. */
 export class RichTextSelectionNode extends RichTextVisualNode {
-  private readonly rects: readonly RichTextSelectionRect[];
-  private readonly offset: { readonly x: number; readonly y: number };
-  private readonly viewportOverlay: boolean;
+  readonly #rects: readonly RichTextSelectionRect[];
+  readonly #offset: { readonly x: number; readonly y: number };
+  readonly #viewportOverlay: boolean;
 
   /** Creates a selection overlay node. */
   public constructor(input: {
@@ -37,42 +37,42 @@ export class RichTextSelectionNode extends RichTextVisualNode {
       depth: input.depth ?? 10_010,
       isEdit: true,
     });
-    this.rects = input.rects;
-    this.offset = input.offset ?? { x: 0, y: 0 };
-    this.viewportOverlay = input.viewportOverlay === true;
+    this.#rects = input.rects;
+    this.#offset = input.offset ?? { x: 0, y: 0 };
+    this.#viewportOverlay = input.viewportOverlay === true;
   }
 
   /** Draws selection rectangles in world or viewport coordinates. */
   public drawScene(context: RenderContext, clipRegion?: ClipRegion): void {
-    if (this.rects.length === 0) return;
-    this.beginScene(context, this.viewportOverlay);
-    applyClip(context, this.resolveClipRegion(clipRegion));
+    if (this.#rects.length === 0) return;
+    this.beginScene(context, this.#viewportOverlay);
+    applyClip(context, this.#resolveClipRegion(clipRegion));
     context.setFillStyle('rgba(173, 214, 255, 0.8)');
-    for (const rect of this.rects) this.drawRect(context, rect);
+    for (const rect of this.#rects) this.#drawRect(context, rect);
     this.endScene(context);
   }
 
   /** World-space regions where text should be painted above the highlight. */
   public getSelectionRects(): readonly RichTextSelectionRect[] {
-    return this.rects;
+    return this.#rects;
   }
 
-  private resolveClipRegion(clipRegion?: ClipRegion): ClipRegion | undefined {
-    if (!clipRegion || !this.viewportOverlay) return clipRegion;
+  #resolveClipRegion(clipRegion?: ClipRegion): ClipRegion | undefined {
+    if (!clipRegion || !this.#viewportOverlay) return clipRegion;
     if (Array.isArray(clipRegion)) {
-      return clipRegion.map(([x, y]) => [x + this.offset.x, y + this.offset.y] as [number, number]);
+      return clipRegion.map(([x, y]) => [x + this.#offset.x, y + this.#offset.y] as [number, number]);
     }
     return new PositionRect<HexColor>(
-      clipRegion.x + this.offset.x,
-      clipRegion.y + this.offset.y,
+      clipRegion.x + this.#offset.x,
+      clipRegion.y + this.#offset.y,
       clipRegion.width,
       clipRegion.height,
     );
   }
 
-  private drawRect(context: RenderContext, rect: RichTextSelectionRect): void {
+  #drawRect(context: RenderContext, rect: RichTextSelectionRect): void {
     context.beginPath();
-    context.rect(rect.x + this.offset.x, rect.y + this.offset.y, rect.width, rect.height);
+    context.rect(rect.x + this.#offset.x, rect.y + this.#offset.y, rect.width, rect.height);
     context.fill();
   }
 }

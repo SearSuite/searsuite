@@ -1,13 +1,5 @@
 import { ScrollManager, type ScrollManagerState } from '../src';
 
-type ScrollManagerInternals = {
-  update(newState: ScrollManagerState): void;
-};
-
-function getUpdate(manager: ScrollManager): (newState: ScrollManagerState) => void {
-  return (manager as unknown as ScrollManagerInternals).update.bind(manager);
-}
-
 describe('', () => {
   let scrollState: ScrollManager;
 
@@ -73,16 +65,10 @@ describe('', () => {
     const mockSubscriberCallback = jest.fn();
     scrollState.subscribeScroll(mockSubscriberCallback);
 
-    const publisher = (instance: ScrollManager, updateState: (state: typeof basicState) => void) => {
-      return () => {
-        updateState(basicState);
-      };
-    };
-
-    scrollState.addPublisher(publisher);
-
-    // Trigger the publisher to update the state
-    scrollState['scrollPublishers'].forEach((publish) => publish());
+    scrollState.addPublisher((_manager, updateState) => {
+      updateState(basicState);
+      return () => void 0;
+    });
 
     // ScrollManager.update() computes: x = min(max(-deltaX + oldX, 0), contentBoundary[0])
     // = min(max(-(-15) + 0, 0), 800) = min(15, 800) = 15
@@ -127,7 +113,7 @@ describe('', () => {
     const subscriber = jest.fn();
     scrollState.subscribeScroll(subscriber);
 
-    const update = getUpdate(scrollState);
+    const update = scrollState.applyInputScroll.bind(scrollState);
     update({ x: 0, y: 0, deltaX: 20, deltaY: 20 });
 
     expect(scrollState.getState()).toMatchObject({ x: 0, y: 0 });
@@ -145,7 +131,7 @@ describe('', () => {
 
   it('allows unbounded scrolling when contentBoundary is [0, 0] (falsy)', () => {
     scrollState.setContentBoundary(0, 0);
-    const update = getUpdate(scrollState);
+    const update = scrollState.applyInputScroll.bind(scrollState);
 
     update({ x: 0, y: 0, deltaX: -50, deltaY: -50 });
 
@@ -211,7 +197,7 @@ describe('', () => {
   });
 
   it('tracks render scroll state for publisher updates until marked rendered', () => {
-    const update = getUpdate(scrollState);
+    const update = scrollState.applyInputScroll.bind(scrollState);
     update({ x: 0, y: 0, deltaX: -15, deltaY: -25 });
 
     expect(scrollState.getState()).toMatchObject({ x: 15, y: 25 });

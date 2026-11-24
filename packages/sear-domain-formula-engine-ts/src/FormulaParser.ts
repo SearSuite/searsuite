@@ -59,11 +59,11 @@ export class FormulaParser implements IFormulaParser {
   // ─── Internal State (Used Only During One parse Call) ───
 
   /** Formula string currently being parsed, after removing the leading '='. */
-  private input: string = '';
+  #input: string = '';
   /** Current read position as a character index. */
-  private pos: number = 0;
-  private functionDepth = 0;
-  private operandCount = 0;
+  #pos: number = 0;
+  #functionDepth = 0;
+  #operandCount = 0;
 
   /**
    * Parses a formula string into an AST.
@@ -76,23 +76,23 @@ export class FormulaParser implements IFormulaParser {
       throw new SearError(`Formula exceeds ${MAX_FORMULA_LENGTH} characters`);
     }
     // Remove the leading '='.
-    this.input = this.normalizeFormulaText(formula.startsWith('=') ? formula.slice(1) : formula);
-    this.pos = 0;
-    this.functionDepth = 0;
-    this.operandCount = 0;
+    this.#input = this.#normalizeFormulaText(formula.startsWith('=') ? formula.slice(1) : formula);
+    this.#pos = 0;
+    this.#functionDepth = 0;
+    this.#operandCount = 0;
 
-    const ast = this.parseExpression();
+    const ast = this.#parseExpression();
 
     // Ensure the entire input has been consumed.
-    this.skipWhitespace();
-    if (this.pos < this.input.length) {
-      throw new SearError(`Unexpected character at position ${this.pos}: '${this.input[this.pos]}'`);
+    this.#skipWhitespace();
+    if (this.#pos < this.#input.length) {
+      throw new SearError(`Unexpected character at position ${this.#pos}: '${this.#input[this.#pos]}'`);
     }
 
     return ast;
   }
 
-  private normalizeFormulaText(input: string): string {
+  #normalizeFormulaText(input: string): string {
     const normalizeSyntax = (text: string): string => text
       .replace(/：/g, ':')
       .replace(/，/g, ',')
@@ -134,7 +134,7 @@ export class FormulaParser implements IFormulaParser {
    */
   extractDependencies(ast: FormulaAST): Dependency[] {
     const deps: Dependency[] = [];
-    this.collectDeps(ast, deps);
+    this.#collectDeps(ast, deps);
     return deps;
   }
 
@@ -145,7 +145,7 @@ export class FormulaParser implements IFormulaParser {
    * If no reference needs shifting, returns the original AST by reference.
    */
   shiftReferences(ast: FormulaAST, changes: StructureChange[]): FormulaAST {
-    return this.shiftNode(ast, changes);
+    return this.#shiftNode(ast, changes);
   }
 
   // ─── Recursive-Descent Parse Methods ────────────────────
@@ -155,8 +155,8 @@ export class FormulaParser implements IFormulaParser {
    *
    * expression → comparison
    */
-  private parseExpression(): FormulaAST {
-    return this.parseComparison();
+  #parseExpression(): FormulaAST {
+    return this.#parseComparison();
   }
 
   /**
@@ -164,29 +164,29 @@ export class FormulaParser implements IFormulaParser {
    *
    * comparison → concat (('=' | '<>' | '<' | '>' | '<=' | '>=') concat)*
    */
-  private parseComparison(): FormulaAST {
-    let left = this.parseConcat();
+  #parseComparison(): FormulaAST {
+    let left = this.#parseConcat();
 
     while (true) {
-      this.skipWhitespace();
+      this.#skipWhitespace();
 
       // Check two-character operators.
-      const twoChar = this.input.substring(this.pos, this.pos + 2);
+      const twoChar = this.#input.substring(this.#pos, this.#pos + 2);
       if (twoChar === '<>' || twoChar === '<=' || twoChar === '>=') {
-        this.advance();
-        this.advance();
+        this.#advance();
+        this.#advance();
         const op = twoChar as BinaryOp;
-        const right = this.parseConcat();
+        const right = this.#parseConcat();
         left = { kind: FormulaNodeKind.Binary, op, left, right };
         continue;
       }
 
       // Check one-character operators.
-      const ch = this.peek();
+      const ch = this.#peek();
       if (ch === '=' || ch === '<' || ch === '>') {
-        this.advance();
+        this.#advance();
         const op = ch as BinaryOp;
-        const right = this.parseConcat();
+        const right = this.#parseConcat();
         left = { kind: FormulaNodeKind.Binary, op, left, right };
       } else {
         break;
@@ -201,14 +201,14 @@ export class FormulaParser implements IFormulaParser {
    *
    * concat → addition (('&') addition)*
    */
-  private parseConcat(): FormulaAST {
-    let left = this.parseAddition();
+  #parseConcat(): FormulaAST {
+    let left = this.#parseAddition();
 
     while (true) {
-      this.skipWhitespace();
-      if (this.peek() === '&') {
-        this.advance();
-        const right = this.parseAddition();
+      this.#skipWhitespace();
+      if (this.#peek() === '&') {
+        this.#advance();
+        const right = this.#parseAddition();
         left = { kind: FormulaNodeKind.Binary, op: '&', left, right };
       } else {
         break;
@@ -219,15 +219,15 @@ export class FormulaParser implements IFormulaParser {
   }
 
   /** addition → term (('+' | '-') term)* */
-  private parseAddition(): FormulaAST {
-    let left = this.parseTerm();
+  #parseAddition(): FormulaAST {
+    let left = this.#parseTerm();
 
     while (true) {
-      this.skipWhitespace();
-      const ch = this.peek();
+      this.#skipWhitespace();
+      const ch = this.#peek();
       if (ch !== '+' && ch !== '-') break;
-      this.advance();
-      const right = this.parseTerm();
+      this.#advance();
+      const right = this.#parseTerm();
       left = { kind: FormulaNodeKind.Binary, op: ch as BinaryOp, left, right };
     }
 
@@ -239,16 +239,16 @@ export class FormulaParser implements IFormulaParser {
    *
    * term → factor (('*' | '/') factor)*
    */
-  private parseTerm(): FormulaAST {
-    let left = this.parseFactor();
+  #parseTerm(): FormulaAST {
+    let left = this.#parseFactor();
 
     while (true) {
-      this.skipWhitespace();
-      const ch = this.peek();
+      this.#skipWhitespace();
+      const ch = this.#peek();
       if (ch === '*' || ch === '/') {
-        this.advance();
+        this.#advance();
         const op = ch as BinaryOp;
-        const right = this.parseFactor();
+        const right = this.#parseFactor();
         left = { kind: FormulaNodeKind.Binary, op, left, right };
       } else {
         break;
@@ -263,14 +263,14 @@ export class FormulaParser implements IFormulaParser {
    *
    * factor → exponent (('^') exponent)*
    */
-  private parseFactor(): FormulaAST {
-    let left = this.parseExponent();
+  #parseFactor(): FormulaAST {
+    let left = this.#parseExponent();
 
     while (true) {
-      this.skipWhitespace();
-      if (this.peek() === '^') {
-        this.advance();
-        const right = this.parseExponent();
+      this.#skipWhitespace();
+      if (this.#peek() === '^') {
+        this.#advance();
+        const right = this.#parseExponent();
         left = { kind: FormulaNodeKind.Binary, op: '^', left, right };
       } else {
         break;
@@ -287,14 +287,14 @@ export class FormulaParser implements IFormulaParser {
    * unary → ('-' | '+') unary | atom invocation* '%'?
    * invocation → '(' arguments? ')'
    */
-  private parseExponent(): FormulaAST {
-    this.skipWhitespace();
-    const ch = this.peek();
+  #parseExponent(): FormulaAST {
+    this.#skipWhitespace();
+    const ch = this.#peek();
 
     // Prefix unary operator: - or +.
     if (ch === '-' || ch === '+') {
-      this.advance();
-      const operand = this.parseExponent();
+      this.#advance();
+      const operand = this.#parseExponent();
       let result: FormulaAST = {
         kind: FormulaNodeKind.Unary,
         op: ch as UnaryOp,
@@ -302,43 +302,43 @@ export class FormulaParser implements IFormulaParser {
       };
 
       // Check postfix percent: -50% -> unary('%', unary('-', 50)).
-      this.skipWhitespace();
-      if (this.peek() === '%') {
-        this.advance();
+      this.#skipWhitespace();
+      if (this.#peek() === '%') {
+        this.#advance();
         result = { kind: FormulaNodeKind.Unary, op: '%', operand: result };
       }
       return result;
     }
 
     // Atom expression, possibly followed by invocation or postfix percent operators.
-    let result = this.parseAtom();
+    let result = this.#parseAtom();
 
     while (true) {
-      const beforeWhitespace = this.pos;
-      this.skipWhitespace();
-      if (this.peek() === '#') {
+      const beforeWhitespace = this.#pos;
+      this.#skipWhitespace();
+      if (this.#peek() === '#') {
         if (result.kind !== FormulaNodeKind.Cell && result.kind !== FormulaNodeKind.WorkbookCell) {
-          throw new SearError(`Expected a cell reference before '#' at position ${this.pos}`);
+          throw new SearError(`Expected a cell reference before '#' at position ${this.#pos}`);
         }
-        this.advance();
+        this.#advance();
         result = { kind: FormulaNodeKind.Spill, reference: result };
         continue;
       }
-      if (this.pos > beforeWhitespace && isReferenceExpression(result) && isReferenceStart(this.peek())) {
-        const right = this.parseAtom();
-        if (!isReferenceExpression(right)) throw new SearError(`Expected a reference at position ${this.pos}`);
+      if (this.#pos > beforeWhitespace && isReferenceExpression(result) && isReferenceStart(this.#peek())) {
+        const right = this.#parseAtom();
+        if (!isReferenceExpression(right)) throw new SearError(`Expected a reference at position ${this.#pos}`);
         result = { kind: FormulaNodeKind.Intersection, left: result, right };
         continue;
       }
-      if (this.peek() === '(') {
-        result = { kind: FormulaNodeKind.Invoke, callee: result, args: this.parseCallArguments() };
+      if (this.#peek() === '(') {
+        result = { kind: FormulaNodeKind.Invoke, callee: result, args: this.#parseCallArguments() };
         continue;
       }
       break;
     }
 
-    while (this.peek() === '%') {
-      this.advance();
+    while (this.#peek() === '%') {
+      this.#advance();
       result = { kind: FormulaNodeKind.Unary, op: '%', operand: result };
     }
 
@@ -350,73 +350,73 @@ export class FormulaParser implements IFormulaParser {
    *
    * atom → number | string | boolean | cellRef | rangeRef | workbookRef | functionCall | '(' expression ')'
    */
-  private parseAtom(): FormulaAST {
-    this.skipWhitespace();
-    const grouping = this.peek() === '(' || this.peek() === '{';
-    const atom = this.parseAtomSyntax();
+  #parseAtom(): FormulaAST {
+    this.#skipWhitespace();
+    const grouping = this.#peek() === '(' || this.#peek() === '{';
+    const atom = this.#parseAtomSyntax();
     if (!grouping && atom.kind !== FormulaNodeKind.Call) {
-      this.operandCount++;
-      if (this.operandCount > MAX_FORMULA_OPERANDS) {
+      this.#operandCount++;
+      if (this.#operandCount > MAX_FORMULA_OPERANDS) {
         throw new SearError(`Formula exceeds ${MAX_FORMULA_OPERANDS} operands`);
       }
     }
     return atom;
   }
 
-  private parseAtomSyntax(): FormulaAST {
-    this.skipWhitespace();
-    const ch = this.peek();
+  #parseAtomSyntax(): FormulaAST {
+    this.#skipWhitespace();
+    const ch = this.#peek();
 
     // Parenthesized expression or tuple: (expression) / (expression, expression).
     if (ch === '(') {
-      this.advance(); // Consume '('.
-      const items = [this.parseExpression()];
-      this.skipWhitespace();
-      while (this.peek() === ',') {
-        this.advance();
-        items.push(this.parseExpression());
-        this.skipWhitespace();
+      this.#advance(); // Consume '('.
+      const items = [this.#parseExpression()];
+      this.#skipWhitespace();
+      while (this.#peek() === ',') {
+        this.#advance();
+        items.push(this.#parseExpression());
+        this.#skipWhitespace();
       }
-      if (this.peek() !== ')') {
-        throw new SearError(`Expected ')' at position ${this.pos}`);
+      if (this.#peek() !== ')') {
+        throw new SearError(`Expected ')' at position ${this.#pos}`);
       }
-      this.advance(); // Consume ')'.
+      this.#advance(); // Consume ')'.
       return items.length === 1 ? items[0] : { kind: FormulaNodeKind.Tuple, items };
     }
 
     // String literal: "hello".
     if (ch === '"') {
-      return this.parseStringLiteral();
+      return this.#parseStringLiteral();
     }
 
     if (ch === '#') {
       const code = Object.values(FormulaErrorCode).find((value) =>
-        this.input.slice(this.pos, this.pos + value.length).toUpperCase() === value);
+        this.#input.slice(this.#pos, this.#pos + value.length).toUpperCase() === value);
       if (code) {
-        this.pos += code.length;
+        this.#pos += code.length;
         return { kind: FormulaNodeKind.Error, code };
       }
     }
 
     // Array constant: {1,2;3,4}.
     if (ch === '{') {
-      return this.parseArrayConstant();
+      return this.#parseArrayConstant();
     }
 
     // Quoted workbook reference: 'Sales Data'!A1 or 'Sales Data'!A1:B5.
     if (ch === "'") {
-      const sheetName = this.parseQuotedSheetName();
-      this.skipWhitespace();
-      if (this.peek() !== '!') throw new SearError(`Expected '!' after quoted sheet name at position ${this.pos}`);
-      this.advance();
-      return this.parseWorkbookCellOrRangeRef(sheetName);
+      const sheetName = this.#parseQuotedSheetName();
+      this.#skipWhitespace();
+      if (this.#peek() !== '!') throw new SearError(`Expected '!' after quoted sheet name at position ${this.#pos}`);
+      this.#advance();
+      return this.#parseWorkbookCellOrRangeRef(sheetName);
     }
 
     // Numeric literal: 42, 3.14, or a whole-row reference: 1:3.
     if (ch !== void 0 && /[0-9.]/.test(ch)) {
-      const rowRange = this.tryParseRowRange();
+      const rowRange = this.#tryParseRowRange();
       if (rowRange) return rowRange;
-      return this.parseNumberLiteral();
+      return this.#parseNumberLiteral();
     }
 
     // Identifier: may be a function name, boolean, or cell reference.
@@ -425,10 +425,10 @@ export class FormulaParser implements IFormulaParser {
     // Cell reference: A1, $A$1, AA10.
     // Range reference: A1:C3.
     if (ch !== void 0 && /[A-Za-z_$]/.test(ch)) {
-      return this.parseIdentifier();
+      return this.#parseIdentifier();
     }
 
-    throw new SearError(`Unexpected character at position ${this.pos}: '${ch}'`);
+    throw new SearError(`Unexpected character at position ${this.#pos}: '${ch}'`);
   }
 
   // ─── Atom Parse Helpers ─────────────────────────────────
@@ -436,16 +436,16 @@ export class FormulaParser implements IFormulaParser {
   /**
    * Parses a numeric literal.
    */
-  private parseNumberLiteral(): FormulaAST {
-    const remaining = this.input.slice(this.pos);
+  #parseNumberLiteral(): FormulaAST {
+    const remaining = this.#input.slice(this.#pos);
     const match = /^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/.exec(remaining);
     const literal = match?.[0];
     if (!literal || ['.', 'e', 'E'].includes(remaining[literal.length] ?? '')) {
-      throw new SearError(`Invalid number at position ${this.pos}`);
+      throw new SearError(`Invalid number at position ${this.#pos}`);
     }
     const value = parseSpreadsheetNumericLiteral(literal);
     if (!Number.isFinite(value)) throw new SearError(`Invalid number: ${literal}`);
-    this.pos += literal.length;
+    this.#pos += literal.length;
     // Preserve an over-limit source for functions that validate argument bounds.
     const rawLiteral = Number(literal) > Number.MAX_SAFE_INTEGER ? literal : undefined;
     return { kind: FormulaNodeKind.Number, value, ...(rawLiteral ? { rawLiteral } : {}) };
@@ -454,39 +454,39 @@ export class FormulaParser implements IFormulaParser {
   /**
    * Parses a string literal wrapped in double quotes.
    */
-  private parseStringLiteral(): FormulaAST {
-    this.advance(); // Consume the opening '"'.
+  #parseStringLiteral(): FormulaAST {
+    this.#advance(); // Consume the opening '"'.
     let value = '';
-    while (this.pos < this.input.length) {
-      if (this.input[this.pos] !== '"') {
-        value += this.input[this.pos];
-        this.pos++;
+    while (this.#pos < this.#input.length) {
+      if (this.#input[this.#pos] !== '"') {
+        value += this.#input[this.#pos];
+        this.#pos++;
         continue;
       }
-      if (this.input[this.pos + 1] === '"') {
+      if (this.#input[this.#pos + 1] === '"') {
         value += '"';
-        this.pos += 2;
+        this.#pos += 2;
         continue;
       }
-      this.advance(); // Consume the closing '"'.
+      this.#advance(); // Consume the closing '"'.
       return { kind: FormulaNodeKind.String, value };
     }
     throw new SearError('Unterminated string literal');
   }
 
   /** Parses an Excel-style array constant into rows of scalar AST nodes. */
-  private parseArrayConstant(): FormulaAST {
-    this.advance(); // Consume '{'.
+  #parseArrayConstant(): FormulaAST {
+    this.#advance(); // Consume '{'.
     const rows: FormulaAST[][] = [];
     let row: FormulaAST[] = [];
 
     while (true) {
-      this.skipWhitespace();
-      if (this.peek() === void 0) throw new SearError(`Unterminated array constant at position ${this.pos}`);
-      if (this.peek() === '}') {
-        if (row.length === 0) throw new SearError(`Empty array constant at position ${this.pos}`);
+      this.#skipWhitespace();
+      if (this.#peek() === void 0) throw new SearError(`Unterminated array constant at position ${this.#pos}`);
+      if (this.#peek() === '}') {
+        if (row.length === 0) throw new SearError(`Empty array constant at position ${this.#pos}`);
         rows.push(row);
-        this.advance();
+        this.#advance();
         const width = rows[0]?.length ?? 0;
         if (width === 0 || rows.some((candidate) => candidate.length !== width)) {
           throw new SearError('Array constant rows must have the same width');
@@ -494,33 +494,33 @@ export class FormulaParser implements IFormulaParser {
         return { kind: FormulaNodeKind.Array, rows };
       }
 
-      row.push(this.parseExpression());
-      this.skipWhitespace();
-      const separator = this.peek();
+      row.push(this.#parseExpression());
+      this.#skipWhitespace();
+      const separator = this.#peek();
       if (separator === ',') {
-        this.advance();
-        this.skipWhitespace();
-        if (this.peek() === ',' || this.peek() === ';' || this.peek() === '}') {
-          throw new SearError(`Missing array constant value at position ${this.pos}`);
+        this.#advance();
+        this.#skipWhitespace();
+        if (this.#peek() === ',' || this.#peek() === ';' || this.#peek() === '}') {
+          throw new SearError(`Missing array constant value at position ${this.#pos}`);
         }
         continue;
       }
       if (separator === ';') {
-        this.advance();
+        this.#advance();
         rows.push(row);
         row = [];
         continue;
       }
       if (separator === '}') {
         rows.push(row);
-        this.advance();
+        this.#advance();
         const width = rows[0]?.length ?? 0;
         if (width === 0 || rows.some((candidate) => candidate.length !== width)) {
           throw new SearError('Array constant rows must have the same width');
         }
         return { kind: FormulaNodeKind.Array, rows };
       }
-      throw new SearError(`Expected ',', ';' or '}' in array constant at position ${this.pos}`);
+      throw new SearError(`Expected ',', ';' or '}' in array constant at position ${this.#pos}`);
     }
   }
 
@@ -534,46 +534,46 @@ export class FormulaParser implements IFormulaParser {
    * 4. Whole-column reference: A:A, $A:$C.
    * 5. Cell/range reference: A1, $A$1, A1:C3.
    */
-  private parseIdentifier(): FormulaAST {
+  #parseIdentifier(): FormulaAST {
     // Read the identifier.
     let name = '';
-    while (this.pos < this.input.length && /[A-Za-z0-9_$.]/.test(this.input[this.pos])) {
-      name += this.input[this.pos];
-      this.pos++;
+    while (this.#pos < this.#input.length && /[A-Za-z0-9_$.]/.test(this.#input[this.#pos])) {
+      name += this.#input[this.#pos];
+      this.#pos++;
     }
 
-    const identifierEnd = this.pos;
-    this.skipWhitespace();
+    const identifierEnd = this.#pos;
+    this.#skipWhitespace();
 
     // Workbook reference: display sheet name followed by '!'.
-    if (this.peek() === '!') {
-      this.advance();
-      return this.parseWorkbookCellOrRangeRef(name);
+    if (this.#peek() === '!') {
+      this.#advance();
+      return this.#parseWorkbookCellOrRangeRef(name);
     }
 
-    if (this.peek() === ':') {
-      const secondSheet = /^:([A-Za-z_][A-Za-z0-9_$.]*)!/.exec(this.input.slice(this.pos));
+    if (this.#peek() === ':') {
+      const secondSheet = /^:([A-Za-z_][A-Za-z0-9_$.]*)!/.exec(this.#input.slice(this.#pos));
       if (secondSheet) {
-        this.pos += secondSheet[0].length;
-        return this.parseWorkbookCellOrRangeRef(`${name}:${secondSheet[1]}`);
+        this.#pos += secondSheet[0].length;
+        return this.#parseWorkbookCellOrRangeRef(`${name}:${secondSheet[1]}`);
       }
     }
 
-    if (this.peek() === '[') {
-      const start = this.pos;
+    if (this.#peek() === '[') {
+      const start = this.#pos;
       let depth = 0;
-      while (this.pos < this.input.length) {
-        const token = this.input[this.pos++];
+      while (this.#pos < this.#input.length) {
+        const token = this.#input[this.#pos++];
         if (token === '[') depth += 1;
         else if (token === ']' && --depth === 0) break;
       }
       if (depth !== 0) throw new SearError(`Unterminated structured reference at position ${start}`);
-      return { kind: FormulaNodeKind.Name, name: `${name}${this.input.slice(start, this.pos)}` };
+      return { kind: FormulaNodeKind.Name, name: `${name}${this.#input.slice(start, this.#pos)}` };
     }
 
     // Check whether this is a function call: identifier followed by '('.
-    if (this.peek() === '(') {
-      return this.parseFunctionCall(name);
+    if (this.#peek() === '(') {
+      return this.#parseFunctionCall(name);
     }
 
     // Check whether this is a boolean.
@@ -581,28 +581,28 @@ export class FormulaParser implements IFormulaParser {
     if (upper === 'TRUE') return { kind: FormulaNodeKind.Boolean, value: true };
     if (upper === 'FALSE') return { kind: FormulaNodeKind.Boolean, value: false };
 
-    if (this.peek() === ':' && this.isColumnRef(name)) {
-      return this.parseColumnRangeRef(name);
+    if (this.#peek() === ':' && this.#isColumnRef(name)) {
+      return this.#parseColumnRangeRef(name);
     }
 
     // Otherwise, it is a cell/range reference or an unqualified name.
     if (/^\$?[A-Za-z]{1,3}\$?[1-9][0-9]*$/.test(name)) {
-      if (this.peek() !== ':') this.pos = identifierEnd;
-      return this.parseCellOrRangeRef(name);
+      if (this.#peek() !== ':') this.#pos = identifierEnd;
+      return this.#parseCellOrRangeRef(name);
     }
     return { kind: FormulaNodeKind.Name, name: upper };
   }
 
-  private parseColumnRangeRef(firstPart: string): FormulaAST {
-    const first = this.parseSingleColumnRef(firstPart);
-    this.advance(); // Consume ':'.
+  #parseColumnRangeRef(firstPart: string): FormulaAST {
+    const first = this.#parseSingleColumnRef(firstPart);
+    this.#advance(); // Consume ':'.
 
     let secondName = '';
-    while (this.pos < this.input.length && /[A-Za-z_$]/.test(this.input[this.pos])) {
-      secondName += this.input[this.pos];
-      this.pos++;
+    while (this.#pos < this.#input.length && /[A-Za-z_$]/.test(this.#input[this.#pos])) {
+      secondName += this.#input[this.#pos];
+      this.#pos++;
     }
-    const second = this.parseSingleColumnRef(secondName);
+    const second = this.#parseSingleColumnRef(secondName);
     const startCol = Math.min(first.col, second.col);
     const endCol = Math.max(first.col, second.col);
     return {
@@ -614,18 +614,18 @@ export class FormulaParser implements IFormulaParser {
     };
   }
 
-  private tryParseRowRange(): FormulaAST | null {
-    const startPos = this.pos;
-    const first = this.readRowRef();
-    if (!first || this.peek() !== ':') {
-      this.pos = startPos;
+  #tryParseRowRange(): FormulaAST | null {
+    const startPos = this.#pos;
+    const first = this.#readRowRef();
+    if (!first || this.#peek() !== ':') {
+      this.#pos = startPos;
       return null;
     }
 
-    this.advance(); // Consume ':'.
-    const second = this.readRowRef();
+    this.#advance(); // Consume ':'.
+    const second = this.#readRowRef();
     if (!second) {
-      this.pos = startPos;
+      this.#pos = startPos;
       return null;
     }
 
@@ -645,44 +645,44 @@ export class FormulaParser implements IFormulaParser {
    *
    * functionCall → name '(' (expression (',' expression)*)? ')'
    */
-  private parseFunctionCall(name: string): FormulaAST {
-    this.functionDepth++;
-    if (this.functionDepth > MAX_FORMULA_FUNCTION_DEPTH) {
-      this.functionDepth--;
+  #parseFunctionCall(name: string): FormulaAST {
+    this.#functionDepth++;
+    if (this.#functionDepth > MAX_FORMULA_FUNCTION_DEPTH) {
+      this.#functionDepth--;
       throw new SearError(`Formula exceeds ${MAX_FORMULA_FUNCTION_DEPTH} nested functions`);
     }
     try {
-      return { kind: FormulaNodeKind.Call, name: name.toUpperCase(), args: this.parseCallArguments() };
+      return { kind: FormulaNodeKind.Call, name: name.toUpperCase(), args: this.#parseCallArguments() };
     } finally {
-      this.functionDepth--;
+      this.#functionDepth--;
     }
   }
 
-  private parseCallArguments(): FormulaAST[] {
-    this.advance(); // Consume '('.
+  #parseCallArguments(): FormulaAST[] {
+    this.#advance(); // Consume '('.
 
     const args: FormulaAST[] = [];
 
-    this.skipWhitespace();
-    if (this.peek() !== ')') {
+    this.#skipWhitespace();
+    if (this.#peek() !== ')') {
       while (true) {
-        this.skipWhitespace();
-        if (this.peek() === ',' || this.peek() === ')') {
+        this.#skipWhitespace();
+        if (this.#peek() === ',' || this.#peek() === ')') {
           args.push({ kind: FormulaNodeKind.Missing });
         } else {
-          args.push(this.parseExpression());
+          args.push(this.#parseExpression());
         }
-        this.skipWhitespace();
-        if (this.peek() !== ',') break;
-        this.advance(); // Consume ','.
+        this.#skipWhitespace();
+        if (this.#peek() !== ',') break;
+        this.#advance(); // Consume ','.
       }
     }
 
-    this.skipWhitespace();
-    if (this.peek() !== ')') {
-      throw new SearError(`Expected ')' after function arguments at position ${this.pos}`);
+    this.#skipWhitespace();
+    if (this.#peek() !== ')') {
+      throw new SearError(`Expected ')' after function arguments at position ${this.#pos}`);
     }
-    this.advance(); // Consume ')'.
+    this.#advance(); // Consume ')'.
 
     return args;
   }
@@ -695,22 +695,22 @@ export class FormulaParser implements IFormulaParser {
    * cellRef: "A1", "$A$1", "AA10"
    * rangeRef: "A1:C3", "$A$1:$C$3"
    */
-  private parseCellOrRangeRef(firstPart: string): FormulaAST {
-    const first = this.parseSingleCellRef(firstPart);
+  #parseCellOrRangeRef(firstPart: string): FormulaAST {
+    const first = this.#parseSingleCellRef(firstPart);
 
     // Check whether this is a range reference: cellRef ':' cellRef.
-    const afterFirst = this.pos;
-    this.skipWhitespace();
-    if (this.peek() === ':') {
-      this.advance(); // Consume ':'.
+    const afterFirst = this.#pos;
+    this.#skipWhitespace();
+    if (this.#peek() === ':') {
+      this.#advance(); // Consume ':'.
 
       // Parse the second cell reference.
       let secondName = '';
-      while (this.pos < this.input.length && /[A-Za-z0-9_$]/.test(this.input[this.pos])) {
-        secondName += this.input[this.pos];
-        this.pos++;
+      while (this.#pos < this.#input.length && /[A-Za-z0-9_$]/.test(this.#input[this.#pos])) {
+        secondName += this.#input[this.#pos];
+        this.#pos++;
       }
-      const second = this.parseSingleCellRef(secondName);
+      const second = this.#parseSingleCellRef(secondName);
 
       return {
         kind: FormulaNodeKind.Range,
@@ -719,7 +719,7 @@ export class FormulaParser implements IFormulaParser {
     }
 
     // Ordinary cell reference.
-    this.pos = afterFirst;
+    this.#pos = afterFirst;
     return {
       kind: FormulaNodeKind.Cell,
       row: first.row,
@@ -735,14 +735,14 @@ export class FormulaParser implements IFormulaParser {
    * The sheet name stays as display text here; workbook hosts bind it to a
    * stable sheet id at compile/evaluation time.
    */
-  private parseWorkbookCellOrRangeRef(sheetName: string): FormulaAST {
-    const first = this.parseSingleCellRef(this.readCellReferenceText());
+  #parseWorkbookCellOrRangeRef(sheetName: string): FormulaAST {
+    const first = this.#parseSingleCellRef(this.#readCellReferenceText());
 
-    const afterFirst = this.pos;
-    this.skipWhitespace();
-    if (this.peek() === ':') {
-      this.advance();
-      const second = this.parseSingleCellRef(this.readCellReferenceText());
+    const afterFirst = this.#pos;
+    this.#skipWhitespace();
+    if (this.#peek() === ':') {
+      this.#advance();
+      const second = this.#parseSingleCellRef(this.#readCellReferenceText());
       return {
         kind: FormulaNodeKind.WorkbookRange,
         sheetName,
@@ -750,7 +750,7 @@ export class FormulaParser implements IFormulaParser {
       };
     }
 
-    this.pos = afterFirst;
+    this.#pos = afterFirst;
     return {
       kind: FormulaNodeKind.WorkbookCell,
       sheetName,
@@ -761,36 +761,36 @@ export class FormulaParser implements IFormulaParser {
     };
   }
 
-  private parseQuotedSheetName(): string {
-    this.advance(); // Consume opening single quote.
+  #parseQuotedSheetName(): string {
+    this.#advance(); // Consume opening single quote.
     let sheetName = '';
-    while (this.pos < this.input.length) {
-      const ch = this.input[this.pos];
+    while (this.#pos < this.#input.length) {
+      const ch = this.#input[this.#pos];
       if (ch !== "'") {
         sheetName += ch;
-        this.pos++;
+        this.#pos++;
         continue;
       }
-      if (this.input[this.pos + 1] === "'") {
+      if (this.#input[this.#pos + 1] === "'") {
         sheetName += "'";
-        this.pos += 2;
+        this.#pos += 2;
         continue;
       }
-      this.advance(); // Consume closing single quote.
+      this.#advance(); // Consume closing single quote.
       if (!sheetName) throw new SearError('Empty quoted sheet name');
       return sheetName;
     }
     throw new SearError('Unterminated quoted sheet name');
   }
 
-  private readCellReferenceText(): string {
-    this.skipWhitespace();
+  #readCellReferenceText(): string {
+    this.#skipWhitespace();
     let ref = '';
-    while (this.pos < this.input.length && /[A-Za-z0-9_$]/.test(this.input[this.pos])) {
-      ref += this.input[this.pos];
-      this.pos++;
+    while (this.#pos < this.#input.length && /[A-Za-z0-9_$]/.test(this.#input[this.#pos])) {
+      ref += this.#input[this.#pos];
+      this.#pos++;
     }
-    if (!ref) throw new SearError(`Expected cell reference at position ${this.pos}`);
+    if (!ref) throw new SearError(`Expected cell reference at position ${this.#pos}`);
     return ref;
   }
 
@@ -799,36 +799,36 @@ export class FormulaParser implements IFormulaParser {
    *
    * Delegates to CellRef.parseCellRef.
    */
-  private parseSingleCellRef(ref: string): ParsedCellRef {
+  #parseSingleCellRef(ref: string): ParsedCellRef {
     return parseCellRef(ref);
   }
 
-  private parseSingleColumnRef(ref: string): { col: number; absCol: boolean } {
-    if (!this.isColumnRef(ref)) throw new SearError(`Invalid column reference: ${ref}`);
+  #parseSingleColumnRef(ref: string): { col: number; absCol: boolean } {
+    if (!this.#isColumnRef(ref)) throw new SearError(`Invalid column reference: ${ref}`);
     const absCol = ref.startsWith('$');
     const label = absCol ? ref.slice(1) : ref;
     return { col: columnLabelToIndex(label), absCol };
   }
 
-  private isColumnRef(ref: string): boolean {
+  #isColumnRef(ref: string): boolean {
     return /^\$?[A-Za-z]{1,3}$/.test(ref);
   }
 
-  private readRowRef(): { row: number; absRow: boolean } | null {
-    const start = this.pos;
+  #readRowRef(): { row: number; absRow: boolean } | null {
+    const start = this.#pos;
     let absRow = false;
-    if (this.peek() === '$') {
+    if (this.#peek() === '$') {
       absRow = true;
-      this.advance();
+      this.#advance();
     }
 
     let rowText = '';
-    while (this.pos < this.input.length && /[0-9]/.test(this.input[this.pos])) {
-      rowText += this.input[this.pos];
-      this.pos++;
+    while (this.#pos < this.#input.length && /[0-9]/.test(this.#input[this.#pos])) {
+      rowText += this.#input[this.#pos];
+      this.#pos++;
     }
     if (!rowText) {
-      this.pos = start;
+      this.#pos = start;
       return null;
     }
     return { row: Number.parseInt(rowText, 10) - 1, absRow };
@@ -839,7 +839,7 @@ export class FormulaParser implements IFormulaParser {
   /**
    * Recursively traverses the AST and collects every cell and range node.
    */
-  private collectDeps(ast: FormulaAST, deps: Dependency[]): void {
+  #collectDeps(ast: FormulaAST, deps: Dependency[]): void {
     switch (ast.kind) {
       case FormulaNodeKind.Cell:
         deps.push({ kind: FormulaNodeKind.Cell, row: ast.row, col: ast.col });
@@ -860,7 +860,7 @@ export class FormulaParser implements IFormulaParser {
         });
         break;
       case FormulaNodeKind.Spill:
-        this.collectDeps(ast.reference, deps);
+        this.#collectDeps(ast.reference, deps);
         break;
       case FormulaNodeKind.WorkbookRange:
         deps.push({
@@ -886,14 +886,14 @@ export class FormulaParser implements IFormulaParser {
         break;
       case FormulaNodeKind.Binary:
       case FormulaNodeKind.Intersection:
-        this.collectDeps(ast.left, deps);
-        this.collectDeps(ast.right, deps);
+        this.#collectDeps(ast.left, deps);
+        this.#collectDeps(ast.right, deps);
         break;
       case FormulaNodeKind.Unary:
-        this.collectDeps(ast.operand, deps);
+        this.#collectDeps(ast.operand, deps);
         break;
       case FormulaNodeKind.Tuple:
-        ast.items.forEach((item) => this.collectDeps(item, deps));
+        ast.items.forEach((item) => this.#collectDeps(item, deps));
         break;
       case FormulaNodeKind.Call:
         if (ast.name.toUpperCase() === 'INDIRECT' && ast.args[0]?.kind === FormulaNodeKind.String &&
@@ -901,25 +901,25 @@ export class FormulaParser implements IFormulaParser {
           try {
             const reference = this.parse(`=${ast.args[0].value}`);
             if (reference.kind === FormulaNodeKind.Cell || reference.kind === FormulaNodeKind.Range) {
-              this.collectDeps(reference, deps);
+              this.#collectDeps(reference, deps);
             }
           } catch {
             // Dynamic or invalid text references are resolved during evaluation.
           }
         }
         for (const arg of ast.args) {
-          this.collectDeps(arg, deps);
+          this.#collectDeps(arg, deps);
         }
         break;
       case FormulaNodeKind.Invoke:
-        this.collectDeps(ast.callee, deps);
+        this.#collectDeps(ast.callee, deps);
         for (const arg of ast.args) {
-          this.collectDeps(arg, deps);
+          this.#collectDeps(arg, deps);
         }
         break;
       case FormulaNodeKind.Array:
         for (const row of ast.rows) {
-          for (const item of row) this.collectDeps(item, deps);
+          for (const item of row) this.#collectDeps(item, deps);
         }
         break;
       case FormulaNodeKind.Name:
@@ -943,7 +943,7 @@ export class FormulaParser implements IFormulaParser {
    * Absolute references (absRow / absCol) do not shift for insert/delete.
    * Absolute references remain fixed for every structure change kind.
    */
-  private shiftNode(ast: FormulaAST, changes: StructureChange[]): FormulaAST {
+  #shiftNode(ast: FormulaAST, changes: StructureChange[]): FormulaAST {
     switch (ast.kind) {
       case FormulaNodeKind.Cell: {
         let newRow = ast.row;
@@ -980,14 +980,14 @@ export class FormulaParser implements IFormulaParser {
         for (const change of changes) {
           const axis = getStructureChangeAxis(change);
           if (axis === StructureChangeAxis.Row) {
-            const start = this.shiftRangeCoordinate(startRow, ast.absStartRow, change, axis);
-            const end = this.shiftRangeCoordinate(endRow, ast.absEndRow, change, axis);
+            const start = this.#shiftRangeCoordinate(startRow, ast.absStartRow, change, axis);
+            const end = this.#shiftRangeCoordinate(endRow, ast.absEndRow, change, axis);
             startRow = start.value;
             endRow = end.value;
             refError ||= start.refError || end.refError;
           } else if (axis === StructureChangeAxis.Col) {
-            const start = this.shiftRangeCoordinate(startCol, ast.absStartCol, change, axis);
-            const end = this.shiftRangeCoordinate(endCol, ast.absEndCol, change, axis);
+            const start = this.#shiftRangeCoordinate(startCol, ast.absStartCol, change, axis);
+            const end = this.#shiftRangeCoordinate(endCol, ast.absEndCol, change, axis);
             startCol = start.value;
             endCol = end.value;
             refError ||= start.refError || end.refError;
@@ -1021,32 +1021,32 @@ export class FormulaParser implements IFormulaParser {
         return ast;
 
       case FormulaNodeKind.Spill: {
-        const reference = this.shiftNode(ast.reference, changes);
+        const reference = this.#shiftNode(ast.reference, changes);
         if (reference.kind !== FormulaNodeKind.Cell && reference.kind !== FormulaNodeKind.WorkbookCell) return reference;
         return reference === ast.reference ? ast : { ...ast, reference };
       }
 
       case FormulaNodeKind.Binary: {
-        const left = this.shiftNode(ast.left, changes);
-        const right = this.shiftNode(ast.right, changes);
+        const left = this.#shiftNode(ast.left, changes);
+        const right = this.#shiftNode(ast.right, changes);
         if (left === ast.left && right === ast.right) return ast;
         return { ...ast, left, right };
       }
       case FormulaNodeKind.Intersection: {
-        const left = this.shiftNode(ast.left, changes);
-        const right = this.shiftNode(ast.right, changes);
+        const left = this.#shiftNode(ast.left, changes);
+        const right = this.#shiftNode(ast.right, changes);
         return left === ast.left && right === ast.right ? ast : { ...ast, left, right };
       }
 
       case FormulaNodeKind.Unary: {
-        const operand = this.shiftNode(ast.operand, changes);
+        const operand = this.#shiftNode(ast.operand, changes);
         if (operand === ast.operand) return ast;
         return { ...ast, operand };
       }
       case FormulaNodeKind.Tuple: {
         let changed = false;
         const items = ast.items.map((item) => {
-          const shifted = this.shiftNode(item, changes);
+          const shifted = this.#shiftNode(item, changes);
           changed ||= shifted !== item;
           return shifted;
         });
@@ -1056,7 +1056,7 @@ export class FormulaParser implements IFormulaParser {
       case FormulaNodeKind.Call: {
         let anyChanged = false;
         const args = ast.args.map((arg) => {
-          const shifted = this.shiftNode(arg, changes);
+          const shifted = this.#shiftNode(arg, changes);
           if (shifted !== arg) anyChanged = true;
           return shifted;
         });
@@ -1065,10 +1065,10 @@ export class FormulaParser implements IFormulaParser {
       }
 
       case FormulaNodeKind.Invoke: {
-        const callee = this.shiftNode(ast.callee, changes);
+        const callee = this.#shiftNode(ast.callee, changes);
         let anyChanged = callee !== ast.callee;
         const args = ast.args.map((arg) => {
-          const shifted = this.shiftNode(arg, changes);
+          const shifted = this.#shiftNode(arg, changes);
           if (shifted !== arg) anyChanged = true;
           return shifted;
         });
@@ -1079,7 +1079,7 @@ export class FormulaParser implements IFormulaParser {
         let changed = false;
         const rows = ast.rows.map((row) =>
           row.map((item) => {
-            const shifted = this.shiftNode(item, changes);
+            const shifted = this.#shiftNode(item, changes);
             if (shifted !== item) changed = true;
             return shifted;
           }),
@@ -1096,7 +1096,7 @@ export class FormulaParser implements IFormulaParser {
   }
 
   /** Shifts one range endpoint while preserving its own absolute-reference flag. */
-  private shiftRangeCoordinate(
+  #shiftRangeCoordinate(
     value: number,
     isAbsolute: boolean,
     change: StructureChange,
@@ -1109,19 +1109,19 @@ export class FormulaParser implements IFormulaParser {
   // ─── Low-Level Character Operations ─────────────────────
 
   /** Gets the current character without advancing. */
-  private peek(): string | undefined {
-    return this.input[this.pos];
+  #peek(): string | undefined {
+    return this.#input[this.#pos];
   }
 
   /** Advances by one character. */
-  private advance(): void {
-    this.pos++;
+  #advance(): void {
+    this.#pos++;
   }
 
   /** Skips whitespace characters. */
-  private skipWhitespace(): void {
-    while (this.pos < this.input.length && /\s/.test(this.input[this.pos])) {
-      this.pos++;
+  #skipWhitespace(): void {
+    while (this.#pos < this.#input.length && /\s/.test(this.#input[this.#pos])) {
+      this.#pos++;
     }
   }
 }

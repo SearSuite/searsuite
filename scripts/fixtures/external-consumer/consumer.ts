@@ -179,23 +179,23 @@ void registerExternalClientContributor;
 class ExternalWorkbookPlugin extends WorkbookPlugin {
   public static readonly symbol = Symbol.for('ExternalWorkbookPlugin');
 
-  private count = 0;
-  private readonly listeners = new Set<(count: number) => void>();
+  #count = 0;
+  readonly #listeners = new Set<(count: number) => void>();
 
   public registerCommands(commands: WorkbookCommandBus): void {
     commands.register(IncrementCommand, () => {
-      this.count += 1;
-      this.listeners.forEach((listener) => listener(this.count));
-      return this.count;
+      this.#count += 1;
+      this.#listeners.forEach((listener) => listener(this.#count));
+      return this.#count;
     });
   }
 
   public registerObservations(observations: ObservationRegistry): void {
     const source: StateObservationSource<number> = {
-      getSnapshot: () => this.count,
+      getSnapshot: () => this.#count,
       subscribe: (listener) => {
-        this.listeners.add(listener);
-        return () => this.listeners.delete(listener);
+        this.#listeners.add(listener);
+        return () => this.#listeners.delete(listener);
       },
     };
     observations.register(CountObservation, source);
@@ -204,19 +204,19 @@ class ExternalWorkbookPlugin extends WorkbookPlugin {
   public registerSessionState(session: SessionStateRegistry): void {
     session.register(CountSessionState, {
       restorePhase: SessionStateRestorePhase.BeforeInitialize,
-      capture: () => this.count,
+      capture: () => this.#count,
       restore: (count) => {
-        this.count = count;
+        this.#count = count;
       },
     });
   }
 
   public registerCapabilities(capabilities: WorkbookRuntimeExtensionRegistry): void {
-    capabilities.register(CountCapability, { getCount: () => this.count });
+    capabilities.register(CountCapability, { getCount: () => this.#count });
   }
 
   public initialize(_context: WorkbookPluginContext): () => void {
-    return () => this.listeners.clear();
+    return () => this.#listeners.clear();
   }
 }
 

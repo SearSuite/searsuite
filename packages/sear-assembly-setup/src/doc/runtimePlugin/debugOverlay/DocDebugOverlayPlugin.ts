@@ -24,7 +24,7 @@ export class DocDebugOverlayPlugin extends DocPlugin<null> {
   /** DI token for resolving DocDebugOverlayPlugin. */
   public static readonly symbol = Symbol.for('DocDebugOverlayPlugin');
 
-  private runtime: DocPluginRuntime | null = null;
+  #runtime: DocPluginRuntime | null = null;
 
   /** Creates a DocDebugOverlayPlugin instance. */
   public constructor() {
@@ -44,7 +44,7 @@ export class DocDebugOverlayPlugin extends DocPlugin<null> {
   }
 
   public render(): Node<NodeProperties>[] | null {
-    const layout = this.runtime?.document.core.getDocRenderLayoutState();
+    const layout = this.#runtime?.document.core.getDocRenderLayoutState();
     if (!layout || (layout.visibleBlocks.length === 0 && !layout.blockRender)) return null;
     return [
       new ViewportOverlayNode({
@@ -52,13 +52,13 @@ export class DocDebugOverlayPlugin extends DocPlugin<null> {
         rect: createVisibleWorldRect(layout),
         role: 'selection',
         depth: 10_030,
-        drawOverlay: (context) => this.drawBlockBounds(context, layout),
+        drawOverlay: (context) => this.#drawBlockBounds(context, layout),
       }),
     ];
   }
 
   public configure(context: DocPluginSetupContext): void {
-    this.runtime = context.runtime;
+    this.#runtime = context.runtime;
   }
 
   public start(): void {
@@ -67,10 +67,10 @@ export class DocDebugOverlayPlugin extends DocPlugin<null> {
 
   public onEditorDestroy(): void {
     this.assertRuntimeWriteAllowed();
-    this.runtime = null;
+    this.#runtime = null;
   }
 
-  private drawBlockBounds(context: RenderContext, layout: DocRenderLayoutState): void {
+  #drawBlockBounds(context: RenderContext, layout: DocRenderLayoutState): void {
     context.save();
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.setStrokeStyle(DOC_DEBUG_OVERLAY_COLORS.blockBounds);

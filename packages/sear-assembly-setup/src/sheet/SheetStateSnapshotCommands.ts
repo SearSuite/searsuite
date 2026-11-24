@@ -39,17 +39,21 @@ export function registerSheetStateSnapshotCommands(
 }
 
 class ExportSheetStateSnapshotCommand implements SheetCommand<ExportSheetStateCommandResult> {
+  readonly #pluginManager: PluginManager<SearCoreSheet, CellProperties>;
+
   /** Stable command id mirrored from ExportSheetStateCommand. */
   public readonly id = ExportSheetStateCommand.id;
 
   /** Creates a command that reads and clones the current sheet state. */
-  public constructor(private readonly pluginManager: PluginManager<SearCoreSheet, CellProperties>) {}
+  public constructor(pluginManager: PluginManager<SearCoreSheet, CellProperties>) {
+    this.#pluginManager = pluginManager;
+  }
 
   /** Returns the cloned sheet state without mutating editor state. */
   public execute(_context: SheetCommandContext): ExportSheetStateCommandResult {
     return {
       pipeline: new Pipeline(this.id),
-      sheetState: captureSheetDocumentState(this.pluginManager),
+      sheetState: captureSheetDocumentState(this.#pluginManager),
     };
   }
 }

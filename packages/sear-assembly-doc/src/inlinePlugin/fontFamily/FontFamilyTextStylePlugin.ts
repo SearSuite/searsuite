@@ -41,10 +41,10 @@ export class FontFamilyTextStylePlugin extends InlineTextStylePluginBase {
   }
 
   public override registerCommands(commands: DocCommandBus): void {
-    commands.register(SetDocFontFamilyCommand, this.createSetFontFamilyCommand.bind(this));
+    commands.register(SetDocFontFamilyCommand, this.#createSetFontFamilyCommand.bind(this));
   }
 
-  private createSetFontFamilyCommand(input: SetDocFontFamilyInput) {
+  #createSetFontFamilyCommand(input: SetDocFontFamilyInput) {
     const fontFamily = normalizeFontFamily(input?.fontFamily);
     return createDocCommand(SetDocFontFamilyCommand.id, DocContentRenderPluginKey, () => {
       const runtime = this.requireRuntime();

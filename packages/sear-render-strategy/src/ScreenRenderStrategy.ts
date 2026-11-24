@@ -70,10 +70,12 @@ export interface ScreenRenderStrategyRuntime<NodeTypeProperties extends NodeProp
 export class ScreenRenderStrategy<
   NodeTypeProperties extends NodeProperties,
 > extends RenderStrategy<NodeTypeProperties> {
+  readonly #rasterCopyExecutor: RasterCopyExecutor;
+
   /** DI token for resolving ScreenRenderStrategy. */
   public static readonly symbol = Symbol.for('ScreenRenderStrategy');
 
-  private runtime: ScreenRenderStrategyRuntime<NodeTypeProperties> = {};
+  #runtime: ScreenRenderStrategyRuntime<NodeTypeProperties> = {};
 
   /** Creates a screen render strategy with injected render targets and copy executor. */
   public constructor(
@@ -91,7 +93,7 @@ export class ScreenRenderStrategy<
     @Inject(GenerationalDirtyTracker.symbol)
     dirtyTree: GenerationalDirtyTracker,
     @Inject(RasterCopyExecutor.symbol)
-    private readonly rasterCopyExecutor: RasterCopyExecutor,
+    rasterCopyExecutor: RasterCopyExecutor,
   ) {
     super(
       renderContext,
@@ -104,11 +106,12 @@ export class ScreenRenderStrategy<
       tree,
       dirtyTree,
     );
+    this.#rasterCopyExecutor = rasterCopyExecutor;
   }
 
   /** Configures host-specific viewport, query, and drawing semantics. */
   public configureRuntime(runtime: ScreenRenderStrategyRuntime<NodeTypeProperties>): void {
-    this.runtime = runtime;
+    this.#runtime = runtime;
   }
 
   /**
@@ -117,27 +120,27 @@ export class ScreenRenderStrategy<
    */
   render(node: Node<NodeTypeProperties>): void {
     // debugger;
-    const scrollState = this.resolveScrollState();
-    const viewport = this.resolveViewport();
-    if (this.runtime.requiresFrameRebuild?.() ?? requiresViewportFrameRebuild(this.renderContext)) {
-      this.renderRebuiltFrame(node, viewport, scrollState);
+    const scrollState = this.#resolveScrollState();
+    const viewport = this.#resolveViewport();
+    if (this.#runtime.requiresFrameRebuild?.() ?? requiresViewportFrameRebuild(this.renderContext)) {
+      this.#renderRebuiltFrame(node, viewport, scrollState);
       return;
     }
-    const frameCache = createViewportFrameCache(this.offScreenRenderContext, this.rasterCopyExecutor);
-    if (frameCache.isReady() && this.runtime.forceFullRepaint?.() !== true) {
-      const hasScrollChange = this.resolveIsScrollStateChanged(scrollState);
-      const blockCopyPlan = this.runtime.consumeBlockRasterCopyPlan?.() ?? null;
+    const frameCache = createViewportFrameCache(this.offScreenRenderContext, this.#rasterCopyExecutor);
+    if (frameCache.isReady() && this.#runtime.forceFullRepaint?.() !== true) {
+      const hasScrollChange = this.#resolveIsScrollStateChanged(scrollState);
+      const blockCopyPlan = this.#runtime.consumeBlockRasterCopyPlan?.() ?? null;
       if (blockCopyPlan && !hasScrollChange) {
-        this.renderBlockCopyFrame(node, frameCache, blockCopyPlan, scrollState);
+        this.#renderBlockCopyFrame(node, frameCache, blockCopyPlan, scrollState);
         return;
       }
       if (!hasScrollChange) return;
       if (Math.abs(scrollState.deltaX) >= viewport.width || Math.abs(scrollState.deltaY) >= viewport.height) {
         clearViewport(this.renderContext, viewport);
-        this.drawQueriedNodes(node, this.resolveWorldRect(viewport, scrollState), scrollState);
+        this.#drawQueriedNodes(node, this.#resolveWorldRect(viewport, scrollState), scrollState);
         frameCache.refreshFromVisibleFrame(this.renderContext, viewport);
-        this.runtime.onFrameRendered?.('full');
-        this.markRenderScrollStateConsumed();
+        this.#runtime.onFrameRendered?.('full');
+        this.#markRenderScrollStateConsumed();
         return;
       }
       const copyPlan = RasterCopyPlan.fromScroll(viewport, scrollState);
@@ -146,36 +149,36 @@ export class ScreenRenderStrategy<
       clearViewport(this.renderContext, copyPlan.viewport);
 
       // Copy the relevant region from the off-screen buffer to the main canvas
-      this.rasterCopyExecutor.copy(this.offScreenRenderContext, this.renderContext, copyPlan.cacheToViewportCopy);
+      this.#rasterCopyExecutor.copy(this.offScreenRenderContext, this.renderContext, copyPlan.cacheToViewportCopy);
 
       // Render the newly exposed (blank) area due to scrolling
-      const blankWorldRect = this.resolveWorldRect(copyPlan.blankViewportRect, scrollState);
-      this.drawQueriedNodes(node, blankWorldRect, scrollState);
+      const blankWorldRect = this.#resolveWorldRect(copyPlan.blankViewportRect, scrollState);
+      this.#drawQueriedNodes(node, blankWorldRect, scrollState);
 
       // Copy the updated main canvas back to the off-screen buffer
       frameCache.refreshFromVisibleFrame(this.renderContext, copyPlan.viewport);
-      this.runtime.onFrameRendered?.('scroll');
-      this.markRenderScrollStateConsumed();
+      this.#runtime.onFrameRendered?.('scroll');
+      this.#markRenderScrollStateConsumed();
     } else {
       // First render: draw everything and initialize the off-screen buffer
-      const visibleRect = this.resolveWorldRect(viewport, scrollState);
+      const visibleRect = this.#resolveWorldRect(viewport, scrollState);
 
       this.renderContext.save();
       this.renderContext.setTransform(1, 0, 0, 1, 0, 0);
       this.renderContext.clearRect(viewport.x, viewport.y, viewport.width, viewport.height);
       this.renderContext.restore();
-      this.drawQueriedNodes(node, visibleRect, scrollState);
+      this.#drawQueriedNodes(node, visibleRect, scrollState);
       // A cache rebuild (including every view-scale change) must be a
       // replacement, never an incremental composition over old pixels.
       // The visible canvas is already a complete base-layer frame here.
       // Clone the complete base frame to initialize the off-screen buffer.
       frameCache.primeFromVisibleFrame(this.renderContext, viewport);
-      this.runtime.onFrameRendered?.('full');
-      this.markRenderScrollStateConsumed();
+      this.#runtime.onFrameRendered?.('full');
+      this.#markRenderScrollStateConsumed();
     }
   }
 
-  private renderBlockCopyFrame(
+  #renderBlockCopyFrame(
     node: Node<NodeTypeProperties>,
     frameCache: ViewportFrameCache,
     copyPlan: BlockRasterCopyPlan,
@@ -186,14 +189,14 @@ export class ScreenRenderStrategy<
       clearViewport(this.renderContext, clearRect);
     }
     for (const invalidWorldRect of copyPlan.invalidWorldRects) {
-      this.drawQueriedNodes(node, invalidWorldRect, scrollState);
+      this.#drawQueriedNodes(node, invalidWorldRect, scrollState);
     }
     for (const copy of copyPlan.cacheToViewportCopies) {
-      this.rasterCopyExecutor.copy(this.offScreenRenderContext, this.renderContext, copy);
+      this.#rasterCopyExecutor.copy(this.offScreenRenderContext, this.renderContext, copy);
     }
     frameCache.refreshFromVisibleFrame(this.renderContext, copyPlan.viewport);
-    this.runtime.onFrameRendered?.('block-copy');
-    this.markRenderScrollStateConsumed();
+    this.#runtime.onFrameRendered?.('block-copy');
+    this.#markRenderScrollStateConsumed();
   }
 
   /** Lets SearCoreSheet batch scroll rendering with scene regeneration into one frame. */
@@ -202,31 +205,31 @@ export class ScreenRenderStrategy<
   }
 
   /** Renders a target that replaces its complete frame rather than reusing a raster cache. */
-  private renderRebuiltFrame(
+  #renderRebuiltFrame(
     node: Node<NodeTypeProperties>,
     viewport: PositionRect<HexColor>,
     scrollState: ScrollManagerState,
   ): void {
     // debugger;
-    const visibleRect = this.resolveWorldRect(viewport, scrollState);
+    const visibleRect = this.#resolveWorldRect(viewport, scrollState);
     this.renderContext.beginFrame();
-    this.drawQueriedNodes(node, visibleRect, scrollState);
-    this.runtime.onFrameRendered?.('rebuild');
-    this.markRenderScrollStateConsumed();
+    this.#drawQueriedNodes(node, visibleRect, scrollState);
+    this.#runtime.onFrameRendered?.('rebuild');
+    this.#markRenderScrollStateConsumed();
   }
 
-  private resolveViewport(): PositionRect<HexColor> {
-    return this.runtime.getViewport?.() ?? this.scrollManager.getPositionRect();
+  #resolveViewport(): PositionRect<HexColor> {
+    return this.#runtime.getViewport?.() ?? this.scrollManager.getPositionRect();
   }
 
-  private resolveScrollState(): ScrollManagerState {
-    if (this.runtime.getScrollState) return this.runtime.getScrollState();
+  #resolveScrollState(): ScrollManagerState {
+    if (this.#runtime.getScrollState) return this.#runtime.getScrollState();
     if (typeof this.scrollManager.getRenderScrollState === 'function') return this.scrollManager.getRenderScrollState();
     return this.scrollState;
   }
 
-  private resolveIsScrollStateChanged(scrollState: ScrollManagerState): boolean {
-    const runtimeResult = this.runtime.isScrollStateChanged?.(scrollState);
+  #resolveIsScrollStateChanged(scrollState: ScrollManagerState): boolean {
+    const runtimeResult = this.#runtime.isScrollStateChanged?.(scrollState);
     if (runtimeResult !== void 0) return runtimeResult;
     return (
       (typeof this.scrollManager.hasUnrenderedScroll === 'function' && this.scrollManager.hasUnrenderedScroll()) ||
@@ -236,27 +239,27 @@ export class ScreenRenderStrategy<
     );
   }
 
-  private markRenderScrollStateConsumed(): void {
+  #markRenderScrollStateConsumed(): void {
     if (typeof this.scrollManager.markScrollStateRendered === 'function') {
       this.scrollManager.markScrollStateRendered();
     }
   }
 
-  private resolveWorldRect(
+  #resolveWorldRect(
     viewportRect: PositionRect<HexColor>,
     scrollState: ScrollManagerState,
   ): PositionRect<HexColor> {
     return (
-      this.runtime.toWorldRect?.(viewportRect, scrollState) ??
+      this.#runtime.toWorldRect?.(viewportRect, scrollState) ??
       createWorldRectFromViewport(viewportRect, scrollState)
     );
   }
 
-  private queryScreenNodes(
+  #queryScreenNodes(
     node: Node<NodeTypeProperties>,
     worldRect: PositionRect<HexColor>,
   ): readonly Node<NodeTypeProperties>[] {
-    const runtimeNodes = this.runtime.queryNodes?.(node, worldRect);
+    const runtimeNodes = this.#runtime.queryNodes?.(node, worldRect);
     if (runtimeNodes) return runtimeNodes;
     const screenNodes: Node<NodeTypeProperties>[] = [];
     for (const candidate of node.query(worldRect)) {
@@ -265,15 +268,15 @@ export class ScreenRenderStrategy<
     return screenNodes;
   }
 
-  private drawQueriedNodes(
+  #drawQueriedNodes(
     node: Node<NodeTypeProperties>,
     worldRect: PositionRect<HexColor>,
     scrollState: ScrollManagerState,
   ): void {
     // debugger;
-    const nodes = this.queryScreenNodes(node, worldRect);
-    if (this.runtime.drawNodes) {
-      this.runtime.drawNodes({ context: this.renderContext, nodes, worldRect, scrollState });
+    const nodes = this.#queryScreenNodes(node, worldRect);
+    if (this.#runtime.drawNodes) {
+      this.#runtime.drawNodes({ context: this.renderContext, nodes, worldRect, scrollState });
       return;
     }
 

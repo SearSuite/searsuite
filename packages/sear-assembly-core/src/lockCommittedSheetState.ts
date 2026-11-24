@@ -3,7 +3,7 @@ import { SearError } from '@searsuite/sear-foundation-error';
 import { Rect } from '@searsuite/sear-foundation-rect';
 
 const csrRuntimeFields = new Set<PropertyKey>([
-  'data', 'indices', 'indptr', 'numRows', 'numCols', 'defaultValue', 'name', 'ndim', 'mutationsLocked', 'listeners',
+  'data', 'indices', 'indptr', 'numRows', 'numCols', 'defaultValue', 'name', 'ndim', 'listeners',
 ]);
 
 /** Locks document-owned state after initialization or a successful transaction commit. */

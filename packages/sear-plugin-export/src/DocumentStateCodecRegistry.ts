@@ -25,16 +25,16 @@ export interface DocumentStateModuleContribution<TOwnerState = unknown, TDocumen
 
 /** Registry that composes document-state modules without central field enumeration. */
 export class DocumentStateCodecRegistry<TState> {
-  private readonly codecs = new Map<string, DocumentStateCodec<TState>>();
+  readonly #codecs = new Map<string, DocumentStateCodec<TState>>();
 
   /** Registers a module codec. Duplicate keys are rejected. */
   public register(codec: DocumentStateCodec<TState>): this {
-    if (this.codecs.has(codec.key)) {
+    if (this.#codecs.has(codec.key)) {
       throw new ExportError(ExportErrorCode.duplicateCodec, 'Document state export codec already exists.', {
         key: codec.key,
       });
     }
-    this.codecs.set(codec.key, codec);
+    this.#codecs.set(codec.key, codec);
     return this;
   }
 
@@ -51,7 +51,7 @@ export class DocumentStateCodecRegistry<TState> {
 
   /** Serializes every registered module whose codec returns a payload. */
   public serialize(state: TState): SearDocumentStateModuleFile[] {
-    return [...this.codecs.values()].flatMap((codec) => {
+    return [...this.#codecs.values()].flatMap((codec) => {
       const payload = codec.serialize(state);
       if (payload === void 0) return [];
       return [{ key: codec.key, payload: cloneJsonValue(payload, codec.key) as JsonValue }];
@@ -61,7 +61,7 @@ export class DocumentStateCodecRegistry<TState> {
   /** Deserializes registered modules into one partial document state. */
   public deserialize(modules: readonly SearDocumentStateModuleFile[], path: string): Partial<TState> {
     return modules.reduce<Partial<TState>>((state, module, index) => {
-      const codec = this.codecs.get(module.key);
+      const codec = this.#codecs.get(module.key);
       if (!codec) {
         throw new ExportError(ExportErrorCode.codecNotFound, 'Document state export codec is not registered.', {
           key: module.key,

@@ -13,11 +13,11 @@ interface Branch extends CellMergeBounds {
 
 /** Balanced bounding-volume index over actual merges, independent of sheet size. */
 export class CellMergeRangeIndex {
-  private readonly root: Branch | undefined;
+  readonly #root: Branch | undefined;
 
   /** Builds an isolated index without materializing cells covered by a merge. */
   public constructor(ranges: readonly CellMergeBounds[]) {
-    this.root = buildBranch(ranges.map((range, order) => ({ ...range, order })));
+    this.#root = buildBranch(ranges.map((range, order) => ({ ...range, order })));
   }
 
   /** Finds membership, preserving matrix traversal order if stored ranges overlap. */
@@ -37,7 +37,7 @@ export class CellMergeRangeIndex {
       visit(branch.left);
       visit(branch.right);
     }
-    visit(this.root);
+    visit(this.#root);
     return result ?? null;
   }
 }

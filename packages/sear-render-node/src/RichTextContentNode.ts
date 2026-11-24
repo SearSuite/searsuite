@@ -11,11 +11,11 @@ import { RichTextVisualNode } from './RichTextVisualNode';
 
 /** Scene node that draws laid-out rich-text lines in world coordinates. */
 export class RichTextContentNode extends RichTextVisualNode {
-  private readonly lines: readonly RichTextRenderLine[];
-  private readonly origin: Pick<PositionRectProps, 'x' | 'y'>;
-  private readonly font: string | undefined;
-  private readonly blockIndexes: ReadonlySet<number> | null;
-  private readonly lineRenderer: RichTextLineRenderer;
+  readonly #lines: readonly RichTextRenderLine[];
+  readonly #origin: Pick<PositionRectProps, 'x' | 'y'>;
+  readonly #font: string | undefined;
+  readonly #blockIndexes: ReadonlySet<number> | null;
+  readonly #lineRenderer: RichTextLineRenderer;
 
   /** Creates a rich-text content node from pre-computed layout lines. */
   public constructor(input: {
@@ -36,11 +36,11 @@ export class RichTextContentNode extends RichTextVisualNode {
       depth: input.depth ?? 1,
       isEdit: true,
     });
-    this.lines = input.lines;
-    this.origin = input.origin;
-    this.font = input.font;
-    this.blockIndexes = input.blockIndexes ? new Set(input.blockIndexes) : null;
-    this.lineRenderer = input.lineRenderer;
+    this.#lines = input.lines;
+    this.#origin = input.origin;
+    this.#font = input.font;
+    this.#blockIndexes = input.blockIndexes ? new Set(input.blockIndexes) : null;
+    this.#lineRenderer = input.lineRenderer;
   }
 
   /** Draws every included layout line inside this node's clip. */
@@ -53,12 +53,12 @@ export class RichTextContentNode extends RichTextVisualNode {
       context.rect(this.positionRect.x, this.positionRect.y, this.positionRect.width, this.positionRect.height);
       context.clip();
     }
-    for (const line of this.lines) this.drawIncludedLine(context, line);
+    for (const line of this.#lines) this.#drawIncludedLine(context, line);
     context.restore();
   }
 
-  private drawIncludedLine(context: RenderContext, line: RichTextRenderLine): void {
-    if (this.blockIndexes && !this.blockIndexes.has(line.textNodePath[0])) return;
-    this.lineRenderer.paint(context, { line, origin: this.origin, font: this.font });
+  #drawIncludedLine(context: RenderContext, line: RichTextRenderLine): void {
+    if (this.#blockIndexes && !this.#blockIndexes.has(line.textNodePath[0])) return;
+    this.#lineRenderer.paint(context, { line, origin: this.#origin, font: this.#font });
   }
 }

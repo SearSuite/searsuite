@@ -455,15 +455,18 @@ describe('createWorkbookEditor', () => {
     const retainedHistorySession = new SessionStateRegistry();
     @Injectable()
     class RetainHistoryPlugin extends WorkbookPlugin {
+      readonly #history: WorkbookHistoryPlugin;
+
       public static readonly symbol = Symbol('RetainHistoryPlugin');
       public constructor(
         @Inject(WorkbookHistoryPlugin.symbol)
-        private readonly history: WorkbookHistoryPlugin,
+        history: WorkbookHistoryPlugin,
       ) {
         super();
+        this.#history = history;
       }
       public registerSessionState(): void {
-        this.history.registerSessionState(retainedHistorySession);
+        this.#history.registerSessionState(retainedHistorySession);
       }
       public initialize(context: WorkbookPluginContext): void {
         retainedHistory = context.container.resolve<WorkbookHistoryPlugin>(WorkbookHistoryPlugin.symbol);
@@ -1021,15 +1024,15 @@ describe('createWorkbookEditor', () => {
     class ThirdPartyWorkbookPlugin extends WorkbookPlugin {
       public static readonly symbol = Symbol('ThirdPartyWorkbookPlugin');
 
-      private readonly names: string[] = [];
+      readonly #names: string[] = [];
 
       public registerCommands(commands: WorkbookCommandBus): void {
-        commands.register(ThirdPartyWorkbookCommand, () => this.names.join('|'));
+        commands.register(ThirdPartyWorkbookCommand, () => this.#names.join('|'));
       }
 
       public registerObservations(observations: ObservationRegistry): void {
         observations.register(ThirdPartyWorkbookObservation, {
-          getSnapshot: () => this.names,
+          getSnapshot: () => this.#names,
           subscribe: () => () => void 0,
         });
       }
@@ -1042,7 +1045,7 @@ describe('createWorkbookEditor', () => {
       public initialize(context: WorkbookPluginContext) {
         lifecycle.push(`init:${context.runtime.sheets.getActiveId()}`);
         const dispose = context.runtime.observations.subscribe(WorkbookDocumentStateObservation, (state) => {
-          this.names.push(state.sheets.map((sheet) => sheet.name).join(','));
+          this.#names.push(state.sheets.map((sheet) => sheet.name).join(','));
         });
         return () => {
           lifecycle.push('dispose');
@@ -1086,10 +1089,10 @@ describe('createWorkbookEditor', () => {
     class IsolatedWorkbookPlugin extends WorkbookPlugin {
       public static readonly symbol = Symbol('IsolatedWorkbookPlugin');
 
-      private count = 0;
+      #count = 0;
 
       public registerCommands(commands: WorkbookCommandBus): void {
-        commands.register(ThirdPartyWorkbookCommand, () => String(++this.count));
+        commands.register(ThirdPartyWorkbookCommand, () => String(++this.#count));
       }
     }
 
@@ -1617,6 +1620,8 @@ describe('createWorkbookEditor', () => {
 
     @Injectable()
     class InjectedWorkbookPlugin extends WorkbookPlugin {
+      readonly #probe: WorkbookProbeService;
+
       public static readonly symbol = Symbol('InjectedWorkbookPlugin');
 
       public static registerServices(context: WorkbookPluginServiceContext): void {
@@ -1625,17 +1630,18 @@ describe('createWorkbookEditor', () => {
 
       public constructor(
         @Inject(WorkbookProbeService.symbol)
-        private readonly probe: WorkbookProbeService,
+        probe: WorkbookProbeService,
       ) {
         super();
+        this.#probe = probe;
       }
 
       public registerCommands(commands: WorkbookCommandBus): void {
-        commands.register(ThirdPartyWorkbookCommand, () => String(this.probe.id));
+        commands.register(ThirdPartyWorkbookCommand, () => String(this.#probe.id));
       }
 
       public onWorkbookDestroy(): void {
-        destroyed.push(this.probe.id);
+        destroyed.push(this.#probe.id);
       }
     }
 
@@ -1669,25 +1675,25 @@ describe('createWorkbookEditor', () => {
     @Injectable()
     class SessionContributorPlugin extends WorkbookPlugin {
       public static readonly symbol = Symbol('SessionContributorPlugin');
-      private first = 'default';
-      private second = 0;
+      #first = 'default';
+      #second = 0;
 
       public registerSessionState(registry: SessionStateRegistry): void {
         registry.register(secondDefinition, {
           restorePhase: SessionStateRestorePhase.BeforeInitialize,
           restoreAfter: [firstDefinition],
-          capture: () => this.second,
+          capture: () => this.#second,
           restore: (value) => {
             restoreOrder.push(`second:${value}`);
-            this.second = value;
+            this.#second = value;
           },
         });
         registry.register(firstDefinition, {
           restorePhase: SessionStateRestorePhase.BeforeInitialize,
-          capture: () => this.first,
+          capture: () => this.#first,
           restore: (value) => {
             restoreOrder.push(`first:${value}`);
-            this.first = value;
+            this.#first = value;
           },
         });
       }
@@ -1857,7 +1863,7 @@ describe('createWorkbookEditor', () => {
     @Injectable()
     class FailingTransactionPlugin extends WorkbookPlugin {
       public static readonly symbol = Symbol('FailingTransactionPlugin');
-      private runtime: WorkbookPluginContext['runtime'] | null = null;
+      #runtime: WorkbookPluginContext['runtime'] | null = null;
 
       public registerCommands(commands: WorkbookCommandBus): void {
         commands.register(FailWorkbookTransactionCommand, () => {
@@ -1874,16 +1880,16 @@ describe('createWorkbookEditor', () => {
           transaction.addStep('fail', () => {
             throw new Error('staged failure');
           });
-          return this.requireRuntime().executeTransaction(transaction);
+          return this.#requireRuntime().executeTransaction(transaction);
         });
       }
 
       public initialize(context: WorkbookPluginContext): void {
-        this.runtime = context.runtime;
+        this.#runtime = context.runtime;
       }
 
-      private requireRuntime(): WorkbookPluginContext['runtime'] {
-        if (this.runtime) return this.runtime;
+      #requireRuntime(): WorkbookPluginContext['runtime'] {
+        if (this.#runtime) return this.#runtime;
         throw new Error('FailingTransactionPlugin has not initialized.');
       }
     }
@@ -1993,7 +1999,7 @@ describe('createWorkbookEditor', () => {
     @Injectable()
     class ContentTransactionPlugin extends WorkbookPlugin {
       public static readonly symbol = Symbol('ContentTransactionPlugin');
-      private runtime: WorkbookPluginContext['runtime'] | null = null;
+      #runtime: WorkbookPluginContext['runtime'] | null = null;
 
       public registerCommands(commands: WorkbookCommandBus): void {
         commands.register(CommitTwoSheetContentCommand, () => {
@@ -2012,7 +2018,7 @@ describe('createWorkbookEditor', () => {
               },
             },
           }));
-          return this.runtime!.executeTransaction(transaction);
+          return this.#runtime!.executeTransaction(transaction);
         });
         commands.register(ChangeOtherSheetCommand, () => {
           const transaction = new WorkbookTransaction(ChangeOtherSheetCommand.id);
@@ -2026,10 +2032,10 @@ describe('createWorkbookEditor', () => {
               },
             },
           }));
-          return this.runtime!.executeTransaction(transaction);
+          return this.#runtime!.executeTransaction(transaction);
         });
         commands.register(InvalidContentSheetCommand, () =>
-          this.runtime!.executeTransaction(
+          this.#runtime!.executeTransaction(
             new WorkbookTransaction(InvalidContentSheetCommand.id, WorkbookHistoryAction.Record, [
               'missing-sheet',
             ]).addStep('missing-content', (state) => state),
@@ -2038,7 +2044,7 @@ describe('createWorkbookEditor', () => {
       }
 
       public initialize(context: WorkbookPluginContext): void {
-        this.runtime = context.runtime;
+        this.#runtime = context.runtime;
       }
     }
 

@@ -11,14 +11,19 @@ import { DocPlugin, type DocPluginRuntime, type DocPluginSetupContext } from '..
 
 /** Shared lifecycle helper for concrete inline style plugins. */
 export abstract class InlineTextStylePluginBase extends DocPlugin<null> {
-  private runtime: DocPluginRuntime | null = null;
+  readonly #contribution: RichTextInlineStyleContribution;
+  readonly #renderContribution: RichTextRunRenderContribution | undefined;
+
+  #runtime: DocPluginRuntime | null = null;
 
   protected constructor(
     key: PluginKey,
-    private readonly contribution: RichTextInlineStyleContribution,
-    private readonly renderContribution?: RichTextRunRenderContribution,
+    contribution: RichTextInlineStyleContribution,
+    renderContribution?: RichTextRunRenderContribution,
   ) {
     super({ key, state: null });
+    this.#contribution = contribution;
+    this.#renderContribution = renderContribution;
   }
 
   public registerState() {
@@ -38,23 +43,23 @@ export abstract class InlineTextStylePluginBase extends DocPlugin<null> {
   }
 
   public configure(context: DocPluginSetupContext): void {
-    this.runtime = context.runtime;
+    this.#runtime = context.runtime;
   }
 
   public registerInlineStyles(registry: RichTextInlineStyleRegistry): void {
-    registry.register(this.contribution);
+    registry.register(this.#contribution);
   }
 
   public registerInlineStyleRenderers(registry: RichTextRunRenderRegistry): void {
-    if (this.renderContribution) registry.register(this.renderContribution);
+    if (this.#renderContribution) registry.register(this.#renderContribution);
   }
 
   public onEditorDestroy(): void {
-    this.runtime = null;
+    this.#runtime = null;
   }
 
   protected requireRuntime(): DocPluginRuntime {
-    if (!this.runtime) throw new SearError(`${this.key.key} is not configured.`);
-    return this.runtime;
+    if (!this.#runtime) throw new SearError(`${this.key.key} is not configured.`);
+    return this.#runtime;
   }
 }

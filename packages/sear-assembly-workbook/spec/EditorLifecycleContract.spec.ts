@@ -270,7 +270,7 @@ class RecordingCollabTransport extends CollabTransport {
   public static instances: RecordingCollabTransport[] = [];
   public readonly sent: CollaborationClientMessage[] = [];
   public disconnectCount = 0;
-  private readonly listeners = new Set<(message: CollaborationServerMessage) => void>();
+  readonly #listeners = new Set<(message: CollaborationServerMessage) => void>();
 
   public constructor() {
     super();
@@ -290,12 +290,12 @@ class RecordingCollabTransport extends CollabTransport {
   }
 
   public subscribe(listener: (message: CollaborationServerMessage) => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
   }
 
   public emit(message: CollaborationServerMessage): void {
-    this.listeners.forEach((listener) => listener(message));
+    this.#listeners.forEach((listener) => listener(message));
   }
 }
 

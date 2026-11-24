@@ -6,6 +6,8 @@ import { SearError } from '@searsuite/sear-foundation-error';
 
 /** Tokenized editor-local external-service registry with isolated listener failures. */
 export class FormulaExternalServiceRegistry implements IFormulaExternalServiceProvider {
+  readonly #warn: (message: string, error: unknown) => void;
+
   readonly #entries = new Map<
     string,
     Array<{ id: number; token: symbol; value: unknown; disposeInvalidation: () => void }>
@@ -17,7 +19,9 @@ export class FormulaExternalServiceRegistry implements IFormulaExternalServicePr
   #dispatchRemoval: ((id: number) => void) | undefined;
   #teardownToken: object | undefined;
 
-  public constructor(private readonly warn: (message: string, error: unknown) => void = () => void 0) {}
+  public constructor(warn: (message: string, error: unknown) => void = () => void 0) {
+    this.#warn = warn;
+  }
 
   public enforceCommandBoundary(isCommandExecuting: () => boolean, dispatchRemoval: (id: number) => void): void {
     if (this.#isCommandExecuting) throw new SearError('Formula external-service registry is already bound.');
@@ -81,7 +85,7 @@ export class FormulaExternalServiceRegistry implements IFormulaExternalServicePr
     const remaining = entries.filter((candidate) => candidate.id !== id);
     if (remaining.length) this.#entries.set(serviceId, remaining);
     else this.#entries.delete(serviceId);
-    this.disposeEntry(entry.disposeInvalidation);
+    this.#disposeEntry(entry.disposeInvalidation);
     this.invalidate({ id: serviceId } as FormulaExternalServiceDefinition<unknown>);
   }
 
@@ -95,7 +99,7 @@ export class FormulaExternalServiceRegistry implements IFormulaExternalServicePr
       try {
         listener([definition.id]);
       } catch (error) {
-        this.warn('Formula external-service invalidation listener failed.', error);
+        this.#warn('Formula external-service invalidation listener failed.', error);
       }
     });
   }
@@ -115,14 +119,14 @@ export class FormulaExternalServiceRegistry implements IFormulaExternalServicePr
     const entries = [...this.#entries.values()].flat();
     this.#entries.clear();
     this.#listeners.clear();
-    entries.reverse().forEach((entry) => this.disposeEntry(entry.disposeInvalidation));
+    entries.reverse().forEach((entry) => this.#disposeEntry(entry.disposeInvalidation));
   }
 
-  private disposeEntry(dispose: () => void): void {
+  #disposeEntry(dispose: () => void): void {
     try {
       dispose();
     } catch (error) {
-      this.warn('Formula external-service subscription disposal failed.', error);
+      this.#warn('Formula external-service subscription disposal failed.', error);
     }
   }
 }

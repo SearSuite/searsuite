@@ -32,7 +32,7 @@ export class SearCoreRenderSession implements SheetRenderSession {
   }
 
   public render(renderContext = this.#context.renderContext): SheetRenderUpdate {
-    this.assertLive();
+    this.#assertLive();
     const selection = toDocSelection({
       anchor: { path: [0, 0], offset: 0 },
       head: { path: [0, 0], offset: 0 },
@@ -53,7 +53,7 @@ export class SearCoreRenderSession implements SheetRenderSession {
   }
 
   public hitTest(input: SheetPointerInput): SheetPointerHit | null {
-    this.assertLive();
+    this.#assertLive();
     const contains =
       this.#context.geometry.containsPoint?.(input.point) ?? containsRect(input.point, this.#context.geometry.cellRect);
     if (!contains) return { target: 'outside' };
@@ -83,7 +83,7 @@ export class SearCoreRenderSession implements SheetRenderSession {
     this.#onDispose();
   }
 
-  private assertLive(): void {
+  #assertLive(): void {
     if (this.#disposed) throw new SearError('SearCoreEditorAdapter render session has been disposed.');
   }
 }

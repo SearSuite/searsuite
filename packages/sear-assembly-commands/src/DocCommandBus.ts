@@ -30,6 +30,8 @@ import { DocCommandDispatcher } from './DocCommandDispatcher';
  */
 @Injectable()
 export class DocCommandBus {
+  readonly #platform: Platform | undefined;
+
   /** DI token for resolving the command bus bound to one document editor instance. */
   public static readonly symbol = Symbol.for('DocCommandBus');
 
@@ -43,7 +45,8 @@ export class DocCommandBus {
   #assertRegistrationWrite: (() => void) | null = null;
 
   /** Creates a command bus that reports boundary diagnostics through the host platform. */
-  constructor(@Inject(Platform.symbol) private readonly platform?: Platform) {
+  constructor(@Inject(Platform.symbol) platform?: Platform) {
+    this.#platform = platform;
     Object.defineProperty(this, 'isExecuting', {
       value: (): boolean => this.#executionDepth > 0 && isInsideCommandExecution() &&
         this.#activeObserverEpoch === getCommandObserverEpoch(),
@@ -142,7 +145,7 @@ export class DocCommandBus {
     const { id } = definition;
     const registration = this.#registrations.get(id);
     if (!registration) throw new SearError(`DocCommandBus has no command registered for ${id}.`);
-    if (registration.definition !== definition) warnIfSyntheticCommandDefinition('DocCommandBus', id, this.warn);
+    if (registration.definition !== definition) warnIfSyntheticCommandDefinition('DocCommandBus', id, this.#warn);
     return this.#executeCommand(id, () => registration.factory(input)) as DocCommandDefinitionResult<Definition>;
   }
 
@@ -219,14 +222,14 @@ export class DocCommandBus {
         try {
           listener(event);
         } catch (error) {
-          this.warn(`DocCommandBus listener failed during ${event.phase}:${event.id}.`, error);
+          this.#warn(`DocCommandBus listener failed during ${event.phase}:${event.id}.`, error);
         }
       });
     });
   }
 
-  private warn = (message: string, ...details: unknown[]): void => {
-    this.platform?.warn?.(message, ...details);
+  #warn = (message: string, ...details: unknown[]): void => {
+    this.#platform?.warn?.(message, ...details);
   };
 
   #assertLive(): void {

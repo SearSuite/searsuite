@@ -103,13 +103,17 @@ function pathEquals(a: number[], b: number[]): boolean {
  */
 @Injectable()
 export class DocLayoutEngine {
+  readonly #blockFlowRegistry: RichTextBlockFlowRegistry;
+
   /** DI token for resolving DocLayoutEngine. */
   public static readonly symbol: symbol = Symbol.for('DocLayoutEngine');
 
   public constructor(
     @Inject(RichTextBlockFlowRegistry.symbol)
-    private readonly blockFlowRegistry: RichTextBlockFlowRegistry,
-  ) {}
+    blockFlowRegistry: RichTextBlockFlowRegistry,
+  ) {
+    this.#blockFlowRegistry = blockFlowRegistry;
+  }
 
   // -----------------------------------------------------------------------
   // buildSnapshot
@@ -142,7 +146,7 @@ export class DocLayoutEngine {
     // Flatten to compute baselines shared by content and cursor render nodes.
     const flatLines: RichTextLine[] = linesPerPara.flat();
 
-    let currentLineTop = this.getFirstLineTop(flatLines, editorHeight, cellPadding, verticalAlign, doc);
+    let currentLineTop = this.#getFirstLineTop(flatLines, editorHeight, cellPadding, verticalAlign, doc);
 
     const allLines: LayoutLine[] = [];
 
@@ -181,7 +185,7 @@ export class DocLayoutEngine {
         }
         currentLineTop += lineBox.lineHeight;
       }
-      currentLineTop += this.blockFlowRegistry.resolve({
+      currentLineTop += this.#blockFlowRegistry.resolve({
         node: doc[paraIndex],
         index: paraIndex,
         blockCount: doc.length,
@@ -254,7 +258,7 @@ export class DocLayoutEngine {
       const blockLineBounds = computeLayoutLineBounds(allLines.slice(lineStart, lineEnd), blockTop);
       const flowHeight =
         computeBlockFlowHeight(blockLines, blockLineBounds.height) +
-        this.blockFlowRegistry.resolve({
+        this.#blockFlowRegistry.resolve({
           node: doc[blockIndex],
           index: blockIndex,
           blockCount: doc.length,
@@ -272,7 +276,7 @@ export class DocLayoutEngine {
     return { snapshot: { lines: allLines }, blocks };
   }
 
-  private getFirstLineTop(
+  #getFirstLineTop(
     lines: RichTextLine[],
     editorHeight: number,
     cellPadding: number,
@@ -283,7 +287,7 @@ export class DocLayoutEngine {
     const totalHeight =
       computeBlockFlowHeight(lines, 0) +
       doc.reduce(
-        (height, node, index) => height + this.blockFlowRegistry.resolve({ node, index, blockCount: doc.length }),
+        (height, node, index) => height + this.#blockFlowRegistry.resolve({ node, index, blockCount: doc.length }),
         0,
       );
     return cellPadding + Math.max(0, (editorHeight - cellPadding * 2 - totalHeight) / 2);

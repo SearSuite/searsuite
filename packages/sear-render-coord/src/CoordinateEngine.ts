@@ -53,6 +53,9 @@ export function createDefaultCoordinateState(): CoordinateState {
  */
 @Injectable()
 export class CoordinateEngine extends Plugin<SearCoreSheet, CellProperties, CoordinateState> {
+  readonly #scrollManager: ScrollManager;
+  readonly #coordinates: CoordinateTransformer;
+
   /** DI token for resolving the coordinate engine. */
   public static readonly symbol: symbol = Symbol.for('CoordinateEngine');
   /** Stable plugin key for coordinate state registration. */
@@ -70,16 +73,18 @@ export class CoordinateEngine extends Plugin<SearCoreSheet, CellProperties, Coor
    */
   constructor(
     @Inject(ScrollManager.symbol)
-    private readonly scrollManager: ScrollManager,
+    scrollManager: ScrollManager,
     @Inject(CoordinateTransformer.symbol)
-    private readonly coordinates: CoordinateTransformer,
+    coordinates: CoordinateTransformer,
   ) {
     super({ key, state: createDefaultCoordinateState() });
+    this.#scrollManager = scrollManager;
+    this.#coordinates = coordinates;
   }
 
   /** Returns a detached projection of the current input and viewport coordinates. */
   public getCoordinateState(): CoordinateState {
-    const scroll = this.scrollManager.getState();
+    const scroll = this.#scrollManager.getState();
     return {
       mouseScreenX: this.#mouseScreenX,
       mouseScreenY: this.#mouseScreenY,
@@ -110,7 +115,7 @@ export class CoordinateEngine extends Plugin<SearCoreSheet, CellProperties, Coor
    * @returns Current pointer converted through the active scroll transform.
    */
   public getCurrentMouseWorld(): CoordinatePoint {
-    return this.coordinates.viewToWorld({
+    return this.#coordinates.viewToWorld({
       x: this.#mouseScreenX,
       y: this.#mouseScreenY,
     });
@@ -118,7 +123,7 @@ export class CoordinateEngine extends Plugin<SearCoreSheet, CellProperties, Coor
 
   /** Returns the latest pointer position in viewport coordinates. */
   public getCurrentMouseView(): CoordinatePoint {
-    return this.coordinates.viewToWorld({ x: this.#mouseScreenX, y: this.#mouseScreenY }, { x: 0, y: 0 });
+    return this.#coordinates.viewToWorld({ x: this.#mouseScreenX, y: this.#mouseScreenY }, { x: 0, y: 0 });
   }
 
   /**
@@ -128,12 +133,12 @@ export class CoordinateEngine extends Plugin<SearCoreSheet, CellProperties, Coor
    * @returns Point in sheet-world coordinates.
    */
   public screenToWorld(screenX: number, screenY: number): CoordinatePoint {
-    return this.coordinates.viewToWorld({ x: screenX, y: screenY });
+    return this.#coordinates.viewToWorld({ x: screenX, y: screenY });
   }
 
   /** Converts a host-event point into an unscrolled viewport point. */
   public screenToView(screenX: number, screenY: number): CoordinatePoint {
-    return this.coordinates.viewToWorld({ x: screenX, y: screenY }, { x: 0, y: 0 });
+    return this.#coordinates.viewToWorld({ x: screenX, y: screenY }, { x: 0, y: 0 });
   }
 
   /**
@@ -143,7 +148,7 @@ export class CoordinateEngine extends Plugin<SearCoreSheet, CellProperties, Coor
    * @returns Point in host-view coordinates.
    */
   public worldToScreen(worldX: number, worldY: number): CoordinatePoint {
-    return this.coordinates.worldToView({ x: worldX, y: worldY });
+    return this.#coordinates.worldToView({ x: worldX, y: worldY });
   }
 
   /**
@@ -151,7 +156,7 @@ export class CoordinateEngine extends Plugin<SearCoreSheet, CellProperties, Coor
    * @returns Visible world-space viewport rectangle.
    */
   public getVisibleWorldRect(): PositionRect<unknown> {
-    return this.coordinates.getVisibleWorldRect();
+    return this.#coordinates.getVisibleWorldRect();
   }
 
   /**
@@ -159,7 +164,7 @@ export class CoordinateEngine extends Plugin<SearCoreSheet, CellProperties, Coor
    * @returns Visible screen-space rectangle starting at the viewport origin.
    */
   public getVisibleScreenRect(): PositionRect<unknown> {
-    const [width, height] = this.scrollManager.getShape();
+    const [width, height] = this.#scrollManager.getShape();
     return new PositionRect(0, 0, width, height);
   }
 

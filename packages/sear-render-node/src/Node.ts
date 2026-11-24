@@ -49,8 +49,8 @@ export abstract class Node<T extends NodeProperties> extends EventListener<strin
 
   /** Rectangle representing the node's position and size. */
   public readonly positionRect: PositionRect<RenderNodeKey> = new PositionRect(0, 0, 0, 0);
-  private runtimeContainer: Container | null = null;
-  private readonly childNodes = new Map<RenderNodeKey, Node<T>>();
+  #runtimeContainer: Container | null = null;
+  readonly #childNodes = new Map<RenderNodeKey, Node<T>>();
 
   /** Editor-local configuration for this node's owning scene graph. */
   public get configEngine(): ConfigEngine {
@@ -79,20 +79,20 @@ export abstract class Node<T extends NodeProperties> extends EventListener<strin
 
   /** Binds this node tree to the editor-local services owned by one SceneGraph. */
   public bindRuntime(container: Container): void {
-    if (this.runtimeContainer && this.runtimeContainer !== container) {
+    if (this.#runtimeContainer && this.#runtimeContainer !== container) {
       throw new SearError('Render node is already bound to another editor runtime.');
     }
-    if (this.runtimeContainer === container) return;
-    this.runtimeContainer = container;
+    if (this.#runtimeContainer === container) return;
+    this.#runtimeContainer = container;
 
     const boundary = this.positionRectStorage.getBoundary();
     if (PositionRect.hasDominantAxisSpan(this.positionRect, boundary)) {
       this.positionRectStorage.updateBoundary(mergeSpatialBoundary(this.positionRect, boundary));
     }
     this.onRuntimeBound();
-    for (const child of this.childNodes.values()) {
+    for (const child of this.#childNodes.values()) {
       child.bindRuntime(container);
-      this.registerChild(child);
+      this.#registerChild(child);
     }
   }
 
@@ -101,8 +101,8 @@ export abstract class Node<T extends NodeProperties> extends EventListener<strin
 
   /** Resolves one service from this node's editor-local runtime. */
   protected resolveRuntime<Service>(identifier: string | symbol): Service {
-    if (!this.runtimeContainer) throw new SearError(`${this.name} is not attached to a SceneGraph runtime.`);
-    return this.runtimeContainer.resolve<Service>(identifier);
+    if (!this.#runtimeContainer) throw new SearError(`${this.name} is not attached to a SceneGraph runtime.`);
+    return this.#runtimeContainer.resolve<Service>(identifier);
   }
 
   /**
@@ -139,10 +139,10 @@ export abstract class Node<T extends NodeProperties> extends EventListener<strin
     function addChildNode(child: Node<T>): void {
       child.parentKey = parent.nodeKey;
       parent.childKeys.push(child.nodeKey);
-      parent.childNodes.set(child.nodeKey, child);
-      if (parent.runtimeContainer) {
-        child.bindRuntime(parent.runtimeContainer);
-        parent.registerChild(child);
+      parent.#childNodes.set(child.nodeKey, child);
+      if (parent.#runtimeContainer) {
+        child.bindRuntime(parent.#runtimeContainer);
+        parent.#registerChild(child);
       }
     }
 
@@ -160,11 +160,11 @@ export abstract class Node<T extends NodeProperties> extends EventListener<strin
   public setStickyTree(sticky: boolean, affix: Pick<NodeProperties, 'top' | 'left'> = {}): this {
     this.sticky = sticky;
     this.properties = { ...this.properties, ...affix };
-    for (const child of this.childNodes.values()) child.setStickyTree(sticky, affix);
+    for (const child of this.#childNodes.values()) child.setStickyTree(sticky, affix);
     return this;
   }
 
-  private registerChild(child: Node<T>): void {
+  #registerChild(child: Node<T>): void {
     const { nodeKey, positionRect } = child;
     this.dataStorage.set(nodeKey, child);
     if (child.randomColorKey) this.hitColorRegistry.register(child.randomColorKey, child);
@@ -216,7 +216,7 @@ export abstract class Node<T extends NodeProperties> extends EventListener<strin
     if (idx !== -1) {
       this.childKeys.splice(idx, 1);
     }
-    this.childNodes.delete(key);
+    this.#childNodes.delete(key);
     child.dispose();
   }
 

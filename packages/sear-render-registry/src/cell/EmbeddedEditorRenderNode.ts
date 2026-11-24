@@ -25,12 +25,12 @@ import {
  * the editor session to the cell geometry and forwards retained draw calls.
  */
 export class EmbeddedEditorRenderNode<T extends NodeProperties = NodeProperties> extends RenderNode<T> {
-  private readonly document: SheetDocument;
-  private readonly fallbackText: string;
-  private session: SheetRenderSession | null = null;
-  private readonly editSession: SheetEditSession | null;
-  private readonly editRenderOptions: SheetEditRenderOptions | undefined;
-  private editorContext: SheetEmbeddedEditorContext | null = null;
+  readonly #document: SheetDocument;
+  readonly #fallbackText: string;
+  #session: SheetRenderSession | null = null;
+  readonly #editSession: SheetEditSession | null;
+  readonly #editRenderOptions: SheetEditRenderOptions | undefined;
+  #editorContext: SheetEmbeddedEditorContext | null = null;
 
   public constructor(
     document: readonly Schema[],
@@ -44,16 +44,16 @@ export class EmbeddedEditorRenderNode<T extends NodeProperties = NodeProperties>
     // such as merged cells. Keep content above its owning box so dirty-pass
     // sorting cannot repaint the box over the text.
     this.depth = (properties.depth ?? 0) + 1;
-    this.document = document as SheetDocument;
-    this.fallbackText = flattenDocumentText(this.document);
-    this.editSession = editSession ?? null;
-    this.editRenderOptions = editRenderOptions;
+    this.#document = document as SheetDocument;
+    this.#fallbackText = flattenDocumentText(this.#document);
+    this.#editSession = editSession ?? null;
+    this.#editRenderOptions = editRenderOptions;
   }
 
   protected override onRuntimeBound(): void {
-    if (!this.hasEmbeddedEditor()) {
-      if (!this.editSession && this.fallbackText) {
-        this.add(new TextNode(this.fallbackText, this.positionRect, this.properties));
+    if (!this.#hasEmbeddedEditor()) {
+      if (!this.#editSession && this.#fallbackText) {
+        this.add(new TextNode(this.#fallbackText, this.positionRect, this.properties));
       }
       return;
     }
@@ -101,31 +101,31 @@ export class EmbeddedEditorRenderNode<T extends NodeProperties = NodeProperties>
           point.y <= thisNode.positionRect.y + thisNode.positionRect.height,
       },
       documentAccessor: {
-        read: () => thisNode.document,
+        read: () => thisNode.#document,
         commit: () => {
           // Render sessions are read-only; edit sessions own commit handling.
         },
       },
-      invalidate: (invalidation) => thisNode.markInvalidation(invalidation),
+      invalidate: (invalidation) => thisNode.#markInvalidation(invalidation),
     };
-    this.editorContext = context;
-    if (!this.editSession) this.session = editor.createRenderSession(context);
+    this.#editorContext = context;
+    if (!this.#editSession) this.#session = editor.createRenderSession(context);
   }
 
   public drawScene(context: RenderContext, clipRegion?: ClipRegion): void {
-    if (this.editSession) {
+    if (this.#editSession) {
       context.save();
       applyClip(context, clipRegion);
-      applyClip(context, this.editorContext?.geometry.clipRect);
-      this.editSession.render(context, this.editRenderOptions);
+      applyClip(context, this.#editorContext?.geometry.clipRect);
+      this.#editSession.render(context, this.#editRenderOptions);
       context.restore();
       return;
     }
-    if (!this.session) return;
+    if (!this.#session) return;
 
     context.save();
-    applyClip(context, clipRegion ?? this.editorContext?.geometry.clipRect);
-    this.session.render(context);
+    applyClip(context, clipRegion ?? this.#editorContext?.geometry.clipRect);
+    this.#session.render(context);
     context.restore();
   }
 
@@ -145,11 +145,11 @@ export class EmbeddedEditorRenderNode<T extends NodeProperties = NodeProperties>
   }
 
   protected override onDisposed(): void {
-    this.session?.dispose();
-    this.session = null;
+    this.#session?.dispose();
+    this.#session = null;
   }
 
-  private hasEmbeddedEditor(): boolean {
+  #hasEmbeddedEditor(): boolean {
     try {
       this.resolveRuntime<SheetEmbeddedEditor>(SheetEmbeddedEditor.symbol);
       return true;
@@ -158,14 +158,14 @@ export class EmbeddedEditorRenderNode<T extends NodeProperties = NodeProperties>
     }
   }
 
-  private markInvalidation(invalidation: SheetEditorInvalidation): void {
+  #markInvalidation(invalidation: SheetEditorInvalidation): void {
     let dirtyTracker: GenerationalDirtyTracker;
     try {
       dirtyTracker = this.resolveRuntime<GenerationalDirtyTracker>(GenerationalDirtyTracker.symbol);
     } catch (_error) {
       return;
     }
-    const rects = invalidation.rects?.length ? invalidation.rects : [this.editorContext?.geometry.cellRect];
+    const rects = invalidation.rects?.length ? invalidation.rects : [this.#editorContext?.geometry.cellRect];
     for (const rect of rects) {
       if (!rect) continue;
       dirtyTracker.mark(new PositionRect(rect.x, rect.y, rect.width, rect.height));

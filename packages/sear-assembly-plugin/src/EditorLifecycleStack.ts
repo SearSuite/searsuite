@@ -2,33 +2,33 @@ import { EditorLifecycleError, EditorLifecycleErrorCode } from './EditorLifecycl
 
 /** Idempotent reverse-order disposer stack used by editor composition roots. */
 export class EditorLifecycleStack {
-  private readonly disposers: Array<() => void> = [];
-  private disposed = false;
+  readonly #disposers: Array<() => void> = [];
+  #disposed = false;
 
   /** Adds one owned resource disposer in acquisition order. */
   public add(disposer: () => void): void {
-    if (this.disposed) {
+    if (this.#disposed) {
       throw new EditorLifecycleError(
         EditorLifecycleErrorCode.StackDisposed,
         'EditorLifecycleStack has already been disposed.',
       );
     }
-    this.disposers.push(disposer);
+    this.#disposers.push(disposer);
   }
 
   /** Runs every disposer in reverse order and continues cleanup after individual failures. */
   public dispose(): void {
-    if (this.disposed) return;
-    this.disposed = true;
+    if (this.#disposed) return;
+    this.#disposed = true;
     const errors: unknown[] = [];
-    for (let index = this.disposers.length - 1; index >= 0; index -= 1) {
+    for (let index = this.#disposers.length - 1; index >= 0; index -= 1) {
       try {
-        this.disposers[index]?.();
+        this.#disposers[index]?.();
       } catch (error) {
         errors.push(error);
       }
     }
-    this.disposers.length = 0;
+    this.#disposers.length = 0;
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1) {
       throw new EditorLifecycleError(

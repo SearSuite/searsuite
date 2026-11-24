@@ -28,6 +28,8 @@ function readClickCount(event: EventWithOffset): number | undefined {
 /** Coordinates render-context events, hit testing and plugin event dispatch. */
 @Injectable()
 export class EventEngine<NodeTypeProperties extends NodeProperties> extends EventListener<string> {
+  readonly #coordinates: CoordinateTransformer;
+
   /** DI token for resolving the event engine. */
   public static readonly symbol: symbol = Symbol.for('EventEngine');
 
@@ -51,9 +53,10 @@ export class EventEngine<NodeTypeProperties extends NodeProperties> extends Even
     @Inject(EventRegistrar.symbol)
     public readonly eventRegistrar: EventRegistrar,
     @Inject(CoordinateTransformer.symbol)
-    private readonly coordinates: CoordinateTransformer,
+    coordinates: CoordinateTransformer,
   ) {
     super();
+    this.#coordinates = coordinates;
     this.initialize();
   }
 
@@ -135,7 +138,7 @@ export class EventEngine<NodeTypeProperties extends NodeProperties> extends Even
     const strategy = this.getStrategy(HitRenderStrategy.symbol) as HitRenderStrategy<NodeTypeProperties> | undefined;
     if (!strategy) throw new SearError('Hit render strategy not found');
     strategy.flushPendingScrollRender();
-    const hitPoint = this.coordinates.viewToRaster({ x, y });
+    const hitPoint = this.#coordinates.viewToRaster({ x, y });
     let targets = strategy.getNodeByCoordinates(this.stageNode, hitPoint.x, hitPoint.y);
     if (!targets.length && this.#cachedStageNode) {
       strategy.renderImmediate(this.#cachedStageNode);

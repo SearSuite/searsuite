@@ -43,11 +43,26 @@ import { createDocFontDescriptor } from './createDocFontDescriptor';
 /** Owns layout snapshots, text-input placement, and render pass execution. */
 @Injectable()
 export class DocRenderCoordinator {
+  readonly #searCoreDoc: SearCoreDoc;
+  readonly #renderEngine: DocRenderEngine;
+  readonly #renderContext: RenderContext;
+  readonly #sceneGraph: SceneGraph<RichTextRenderNodeProperties>;
+  readonly #textInput: TextInput;
+  readonly #scrollManager: ScrollManager;
+  readonly #viewportEnvironment: DocViewportEnvironment;
+  readonly #renderLayouts: DocRenderLayoutService;
+  readonly #configuration: DocEditorRuntimeConfiguration;
+  readonly #configEngine: ConfigEngine;
+  readonly #lifecycle: DocEditorLifecycleState;
+  readonly #platform: Platform;
+  readonly #commands: DocCommandBus;
+  readonly #incrementalRenderPolicy: IncrementalRenderPolicy;
+
   /** DI token for resolving the render coordinator. */
   public static readonly symbol = Symbol.for('DocRenderCoordinator');
 
-  private stopScrollReRender: (() => void) | null = null;
-  private scrollRenderFrame: number | null = null;
+  #stopScrollReRender: (() => void) | null = null;
+  #scrollRenderFrame: number | null = null;
   #teardownToken: object | undefined;
   #destroyed = false;
   #bound = false;
@@ -61,43 +76,58 @@ export class DocRenderCoordinator {
   /** Creates a render coordinator for one document editor instance. */
   public constructor(
     @Inject(SearCoreDoc.symbol)
-    private readonly searCoreDoc: SearCoreDoc,
+    searCoreDoc: SearCoreDoc,
     @Inject(DocRenderEngine.symbol)
-    private readonly renderEngine: DocRenderEngine,
+    renderEngine: DocRenderEngine,
     @Inject(RenderContext.symbol)
-    private readonly renderContext: RenderContext,
+    renderContext: RenderContext,
     @Inject(SceneGraph.symbol)
-    private readonly sceneGraph: SceneGraph<RichTextRenderNodeProperties>,
+    sceneGraph: SceneGraph<RichTextRenderNodeProperties>,
     @Inject(TextInput.symbol)
-    private readonly textInput: TextInput,
+    textInput: TextInput,
     @Inject(ScrollManager.symbol)
-    private readonly scrollManager: ScrollManager,
+    scrollManager: ScrollManager,
     @Inject(DocViewportEnvironment.symbol)
-    private readonly viewportEnvironment: DocViewportEnvironment,
+    viewportEnvironment: DocViewportEnvironment,
     @Inject(DocRenderLayoutService.symbol)
-    private readonly renderLayouts: DocRenderLayoutService,
+    renderLayouts: DocRenderLayoutService,
     @Inject(DocEditorRuntimeConfigurationSymbol)
-    private readonly configuration: DocEditorRuntimeConfiguration,
+    configuration: DocEditorRuntimeConfiguration,
     @Inject(ConfigEngine.symbol)
-    private readonly configEngine: ConfigEngine,
+    configEngine: ConfigEngine,
     @Inject(DocEditorLifecycleState.symbol)
-    private readonly lifecycle: DocEditorLifecycleState,
+    lifecycle: DocEditorLifecycleState,
     @Inject(Platform.symbol)
-    private readonly platform: Platform,
+    platform: Platform,
     @Inject(DocCommandBus.symbol)
-    private readonly commands: DocCommandBus,
+    commands: DocCommandBus,
     @Inject(IncrementalRenderPolicy.symbol)
-    private readonly incrementalRenderPolicy: IncrementalRenderPolicy,
-  ) {}
+    incrementalRenderPolicy: IncrementalRenderPolicy,
+  ) {
+    this.#searCoreDoc = searCoreDoc;
+    this.#renderEngine = renderEngine;
+    this.#renderContext = renderContext;
+    this.#sceneGraph = sceneGraph;
+    this.#textInput = textInput;
+    this.#scrollManager = scrollManager;
+    this.#viewportEnvironment = viewportEnvironment;
+    this.#renderLayouts = renderLayouts;
+    this.#configuration = configuration;
+    this.#configEngine = configEngine;
+    this.#lifecycle = lifecycle;
+    this.#platform = platform;
+    this.#commands = commands;
+    this.#incrementalRenderPolicy = incrementalRenderPolicy;
+  }
 
   /** Binds Core render requests and scroll updates to document plugin-node refresh plus render(stage). */
   public bind(): void {
     if (this.#destroyed) throw new SearError('Doc render coordinator has been destroyed.');
     if (this.#bound) return;
     this.#bound = true;
-    this.updateViewport();
-    this.searCoreDoc.bindDocRenderRequestHandler(this.renderDocumentRequests.bind(this));
-    this.stopScrollReRender = this.scrollManager.subscribeScroll(this.handleScrollReRender.bind(this), true);
+    this.#updateViewport();
+    this.#searCoreDoc.bindDocRenderRequestHandler(this.#renderDocumentRequests.bind(this));
+    this.#stopScrollReRender = this.#scrollManager.subscribeScroll(this.#handleScrollReRender.bind(this), true);
   }
 
   /** Releases scroll-triggered subscriptions and pending animation work owned by this coordinator. */
@@ -107,83 +137,83 @@ export class DocRenderCoordinator {
       throw new SearError('Doc render cleanup requires its editor owner.');
     }
     this.#destroyed = true;
-    this.stopScrollReRender?.();
-    this.stopScrollReRender = null;
-    if (this.scrollRenderFrame !== null) this.platform.cancelAnimationFrame(this.scrollRenderFrame);
-    this.scrollRenderFrame = null;
+    this.#stopScrollReRender?.();
+    this.#stopScrollReRender = null;
+    if (this.#scrollRenderFrame !== null) this.#platform.cancelAnimationFrame(this.#scrollRenderFrame);
+    this.#scrollRenderFrame = null;
   }
 
   /** Invalidates cached layout state owned by the render coordinator. */
   public resetLayoutCache(): void {
-    if (!this.commands.isExecuting()) throw new SearError('Doc layout changes must run through editor.commands.run(...).');
-    this.renderLayouts.reset();
+    if (!this.#commands.isExecuting()) throw new SearError('Doc layout changes must run through editor.commands.run(...).');
+    this.#renderLayouts.reset();
   }
 
   /** Renders a command-owned viewport scroll frame. */
   public renderViewportScrollFrame(): boolean {
-    if (!this.commands.isExecuting()) throw new SearError('Doc rendering must run through editor.commands.run(...).');
+    if (!this.#commands.isExecuting()) throw new SearError('Doc rendering must run through editor.commands.run(...).');
     warnIfOutsideCommandExecution('DocRenderCoordinator.renderViewportScrollFrame');
-    return this.renderScrollFrame();
+    return this.#renderScrollFrame();
   }
 
-  private renderDocumentRequests(requests: readonly DocRenderRequest[]): void {
-    if (this.renderInteractionRequests(requests)) return;
-    this.renderContentFrame(requests);
+  #renderDocumentRequests(requests: readonly DocRenderRequest[]): void {
+    if (this.#renderInteractionRequests(requests)) return;
+    this.#renderContentFrame(requests);
   }
 
-  private renderContentFrame(requests: readonly DocRenderRequest[]): boolean {
-    return this.renderFrame({
+  #renderContentFrame(requests: readonly DocRenderRequest[]): boolean {
+    return this.#renderFrame({
       markSceneDirty: true,
       reuseLayout: false,
       renderOperations: collectRequestedRenderOperations(requests),
     });
   }
 
-  private renderScrollFrame(): boolean {
-    return this.renderFrame({ markSceneDirty: false, reuseLayout: true, renderOperations: EMPTY_RENDER_OPERATIONS });
+  #renderScrollFrame(): boolean {
+    return this.#renderFrame({ markSceneDirty: false, reuseLayout: true, renderOperations: EMPTY_RENDER_OPERATIONS });
   }
 
-  private renderInteractionRequests(requests: readonly DocRenderRequest[]): boolean {
-    const requestedPluginKeys = this.createInteractionPluginKeySet(requests);
+  #renderInteractionRequests(requests: readonly DocRenderRequest[]): boolean {
+    const requestedPluginKeys = this.#createInteractionPluginKeySet(requests);
     if (!requestedPluginKeys) return false;
-    if (this.lifecycle.isDestroyed()) return false;
-    this.updateViewport();
-    this.renderContext.setFont(createDocFontDescriptor(this.configEngine.getDefaultConfig()));
-    const currentContentRect = this.viewportEnvironment.getContentRect();
-    const currentViewport = this.viewportEnvironment.getViewport();
-    const layout = this.renderLayouts.refreshInteractionLayout(currentContentRect, currentViewport);
+    if (this.#lifecycle.isDestroyed()) return false;
+    this.#updateViewport();
+    this.#renderContext.setFont(createDocFontDescriptor(this.#configEngine.getDefaultConfig()));
+    const currentContentRect = this.#viewportEnvironment.getContentRect();
+    const currentViewport = this.#viewportEnvironment.getViewport();
+    const layout = this.#renderLayouts.refreshInteractionLayout(currentContentRect, currentViewport);
     if (!layout) return false;
-    this.searCoreDoc.setDocRenderLayoutState(this.createRenderLayoutState(layout, currentContentRect));
-    this.refreshRequestedPluginNodes(requestedPluginKeys, true);
-    this.updateTextInputPosition(layout.cursorX, layout.cursorY, layout.composingCaretPixelOffset);
-    this.renderEngine.render(this.sceneGraph);
-    this.searCoreDoc.eventEngine?.renderHitOnNextFrame(this.sceneGraph);
+    this.#searCoreDoc.setDocRenderLayoutState(this.#createRenderLayoutState(layout, currentContentRect));
+    this.#refreshRequestedPluginNodes(requestedPluginKeys, true);
+    this.#updateTextInputPosition(layout.cursorX, layout.cursorY, layout.composingCaretPixelOffset);
+    this.#renderEngine.render(this.#sceneGraph);
+    this.#searCoreDoc.eventEngine?.renderHitOnNextFrame(this.#sceneGraph);
     return true;
   }
 
-  private renderFrame(options: {
+  #renderFrame(options: {
     readonly markSceneDirty: boolean;
     readonly reuseLayout: boolean;
     readonly renderOperations: DocRenderOperations;
   }): boolean {
-    if (this.lifecycle.isDestroyed()) return false;
-    this.updateViewport();
-    this.renderContext.setFont(createDocFontDescriptor(this.configEngine.getDefaultConfig()));
-    const currentContentRect = this.viewportEnvironment.getContentRect();
-    const currentViewport = this.viewportEnvironment.getViewport();
+    if (this.#lifecycle.isDestroyed()) return false;
+    this.#updateViewport();
+    this.#renderContext.setFont(createDocFontDescriptor(this.#configEngine.getDefaultConfig()));
+    const currentContentRect = this.#viewportEnvironment.getContentRect();
+    const currentViewport = this.#viewportEnvironment.getViewport();
     const prepareMode = options.reuseLayout ? 'viewport' : 'full';
-    const prepareStart = this.platform.now();
+    const prepareStart = this.#platform.now();
     const layout = options.reuseLayout
-      ? this.renderLayouts.prepareViewportLayout(currentContentRect, currentViewport)
-      : this.renderLayouts.prepareRenderLayout(currentContentRect, currentViewport, options.renderOperations);
-    this.renderLayouts.recordRenderPrepareTiming(prepareMode, this.platform.now() - prepareStart);
+      ? this.#renderLayouts.prepareViewportLayout(currentContentRect, currentViewport)
+      : this.#renderLayouts.prepareRenderLayout(currentContentRect, currentViewport, options.renderOperations);
+    this.#renderLayouts.recordRenderPrepareTiming(prepareMode, this.#platform.now() - prepareStart);
     const blockRasterCopy = options.reuseLayout
       ? NO_INCREMENTAL_RENDER_PLAN
-      : this.resolveBlockRasterCopyPlan(layout, currentViewport);
-    this.renderEngine.setBlockRasterCopyPlan(blockRasterCopy.plan);
+      : this.#resolveBlockRasterCopyPlan(layout, currentViewport);
+    this.#renderEngine.setBlockRasterCopyPlan(blockRasterCopy.plan);
     const expectedFrameMode = options.reuseLayout ? 'scroll' : blockRasterCopy.plan ? 'block-copy' : 'full';
-    this.searCoreDoc.setDocRenderLayoutState(
-      this.createRenderLayoutState(
+    this.#searCoreDoc.setDocRenderLayoutState(
+      this.#createRenderLayoutState(
         layout,
         currentContentRect,
         createBlockRenderDebugSnapshot(
@@ -195,39 +225,39 @@ export class DocRenderCoordinator {
         ),
       ),
     );
-    this.refreshAllPluginNodes(options.markSceneDirty, blockRasterCopy.plan !== null);
+    this.#refreshAllPluginNodes(options.markSceneDirty, blockRasterCopy.plan !== null);
 
-    this.updateTextInputPosition(layout.cursorX, layout.cursorY, layout.composingCaretPixelOffset);
-    this.renderEngine.render(this.sceneGraph);
-    this.renderLayouts.recordBlockRenderDebugSnapshot(
+    this.#updateTextInputPosition(layout.cursorX, layout.cursorY, layout.composingCaretPixelOffset);
+    this.#renderEngine.render(this.#sceneGraph);
+    this.#renderLayouts.recordBlockRenderDebugSnapshot(
       createBlockRenderDebugSnapshot(
         layout,
         blockRasterCopy.plan,
-        this.renderEngine.getLastScreenRenderMode() ?? 'skipped',
+        this.#renderEngine.getLastScreenRenderMode() ?? 'skipped',
         blockRasterCopy.decision,
         blockRasterCopy.candidate,
       ),
     );
-    this.searCoreDoc.eventEngine?.renderHitOnNextFrame(this.sceneGraph);
+    this.#searCoreDoc.eventEngine?.renderHitOnNextFrame(this.#sceneGraph);
     return true;
   }
 
-  private refreshAllPluginNodes(markDirty: boolean, useBlockRasterCopy: boolean): void {
+  #refreshAllPluginNodes(markDirty: boolean, useBlockRasterCopy: boolean): void {
     const coordinator = this;
     function refreshDocPluginNodes(plugin: Plugin<SearCoreDoc, RichTextRenderNodeProperties, unknown>): void {
-      coordinator.refreshPluginNodes(plugin, markDirty, useBlockRasterCopy);
+      coordinator.#refreshPluginNodes(plugin, markDirty, useBlockRasterCopy);
     }
-    this.searCoreDoc.pluginManager.forEach(refreshDocPluginNodes);
+    this.#searCoreDoc.pluginManager.forEach(refreshDocPluginNodes);
   }
 
-  private refreshPluginNodes(
+  #refreshPluginNodes(
     plugin: Plugin<SearCoreDoc, RichTextRenderNodeProperties, unknown>,
     markDirty: boolean,
     useBlockRasterCopy: boolean = false,
   ): void {
-    const shapes = plugin.render?.(this.searCoreDoc) || [];
+    const shapes = plugin.render?.(this.#searCoreDoc) || [];
     if (plugin.key.key === DocContentRenderPluginKey.key && (!markDirty || useBlockRasterCopy)) {
-      const layout = this.searCoreDoc.getDocRenderLayoutState();
+      const layout = this.#searCoreDoc.getDocRenderLayoutState();
       const changedBlockKeys = useBlockRasterCopy
         ? new Set(layout?.blockLayoutDiff.getChangedEntries().map((entry) => entry.id) ?? [])
         : new Set<string>();
@@ -238,21 +268,21 @@ export class DocRenderCoordinator {
         replaceRetainedGeometryChanged: true,
         ...(changedBlockKeys.size > 0 ? { replaceRetainedKeys: changedBlockKeys } : {}),
       };
-      this.sceneGraph.reconcilePluginNodes(plugin.key.key, shapes, reconcileOptions);
+      this.#sceneGraph.reconcilePluginNodes(plugin.key.key, shapes, reconcileOptions);
       return;
     }
-    this.sceneGraph.addPluginNode(plugin.key.key, shapes, { markDirty });
+    this.#sceneGraph.addPluginNode(plugin.key.key, shapes, { markDirty });
   }
 
-  private refreshRequestedPluginNodes(requestedPluginKeys: ReadonlySet<string>, markDirty: boolean): void {
+  #refreshRequestedPluginNodes(requestedPluginKeys: ReadonlySet<string>, markDirty: boolean): void {
     const coordinator = this;
     function refreshRequestedDocPluginNodes(plugin: Plugin<SearCoreDoc, RichTextRenderNodeProperties, unknown>): void {
-      if (requestedPluginKeys.has(plugin.key.key)) coordinator.refreshPluginNodes(plugin, markDirty);
+      if (requestedPluginKeys.has(plugin.key.key)) coordinator.#refreshPluginNodes(plugin, markDirty);
     }
-    this.searCoreDoc.pluginManager.forEach(refreshRequestedDocPluginNodes);
+    this.#searCoreDoc.pluginManager.forEach(refreshRequestedDocPluginNodes);
   }
 
-  private createInteractionPluginKeySet(requests: readonly DocRenderRequest[]): ReadonlySet<string> | null {
+  #createInteractionPluginKeySet(requests: readonly DocRenderRequest[]): ReadonlySet<string> | null {
     if (requests.length === 0) return null;
     const requestedPluginKeys = new Set<string>();
     for (const request of requests) {
@@ -263,34 +293,34 @@ export class DocRenderCoordinator {
     return requestedPluginKeys;
   }
 
-  private createRenderLayoutState(
+  #createRenderLayoutState(
     layout: DocRenderLayout,
     contentRect: DocEditorContentRect,
     blockRender?: DocBlockRenderDebugSnapshot,
   ): DocRenderLayoutState {
     return {
-      viewport: this.viewportEnvironment.getViewport(),
+      viewport: this.#viewportEnvironment.getViewport(),
       contentRect,
       layoutCache: layout.layoutCache,
       blockLayoutDiff: layout.blockLayoutDiff,
       visibleBlocks: layout.visibleBlocks,
       documentRect: layout.documentRect,
-      font: createDocFontDescriptor(this.configEngine.getDefaultConfig()),
-      scroll: this.scrollManager.getState(),
+      font: createDocFontDescriptor(this.#configEngine.getDefaultConfig()),
+      scroll: this.#scrollManager.getState(),
       ...(blockRender ? { blockRender } : {}),
     };
   }
 
-  private resolveBlockRasterCopyPlan(
+  #resolveBlockRasterCopyPlan(
     layout: DocRenderLayout,
     viewport: DocEditorViewport,
   ): ResolvedBlockRasterCopyPlan {
-    const plan = this.createBlockRasterCopyPlan(layout, viewport);
+    const plan = this.#createBlockRasterCopyPlan(layout, viewport);
     if (!plan) return NO_INCREMENTAL_RENDER_PLAN;
     const candidate = createIncrementalRenderCandidate(plan);
-    const decision = this.incrementalRenderPolicy.evaluate(
+    const decision = this.#incrementalRenderPolicy.evaluate(
       candidate,
-      this.configEngine.getDefaultConfig().incrementalRenderPolicyLimits,
+      this.#configEngine.getDefaultConfig().incrementalRenderPolicyLimits,
     );
     return {
       plan: decision.accepted ? plan : null,
@@ -299,10 +329,10 @@ export class DocRenderCoordinator {
     };
   }
 
-  private createBlockRasterCopyPlan(layout: DocRenderLayout, viewport: DocEditorViewport): BlockRasterCopyPlan | null {
+  #createBlockRasterCopyPlan(layout: DocRenderLayout, viewport: DocEditorViewport): BlockRasterCopyPlan | null {
     const shiftedEntries = layout.blockLayoutDiff.getShiftedEntries();
     if (!layout.blockLayoutDiff.hasChanges() || shiftedEntries.length === 0) return null;
-    const scrollState = this.scrollManager.getRenderScrollState();
+    const scrollState = this.#scrollManager.getRenderScrollState();
     const clearWorldRects = createAffectedTailClearRects(layout, viewport, scrollState);
     if (clearWorldRects.length === 0) return null;
     const invalidWorldRects = layout.blockLayoutDiff.getChangedEntries().flatMap((entry) => {
@@ -326,29 +356,29 @@ export class DocRenderCoordinator {
     });
   }
 
-  private handleScrollReRender(): void {
-    if (this.scrollRenderFrame !== null) return;
-    this.scrollRenderFrame = this.platform.requestAnimationFrame(this.runScheduledScrollRender.bind(this));
+  #handleScrollReRender(): void {
+    if (this.#scrollRenderFrame !== null) return;
+    this.#scrollRenderFrame = this.#platform.requestAnimationFrame(this.#runScheduledScrollRender.bind(this));
   }
 
-  private runScheduledScrollRender(): void {
-    this.scrollRenderFrame = null;
-    if (!this.lifecycle.isDestroyed()) this.commands.run(RenderDocViewportCommand, void 0);
+  #runScheduledScrollRender(): void {
+    this.#scrollRenderFrame = null;
+    if (!this.#lifecycle.isDestroyed()) this.#commands.run(RenderDocViewportCommand, void 0);
   }
 
-  private updateViewport(): void {
-    const viewport = this.viewportEnvironment.getViewport();
-    this.renderEngine.setViewport({
+  #updateViewport(): void {
+    const viewport = this.#viewportEnvironment.getViewport();
+    this.#renderEngine.setViewport({
       width: viewport.width,
       height: viewport.height,
-      contentRect: this.viewportEnvironment.getContentRect(),
+      contentRect: this.#viewportEnvironment.getContentRect(),
     });
   }
 
-  private updateTextInputPosition(cursorX: number, cursorY: number, composingCaretPixelOffset: number): void {
-    const rootOffset = this.viewportEnvironment.readRootViewOffset();
-    const scroll = this.scrollManager.getState();
-    this.textInput.setPosition(
+  #updateTextInputPosition(cursorX: number, cursorY: number, composingCaretPixelOffset: number): void {
+    const rootOffset = this.#viewportEnvironment.readRootViewOffset();
+    const scroll = this.#scrollManager.getState();
+    this.#textInput.setPosition(
       rootOffset.x + cursorX - scroll.x + composingCaretPixelOffset,
       rootOffset.y + cursorY - scroll.y,
     );

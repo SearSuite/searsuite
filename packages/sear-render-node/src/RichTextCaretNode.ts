@@ -6,15 +6,15 @@ import { RichTextVisualNode } from './RichTextVisualNode';
 
 /** Scene node that draws a rich-text caret. */
 export class RichTextCaretNode extends RichTextVisualNode {
-  private readonly caret: {
+  readonly #caret: {
     readonly x: number;
     readonly y: number;
     readonly height: number;
     readonly visible: boolean;
     readonly pixelOffset: number;
   };
-  private readonly scroll: { readonly x: number; readonly y: number };
-  private readonly viewportOverlay: boolean;
+  readonly #scroll: { readonly x: number; readonly y: number };
+  readonly #viewportOverlay: boolean;
 
   /** Creates a caret overlay node. */
   public constructor(input: {
@@ -39,26 +39,26 @@ export class RichTextCaretNode extends RichTextVisualNode {
       depth: input.depth ?? 10_020,
       isEdit: true,
     });
-    this.caret = {
+    this.#caret = {
       ...input.caret,
       pixelOffset: input.caret.pixelOffset ?? 0,
     };
-    this.scroll = input.scroll ?? { x: 0, y: 0 };
-    this.viewportOverlay = input.viewportOverlay === true;
+    this.#scroll = input.scroll ?? { x: 0, y: 0 };
+    this.#viewportOverlay = input.viewportOverlay === true;
   }
 
   /** Draws the caret when the blink state says it is visible. */
   public drawScene(context: RenderContext): void {
-    if (!this.caret.visible) return;
+    if (!this.#caret.visible) return;
     const metrics = context.measureText('|');
-    const ascent = metrics.fontAscent ?? this.caret.height * 0.8;
-    const descent = metrics.fontDescent ?? this.caret.height * 0.2;
-    const snappedX = Math.round(this.caret.x + this.caret.pixelOffset);
-    const top = this.caret.y - ascent;
-    const bottom = this.caret.y + descent;
-    const offset = this.resolveViewportOffset(this.viewportOverlay, this.scroll);
+    const ascent = metrics.fontAscent ?? this.#caret.height * 0.8;
+    const descent = metrics.fontDescent ?? this.#caret.height * 0.2;
+    const snappedX = Math.round(this.#caret.x + this.#caret.pixelOffset);
+    const top = this.#caret.y - ascent;
+    const bottom = this.#caret.y + descent;
+    const offset = this.resolveViewportOffset(this.#viewportOverlay, this.#scroll);
 
-    this.beginScene(context, this.viewportOverlay);
+    this.beginScene(context, this.#viewportOverlay);
     context.setStrokeStyle(StandardColor.Black);
     context.setLineWidth(2);
     context.beginPath();

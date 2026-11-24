@@ -56,8 +56,8 @@ export class FormulaCell extends Cell<CellProperties<string>> {
     // width during construction and overwrites positionRect.width (see TextNode.ts).
     // Building TextNode first would give FixBoxNode the narrowed width, causing
     // the cell border/background to shrink to text width and appear left-shifted.
-    const numericResult = this.readScalarResult();
-    const format = this.getEffectiveFormat();
+    const numericResult = this.#readScalarResult();
+    const format = this.#getEffectiveFormat();
     const numericDisplay =
       typeof numericResult === 'number'
         ? formatCellNumberDisplay(numericResult, format, this.context.cellFormatLocale)
@@ -70,7 +70,7 @@ export class FormulaCell extends Cell<CellProperties<string>> {
     const boxProperties: CellProperties<string> = { ...properties, horizontalAlign: resolvedAlignment };
     const textProperties: CellProperties<string> = {
       ...properties,
-      ...(this.readHyperlink() ? { textColor: '#0563C1' as HexColor, semanticRole: 'hyperlink' } : {}),
+      ...(this.#readHyperlink() ? { textColor: '#0563C1' as HexColor, semanticRole: 'hyperlink' } : {}),
       ...(typeof numericResult === 'number' ? { textOverflowWidth: positionRect.width } : {}),
       ...(isErrorValue ? { textColor: '#FF0000' as HexColor } : {}),
       ...(numericDisplay?.color === undefined ? {} : { textColor: numericDisplay.color }),
@@ -90,26 +90,26 @@ export class FormulaCell extends Cell<CellProperties<string>> {
     const { row, col, formulaResultProvider: provider } = this.context;
     if (row === void 0 || col === void 0 || !provider) return '';
     const result = provider.getFormulaResult(row, col);
-    if (!Array.isArray(result)) return this.formatResult(result);
+    if (!Array.isArray(result)) return this.#formatResult(result);
     const rows = result as unknown[];
     const firstRow = Array.isArray(rows[0]) ? rows[0] : rows;
-    return this.formatResult(firstRow[0]);
+    return this.#formatResult(firstRow[0]);
   }
 
-  private formatResult(value: unknown): string {
+  #formatResult(value: unknown): string {
     return typeof value === 'number'
-      ? formatCellNumberDisplay(value, this.getEffectiveFormat(), this.context.cellFormatLocale).text
+      ? formatCellNumberDisplay(value, this.#getEffectiveFormat(), this.context.cellFormatLocale).text
       : formatCellText(formatFormulaValue(value), this.properties.format, this.context.cellFormatLocale);
   }
 
-  private getEffectiveFormat(): unknown {
+  #getEffectiveFormat(): unknown {
     const { row, col, formulaResultProvider } = this.context;
     return this.properties.format ?? (
       row === void 0 || col === void 0 ? void 0 : formulaResultProvider?.getFormulaResultFormat?.(row, col)
     );
   }
 
-  private readScalarResult(): unknown {
+  #readScalarResult(): unknown {
     const { row, col, formulaResultProvider: provider } = this.context;
     if (row === void 0 || col === void 0 || !provider) return undefined;
     const result = provider.getFormulaResult(row, col);
@@ -119,7 +119,7 @@ export class FormulaCell extends Cell<CellProperties<string>> {
     return firstRow[0];
   }
 
-  private readHyperlink(): boolean {
+  #readHyperlink(): boolean {
     const { row, col, formulaRichResultProvider } = this.context;
     return row !== undefined && col !== undefined
       && formulaRichResultProvider?.getFormulaRichResult(row, col)?.kind === 'hyperlink';

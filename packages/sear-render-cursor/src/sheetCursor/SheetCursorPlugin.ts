@@ -17,39 +17,46 @@ interface ISheetCursorState {}
 /** Projects Sheet interaction state into host cursor behavior. */
 @Injectable()
 export class SheetCursorPlugin extends Plugin<SearCoreSheet, CellProperties, ISheetCursorState> {
+  readonly #cursorRegistry: CursorRegistry;
+  readonly #cursorEngine: CursorEngine;
+  readonly #coordinates: CoordinateEngine;
+
   /** DI token for resolving SheetCursorPlugin. */
   public static readonly symbol: symbol = Symbol.for('SheetCursorPlugin');
 
   /** Creates a SheetCursorPlugin instance. */
   constructor(
     @Inject(CursorRegistry.symbol)
-    private readonly cursorRegistry: CursorRegistry,
-    @Inject(CursorEngine.symbol) private readonly cursorEngine: CursorEngine,
-    @Inject(CoordinateEngine.symbol) private readonly coordinates: CoordinateEngine,
+    cursorRegistry: CursorRegistry,
+    @Inject(CursorEngine.symbol) cursorEngine: CursorEngine,
+    @Inject(CoordinateEngine.symbol) coordinates: CoordinateEngine,
     @Inject(RenderContext.symbol) renderContext: RenderContext,
   ) {
     super({ key, state: {} });
-    this.cursorEngine.mount(renderContext.getRenderTarget());
-    this.installDefaultRules();
+    this.#cursorRegistry = cursorRegistry;
+    this.#cursorEngine = cursorEngine;
+    this.#coordinates = coordinates;
+    this.#cursorEngine.mount(renderContext.getRenderTarget());
+    this.#installDefaultRules();
   }
 
-  private installDefaultRules(): void {
-    this.cursorRegistry.register({
+  #installDefaultRules(): void {
+    this.#cursorRegistry.register({
       kind: CursorRuleKind.Region,
       region: CellRegion.Grid,
       cursor: CursorToken.Cell,
     });
-    this.cursorRegistry.register({
+    this.#cursorRegistry.register({
       kind: CursorRuleKind.Region,
       region: CellRegion.RowHeader,
       cursor: CursorToken.RowSelect,
     });
-    this.cursorRegistry.register({
+    this.#cursorRegistry.register({
       kind: CursorRuleKind.Region,
       region: CellRegion.ColumnHeader,
       cursor: CursorToken.ColumnSelect,
     });
-    this.cursorRegistry.register({
+    this.#cursorRegistry.register({
       kind: CursorRuleKind.Region,
       region: CellRegion.Corner,
       cursor: CursorToken.Default,
@@ -67,20 +74,20 @@ export class SheetCursorPlugin extends Plugin<SearCoreSheet, CellProperties, ISh
    */
   public onMouseMove(_searCore: SearCoreSheet, event: EventWithOffsetAndTarget<CellProperties>): void {
     const properties = event.target?.properties;
-    const target = properties != null && SheetCursorPlugin.hasType(properties) ? properties : null;
+    const target = properties != null && this.#hasType(properties) ? properties : null;
     const { offsetX, offsetY } = event.origin;
-    const token = this.cursorRegistry.resolve(target, {
+    const token = this.#cursorRegistry.resolve(target, {
       core: _searCore,
       origin: event.origin,
-      view: this.coordinates.screenToView(offsetX, offsetY),
-      world: this.coordinates.screenToWorld(offsetX, offsetY),
+      view: this.#coordinates.screenToView(offsetX, offsetY),
+      world: this.#coordinates.screenToWorld(offsetX, offsetY),
       target,
     });
-    this.cursorEngine.apply(token);
+    this.#cursorEngine.apply(token);
   }
 
   /** Type guard: narrows Partial<CellProperties> → CellProperties by asserting the required field. */
-  private static hasType(p: Partial<CellProperties>): p is CellProperties {
+  #hasType(p: Partial<CellProperties>): p is CellProperties {
     return p.type != null;
   }
 

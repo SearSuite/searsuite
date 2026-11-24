@@ -115,13 +115,13 @@ export class RectOT extends BaseOT {
       } else if (MatrixOTActionName.RowDelete in currentOperation && currentOperation.rd !== void 0) {
         snapshot.removeRow(currentOperation.p[0]);
       } else if (MatrixOTActionName.RowMove in currentOperation && currentOperation.rm !== void 0) {
-        RectOT.swapAxis(snapshot, 0, currentOperation.p[0], currentOperation[MatrixOTActionName.RowMove][0]);
+        RectOT.#swapAxis(snapshot, 0, currentOperation.p[0], currentOperation[MatrixOTActionName.RowMove][0]);
       } else if (MatrixOTActionName.ColInsert in currentOperation && currentOperation.ci !== void 0) {
         snapshot.addCol(currentOperation.p[0]);
       } else if (MatrixOTActionName.ColDelete in currentOperation && currentOperation.cd !== void 0) {
         snapshot.removeCol(currentOperation.p[0]);
       } else if (MatrixOTActionName.ColMove in currentOperation && currentOperation.cm !== void 0) {
-        RectOT.swapAxis(snapshot, 1, currentOperation.p[0], currentOperation.cm[0]);
+        RectOT.#swapAxis(snapshot, 1, currentOperation.p[0], currentOperation.cm[0]);
       } else if (RectOTActionName.UpdateRect in currentOperation && currentOperation.ur !== void 0) {
         snapshot.update(currentOperation.ur);
       } else {
@@ -138,7 +138,7 @@ export class RectOT extends BaseOT {
    * @param firstIndex - First moved index.
    * @param secondIndex - Second moved index.
    */
-  private static swapAxis(snapshot: Rect, axis: 0 | 1, firstIndex: number, secondIndex: number): void {
+  static #swapAxis(snapshot: Rect, axis: 0 | 1, firstIndex: number, secondIndex: number): void {
     const firstPoint = snapshot.getPoint(0);
     const secondPoint = snapshot.getPoint(1);
     const shifted = [firstPoint[axis], secondPoint[axis]].map((value) => {

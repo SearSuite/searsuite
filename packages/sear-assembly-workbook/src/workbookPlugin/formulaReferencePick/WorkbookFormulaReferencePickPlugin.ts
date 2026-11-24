@@ -31,6 +31,8 @@ import type { WorkbookTransactionCommittedEvent } from '../../WorkbookTransactio
 /** Retains one formula edit while its source sheet is temporarily unmounted. */
 @Injectable()
 export class WorkbookFormulaReferencePickPlugin extends WorkbookPlugin implements FormulaReferencePickService {
+  readonly #platform: Platform;
+
   public static readonly symbol = Symbol.for('WorkbookFormulaReferencePickPlugin');
   #context: WorkbookPluginContext | null = null;
   #pending: { sourceId: string; draft: FormulaEditDraft; reference?: string } | null = null;
@@ -38,8 +40,9 @@ export class WorkbookFormulaReferencePickPlugin extends WorkbookPlugin implement
   #revealTimer: number | null = null;
   #disposePendingEscape: (() => void) | null = null;
 
-  constructor(@Inject(Platform.symbol) private readonly platform: Platform) {
+  constructor(@Inject(Platform.symbol) platform: Platform) {
     super();
+    this.#platform = platform;
   }
 
   public getSheetServices(): readonly WorkbookCompanionSheetService[] {
@@ -47,10 +50,10 @@ export class WorkbookFormulaReferencePickPlugin extends WorkbookPlugin implement
   }
 
   public registerCommands(commands: WorkbookCommandBus): void {
-    commands.register(CaptureWorkbookFormulaDraftCommand, () => this.captureDraft());
-    commands.register(PickWorkbookFormulaReferenceCommand, (input) => this.applyPickedReference(input.start, input.end));
-    commands.register(CancelWorkbookFormulaReferencePickCommand, () => this.cancelPick());
-    commands.register(RestoreWorkbookFormulaDraftCommand, () => this.restoreAtSource());
+    commands.register(CaptureWorkbookFormulaDraftCommand, () => this.#captureDraft());
+    commands.register(PickWorkbookFormulaReferenceCommand, (input) => this.#applyPickedReference(input.start, input.end));
+    commands.register(CancelWorkbookFormulaReferencePickCommand, () => this.#cancelPick());
+    commands.register(RestoreWorkbookFormulaDraftCommand, () => this.#restoreAtSource());
   }
 
   public initialize(context: WorkbookPluginContext): () => void {
@@ -58,8 +61,8 @@ export class WorkbookFormulaReferencePickPlugin extends WorkbookPlugin implement
     return () => {
       this.#disposePendingEscape?.();
       this.#disposePendingEscape = null;
-      if (this.#returnTimer !== null) this.platform.clearTimeout(this.#returnTimer);
-      if (this.#revealTimer !== null) this.platform.clearTimeout(this.#revealTimer);
+      if (this.#returnTimer !== null) this.#platform.clearTimeout(this.#returnTimer);
+      if (this.#revealTimer !== null) this.#platform.clearTimeout(this.#revealTimer);
       this.#returnTimer = null;
       this.#revealTimer = null;
       this.#pending = null;
@@ -73,13 +76,13 @@ export class WorkbookFormulaReferencePickPlugin extends WorkbookPlugin implement
 
   public onSheetActivationFailed(): void {
     this.#context?.runtime.commands.run(RestoreWorkbookFormulaDraftCommand, void 0);
-    this.bindPendingEscape();
+    this.#bindPendingEscape();
   }
 
   public onTransactionCommitted(event: WorkbookTransactionCommittedEvent): void {
     if (event.before.activeSheetId === event.after.activeSheetId) return;
     this.#context?.runtime.commands.run(RestoreWorkbookFormulaDraftCommand, void 0);
-    this.bindPendingEscape();
+    this.#bindPendingEscape();
   }
 
   public hasPendingPick(): boolean {
@@ -91,7 +94,7 @@ export class WorkbookFormulaReferencePickPlugin extends WorkbookPlugin implement
     this.#context?.runtime.commands.run(PickWorkbookFormulaReferenceCommand, { start, end });
   }
 
-  private applyPickedReference(start: Point, end: Point): void {
+  #applyPickedReference(start: Point, end: Point): void {
     this.#assertCommandBoundary();
     const pending = this.#pending;
     const runtime = this.#context?.runtime;
@@ -104,8 +107,8 @@ export class WorkbookFormulaReferencePickPlugin extends WorkbookPlugin implement
       const qualifierStart = findTrailingSheetQualifierStart(pending.draft.text, pending.draft.selectionStart);
       if (qualifierStart !== null) pending.draft = { ...pending.draft, selectionStart: qualifierStart };
     }
-    if (this.#returnTimer !== null) this.platform.clearTimeout(this.#returnTimer);
-    this.#returnTimer = this.platform.setTimeout(() => {
+    if (this.#returnTimer !== null) this.#platform.clearTimeout(this.#returnTimer);
+    this.#returnTimer = this.#platform.setTimeout(() => {
       this.#returnTimer = null;
       if (this.#pending !== pending || !this.#context) return;
       this.#context.runtime.commands.run(ActivateWorkbookSheetCommand, { sheetId: pending.sourceId });
@@ -116,21 +119,21 @@ export class WorkbookFormulaReferencePickPlugin extends WorkbookPlugin implement
     this.#context?.runtime.commands.run(CancelWorkbookFormulaReferencePickCommand, void 0);
   }
 
-  private cancelPick(): void {
+  #cancelPick(): void {
     this.#assertCommandBoundary();
     const pending = this.#pending;
     if (!pending || !this.#context) return;
     this.#pending = null;
     this.#disposePendingEscape?.();
     this.#disposePendingEscape = null;
-    if (this.#returnTimer !== null) this.platform.clearTimeout(this.#returnTimer);
-    this.#returnTimer = this.platform.setTimeout(() => {
+    if (this.#returnTimer !== null) this.#platform.clearTimeout(this.#returnTimer);
+    this.#returnTimer = this.#platform.setTimeout(() => {
       this.#returnTimer = null;
       this.#context?.runtime.commands.run(ActivateWorkbookSheetCommand, { sheetId: pending.sourceId });
     }, 0);
   }
 
-  private captureDraft(): void {
+  #captureDraft(): void {
     this.#assertCommandBoundary();
     if (this.#pending) return;
     const runtime = this.#context?.runtime;
@@ -143,7 +146,7 @@ export class WorkbookFormulaReferencePickPlugin extends WorkbookPlugin implement
     this.#pending = { sourceId: runtime.sheets.getActiveId(), draft };
   }
 
-  private restoreAtSource(): void {
+  #restoreAtSource(): void {
     this.#assertCommandBoundary();
     const pending = this.#pending;
     const runtime = this.#context?.runtime;
@@ -154,8 +157,8 @@ export class WorkbookFormulaReferencePickPlugin extends WorkbookPlugin implement
       draft: pending.draft,
       ...(pending.reference ? { reference: pending.reference } : {}),
     });
-    if (this.#revealTimer !== null) this.platform.clearTimeout(this.#revealTimer);
-    this.#revealTimer = this.platform.setTimeout(() => {
+    if (this.#revealTimer !== null) this.#platform.clearTimeout(this.#revealTimer);
+    this.#revealTimer = this.#platform.setTimeout(() => {
       this.#revealTimer = null;
       if (!this.#context || runtime.sheets.getActiveId() !== pending.sourceId) return;
       const mountedEditor = runtime.sheets.getActiveEditor();
@@ -168,7 +171,7 @@ export class WorkbookFormulaReferencePickPlugin extends WorkbookPlugin implement
     this.#pending = null;
   }
 
-  private bindPendingEscape(): void {
+  #bindPendingEscape(): void {
     this.#disposePendingEscape?.();
     this.#disposePendingEscape = null;
     if (!this.hasPendingPick()) return;

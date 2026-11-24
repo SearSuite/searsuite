@@ -8,10 +8,14 @@ import { RichTextRunRenderRegistry } from './RichTextRunRenderRegistry';
 /** Paints one contiguous rich-text run using the registered render contributions. */
 @Injectable()
 export class RichTextRunRenderer {
+  readonly #registry: RichTextRunRenderRegistry;
+
   /** DI token for resolving the run renderer. */
   public static readonly symbol = Symbol.for('RichTextRunRenderer');
   /** Creates a run renderer backed by the render contribution registry. */
-  public constructor(private readonly registry: RichTextRunRenderRegistry) {}
+  public constructor(registry: RichTextRunRenderRegistry) {
+    this.#registry = registry;
+  }
 
   /** Paints one run and restores all renderer state changed by its style plugins. */
   public paint(
@@ -32,10 +36,10 @@ export class RichTextRunRenderer {
     context.save();
     context.setFillStyle(StandardColor.Black);
     context.setStrokeStyle(StandardColor.Black);
-    context.setFont(this.registry.resolveFont(input.font, input.style));
-    this.registry.applyRenderState(context, input.style);
+    context.setFont(this.#registry.resolveFont(input.font, input.style));
+    this.#registry.applyRenderState(context, input.style);
     context.fillText(input.text, input.x, input.baselineY);
-    this.registry.paintRun({ context, ...input });
+    this.#registry.paintRun({ context, ...input });
     context.restore();
   }
 }

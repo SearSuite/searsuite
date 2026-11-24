@@ -80,61 +80,61 @@ export interface DocVirtualLayoutResult {
 }
 
 export class PrefixHeightIndex {
-  private readonly tree: number[];
-  private readonly heights: number[];
+  readonly #tree: number[];
+  readonly #heights: number[];
 
   public constructor(heights: readonly number[]) {
-    this.heights = heights.map(normalizeHeight);
-    this.tree = Array.from({ length: this.heights.length + 1 }, createZero);
-    for (let index = 0; index < this.heights.length; index++) {
-      this.add(index, this.heights[index]);
+    this.#heights = heights.map(normalizeHeight);
+    this.#tree = Array.from({ length: this.#heights.length + 1 }, createZero);
+    for (let index = 0; index < this.#heights.length; index++) {
+      this.#add(index, this.#heights[index]);
     }
   }
 
   public get totalHeight(): number {
-    return this.sum(this.heights.length);
+    return this.#sum(this.#heights.length);
   }
 
   public getTop(index: number): number {
     if (index <= 0) return 0;
-    return this.sum(Math.min(index, this.heights.length));
+    return this.#sum(Math.min(index, this.#heights.length));
   }
 
   public update(index: number, height: number): void {
-    if (index < 0 || index >= this.heights.length) return;
+    if (index < 0 || index >= this.#heights.length) return;
     const next = normalizeHeight(height);
-    const delta = next - this.heights[index];
+    const delta = next - this.#heights[index];
     if (delta === 0) return;
-    this.heights[index] = next;
-    this.add(index, delta);
+    this.#heights[index] = next;
+    this.#add(index, delta);
   }
 
   public findIndexAt(y: number): number {
-    if (this.heights.length === 0) return -1;
+    if (this.#heights.length === 0) return -1;
     const target = Math.max(0, Math.min(y, Math.max(0, this.totalHeight - 1)));
     let index = 0;
-    let bit = highestPowerOfTwoAtMost(this.heights.length);
+    let bit = highestPowerOfTwoAtMost(this.#heights.length);
     let accumulated = 0;
     while (bit !== 0) {
       const next = index + bit;
-      if (next <= this.heights.length && accumulated + this.tree[next] <= target) {
+      if (next <= this.#heights.length && accumulated + this.#tree[next] <= target) {
         index = next;
-        accumulated += this.tree[next];
+        accumulated += this.#tree[next];
       }
       bit >>= 1;
     }
-    return Math.min(index, this.heights.length - 1);
+    return Math.min(index, this.#heights.length - 1);
   }
 
-  private add(index: number, delta: number): void {
-    for (let cursor = index + 1; cursor < this.tree.length; cursor += cursor & -cursor) {
-      this.tree[cursor] += delta;
+  #add(index: number, delta: number): void {
+    for (let cursor = index + 1; cursor < this.#tree.length; cursor += cursor & -cursor) {
+      this.#tree[cursor] += delta;
     }
   }
 
-  private sum(count: number): number {
+  #sum(count: number): number {
     let total = 0;
-    for (let cursor = count; cursor > 0; cursor -= cursor & -cursor) total += this.tree[cursor];
+    for (let cursor = count; cursor > 0; cursor -= cursor & -cursor) total += this.#tree[cursor];
     return total;
   }
 }

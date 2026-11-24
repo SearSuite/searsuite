@@ -37,10 +37,10 @@ export class FontSizeTextStylePlugin extends InlineTextStylePluginBase {
   }
 
   public override registerCommands(commands: DocCommandBus): void {
-    commands.register(SetDocFontSizeCommand, this.createSetFontSizeCommand.bind(this));
+    commands.register(SetDocFontSizeCommand, this.#createSetFontSizeCommand.bind(this));
   }
 
-  private createSetFontSizeCommand(input: SetDocFontSizeInput) {
+  #createSetFontSizeCommand(input: SetDocFontSizeInput) {
     const fontSize = normalizeFontSize(input?.fontSize);
     return createDocCommand(SetDocFontSizeCommand.id, DocContentRenderPluginKey, () => {
       const runtime = this.requireRuntime();

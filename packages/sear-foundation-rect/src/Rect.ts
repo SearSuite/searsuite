@@ -55,7 +55,7 @@ export class Rect {
     return defaultRect;
   }
 
-  private rect: [Point, Point];
+  #rect: [Point, Point];
 
   /**
    * Creates a rectangle from two corner points.
@@ -63,14 +63,14 @@ export class Rect {
    * @param rect The rectangle bounds as `[[startRow, startCol], [endRow, endCol]]`.
    */
   constructor(rect: [Point, Point] = Rect.Empty) {
-    this.rect = rect === defaultRect ? createEmptyRectShape() : rect;
+    this.#rect = rect === defaultRect ? createEmptyRectShape() : rect;
   }
 
   /**
    * Returns the current rectangle representation.
    */
   public get shape() {
-    return lockedShapes.get(this) ?? this.rect;
+    return lockedShapes.get(this) ?? this.#rect;
   }
 
   /**
@@ -94,7 +94,7 @@ export class Rect {
   /** Prevents changes through methods or coordinates retained from a committed state. */
   public lockMutations(): void {
     if (lockedShapes.has(this)) return;
-    const [[startRow, startCol], [endRow, endCol]] = this.rect;
+    const [[startRow, startCol], [endRow, endCol]] = this.#rect;
     const coordinates = [startRow, startCol, endRow, endCol];
     if (!coordinates.every(Number.isSafeInteger)) {
       throw new SearError('Committed rectangle coordinates must be safe integers.');
@@ -103,9 +103,9 @@ export class Rect {
     Object.freeze(snapshot[0]);
     Object.freeze(snapshot[1]);
     Object.freeze(snapshot);
-    Object.freeze(this.rect[0]);
-    Object.freeze(this.rect[1]);
-    Object.freeze(this.rect);
+    Object.freeze(this.#rect[0]);
+    Object.freeze(this.#rect[1]);
+    Object.freeze(this.#rect);
     lockedShapes.set(this, snapshot);
     Object.freeze(this);
   }
@@ -196,7 +196,8 @@ export class Rect {
    * @param rect The new rectangle coordinates.
    */
   public update(rect: [Point, Point]): Rect {
-    this.rect = rect;
+    if (Object.isFrozen(this)) throw new SearError('Cannot update a frozen rectangle.');
+    this.#rect = rect;
     return this;
   }
 

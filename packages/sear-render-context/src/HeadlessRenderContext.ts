@@ -11,10 +11,10 @@ export class HeadlessRenderContext extends RenderContext {
   /** DI token for resolving the headless render context. */
   public static readonly symbol: symbol = Symbol.for('HeadlessRenderContext');
 
-  private readonly attributes = new Map<string, string>();
-  private viewScale = 1;
-  private rasterScale = 1;
-  private lineWidth = 1;
+  readonly #attributes = new Map<string, string>();
+  #viewScale = 1;
+  #rasterScale = 1;
+  #lineWidth = 1;
 
   /** @inheritdoc */
   public getRenderTarget(): unknown {
@@ -22,33 +22,33 @@ export class HeadlessRenderContext extends RenderContext {
   }
   /** @inheritdoc */
   public setAttribute(name: string, value: string): void {
-    this.attributes.set(name, value);
+    this.#attributes.set(name, value);
   }
   /** @inheritdoc */
   public getAttribute(name: string): string {
-    return this.attributes.get(name) ?? '';
+    return this.#attributes.get(name) ?? '';
   }
   /** @inheritdoc */
   public initialize(scale: number = 1): void {
-    this.rasterScale = scale;
+    this.#rasterScale = scale;
   }
   /** @inheritdoc */
-  public resize(_width: number, _height: number, scale: number = this.rasterScale): void {
-    this.rasterScale = scale;
+  public resize(_width: number, _height: number, scale: number = this.#rasterScale): void {
+    this.#rasterScale = scale;
     this.isDrawn = false;
   }
   /** @inheritdoc */
   public setViewScale(scale: number): void {
-    this.viewScale = scale;
+    this.#viewScale = scale;
     this.isDrawn = false;
   }
   /** @inheritdoc */
   public getViewScale(): number {
-    return this.viewScale;
+    return this.#viewScale;
   }
   /** @inheritdoc */
   public getRasterScale(): number {
-    return this.rasterScale;
+    return this.#rasterScale;
   }
   /** @inheritdoc */
   public save(): void {}
@@ -98,15 +98,15 @@ export class HeadlessRenderContext extends RenderContext {
   public strokeRect(_x: number, _y: number, _width: number, _height: number): void {}
   /** @inheritdoc */
   public setLineWidth(width: number): void {
-    this.lineWidth = width;
+    this.#lineWidth = width;
   }
   /** @inheritdoc */
   public getLineWidth(): number {
-    return this.lineWidth;
+    return this.#lineWidth;
   }
   /** @inheritdoc */
   public getMaxLineWidth(): number {
-    return this.lineWidth;
+    return this.#lineWidth;
   }
   /** @inheritdoc */
   public setLineDash(_segments: number[]): void {}

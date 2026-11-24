@@ -21,7 +21,7 @@ export class SceneGraph<T extends NodeProperties> extends Node<T> {
   public static readonly symbol: symbol = Symbol.for('SceneGraph');
 
   /** Plugin key to top-level render-node keys registered by that plugin. */
-  private pluginKeysMap: Map<string, RenderNodeKey[]> = new Map();
+  #pluginKeysMap: Map<string, RenderNodeKey[]> = new Map();
 
   /** Creates a scene graph bound to one editor-local DI runtime. */
   public constructor(container: Container) {
@@ -30,7 +30,7 @@ export class SceneGraph<T extends NodeProperties> extends Node<T> {
   }
 
   /** Dirty tracker resolved lazily so tests can replace the DI binding. */
-  private get dirtyTree(): GenerationalDirtyTracker {
+  get #dirtyTree(): GenerationalDirtyTracker {
     return this.resolveRuntime<GenerationalDirtyTracker>(GenerationalDirtyTracker.symbol);
   }
 
@@ -52,10 +52,10 @@ export class SceneGraph<T extends NodeProperties> extends Node<T> {
     for (const n of nodes) {
       keys.push(n.nodeKey);
       n.positionRect.key = n.nodeKey;
-      if (markDirty) this.dirtyTree.mark(toDirtyRect(n.positionRect));
+      if (markDirty) this.#dirtyTree.mark(toDirtyRect(n.positionRect));
     }
 
-    this.pluginKeysMap.set(pluginKeyString, keys);
+    this.#pluginKeysMap.set(pluginKeyString, keys);
     this.add(nodes);
   }
 
@@ -80,7 +80,7 @@ export class SceneGraph<T extends NodeProperties> extends Node<T> {
     const markDirty = options.markDirty !== false;
     const retainExisting = options.retainExisting !== false;
     const updateRetainedGeometry = options.updateRetainedGeometry === true;
-    const previousKeys = new Set(this.pluginKeysMap.get(pluginKeyString) ?? []);
+    const previousKeys = new Set(this.#pluginKeysMap.get(pluginKeyString) ?? []);
     const nodes = Array.isArray(node) ? node : [node];
     const nextKeys: RenderNodeKey[] = [];
 
@@ -94,41 +94,41 @@ export class SceneGraph<T extends NodeProperties> extends Node<T> {
           (options.replaceRetainedKeys?.has(nodeKey) ?? false) ||
           (options.replaceRetainedGeometryChanged === true && !hasSameRectSize(retainedNode.positionRect, nextNode.positionRect));
         if (shouldReplaceRetained) {
-          this.removePluginNodeByKey(nodeKey, { markDirty });
+          this.#removePluginNodeByKey(nodeKey, { markDirty });
           nextNode.positionRect.key = nodeKey;
-          if (markDirty) this.dirtyTree.mark(toDirtyRect(nextNode.positionRect));
+          if (markDirty) this.#dirtyTree.mark(toDirtyRect(nextNode.positionRect));
           this.add(nextNode);
           continue;
         }
-        if (updateRetainedGeometry) this.updateRetainedNodeGeometry(retainedNode, nextNode, { markDirty });
+        if (updateRetainedGeometry) this.#updateRetainedNodeGeometry(retainedNode, nextNode, { markDirty });
         releaseUnattachedHitColor(nextNode);
         continue;
       }
-      this.removePluginNodeByKey(nodeKey, { markDirty });
+      this.#removePluginNodeByKey(nodeKey, { markDirty });
       nextNode.positionRect.key = nodeKey;
-      if (markDirty) this.dirtyTree.mark(toDirtyRect(nextNode.positionRect));
+      if (markDirty) this.#dirtyTree.mark(toDirtyRect(nextNode.positionRect));
       this.add(nextNode);
     }
 
     for (const removedKey of previousKeys) {
-      this.removePluginNodeByKey(removedKey, { markDirty });
+      this.#removePluginNodeByKey(removedKey, { markDirty });
     }
-    this.pluginKeysMap.set(pluginKeyString, nextKeys);
+    this.#pluginKeysMap.set(pluginKeyString, nextKeys);
   }
 
-  private updateRetainedNodeGeometry(
+  #updateRetainedNodeGeometry(
     retainedNode: Node<T>,
     nextNode: Node<T>,
     options: { readonly markDirty: boolean },
   ): void {
     if (!hasSameRectSize(retainedNode.positionRect, nextNode.positionRect)) return;
     if (hasSameRectPosition(retainedNode.positionRect, nextNode.positionRect)) return;
-    if (options.markDirty) this.dirtyTree.mark(toDirtyRect(retainedNode.positionRect));
+    if (options.markDirty) this.#dirtyTree.mark(toDirtyRect(retainedNode.positionRect));
     this.positionRectStorage.remove(retainedNode.positionRect, (rect) => rect.key === retainedNode.nodeKey);
     retainedNode.positionRect.updatePosition(nextNode.positionRect.x, nextNode.positionRect.y);
     retainedNode.positionRect.key = retainedNode.nodeKey;
     this.positionRectStorage.insert(retainedNode.positionRect);
-    if (options.markDirty) this.dirtyTree.mark(toDirtyRect(retainedNode.positionRect));
+    if (options.markDirty) this.#dirtyTree.mark(toDirtyRect(retainedNode.positionRect));
   }
 
   /**
@@ -140,24 +140,24 @@ export class SceneGraph<T extends NodeProperties> extends Node<T> {
     options: { readonly markDirty?: boolean } = {},
   ) {
     const markDirty = options.markDirty !== false;
-    const keys = this.pluginKeysMap.get(pluginKeyString);
+    const keys = this.#pluginKeysMap.get(pluginKeyString);
 
     if (keys) {
-      for (const key of keys) this.removePluginNodeByKey(key, { markDirty });
-      this.pluginKeysMap.delete(pluginKeyString);
+      for (const key of keys) this.#removePluginNodeByKey(key, { markDirty });
+      this.#pluginKeysMap.delete(pluginKeyString);
     }
   }
 
-  private removePluginNodeByKey(key: RenderNodeKey, options: { readonly markDirty: boolean }): void {
+  #removePluginNodeByKey(key: RenderNodeKey, options: { readonly markDirty: boolean }): void {
     const node = this.dataStorage.get(key);
     if (!node) return;
-    if (options.markDirty) this.dirtyTree.mark(toDirtyRect(node.positionRect));
-    const removedSet = this.collectNodeKeys(node);
+    if (options.markDirty) this.#dirtyTree.mark(toDirtyRect(node.positionRect));
+    const removedSet = this.#collectNodeKeys(node);
     node.dispose();
-    this.removeChildKeys(removedSet);
+    this.#removeChildKeys(removedSet);
   }
 
-  private collectNodeKeys(node: Node<T>): ReadonlySet<RenderNodeKey> {
+  #collectNodeKeys(node: Node<T>): ReadonlySet<RenderNodeKey> {
     const removedSet = new Set<RenderNodeKey>();
     const graph = this;
     function collectRemovedNodeKeys(current: Node<T>): void {
@@ -171,7 +171,7 @@ export class SceneGraph<T extends NodeProperties> extends Node<T> {
     return removedSet;
   }
 
-  private removeChildKeys(removedSet: ReadonlySet<RenderNodeKey>): void {
+  #removeChildKeys(removedSet: ReadonlySet<RenderNodeKey>): void {
     let writeIndex = 0;
     for (let readIndex = 0; readIndex < this.childKeys.length; readIndex++) {
       if (!removedSet.has(this.childKeys[readIndex])) {

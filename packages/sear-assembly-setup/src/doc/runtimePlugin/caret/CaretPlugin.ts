@@ -25,17 +25,20 @@ import { DocCaretPluginKey, DocSelectionPluginKey } from '@searsuite/sear-assemb
 /** Owns caret movement, focus, blink state, and caret overlay rendering. */
 @Injectable()
 export class CaretPlugin extends DocPlugin<null> {
+  readonly #caretState: DocCaretState;
+
   /** DI token for resolving CaretPlugin. */
   public static readonly symbol = Symbol.for('CaretPlugin');
 
-  private runtime: DocPluginRuntime | null = null;
+  #runtime: DocPluginRuntime | null = null;
 
   /** Creates a CaretPlugin instance. */
   public constructor(
     @Inject(DocCaretState.symbol)
-    private readonly caretState: DocCaretState,
+    caretState: DocCaretState,
   ) {
     super({ key: DocCaretPluginKey, state: null });
+    this.#caretState = caretState;
   }
 
   /** Registers caret-owned state before the plugin is resolved. */
@@ -56,9 +59,9 @@ export class CaretPlugin extends DocPlugin<null> {
   }
 
   public render(): Node<NodeProperties>[] | null {
-    const layout = this.runtime?.document.core.getDocRenderLayoutState();
+    const layout = this.#runtime?.document.core.getDocRenderLayoutState();
     if (!layout) return null;
-    const runtime = this.requireRuntime();
+    const runtime = this.#requireRuntime();
     const cursor = runtime.document.cursor.getCursor();
     if (!cursor) return null;
     const scroll = runtime.scroll.manager.getState();
@@ -92,8 +95,8 @@ export class CaretPlugin extends DocPlugin<null> {
   }
 
   public configure(context: DocPluginSetupContext): void {
-    this.runtime = context.runtime;
-    context.runtime.extensions.register(DocPluginRuntimeCapability.CaretState, this.caretState);
+    this.#runtime = context.runtime;
+    context.runtime.extensions.register(DocPluginRuntimeCapability.CaretState, this.#caretState);
   }
 
   public registerKeyboardHandlers({ bindings, commands }: DocKeyboardHandlerRegistrationContext): void {
@@ -110,18 +113,18 @@ export class CaretPlugin extends DocPlugin<null> {
 
   public onEditorDestroy(): void {
     this.assertRuntimeWriteAllowed();
-    this.runtime = null;
+    this.#runtime = null;
   }
 
   public registerCommands(commands: DocCommandBus): void {
-    commands.register(MoveDocCursorCommand, this.createMoveDocCursorCommand.bind(this));
+    commands.register(MoveDocCursorCommand, this.#createMoveDocCursorCommand.bind(this));
     commands.register(FocusDocCommand, createFocusDocCommand);
   }
 
-  private createMoveDocCursorCommand(input: MoveDocCursorInput) {
+  #createMoveDocCursorCommand(input: MoveDocCursorInput) {
     const plugin = this;
     function createMoveDocCursorTransaction() {
-      return plugin.requireRuntime().document.input.createArrowTransaction(input.direction, input.shiftKey ?? false);
+      return plugin.#requireRuntime().document.input.createArrowTransaction(input.direction, input.shiftKey ?? false);
     }
     return createDocCommand(
       MoveDocCursorCommand.id,
@@ -131,9 +134,9 @@ export class CaretPlugin extends DocPlugin<null> {
     );
   }
 
-  private requireRuntime(): DocPluginRuntime {
-    if (!this.runtime) throw new SearError('CaretPlugin is not configured.');
-    return this.runtime;
+  #requireRuntime(): DocPluginRuntime {
+    if (!this.#runtime) throw new SearError('CaretPlugin is not configured.');
+    return this.#runtime;
   }
 }
 

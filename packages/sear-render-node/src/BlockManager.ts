@@ -24,12 +24,12 @@ export class BlockManager implements RichTextBlockLayoutProvider {
   /** DI token for resolving the rich-document block manager. */
   public static readonly symbol = Symbol.for('BlockManager');
 
-  private readonly textShaper: TextShaper;
-  private readonly inlineStyleRegistry: RichTextInlineStyleRegistry;
-  private readonly runRenderRegistry: RichTextRunRenderRegistry;
-  private readonly lineBoxRegistry: RichTextLineBoxRegistry;
-  private readonly paragraphLayoutDefaults: RichTextParagraphLayoutDefaults;
-  private baseFont: string | undefined;
+  readonly #textShaper: TextShaper;
+  readonly #inlineStyleRegistry: RichTextInlineStyleRegistry;
+  readonly #runRenderRegistry: RichTextRunRenderRegistry;
+  readonly #lineBoxRegistry: RichTextLineBoxRegistry;
+  readonly #paragraphLayoutDefaults: RichTextParagraphLayoutDefaults;
+  #baseFont: string | undefined;
   #isCommandExecuting: (() => boolean) | undefined;
 
   /** Closes direct block writes after the owning editor has assembled. */
@@ -44,8 +44,8 @@ export class BlockManager implements RichTextBlockLayoutProvider {
     }
   }
 
-  private blocks: RichDocNode[] | RichDocTextNode[] = [];
-  private blocksMeasureInfo: { width: number; height: number }[] = [];
+  #blocks: RichDocNode[] | RichDocTextNode[] = [];
+  #blocksMeasureInfo: { width: number; height: number }[] = [];
 
   /** Maximum measured unwrapped block width. */
   public maxWidth: number = 0;
@@ -54,7 +54,7 @@ export class BlockManager implements RichTextBlockLayoutProvider {
   public getUnwrappedSize(): { width: number; height: number } {
     return {
       width: this.maxWidth,
-      height: this.blocksMeasureInfo.reduce((sum, block) => sum + block.height, 0),
+      height: this.#blocksMeasureInfo.reduce((sum, block) => sum + block.height, 0),
     };
   }
 
@@ -70,67 +70,67 @@ export class BlockManager implements RichTextBlockLayoutProvider {
     baseFont?: string,
     paragraphLayoutDefaults: RichTextParagraphLayoutDefaults = defaultRichTextParagraphLayoutDefaults,
   ) {
-    this.textShaper = textShaper;
-    this.inlineStyleRegistry = inlineStyleRegistry;
-    this.lineBoxRegistry = lineBoxRegistry;
-    this.paragraphLayoutDefaults = paragraphLayoutDefaults;
-    this.runRenderRegistry = runRenderRegistry;
-    this.baseFont = baseFont;
+    this.#textShaper = textShaper;
+    this.#inlineStyleRegistry = inlineStyleRegistry;
+    this.#lineBoxRegistry = lineBoxRegistry;
+    this.#paragraphLayoutDefaults = paragraphLayoutDefaults;
+    this.#runRenderRegistry = runRenderRegistry;
+    this.#baseFont = baseFont;
   }
 
   /** Creates an unshared measurement workspace for a read-only layout request. */
   public createDetached(): BlockManager {
     return new BlockManager(
-      this.textShaper,
-      this.inlineStyleRegistry,
-      this.runRenderRegistry,
-      this.lineBoxRegistry,
-      this.baseFont,
-      this.paragraphLayoutDefaults,
+      this.#textShaper,
+      this.#inlineStyleRegistry,
+      this.#runRenderRegistry,
+      this.#lineBoxRegistry,
+      this.#baseFont,
+      this.#paragraphLayoutDefaults,
     );
   }
 
   /** Adds a rich document block and records its measured size. */
   add(node: RichDocNode): void {
     this.#assertCommandWrite();
-    this.blocks.push(node);
-    this.measureNode(node);
+    this.#blocks.push(node);
+    this.#measureNode(node);
   }
 
   /** Clears all measured blocks and cached size information. */
   clear(): void {
     this.#assertCommandWrite();
-    this.blocks = [];
-    this.blocksMeasureInfo = [];
+    this.#blocks = [];
+    this.#blocksMeasureInfo = [];
     this.maxWidth = 0;
   }
 
   /** Selects the transient base font used for the next layout pass. */
   public setBaseFont(font: string): void {
     this.#assertCommandWrite();
-    this.baseFont = font;
+    this.#baseFont = font;
   }
 
-  private measureNodeChars(node: RichDocNode): RichTextChar[] {
+  #measureNodeChars(node: RichDocNode): RichTextChar[] {
     return (node.content as Array<RichDocNode | RichDocTextNode>).flatMap((child, childIndex) => {
       if (!isTextNode(child)) return [];
-      return this.measureWords(child.text ?? '', this.inlineStyleRegistry.readTextNodeStyle(child), childIndex);
+      return this.#measureWords(child.text ?? '', this.#inlineStyleRegistry.readTextNodeStyle(child), childIndex);
     });
   }
 
-  private measureNode(node: RichDocNode): void {
-    const words = this.measureNodeChars(node);
-    this.blocksMeasureInfo.push({
+  #measureNode(node: RichDocNode): void {
+    const words = this.#measureNodeChars(node);
+    this.#blocksMeasureInfo.push({
       width: words.reduce((sum, w) => sum + w.width, 0),
       height: words.reduce((max, w) => Math.max(max, w.height), 0),
     });
-    this.maxWidth = Math.max(this.maxWidth, this.blocksMeasureInfo[this.blocksMeasureInfo.length - 1].width);
+    this.maxWidth = Math.max(this.maxWidth, this.#blocksMeasureInfo[this.#blocksMeasureInfo.length - 1].width);
   }
 
-  private measureWords(text: string, style?: RichTextInlineStyle, textNodeIndex?: number): RichTextChar[] {
+  #measureWords(text: string, style?: RichTextInlineStyle, textNodeIndex?: number): RichTextChar[] {
     const sourceText = text || ' ';
-    const font = this.runRenderRegistry.resolveFont(this.baseFont ?? '16px sans-serif', style);
-    const shaped = this.textShaper.shape({ text: sourceText, font });
+    const font = this.#runRenderRegistry.resolveFont(this.#baseFont ?? '16px sans-serif', style);
+    const shaped = this.#textShaper.shape({ text: sourceText, font });
     const caretByOffset = new Map(shaped.caretStops.map((stop) => [stop.textOffset, stop.x]));
     const ranges =
       shaped.clusters.length > 0
@@ -145,7 +145,7 @@ export class BlockManager implements RichTextBlockLayoutProvider {
     const chars = ranges.map((range) => {
       const startX = caretByOffset.get(range.start) ?? 0;
       const endX = caretByOffset.get(range.end) ?? startX;
-      return this.createChar(
+      return this.#createChar(
         text ? sourceText.slice(range.start, range.end) : '',
         Math.max(0, endX - startX),
         height,
@@ -157,11 +157,11 @@ export class BlockManager implements RichTextBlockLayoutProvider {
         range.start,
       );
     });
-    if (!text) return [this.createChar('', 0, height, ascent, 0, undefined, style, textNodeIndex, 0)];
+    if (!text) return [this.#createChar('', 0, height, ascent, 0, undefined, style, textNodeIndex, 0)];
     return chars;
   }
 
-  private createChar(
+  #createChar(
     char: string,
     width: number,
     height: number,
@@ -187,23 +187,23 @@ export class BlockManager implements RichTextBlockLayoutProvider {
 
   /** Calculates a flattened list of wrapped rich-text lines for all blocks. */
   public calculateLayout(width: number): RichTextLine[] {
-    return this.blocks
+    return this.#blocks
       .map((block) => {
-        const paragraphLayout = resolveRichTextParagraphLayout(block, this.paragraphLayoutDefaults);
-        const words = this.measureNodeChars(block);
-        return this.wrapLines(words, width, paragraphLayout.lineSpacing);
+        const paragraphLayout = resolveRichTextParagraphLayout(block, this.#paragraphLayoutDefaults);
+        const words = this.#measureNodeChars(block);
+        return this.#wrapLines(words, width, paragraphLayout.lineSpacing);
       })
       .flat();
   }
 
   /** Calculates wrapped rich-text lines per paragraph while preserving paragraph mapping. */
   public calculateLayoutPerParagraph(width: number): RichTextLine[][] {
-    return this.blocks.map((block) => {
-      const paragraphLayout = resolveRichTextParagraphLayout(block, this.paragraphLayoutDefaults);
-      const words = this.measureNodeChars(block);
-      const lines = this.wrapLines(words, width, paragraphLayout.lineSpacing);
-      const defaultChars = this.measureWords(' ');
-      const emptyLineBox = this.lineBoxRegistry.resolve({
+    return this.#blocks.map((block) => {
+      const paragraphLayout = resolveRichTextParagraphLayout(block, this.#paragraphLayoutDefaults);
+      const words = this.#measureNodeChars(block);
+      const lines = this.#wrapLines(words, width, paragraphLayout.lineSpacing);
+      const defaultChars = this.#measureWords(' ');
+      const emptyLineBox = this.#lineBoxRegistry.resolve({
         chars: defaultChars,
         lineSpacing: paragraphLayout.lineSpacing,
       });
@@ -213,26 +213,26 @@ export class BlockManager implements RichTextBlockLayoutProvider {
             {
               chars: [],
               width: 0,
-              height: this.defaultLineHeight(),
-              fontAscent: this.defaultFontAscent(),
-              fontDescent: Math.max(0, this.defaultLineHeight() - this.defaultFontAscent()),
+              height: this.#defaultLineHeight(),
+              fontAscent: this.#defaultFontAscent(),
+              fontDescent: Math.max(0, this.#defaultLineHeight() - this.#defaultFontAscent()),
               lineBox: emptyLineBox,
             },
           ];
     });
   }
 
-  private defaultLineHeight(): number {
-    const words = this.measureWords(' ');
+  #defaultLineHeight(): number {
+    const words = this.#measureWords(' ');
     return words[0]?.height ?? 14;
   }
 
-  private defaultFontAscent(): number {
-    const words = this.measureWords(' ');
-    return words[0]?.fontAscent ?? this.defaultLineHeight();
+  #defaultFontAscent(): number {
+    const words = this.#measureWords(' ');
+    return words[0]?.fontAscent ?? this.#defaultLineHeight();
   }
 
-  private wrapLines(chars: RichTextChar[], maxWidth: number, lineSpacing: RichTextLineSpacing): RichTextLine[] {
+  #wrapLines(chars: RichTextChar[], maxWidth: number, lineSpacing: RichTextLineSpacing): RichTextLine[] {
     const lines: RichTextLine[] = [];
     let line: typeof chars = [];
     let lineWidth = 0;
@@ -246,13 +246,13 @@ export class BlockManager implements RichTextBlockLayoutProvider {
           lineWidth += word.width;
           maxHeight = Math.max(maxHeight, word.height);
           maxFontAscent = Math.max(maxFontAscent, word.fontAscent);
-          lines.push(this.createLine(line, lineWidth, maxHeight, maxFontAscent, lineSpacing));
+          lines.push(this.#createLine(line, lineWidth, maxHeight, maxFontAscent, lineSpacing));
           line = [];
           lineWidth = 0;
           maxHeight = 0;
           maxFontAscent = 0;
         } else {
-          lines.push(this.createLine(line, lineWidth, maxHeight, maxFontAscent, lineSpacing));
+          lines.push(this.#createLine(line, lineWidth, maxHeight, maxFontAscent, lineSpacing));
           line = [word];
           lineWidth = word.width;
           maxHeight = word.height;
@@ -265,11 +265,11 @@ export class BlockManager implements RichTextBlockLayoutProvider {
         maxFontAscent = Math.max(maxFontAscent, word.fontAscent);
       }
     });
-    if (line.length > 0) lines.push(this.createLine(line, lineWidth, maxHeight, maxFontAscent, lineSpacing));
+    if (line.length > 0) lines.push(this.#createLine(line, lineWidth, maxHeight, maxFontAscent, lineSpacing));
     return lines;
   }
 
-  private createLine(
+  #createLine(
     chars: RichTextChar[],
     width: number,
     height: number,
@@ -280,7 +280,7 @@ export class BlockManager implements RichTextBlockLayoutProvider {
       (max, char) => Math.max(max, char.fontDescent ?? Math.max(0, char.height - char.fontAscent)),
       0,
     );
-    const lineBox = this.lineBoxRegistry.resolve({ chars, lineSpacing });
+    const lineBox = this.#lineBoxRegistry.resolve({ chars, lineSpacing });
     return { chars, width, height, fontAscent, fontDescent, lineBox };
   }
 }

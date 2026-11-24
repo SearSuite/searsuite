@@ -28,14 +28,18 @@ export function registerDocSessionStateCommands(commands: DocCommandBus, session
 }
 
 class CaptureDocSessionStateSnapshotCommand implements DocEditorCommand<CaptureDocSessionStateCommandResult> {
+  readonly #session: SessionStateRegistry;
+
   public readonly id = CaptureDocSessionStateCommand.id;
 
-  public constructor(private readonly session: SessionStateRegistry) {}
+  public constructor(session: SessionStateRegistry) {
+    this.#session = session;
+  }
 
   public execute(_context: DocCommandContext): CaptureDocSessionStateCommandResult {
     return {
       pipeline: new Pipeline(this.id),
-      sessionState: this.session.capture(),
+      sessionState: this.#session.capture(),
     };
   }
 }

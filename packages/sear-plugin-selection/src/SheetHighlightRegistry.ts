@@ -49,6 +49,8 @@ export interface SheetHighlightProvider {
  */
 @Injectable()
 export class SheetHighlightRegistry {
+  readonly #platform: Platform | undefined;
+
   /** DI token for resolving SheetHighlightRegistry. */
   public static readonly symbol = Symbol.for('SheetHighlightRegistry');
 
@@ -56,7 +58,9 @@ export class SheetHighlightRegistry {
   readonly #enabled = new Map<string, boolean>();
   readonly #listeners = new Set<() => void>();
 
-  public constructor(@Inject(Platform.symbol) private readonly platform?: Platform) {}
+  public constructor(@Inject(Platform.symbol) platform?: Platform) {
+    this.#platform = platform;
+  }
 
   /** Registers the value. */
   public register(provider: SheetHighlightProvider): () => void {
@@ -67,14 +71,14 @@ export class SheetHighlightRegistry {
     }
     this.#providers.set(entry.key, entry);
     this.#enabled.set(entry.key, true);
-    this.notify();
+    this.#notify();
     const registry = this;
     return function unregisterSheetHighlightProvider(): void {
       assertSheetContributionWrite(registry);
       if (registry.#providers.get(entry.key) !== entry) return;
       registry.#providers.delete(entry.key);
       registry.#enabled.delete(entry.key);
-      registry.notify();
+      registry.#notify();
     };
   }
 
@@ -83,7 +87,7 @@ export class SheetHighlightRegistry {
     assertSheetContributionWrite(this);
     if (!this.#providers.has(providerKey) || this.#enabled.get(providerKey) === enabled) return;
     this.#enabled.set(providerKey, enabled);
-    this.notify();
+    this.#notify();
   }
 
   /**
@@ -91,7 +95,7 @@ export class SheetHighlightRegistry {
    * example selection, search terms, or remote cursors) changes externally.
    */
   public invalidate(): void {
-    this.notify();
+    this.#notify();
   }
 
   /** Returns the highlights. */
@@ -113,13 +117,13 @@ export class SheetHighlightRegistry {
     };
   }
 
-  private notify(): void {
+  #notify(): void {
     runOutsideCommandExecution(() =>
       this.#listeners.forEach((listener) => {
         try {
           listener();
         } catch (error) {
-          this.platform?.warn('Sheet highlight listener failed.', error);
+          this.#platform?.warn('Sheet highlight listener failed.', error);
         }
       }),
     );

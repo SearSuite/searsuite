@@ -38,6 +38,8 @@ export interface WorkbookCommandBusOptions {
 
 /** Editor-scoped command bus for workbook-level sheet-list actions. */
 export class WorkbookCommandBus {
+  readonly #options: WorkbookCommandBusOptions;
+
   /** DI token for the command bus owned by one WorkbookEditor. */
   public static readonly symbol = Symbol.for('WorkbookCommandBus');
 
@@ -49,7 +51,8 @@ export class WorkbookCommandBus {
   #assertRegistrationWrite: (() => void) | null = null;
 
   /** Creates an empty workbook command bus. */
-  public constructor(private readonly options: WorkbookCommandBusOptions = {}) {
+  public constructor(options: WorkbookCommandBusOptions = {}) {
+    this.#options = options;
     Object.defineProperty(this, 'isExecuting', {
       value: (): boolean => this.#executionDepth > 0 && isInsideCommandExecution() &&
         this.#activeObserverEpoch === getCommandObserverEpoch(),
@@ -117,7 +120,7 @@ export class WorkbookCommandBus {
     const registration = this.#registrations.get(id);
     if (!registration) throw new SearError(`WorkbookCommandBus has no command registered for ${id}.`);
     if (registration.definition !== definition) {
-      this.options.warn?.(`WorkbookCommandBus received a recreated command definition for ${id}.`, {
+      this.#options.warn?.(`WorkbookCommandBus received a recreated command definition for ${id}.`, {
         registered: registration.definition,
         received: definition,
       });
@@ -214,7 +217,7 @@ export class WorkbookCommandBus {
         try {
           listener(event);
         } catch (error) {
-          this.options.warn?.(`WorkbookCommandBus listener failed during ${event.phase}:${event.id}.`, error);
+          this.#options.warn?.(`WorkbookCommandBus listener failed during ${event.phase}:${event.id}.`, error);
         }
       });
     });

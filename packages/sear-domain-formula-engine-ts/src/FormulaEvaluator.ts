@@ -42,14 +42,20 @@ const COMPARISON_OPERATORS = new Set(['=', '<>', '<', '>', '<=', '>=']);
 /** Evaluates parsed formulas against an explicit host-provided context. */
 @Injectable()
 export class FormulaEvaluator implements IFormulaEvaluator {
+  #registry: IFunctionRegistry;
+  #aggCache: IAggregationCache;
+
   /** DI token for resolving FormulaEvaluator. */
   public static readonly symbol = Symbol.for('FormulaEvaluator');
 
   /** Creates a FormulaEvaluator instance. */
   constructor(
-    @Inject(IFunctionRegistry.symbol) private registry: IFunctionRegistry,
-    @Inject(IAggregationCache.symbol) private aggCache: IAggregationCache,
-  ) {}
+    @Inject(IFunctionRegistry.symbol) registry: IFunctionRegistry,
+    @Inject(IAggregationCache.symbol) aggCache: IAggregationCache,
+  ) {
+    this.#registry = registry;
+    this.#aggCache = aggCache;
+  }
 
   /**
    * Evaluates one AST.
@@ -72,33 +78,33 @@ export class FormulaEvaluator implements IFormulaEvaluator {
       case FormulaNodeKind.Name:
         return context.scope?.get(ast.name) ?? createFormulaError(FormulaErrorCode.Name);
       case FormulaNodeKind.Tuple:
-        return { kind: 'tuple', items: ast.items.map((item) => this.evaluateArrayExpression(item, context)) };
+        return { kind: 'tuple', items: ast.items.map((item) => this.#evaluateArrayExpression(item, context)) };
 
       case FormulaNodeKind.Intersection: {
         const reference = resolveReferenceIntersection(ast, context);
         if (isFormulaError(reference)) return reference;
         return reference.kind === FormulaNodeKind.Cell
-          ? this.evaluateCell(reference.row, reference.col, context)
+          ? this.#evaluateCell(reference.row, reference.col, context)
           : reference.kind === FormulaNodeKind.WorkbookCell
-          ? this.evaluateWorkbookCell(reference.sheetName, reference.row, reference.col, context)
+          ? this.#evaluateWorkbookCell(reference.sheetName, reference.row, reference.col, context)
           : createFormulaError(FormulaErrorCode.Value);
       }
 
       case FormulaNodeKind.Array:
-        return ast.rows.map((row) => row.map((item) => this.evaluateArrayExpression(item, context)));
+        return ast.rows.map((row) => row.map((item) => this.#evaluateArrayExpression(item, context)));
 
       case FormulaNodeKind.Missing:
         return createFormulaError(FormulaErrorCode.Value);
 
       // ─── Cell Reference: Read From Context ───
       case FormulaNodeKind.Cell:
-        return this.evaluateCell(ast.row, ast.col, context);
+        return this.#evaluateCell(ast.row, ast.col, context);
 
       case FormulaNodeKind.WorkbookCell:
-        return this.evaluateWorkbookCell(ast.sheetName, ast.row, ast.col, context);
+        return this.#evaluateWorkbookCell(ast.sheetName, ast.row, ast.col, context);
 
       case FormulaNodeKind.Spill:
-        return this.evaluateSpill(ast.reference, context);
+        return this.#evaluateSpill(ast.reference, context);
 
       // ─── Range Reference: Cannot Be Evaluated Directly ───
       case FormulaNodeKind.Range:
@@ -114,15 +120,15 @@ export class FormulaEvaluator implements IFormulaEvaluator {
 
       // ─── Binary Operation ───
       case FormulaNodeKind.Binary:
-        return this.evaluateBinary(ast.op, ast.left, ast.right, context);
+        return this.#evaluateBinary(ast.op, ast.left, ast.right, context);
 
       // ─── Unary Operation ───
       case FormulaNodeKind.Unary:
-        return this.evaluateUnary(ast.op, ast.operand, context);
+        return this.#evaluateUnary(ast.op, ast.operand, context);
 
       // ─── Function Call ───
       case FormulaNodeKind.Call:
-        return this.evaluateCall(ast.name, ast.args, context);
+        return this.#evaluateCall(ast.name, ast.args, context);
       case FormulaNodeKind.Invoke: {
         const callee = this.evaluate(ast.callee, context);
         return isFormulaError(callee) ? callee : createFormulaError(FormulaErrorCode.Value);
@@ -157,7 +163,7 @@ export class FormulaEvaluator implements IFormulaEvaluator {
    * Registers a custom function.
    */
   registerFunction(fn: FormulaFunction): void {
-    this.registry.register(fn);
+    this.#registry.register(fn);
   }
 
   // ─── Internal Evaluation Methods ────────────────────────
@@ -165,7 +171,7 @@ export class FormulaEvaluator implements IFormulaEvaluator {
   /**
    * Evaluates a cell reference.
    */
-  private evaluateCell(row: number, col: number, context: EvalContext): FormulaValue {
+  #evaluateCell(row: number, col: number, context: EvalContext): FormulaValue {
     // Negative values come from reference shifting; positive coordinates beyond
     // current sheet bounds are also #REF!.
     if (!context.isCellInBounds(row, col)) {
@@ -178,7 +184,7 @@ export class FormulaEvaluator implements IFormulaEvaluator {
     }
   }
 
-  private evaluateWorkbookCell(sheetName: string, row: number, col: number, context: EvalContext): FormulaValue {
+  #evaluateWorkbookCell(sheetName: string, row: number, col: number, context: EvalContext): FormulaValue {
     if (!context.getWorkbookCellValue) return createFormulaError(FormulaErrorCode.Reference);
     try {
       return context.getWorkbookCellValue(sheetName, row, col);
@@ -187,7 +193,7 @@ export class FormulaEvaluator implements IFormulaEvaluator {
     }
   }
 
-  private evaluateSpill(
+  #evaluateSpill(
     reference: Extract<FormulaAST, { kind: typeof FormulaNodeKind.Cell | typeof FormulaNodeKind.WorkbookCell }>,
     context: EvalContext,
   ): FormulaValue {
@@ -208,29 +214,29 @@ export class FormulaEvaluator implements IFormulaEvaluator {
    * 2. Propagate errors: if either operand is FormulaError, return that error.
    * 3. Execute the operation.
    */
-  private evaluateBinary(op: string, leftAST: FormulaAST, rightAST: FormulaAST, context: EvalContext): FormulaValue {
-    const left = this.evaluateArrayExpression(leftAST, context);
-    const right = this.evaluateArrayExpression(rightAST, context);
+  #evaluateBinary(op: string, leftAST: FormulaAST, rightAST: FormulaAST, context: EvalContext): FormulaValue {
+    const left = this.#evaluateArrayExpression(leftAST, context);
+    const right = this.#evaluateArrayExpression(rightAST, context);
     const chainedComparison = COMPARISON_OPERATORS.has(op) &&
       leftAST.kind === FormulaNodeKind.Binary && COMPARISON_OPERATORS.has(leftAST.op);
 
     if (Array.isArray(left) || Array.isArray(right)) {
-      return this.applyArrayBinary(op, left, right, context, chainedComparison);
+      return this.#applyArrayBinary(op, left, right, context, chainedComparison);
     }
 
-    return this.applyScalarBinary(op, left, right, context, chainedComparison);
+    return this.#applyScalarBinary(op, left, right, context, chainedComparison);
   }
 
   /**
    * Evaluates a unary operation.
    */
-  private evaluateUnary(op: string, operandAST: FormulaAST, context: EvalContext): FormulaValue {
-    const operand = this.evaluateArrayExpression(operandAST, context);
+  #evaluateUnary(op: string, operandAST: FormulaAST, context: EvalContext): FormulaValue {
+    const operand = this.#evaluateArrayExpression(operandAST, context);
 
     if (Array.isArray(operand)) {
       const rows = operand as FormulaValue[][];
       return rows.map((row) =>
-        (Array.isArray(row) ? row : [row]).map((value) => this.applyScalarUnary(op, value, context)),
+        (Array.isArray(row) ? row : [row]).map((value) => this.#applyScalarUnary(op, value, context)),
       );
     }
 
@@ -239,17 +245,17 @@ export class FormulaEvaluator implements IFormulaEvaluator {
 
     switch (op) {
       case '-': {
-        const n = this.numericOperand(operand, context);
+        const n = this.#numericOperand(operand, context);
         if (isFormulaError(n)) return n;
         return -n;
       }
       case '+': {
-        const n = this.numericOperand(operand, context);
+        const n = this.#numericOperand(operand, context);
         if (isFormulaError(n)) return n;
         return n;
       }
       case '%': {
-        const n = this.numericOperand(operand, context);
+        const n = this.#numericOperand(operand, context);
         if (isFormulaError(n)) return n;
         return n / 100;
       }
@@ -269,9 +275,9 @@ export class FormulaEvaluator implements IFormulaEvaluator {
    * 2. Build the FormulaArg[] list, preserving range/cell semantics without expansion.
    * 3. Call the function's evaluate method.
    */
-  private evaluateCall(name: string, argsAST: FormulaAST[], context: EvalContext): FormulaValue {
+  #evaluateCall(name: string, argsAST: FormulaAST[], context: EvalContext): FormulaValue {
     // Find the function.
-    const fn = this.registry.get(name);
+    const fn = this.#registry.get(name);
     if (!fn) {
       return createFormulaError(FormulaErrorCode.Name);
     }
@@ -387,31 +393,31 @@ export class FormulaEvaluator implements IFormulaEvaluator {
         return { kind: 'value', value: value ?? createFormulaError(FormulaErrorCode.Name), sourceAst: argAST };
       }
       // Evaluate other nodes first.
-      const value = this.evaluateArrayExpression(argAST, nestedContext);
+      const value = this.#evaluateArrayExpression(argAST, nestedContext);
       return { kind: 'value', value, sourceKind: argAST.kind, sourceAst: argAST };
     });
 
     // Call the function.
     return fn.evaluate(args, {
       ...context,
-      aggregationCache: this.aggCache,
+      aggregationCache: this.#aggCache,
       evaluateFormula: (ast, scope) => this.evaluate(ast, scope ? { ...nestedContext, scope } : nestedContext),
-      evaluateArrayFormula: (ast, scope) => this.evaluateArrayExpression(ast, scope ? { ...nestedContext, scope } : nestedContext),
+      evaluateArrayFormula: (ast, scope) => this.#evaluateArrayExpression(ast, scope ? { ...nestedContext, scope } : nestedContext),
     });
   }
 
   /** Evaluates an expression in array context, promoting range references to 2D values. */
-  private evaluateArrayExpression(ast: FormulaAST, context: EvalContext): FormulaValue {
+  #evaluateArrayExpression(ast: FormulaAST, context: EvalContext): FormulaValue {
     switch (ast.kind) {
       case FormulaNodeKind.Intersection: {
         const reference = resolveReferenceIntersection(ast, context);
         if (isFormulaError(reference)) return reference;
-        if (reference.kind === FormulaNodeKind.Cell) return this.evaluateCell(reference.row, reference.col, context);
+        if (reference.kind === FormulaNodeKind.Cell) return this.#evaluateCell(reference.row, reference.col, context);
         if (reference.kind === FormulaNodeKind.WorkbookCell) {
-          return this.evaluateWorkbookCell(reference.sheetName, reference.row, reference.col, context);
+          return this.#evaluateWorkbookCell(reference.sheetName, reference.row, reference.col, context);
         }
         if (reference.kind === FormulaNodeKind.Range) {
-          return this.evaluateArrayExpression(
+          return this.#evaluateArrayExpression(
             {
               kind: FormulaNodeKind.Range,
               start: reference.start,
@@ -424,7 +430,7 @@ export class FormulaEvaluator implements IFormulaEvaluator {
             context,
           );
         }
-        return this.evaluateArrayExpression(
+        return this.#evaluateArrayExpression(
           {
             kind: FormulaNodeKind.WorkbookRange,
             sheetName: reference.sheetName,
@@ -476,13 +482,13 @@ export class FormulaEvaluator implements IFormulaEvaluator {
       case FormulaNodeKind.RowRange:
         return createFormulaError(FormulaErrorCode.Value);
       case FormulaNodeKind.Array:
-        return ast.rows.map((row) => row.map((item) => this.evaluateArrayExpression(item, context)));
+        return ast.rows.map((row) => row.map((item) => this.#evaluateArrayExpression(item, context)));
       case FormulaNodeKind.Binary:
-        return this.evaluateBinary(ast.op, ast.left, ast.right, context);
+        return this.#evaluateBinary(ast.op, ast.left, ast.right, context);
       case FormulaNodeKind.Unary:
-        return this.evaluateUnary(ast.op, ast.operand, context);
+        return this.#evaluateUnary(ast.op, ast.operand, context);
       case FormulaNodeKind.Call:
-        return this.evaluateCall(ast.name, ast.args, context);
+        return this.#evaluateCall(ast.name, ast.args, context);
       case FormulaNodeKind.Invoke: {
         const callee = this.evaluate(ast.callee, context);
         return isFormulaError(callee) ? callee : createFormulaError(FormulaErrorCode.Value);
@@ -502,7 +508,7 @@ export class FormulaEvaluator implements IFormulaEvaluator {
     }
   }
 
-  private applyArrayBinary(
+  #applyArrayBinary(
     op: string, left: FormulaValue, right: FormulaValue, context: EvalContext, chainedComparison = false,
   ): FormulaValue {
     const leftRows = Array.isArray(left) ? (left as FormulaValue[][]) : undefined;
@@ -532,14 +538,14 @@ export class FormulaEvaluator implements IFormulaEvaluator {
             ? rightRows[r]
             : createFormulaError(FormulaErrorCode.Value)
           : right;
-        row.push(this.applyScalarBinary(op, lv, rv, context, chainedComparison));
+        row.push(this.#applyScalarBinary(op, lv, rv, context, chainedComparison));
       }
       out.push(row);
     }
     return out;
   }
 
-  private applyScalarBinary(
+  #applyScalarBinary(
     op: string, left: FormulaValue, right: FormulaValue, context: EvalContext, chainedComparison = false,
   ): FormulaValue {
     if (isFormulaError(left)) return left;
@@ -547,61 +553,61 @@ export class FormulaEvaluator implements IFormulaEvaluator {
     if (chainedComparison && typeof left === 'boolean') left = Number(left);
     switch (op) {
       case '+': {
-        const l = this.numericOperand(left, context);
-        const r = this.numericOperand(right, context);
-        return isFormulaError(l) ? l : isFormulaError(r) ? r : this.finiteArithmeticResult(l + r);
+        const l = this.#numericOperand(left, context);
+        const r = this.#numericOperand(right, context);
+        return isFormulaError(l) ? l : isFormulaError(r) ? r : this.#finiteArithmeticResult(l + r);
       }
       case '-': {
-        const l = this.numericOperand(left, context);
-        const r = this.numericOperand(right, context);
-        return isFormulaError(l) ? l : isFormulaError(r) ? r : this.finiteArithmeticResult(l - r);
+        const l = this.#numericOperand(left, context);
+        const r = this.#numericOperand(right, context);
+        return isFormulaError(l) ? l : isFormulaError(r) ? r : this.#finiteArithmeticResult(l - r);
       }
       case '*': {
-        const l = this.numericOperand(left, context);
-        const r = this.numericOperand(right, context);
-        return isFormulaError(l) ? l : isFormulaError(r) ? r : this.finiteArithmeticResult(l * r);
+        const l = this.#numericOperand(left, context);
+        const r = this.#numericOperand(right, context);
+        return isFormulaError(l) ? l : isFormulaError(r) ? r : this.#finiteArithmeticResult(l * r);
       }
       case '/': {
-        const l = this.numericOperand(left, context);
-        const r = this.numericOperand(right, context);
+        const l = this.#numericOperand(left, context);
+        const r = this.#numericOperand(right, context);
         if (isFormulaError(l)) return l;
         if (isFormulaError(r)) return r;
-        return r === 0 ? createFormulaError(FormulaErrorCode.DivisionByZero) : this.finiteArithmeticResult(l / r);
+        return r === 0 ? createFormulaError(FormulaErrorCode.DivisionByZero) : this.#finiteArithmeticResult(l / r);
       }
       case '^': {
-        const l = this.numericOperand(left, context);
-        const r = this.numericOperand(right, context);
+        const l = this.#numericOperand(left, context);
+        const r = this.#numericOperand(right, context);
         return isFormulaError(l) ? l : isFormulaError(r) ? r : excelPower(l, r);
       }
       case '&': {
-        const joined = String(this.toDisplayString(left)) + String(this.toDisplayString(right));
+        const joined = String(this.#toDisplayString(left)) + String(this.#toDisplayString(right));
         return joined.length > 32767 ? createFormulaError(FormulaErrorCode.Value) : joined;
       }
       case '=':
-        return this.compareValues(left, right) === 0;
+        return this.#compareValues(left, right) === 0;
       case '<>':
-        return this.compareValues(left, right) !== 0;
+        return this.#compareValues(left, right) !== 0;
       case '<':
-        return this.compareValues(left, right) < 0;
+        return this.#compareValues(left, right) < 0;
       case '>':
-        return this.compareValues(left, right) > 0;
+        return this.#compareValues(left, right) > 0;
       case '<=':
-        return this.compareValues(left, right) <= 0;
+        return this.#compareValues(left, right) <= 0;
       case '>=':
-        return this.compareValues(left, right) >= 0;
+        return this.#compareValues(left, right) >= 0;
       default:
         return createFormulaError(FormulaErrorCode.Value);
     }
   }
 
-  private finiteArithmeticResult(value: number): FormulaValue {
+  #finiteArithmeticResult(value: number): FormulaValue {
     return Number.isFinite(value) ? value : createFormulaError(FormulaErrorCode.Number);
   }
 
-  private applyScalarUnary(op: string, operand: FormulaValue, context: EvalContext): FormulaValue {
+  #applyScalarUnary(op: string, operand: FormulaValue, context: EvalContext): FormulaValue {
     if (isFormulaError(operand)) return operand;
     if (op === 'NOT') return typeof operand === 'boolean' ? !operand : createFormulaError(FormulaErrorCode.Value);
-    const n = this.numericOperand(operand, context);
+    const n = this.#numericOperand(operand, context);
     if (isFormulaError(n)) return n;
     if (op === '-') return -n;
     if (op === '%') return n / 100;
@@ -610,7 +616,7 @@ export class FormulaEvaluator implements IFormulaEvaluator {
 
   // ─── Helpers ─────────────────────────────────────────────
 
-  private numericOperand(value: FormulaValue, context: EvalContext): number | FormulaError {
+  #numericOperand(value: FormulaValue, context: EvalContext): number | FormulaError {
     const number = toNumberOrError(value);
     return isFormulaError(number) ? numericDateText(value, context) ?? number : number;
   }
@@ -622,7 +628,7 @@ export class FormulaEvaluator implements IFormulaEvaluator {
    * boolean: "TRUE" / "FALSE"
    * string: unchanged
    */
-  private toDisplayString(v: FormulaValue): string {
+  #toDisplayString(v: FormulaValue): string {
     if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
     if (typeof v === 'number') return String(v);
     if (typeof v === 'string') return v;
@@ -640,7 +646,7 @@ export class FormulaEvaluator implements IFormulaEvaluator {
    *
    * @returns Negative when left < right, 0 when equal, positive when left > right.
    */
-  private compareValues(left: FormulaValue, right: FormulaValue): number {
+  #compareValues(left: FormulaValue, right: FormulaValue): number {
     const typeOrder = (v: FormulaValue): number => {
       if (typeof v === 'number') return 0;
       if (typeof v === 'string' || isFormulaText(v)) return 1;

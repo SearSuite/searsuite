@@ -37,13 +37,13 @@ export class FormulaTextServiceRegistry implements IFormulaTextServiceProvider {
   }
 
   public registerPhoneticReader(reader: FormulaPhoneticReader): () => void {
-    return this.register(this.#phoneticReaders, reader);
+    return this.#register(this.#phoneticReaders, reader);
   }
 
   public registerLanguageService(service: FormulaLanguageService): () => void {
-    const dispose = this.register(this.#languageServices, service);
-    this.bindLanguageInvalidation();
-    this.emitInvalidation();
+    const dispose = this.#register(this.#languageServices, service);
+    this.#bindLanguageInvalidation();
+    this.#emitInvalidation();
     return dispose;
   }
 
@@ -52,7 +52,7 @@ export class FormulaTextServiceRegistry implements IFormulaTextServiceProvider {
     return () => this.#listeners.delete(listener);
   }
 
-  private register<Value>(
+  #register<Value>(
     registrations: Array<{ id: number; value: Value }>,
     value: Value,
   ): () => void {
@@ -72,21 +72,21 @@ export class FormulaTextServiceRegistry implements IFormulaTextServiceProvider {
     }
     if (languageIndex >= 0) {
       this.#languageServices.splice(languageIndex, 1);
-      this.bindLanguageInvalidation();
-      this.emitInvalidation();
+      this.#bindLanguageInvalidation();
+      this.#emitInvalidation();
     } else {
       this.#phoneticReaders.splice(phoneticIndex, 1);
     }
   }
 
-  private bindLanguageInvalidation(): void {
+  #bindLanguageInvalidation(): void {
     this.#disposeLanguageInvalidation?.();
     this.#disposeLanguageInvalidation = this.getLanguageService()?.subscribeInvalidation?.(() =>
-      this.emitInvalidation(),
+      this.#emitInvalidation(),
     );
   }
 
-  private emitInvalidation(): void {
+  #emitInvalidation(): void {
     this.#listeners.forEach((listener) => listener());
   }
 }

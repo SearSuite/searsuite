@@ -21,11 +21,15 @@ import {
 /** Rewrites formula references after Sheet structure changes. */
 @Injectable()
 export class FormulaRefShifter {
+  #parser: IFormulaParser;
+
   /** DI token for resolving FormulaRefShifter. */
   public static readonly symbol = Symbol.for('FormulaRefShifter');
 
   /** Creates a FormulaRefShifter instance. */
-  constructor(@Inject(IFormulaParser.symbol) private parser: IFormulaParser) {}
+  constructor(@Inject(IFormulaParser.symbol) parser: IFormulaParser) {
+    this.#parser = parser;
+  }
 
   /**
    * Handles structural changes by traversing all formula ASTs and shifting references.
@@ -43,7 +47,7 @@ export class FormulaRefShifter {
     for (const [key, ast] of formulas) {
       // Call the parser's reference-shifting method.
       // shiftReferences returns a new immutable AST, or the original AST when nothing changed.
-      const newAst = this.parser.shiftReferences(ast, changes);
+      const newAst = this.#parser.shiftReferences(ast, changes);
       if (newAst !== ast) {
         result.push({ key, newAst });
       }

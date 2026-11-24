@@ -161,6 +161,16 @@ function selectionPointerInput(
  */
 @Injectable()
 export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, [RectRange, RectRange]> {
+  readonly #keyboardRouter: KeyboardRouter;
+  readonly #platform: Platform | undefined;
+  readonly #rangeMoves: SheetRangeMoveRegistry | undefined;
+  readonly #rangeDrag: SheetRangeDrag | undefined;
+  readonly #highlights: SheetHighlightRegistry | undefined;
+  readonly #inputValidation: SheetCellInputValidationRegistry | undefined;
+  readonly #pointerCapture: PointerCapture | undefined;
+  readonly #textInput: TextInput | undefined;
+  readonly #formats: SheetFormatTransferRegistry | undefined;
+
   /** DI token for resolving SheetSelectionPlugin. */
   public static readonly symbol: symbol = Symbol.for('SheetSelectionPlugin');
   /** Stable plugin key for SheetSelectionPlugin. */
@@ -195,46 +205,55 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     @Inject(SheetCellMergePlugin.symbol)
     sheetCellMergePlugin: SheetCellMergePlugin,
     @Inject(KeyboardRouter.symbol)
-    private readonly keyboardRouter: KeyboardRouter,
+    keyboardRouter: KeyboardRouter,
     @Inject(Platform.symbol)
-    private readonly platform?: Platform,
+    platform?: Platform,
     @Inject(SheetInteractionReducerRegistry.symbol)
     interactionReducers?: SheetInteractionReducerRegistry,
     @Inject(SheetCommandBus.symbol)
     commands?: SheetCommandBus,
     @Inject(SheetRangeMoveRegistry.symbol)
-    private readonly rangeMoves?: SheetRangeMoveRegistry,
+    rangeMoves?: SheetRangeMoveRegistry,
     @Inject(SheetRangeDrag.symbol)
-    private readonly rangeDrag?: SheetRangeDrag,
+    rangeDrag?: SheetRangeDrag,
     @Inject(SheetHighlightRegistry.symbol)
-    private readonly highlights?: SheetHighlightRegistry,
+    highlights?: SheetHighlightRegistry,
     @Inject(SheetCellInputValidationRegistry.symbol)
-    private readonly inputValidation?: SheetCellInputValidationRegistry,
+    inputValidation?: SheetCellInputValidationRegistry,
     @Inject(PointerCapture.symbol)
-    private readonly pointerCapture?: PointerCapture,
+    pointerCapture?: PointerCapture,
     @Inject(TextInput.symbol)
-    private readonly textInput?: TextInput,
+    textInput?: TextInput,
     @Inject(SheetFormatTransferRegistry.symbol)
-    private readonly formats?: SheetFormatTransferRegistry,
+    formats?: SheetFormatTransferRegistry,
   ) {
     super({
       key: key,
       state: [createEmptyRect(), createEmptyRect()],
     });
+    this.#keyboardRouter = keyboardRouter;
+    this.#platform = platform;
+    this.#rangeMoves = rangeMoves;
+    this.#rangeDrag = rangeDrag;
+    this.#highlights = highlights;
+    this.#inputValidation = inputValidation;
+    this.#pointerCapture = pointerCapture;
+    this.#textInput = textInput;
+    this.#formats = formats;
     this.#commands = commands;
     this.#sheetCellMergePlugin = sheetCellMergePlugin;
     if (interactionReducers) registerSheetSelectionInteractionReducers(interactionReducers);
 
-    this.subscribeNavigationHandlers();
-    this.keyboardRouter.startListener();
+    this.#subscribeNavigationHandlers();
+    this.#keyboardRouter.startListener();
   }
 
   /** Binds this plugin to the core owned by its editor-local container. */
   public bindCore(core: SearCoreSheet): void {
     this.#bindCoreReference(core);
-    this.rangeDrag?.bind(core, () => this.getState()[1], this.#rangeDragOwnerToken);
-    if (this.highlights && !this.#disposeAdditionalHighlight) {
-      this.#disposeAdditionalHighlight = this.highlights.register({
+    this.#rangeDrag?.bind(core, () => this.getState()[1], this.#rangeDragOwnerToken);
+    if (this.#highlights && !this.#disposeAdditionalHighlight) {
+      this.#disposeAdditionalHighlight = this.#highlights.register({
         key: 'sheet.selection.additional',
         getHighlights: () =>
           this.#additionalRanges.map((range) => ({
@@ -264,10 +283,10 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
       throw new SearError('Sheet selection queries are already bound to an editor.');
     }
     this.#queries = queries;
-    if (this.rangeMoves) {
-      queries.register(AnalyzeSheetRangeMove, (input) => this.analyzeRangeMove(input));
+    if (this.#rangeMoves) {
+      queries.register(AnalyzeSheetRangeMove, (input) => this.#analyzeRangeMove(input));
       queries.register(GetSheetRangeMoveConflict, (input) => {
-        const analysis = this.analyzeRangeMove(input);
+        const analysis = this.#analyzeRangeMove(input);
         if (analysis.status === SheetRangeMoveStatus.Blocked) throw new SheetRangeMoveRejectedError(analysis);
         return analysis.status === SheetRangeMoveStatus.RequiresConfirmation;
       });
@@ -315,7 +334,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
         restore: (ranges) => {
           SessionStateRegistry.prototype.assertRestorationOpen.call(registry);
           this.#additionalRanges = ranges.map((range) => range.clone());
-          this.highlights?.invalidate();
+          this.#highlights?.invalidate();
         },
       });
     });
@@ -334,7 +353,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     this.#selectionCursor = focus[0] < 0 ? null : [...focus];
   }
 
-  private requireCore(): SearCoreSheet {
+  #requireCore(): SearCoreSheet {
     if (!this.#core) throw new SearError('SheetSelectionPlugin is not bound to a Sheet editor core.');
     return this.#core;
   }
@@ -376,7 +395,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
 
   /** Lets the editor distinguish the fill handle from a cell-body double click. */
   public onFillHandleDoubleClick(event: EventWithOffsetAndTarget<CellProperties>): boolean {
-    return this.rangeDrag?.onFillHandleDoubleClick(event) ?? false;
+    return this.#rangeDrag?.onFillHandleDoubleClick(event) ?? false;
   }
 
   /** Handles the mouse down lifecycle event. */
@@ -400,7 +419,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     const additive = Boolean(
       (event.origin?.metaKey || event.origin?.ctrlKey) && event.target?.properties.region === CellRegion.Grid,
     );
-    if (!additive && this.rangeDrag?.onMouseDown(event)) return false;
+    if (!additive && this.#rangeDrag?.onMouseDown(event)) return false;
     return this.#dispatchPointerInput(searCore, selectionPointerInput(SheetSelectionPointerAction.Down, event));
   }
 
@@ -421,7 +440,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
         return;
       case SheetSelectionPointerAction.Tick:
         this.#selectionScrollFrame = null;
-        this.advanceSelectionScroll();
+        this.#advanceSelectionScroll();
     }
   }
 
@@ -441,7 +460,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
       const geometry = readSheetGeometry(searCore.getDataEngine());
       if (!geometry || !geometry.rowSizes.shape[1] || !geometry.columnSizes.shape[1]) return;
       const first: Point = [0, 0];
-      this.executeSelectionCommand(
+      this.#executeSelectionCommand(
         searCore,
         first,
         [geometry.rowSizes.shape[1] - 1, geometry.columnSizes.shape[1] - 1],
@@ -468,7 +487,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
 
     if (region === CellRegion.RowHeader && startRowIndex !== void 0) {
       if (!dataState) {
-        this.platform?.warn(
+        this.#platform?.warn(
           'SheetSelectionPlugin onMouseDown row-header selection skipped: sheet geometry fields are missing.',
         );
         return;
@@ -479,7 +498,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
       this.#headerDragMode = 'row';
     } else if (region === CellRegion.ColumnHeader && startColIndex !== void 0) {
       if (!dataState) {
-        this.platform?.warn(
+        this.#platform?.warn(
           'SheetSelectionPlugin onMouseDown column-header selection skipped: sheet geometry fields are missing.',
         );
         return;
@@ -501,7 +520,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     const normalized = selectRange({
       start: anchor,
       end: focus,
-      findMerge: this.findMergedSelectionRange.bind(this),
+      findMerge: this.#findMergedSelectionRange.bind(this),
       lastRow: dataState ? dataState.rowSizes.shape[1] - 1 : void 0,
       lastCol: dataState ? dataState.columnSizes.shape[1] - 1 : void 0,
     });
@@ -519,7 +538,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     const navigationOrigin = extendingFromPointer ? this.#selectionOrigin! : focus;
 
     if (extendingFromPointer) {
-      this.executeSelectionCommand(
+      this.#executeSelectionCommand(
         searCore,
         anchor,
         focus,
@@ -531,7 +550,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
         { origin: navigationOrigin, cursor: focus },
       );
     } else {
-      this.executeSelectionCommand(
+      this.#executeSelectionCommand(
         searCore,
         anchor,
         focus,
@@ -545,19 +564,19 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     }
     this.#isSelecting = true;
     this.#disposeSelectionCapture?.();
-    this.#disposeSelectionCapture = this.pointerCapture?.start({
+    this.#disposeSelectionCapture = this.#pointerCapture?.start({
       onRelease: () => {
         if (!this.#isSelecting) return;
         this.#dispatchPointerInput(searCore, selectionPointerInput(SheetSelectionPointerAction.Up));
-        this.textInput?.startListener();
-        this.textInput?.refocus();
+        this.#textInput?.startListener();
+        this.#textInput?.refocus();
       },
     }) ?? null;
   }
 
   /** Handles the mouse move lifecycle event. */
   public onMouseMove(searCore: SearCoreSheet, event: EventWithOffsetAndTarget<CellProperties>): boolean | void {
-    if (this.rangeDrag?.isActive()) return false;
+    if (this.#rangeDrag?.isActive()) return false;
     if (!this.#isSelecting) return;
     return this.#dispatchPointerInput(searCore, selectionPointerInput(SheetSelectionPointerAction.Move, event));
   }
@@ -566,7 +585,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     this.#updatePointerPosition(input.view);
     const plan = this.#planPointerMove(searCore, input);
     if (!plan) return;
-    this.executeSelectionCommand(
+    this.#executeSelectionCommand(
       searCore,
       plan.anchor,
       plan.focus,
@@ -582,13 +601,13 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
   #updatePointerPosition(view: SheetSelectionPointerInput['view']): void {
     if (!view) return;
     this.#selectionPointer = { x: view.x, y: view.y };
-    this.scheduleSelectionScroll();
+    this.#scheduleSelectionScroll();
   }
 
   #planPointerMove(searCore: SearCoreSheet, input: SheetSelectionPointerInput): SheetSelectRangeInput | null {
     const target = input.target;
     if (!target) {
-      this.platform?.warn('SheetSelectionPlugin onMouseMove event target is null');
+      this.#platform?.warn('SheetSelectionPlugin onMouseMove event target is null');
       return null;
     }
 
@@ -597,13 +616,13 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     const { endRowIndex, endColIndex } = properties;
 
     if (startRowIndex === void 0 || startColIndex === void 0 || endRowIndex === void 0 || endColIndex === void 0) {
-      this.platform?.warn('SheetSelectionPlugin onMouseMove target properties is missing ExcelNodeProperties');
+      this.#platform?.warn('SheetSelectionPlugin onMouseMove target properties is missing ExcelNodeProperties');
       return null;
     }
     const dataEngine = searCore.getDataEngine();
     const state = dataEngine.getDataType<[RectRange, RectRange]>(this.pluginKey);
     if (!state) {
-      this.platform?.warn('SheetSelectionPlugin onMouseMove selection state is not found');
+      this.#platform?.warn('SheetSelectionPlugin onMouseMove selection state is not found');
       return null;
     }
 
@@ -685,14 +704,14 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     this.#disposeSelectionCapture?.();
     this.#disposeSelectionCapture = null;
     this.#selectionPointer = null;
-    if (this.#selectionScrollFrame !== null) this.platform?.cancelAnimationFrame(this.#selectionScrollFrame);
+    if (this.#selectionScrollFrame !== null) this.#platform?.cancelAnimationFrame(this.#selectionScrollFrame);
     this.#selectionScrollFrame = null;
     this.#headerDragMode = 'none';
   }
 
-  private scheduleSelectionScroll(): void {
-    if (!this.platform || this.#selectionScrollFrame !== null || !this.#selectionPointer) return;
-    this.#selectionScrollFrame = this.platform.requestAnimationFrame(() => {
+  #scheduleSelectionScroll(): void {
+    if (!this.#platform || this.#selectionScrollFrame !== null || !this.#selectionPointer) return;
+    this.#selectionScrollFrame = this.#platform.requestAnimationFrame(() => {
       if (this.hasStateWriteBoundary()) {
         if (!this.#commands) throw new SearError('Sheet selection pointer command is unavailable.');
         this.#commands.run(HandleSheetSelectionPointerCommand, {
@@ -700,14 +719,14 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
         });
       } else {
         this.#selectionScrollFrame = null;
-        this.advanceSelectionScroll();
+        this.#advanceSelectionScroll();
       }
     });
   }
 
-  private advanceSelectionScroll(): void {
+  #advanceSelectionScroll(): void {
     if (!this.#isSelecting || !this.#selectionPointer) return;
-    const core = this.requireCore();
+    const core = this.#requireCore();
     const geometry = readSheetGeometry(core.getDataEngine());
     if (!geometry) return;
     const scroll = core.renderEngine.scrollManager;
@@ -745,44 +764,44 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
           : [row, col];
       const start: Point =
         this.#headerDragMode === 'row' ? [anchor[0], 0] : this.#headerDragMode === 'col' ? [0, anchor[1]] : [...anchor];
-      this.executeSelectionCommand(core, start, end, SheetSelectionSource.Pointer, false, start, end, void 0, {
+      this.#executeSelectionCommand(core, start, end, SheetSelectionSource.Pointer, false, start, end, void 0, {
         origin: this.#selectionOrigin ?? start,
         cursor: end,
       });
     }
-    this.scheduleSelectionScroll();
+    this.#scheduleSelectionScroll();
   }
 
-  private findMergedSelectionRange(point: readonly [number, number]): { start: Point; end: Point } | undefined {
+  #findMergedSelectionRange(point: readonly [number, number]): { start: Point; end: Point } | undefined {
     const merge = this.#sheetCellMergePlugin.isMergedCell(point[0], point[1]);
     return merge ? { start: merge.getPoint(0), end: merge.getPoint(1) } : void 0;
   }
 
   // ─── Arrow / Enter key navigation ────────────────────────────────────────
 
-  private subscribeNavigationHandlers(): void {
-    this.keyboardRouter.subscribe({
-      onDelete: this.handleSelectionDeleteKey.bind(this),
-      onSelectAll: this.handleSelectionSelectAllKey.bind(this),
-      onHome: this.handleSelectionHomeKey.bind(this),
-      onEnd: this.handleSelectionEndKey.bind(this),
-      onPage: this.handleSelectionPageKey.bind(this),
-      onHorizontalPage: this.handleSelectionHorizontalPageKey.bind(this),
-      onSelectRow: this.handleSelectionSelectRowKey.bind(this),
-      onSelectColumn: this.handleSelectionSelectColumnKey.bind(this),
-      onEnter: this.handleSelectionEnterKey.bind(this),
-      onArrowDown: this.handleSelectionArrowDown.bind(this),
-      onArrowUp: this.handleSelectionArrowUp.bind(this),
-      onArrowLeft: this.handleSelectionArrowLeft.bind(this),
-      onArrowRight: this.handleSelectionArrowRight.bind(this),
-      onTab: this.handleSelectionTabKey.bind(this),
-      onFillDown: () => this.fillSelectionFromEdge('down'),
-      onFillRight: () => this.fillSelectionFromEdge('right'),
-      onCopyFormulaAbove: () => this.copyFormulaFromAbove(),
+  #subscribeNavigationHandlers(): void {
+    this.#keyboardRouter.subscribe({
+      onDelete: this.#handleSelectionDeleteKey.bind(this),
+      onSelectAll: this.#handleSelectionSelectAllKey.bind(this),
+      onHome: this.#handleSelectionHomeKey.bind(this),
+      onEnd: this.#handleSelectionEndKey.bind(this),
+      onPage: this.#handleSelectionPageKey.bind(this),
+      onHorizontalPage: this.#handleSelectionHorizontalPageKey.bind(this),
+      onSelectRow: this.#handleSelectionSelectRowKey.bind(this),
+      onSelectColumn: this.#handleSelectionSelectColumnKey.bind(this),
+      onEnter: this.#handleSelectionEnterKey.bind(this),
+      onArrowDown: this.#handleSelectionArrowDown.bind(this),
+      onArrowUp: this.#handleSelectionArrowUp.bind(this),
+      onArrowLeft: this.#handleSelectionArrowLeft.bind(this),
+      onArrowRight: this.#handleSelectionArrowRight.bind(this),
+      onTab: this.#handleSelectionTabKey.bind(this),
+      onFillDown: () => this.#fillSelectionFromEdge('down'),
+      onFillRight: () => this.#fillSelectionFromEdge('right'),
+      onCopyFormulaAbove: () => this.#copyFormulaFromAbove(),
     });
   }
 
-  private fillSelectionFromEdge(direction: 'down' | 'right'): void {
+  #fillSelectionFromEdge(direction: 'down' | 'right'): void {
     if (this.#additionalRanges.length) return;
     const range = this.getState()[1];
     const anchor = range.getPoint(0);
@@ -802,19 +821,19 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     });
   }
 
-  private copyFormulaFromAbove(): void {
+  #copyFormulaFromAbove(): void {
     if (this.#additionalRanges.length) return;
     const range = this.getState()[1];
     const cell = range.getPoint(0);
     if (cell[0] <= 0 || cell[1] < 0 || cell.some((value, index) => value !== range.getPoint(1)[index])) return;
-    if (this.readCells()?.getItem(cell[0] - 1, cell[1])?.type !== CellType.Formula) return;
+    if (this.#readCells()?.getItem(cell[0] - 1, cell[1])?.type !== CellType.Formula) return;
     const above: [number, number] = [cell[0] - 1, cell[1]];
     this.#commands?.run(FillSheetRangeCommand, {
       source: { start: above, end: above }, target: cell, mode: 'exact',
     });
   }
 
-  private handleSelectionDeleteKey(): void {
+  #handleSelectionDeleteKey(): void {
     if (this.#additionalRanges.length) {
       this.#commands?.run(ClearSelectedContentsCommand, void 0);
       return;
@@ -826,13 +845,13 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     this.#commands?.run(ClearRangeContentsCommand, { anchor, focus });
   }
 
-  private handleSelectionSelectAllKey(): void {
-    const core = this.requireCore();
+  #handleSelectionSelectAllKey(): void {
+    const core = this.#requireCore();
     const geometry = readSheetGeometry(core.getDataEngine());
     if (!geometry || geometry.rowSizes.shape[1] === 0 || geometry.columnSizes.shape[1] === 0) return;
     const current = this.getState();
     const active = current[0].getPoint(0);
-    const cells = this.readCells();
+    const cells = this.#readCells();
     const occupied = (row: number, col: number): boolean => {
       const cell = cells?.getItem(row, col);
       return cell != null && (cell.value != null || Boolean(cell.formula));
@@ -876,11 +895,11 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
         (top !== bottom || left !== right) &&
         (selectedStart[0] !== top || selectedStart[1] !== left || selectedEnd[0] !== bottom || selectedEnd[1] !== right)
       ) {
-        this.executeSelectionCommand(core, [top, left], [bottom, right], SheetSelectionSource.Keyboard);
+        this.#executeSelectionCommand(core, [top, left], [bottom, right], SheetSelectionSource.Keyboard);
         return;
       }
     }
-    this.executeSelectionCommand(
+    this.#executeSelectionCommand(
       core,
       [0, 0],
       [geometry.rowSizes.shape[1] - 1, geometry.columnSizes.shape[1] - 1],
@@ -888,19 +907,19 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     );
   }
 
-  private handleSelectionHomeKey(primaryModifier: boolean, shiftKey: boolean): void {
+  #handleSelectionHomeKey(primaryModifier: boolean, shiftKey: boolean): void {
     const cell = shiftKey ? this.#selectionCursor ?? this.getState()[0].getPoint(0) : this.getState()[0].getPoint(0);
     if (cell[0] < 0) return;
     const target: Point = [primaryModifier ? 0 : cell[0], 0];
-    this.selectNavigationTarget(target, shiftKey);
+    this.#selectNavigationTarget(target, shiftKey);
   }
 
-  private readCells(): SheetCellDataReader | null {
+  #readCells(): SheetCellDataReader | null {
     return this.#queries?.has(ReadSheetCellDataQuery) ? this.#queries.run(ReadSheetCellDataQuery, void 0) : null;
   }
 
-  private handleSelectionEndKey(shiftKey: boolean): void {
-    const cells = this.readCells();
+  #handleSelectionEndKey(shiftKey: boolean): void {
+    const cells = this.#readCells();
     if (!cells?.forEachStoredInRange || cells.shape[0] === 0 || cells.shape[1] === 0) return;
     let row = 0;
     let col = 0;
@@ -909,17 +928,17 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
       row = Math.max(row, cellRow);
       col = Math.max(col, cellCol);
     });
-    const formatted = this.formats?.usedExtent(cells.shape[0] - 1, cells.shape[1] - 1);
+    const formatted = this.#formats?.usedExtent(cells.shape[0] - 1, cells.shape[1] - 1);
     if (formatted) {
       row = Math.max(row, formatted[0]);
       col = Math.max(col, formatted[1]);
     }
     const target: Point = [row, col];
-    this.selectNavigationTarget(target, shiftKey);
+    this.#selectNavigationTarget(target, shiftKey);
   }
 
-  private handleSelectionPageKey(direction: -1 | 1, shiftKey: boolean): void {
-    const core = this.requireCore();
+  #handleSelectionPageKey(direction: -1 | 1, shiftKey: boolean): void {
+    const core = this.#requireCore();
     const geometry = readSheetGeometry(core.getDataEngine());
     const cell = shiftKey ? this.#selectionCursor ?? this.getState()[0].getPoint(0) : this.getState()[0].getPoint(0);
     if (!geometry || cell[0] < 0) return;
@@ -933,12 +952,12 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     const targetOffset = Math.max(0, currentTop + direction * pageSize);
     const row = Math.max(0, Math.min(rows.shape[1] - 1, rows.getLeftBoundaryColIndexByDimension(targetOffset)));
     const target: Point = [row, cell[1]];
-    this.selectNavigationTarget(target, shiftKey);
+    this.#selectNavigationTarget(target, shiftKey);
     scrollManager.requestScrollTo(scroll.x, Math.max(0, scroll.y + direction * pageSize));
   }
 
-  private handleSelectionHorizontalPageKey(direction: -1 | 1, shiftKey: boolean): void {
-    const core = this.requireCore();
+  #handleSelectionHorizontalPageKey(direction: -1 | 1, shiftKey: boolean): void {
+    const core = this.#requireCore();
     const geometry = readSheetGeometry(core.getDataEngine());
     const cell = shiftKey ? this.#selectionCursor ?? this.getState()[0].getPoint(0) : this.getState()[0].getPoint(0);
     if (!geometry || cell[1] < 0) return;
@@ -950,26 +969,26 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     const currentLeft = columns.getDimensionLeftBoundaryByIndex(cell[1]);
     const targetOffset = Math.max(0, currentLeft + direction * pageSize);
     const col = Math.max(0, Math.min(columns.shape[1] - 1, columns.getLeftBoundaryColIndexByDimension(targetOffset)));
-    this.selectNavigationTarget([cell[0], col], shiftKey);
+    this.#selectNavigationTarget([cell[0], col], shiftKey);
     scrollManager.requestScrollTo(Math.max(0, scroll.x + direction * pageSize), scroll.y);
   }
 
-  private selectNavigationTarget(target: Point, extend: boolean): void {
-    const core = this.requireCore();
+  #selectNavigationTarget(target: Point, extend: boolean): void {
+    const core = this.#requireCore();
     if (!extend) {
-      this.executeSelectionCommand(core, target, target, SheetSelectionSource.Keyboard, true);
+      this.#executeSelectionCommand(core, target, target, SheetSelectionSource.Keyboard, true);
       return;
     }
     const origin = this.#selectionOrigin ?? this.getState()[0].getPoint(0);
     const anchor: Point = [Math.min(origin[0], target[0]), Math.min(origin[1], target[1])];
     const focus: Point = [Math.max(origin[0], target[0]), Math.max(origin[1], target[1])];
-    this.executeSelectionCommand(core, anchor, focus, SheetSelectionSource.Keyboard, true, anchor, anchor, void 0, {
+    this.#executeSelectionCommand(core, anchor, focus, SheetSelectionSource.Keyboard, true, anchor, anchor, void 0, {
       origin,
       cursor: target,
     });
   }
 
-  private findDataBoundary(
+  #findDataBoundary(
     cells: SheetCellDataReader,
     current: Point,
     direction: (typeof SelectionMoveDirection)[keyof typeof SelectionMoveDirection],
@@ -1004,14 +1023,14 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     return vertical ? [target, current[1]] : [current[0], target];
   }
 
-  private handleSelectionSelectRowKey(): void {
-    const core = this.requireCore();
+  #handleSelectionSelectRowKey(): void {
+    const core = this.#requireCore();
     const range = this.getState()[1];
     const start = range.getPoint(0);
     const end = range.getPoint(1);
     const geometry = readSheetGeometry(core.getDataEngine());
     if (start[0] < 0 || !geometry) return;
-    this.executeSelectionCommand(
+    this.#executeSelectionCommand(
       core,
       [start[0], 0],
       [end[0], geometry.columnSizes.shape[1] - 1],
@@ -1019,12 +1038,12 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     );
   }
 
-  private handleSelectionSelectColumnKey(): void {
-    const core = this.requireCore();
+  #handleSelectionSelectColumnKey(): void {
+    const core = this.#requireCore();
     const cell = this.getState()[0].getPoint(0);
     const geometry = readSheetGeometry(core.getDataEngine());
     if (cell[1] < 0 || !geometry) return;
-    this.executeSelectionCommand(
+    this.#executeSelectionCommand(
       core,
       [0, cell[1]],
       [geometry.rowSizes.shape[1] - 1, cell[1]],
@@ -1032,7 +1051,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     );
   }
 
-  private handleSelectionEnterKey(shiftKey: boolean): void {
+  #handleSelectionEnterKey(shiftKey: boolean): void {
     const state = this.getState();
     const start = state[1].getPoint(0);
     const end = state[1].getPoint(1);
@@ -1048,8 +1067,8 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
         col = col > start[1] ? col - 1 : end[1];
       }
       const target: Point = [row, col];
-      this.executeSelectionCommand(
-        this.requireCore(),
+      this.#executeSelectionCommand(
+        this.#requireCore(),
         [...start],
         [...end],
         SheetSelectionSource.Keyboard,
@@ -1065,7 +1084,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
 
   /** Returns the destination row when Enter requires a structural extension. */
   public getDownwardEntryExtensionIndex(): number | null {
-    const core = this.requireCore();
+    const core = this.#requireCore();
     const geometry = readSheetGeometry(core.getDataEngine());
     const row = this.getState()[0].getPoint(0)[0];
     const lastRow = (geometry?.rowSizes.shape[1] ?? 0) - 1;
@@ -1078,28 +1097,28 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     if (index !== null) this.#commands?.run(InsertRowCommand, { index, historyGroup });
   }
 
-  private handleSelectionArrowDown(shiftKey: boolean, metaKey: boolean): void {
+  #handleSelectionArrowDown(shiftKey: boolean, metaKey: boolean): void {
     this.navigate(SelectionMoveDirection.Down, shiftKey, metaKey);
   }
 
-  private handleSelectionArrowUp(shiftKey: boolean, metaKey: boolean): void {
+  #handleSelectionArrowUp(shiftKey: boolean, metaKey: boolean): void {
     this.navigate(SelectionMoveDirection.Up, shiftKey, metaKey);
   }
 
-  private handleSelectionArrowLeft(shiftKey: boolean, metaKey: boolean): void {
+  #handleSelectionArrowLeft(shiftKey: boolean, metaKey: boolean): void {
     this.navigate(SelectionMoveDirection.Left, shiftKey, metaKey);
   }
 
-  private handleSelectionArrowRight(shiftKey: boolean, metaKey: boolean): void {
+  #handleSelectionArrowRight(shiftKey: boolean, metaKey: boolean): void {
     this.navigate(SelectionMoveDirection.Right, shiftKey, metaKey);
   }
 
-  private handleSelectionTabKey(shiftKey: boolean): void {
+  #handleSelectionTabKey(shiftKey: boolean): void {
     const state = this.getState();
     const start = state[1].getPoint(0);
     const end = state[1].getPoint(1);
     if (start[0] < 0) return;
-    const merge = this.findMergedSelectionRange(start);
+    const merge = this.#findMergedSelectionRange(start);
     const singleMergedCell =
       merge &&
       merge.start[0] === start[0] &&
@@ -1122,8 +1141,8 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
       row = row > start[0] ? row - 1 : end[0];
     }
     const target: Point = [row, col];
-    this.executeSelectionCommand(
-      this.requireCore(),
+    this.#executeSelectionCommand(
+      this.#requireCore(),
       [...start],
       [...end],
       SheetSelectionSource.Keyboard,
@@ -1135,7 +1154,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
 
   /** Returns the destination column when Tab requires a structural extension. */
   public getRightwardEntryExtensionIndex(): number | null {
-    const core = this.requireCore();
+    const core = this.#requireCore();
     const geometry = readSheetGeometry(core.getDataEngine());
     const col = this.getState()[0].getPoint(0)[1];
     const lastCol = (geometry?.columnSizes.shape[1] ?? 0) - 1;
@@ -1154,7 +1173,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     shiftKey: boolean = false,
     metaKey: boolean = false,
   ): void {
-    const searCore = this.requireCore();
+    const searCore = this.#requireCore();
     const dataEngine = searCore.getDataEngine();
     const selectionState = dataEngine.getDataType<[RectRange, RectRange]>(this.pluginKey);
     const dataState = readSheetGeometry(dataEngine);
@@ -1176,7 +1195,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
       // Extend selection: selectionOrigin is the fixed anchor, selectionCursor tracks the moving end
       const origin: Point = this.#selectionOrigin ?? [...focus];
       const cursor: Point = this.#selectionCursor ?? [...focus];
-      const cells = metaKey ? this.readCells() : null;
+      const cells = metaKey ? this.#readCells() : null;
       const result = extendSelection({
         origin,
         cursor,
@@ -1185,9 +1204,9 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
         lastCol,
         jumpToEdge: metaKey,
         ...(cells?.forEachStoredInRange
-          ? { jumpTarget: this.findDataBoundary(cells, cursor, direction, lastRow, lastCol) }
+          ? { jumpTarget: this.#findDataBoundary(cells, cursor, direction, lastRow, lastCol) }
           : {}),
-        findMerge: this.findMergedSelectionRange.bind(this),
+        findMerge: this.#findMergedSelectionRange.bind(this),
       });
       nextOrigin = origin;
       nextCursor = result.cursor;
@@ -1208,9 +1227,9 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
       } else {
         targetCol = 0;
       }
-      const cells = this.readCells();
+      const cells = this.#readCells();
       const target = cells?.forEachStoredInRange
-        ? this.findDataBoundary(cells, [...focus], direction, lastRow, lastCol)
+        ? this.#findDataBoundary(cells, [...focus], direction, lastRow, lastCol)
         : ([targetRow, targetCol] as Point);
       nextAnchor = target;
       nextFocus = target;
@@ -1222,7 +1241,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
         direction,
         lastRow,
         lastCol,
-        findMerge: this.findMergedSelectionRange.bind(this),
+        findMerge: this.#findMergedSelectionRange.bind(this),
       });
       nextAnchor = result.anchor;
       nextFocus = result.focus;
@@ -1231,7 +1250,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     }
 
     const rowDirection = direction === SelectionMoveDirection.Up ? -1 : 1;
-    const visibleRow = this.findVisibleNavigationRow(dataState.rowSizes, nextCursor[0], rowDirection);
+    const visibleRow = this.#findVisibleNavigationRow(dataState.rowSizes, nextCursor[0], rowDirection);
     if (visibleRow === null) return;
     if (visibleRow !== nextCursor[0]) {
       nextCursor = [visibleRow, nextCursor[1]];
@@ -1245,7 +1264,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
       }
     }
 
-    this.executeSelectionCommand(
+    this.#executeSelectionCommand(
       searCore,
       nextAnchor,
       nextFocus,
@@ -1258,7 +1277,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     );
   }
 
-  private findVisibleNavigationRow(rowSizes: DimensionsCSRMatrix, row: number, direction: number): number | null {
+  #findVisibleNavigationRow(rowSizes: DimensionsCSRMatrix, row: number, direction: number): number | null {
     if (rowSizes.getItem(0, row) !== 0) return row;
     const lastRow = rowSizes.shape[1] - 1;
     for (let next = row + direction; next >= 0 && next <= lastRow; next += direction) {
@@ -1270,7 +1289,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     return null;
   }
 
-  private scrollIntoView(
+  #scrollIntoView(
     searCore: SearCoreSheet,
     dataState: SheetGeometryFields,
     targetAnchor: Point,
@@ -1325,7 +1344,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
   }
 
   /** Bridges command results into the existing selection interaction pipeline. */
-  private executeSelectionCommand(
+  #executeSelectionCommand(
     searCore: SearCoreSheet,
     anchor: Point,
     focus: Point,
@@ -1336,7 +1355,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     additionalSelectionMode?: SheetAdditionalSelectionMode,
     navigation?: SheetSelectRangeInput['navigation'],
   ): void {
-    const commands = this.getCommandBus(searCore);
+    const commands = this.#getCommandBus(searCore);
     if (!commands) return;
     const input: SheetSelectRangeInput = {
       anchor,
@@ -1385,12 +1404,12 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     commands.run(SelectRangeCommand, { anchor: point, focus: point, ensureVisible: true });
   }
 
-  private createSelectRangeCommand(input: SheetSelectRangeInput): PipelineExecutionCommand {
-    const searCore = this.#commandCore ?? this.requireCore();
-    return new PipelineExecutionCommand(SelectRangeCommand.id, this.createSelectRangePipeline(input, searCore));
+  #createSelectRangeCommand(input: SheetSelectRangeInput): PipelineExecutionCommand {
+    const searCore = this.#commandCore ?? this.#requireCore();
+    return new PipelineExecutionCommand(SelectRangeCommand.id, this.#createSelectRangePipeline(input, searCore));
   }
 
-  private createSelectRangePipeline(input: SheetSelectRangeInput, searCore: SearCoreSheet): Pipeline {
+  #createSelectRangePipeline(input: SheetSelectRangeInput, searCore: SearCoreSheet): Pipeline {
     const dataState = readSheetGeometry(searCore.getDataEngine());
     const hasActiveRange = input.activeAnchor !== void 0 || input.activeFocus !== void 0;
     const anchor = [...input.anchor] as Point;
@@ -1404,7 +1423,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
       : selectRange({
           start: input.anchor,
           end: input.focus,
-          findMerge: this.findMergedSelectionRange.bind(this),
+          findMerge: this.#findMergedSelectionRange.bind(this),
           lastRow: dataState?.rowSizes.shape[1] ? dataState.rowSizes.shape[1] - 1 : void 0,
           lastCol: dataState?.columnSizes.shape[1] ? dataState.columnSizes.shape[1] - 1 : void 0,
         });
@@ -1412,7 +1431,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
       createUpdateRectOTOperation([0], activeAnchor, activeFocus),
       createUpdateRectOTOperation([1], normalized.anchor, normalized.focus),
     ];
-    const pipeline = this.createSelectionPipeline(
+    const pipeline = this.#createSelectionPipeline(
       createSheetTransaction(this.pluginKey, operations),
       normalized.anchor,
       normalized.focus,
@@ -1447,15 +1466,15 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     if (input.ensureVisible) {
       pipeline.addPostCommit(SheetSelectionPipelineStepName.EnsureSelectionVisible, () => {
         const state = readSheetGeometry(searCore.getDataEngine());
-        if (state) this.scrollIntoView(searCore, state, [...normalized.anchor], [...normalized.focus]);
+        if (state) this.#scrollIntoView(searCore, state, [...normalized.anchor], [...normalized.focus]);
       });
     }
     return pipeline;
   }
 
-  private getCommandBus(_searCore: SearCoreSheet): SheetCommandBus | null {
+  #getCommandBus(_searCore: SearCoreSheet): SheetCommandBus | null {
     if (this.#commands) return this.#commands;
-    this.platform?.warn('SheetSelectionPlugin getCommandBus skipped: SheetCommandBus is missing.');
+    this.#platform?.warn('SheetSelectionPlugin getCommandBus skipped: SheetCommandBus is missing.');
     return null;
   }
 
@@ -1466,17 +1485,17 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
       throw new SearError('Sheet selection commands are already bound to an editor.');
     }
     this.#commands = commands;
-    this.rangeDrag?.registerCommands(commands);
+    this.#rangeDrag?.registerCommands(commands);
     commands.register(
       RestartSheetSelectionNavigationCommand,
       () => new LocalActionCommand(RestartSheetSelectionNavigationCommand.id, () => this.#restartNavigation()),
     );
     commands.register(HandleSheetSelectionPointerCommand, (input) => {
-      const core = this.requireCore();
+      const core = this.#requireCore();
       if (input.action === SheetSelectionPointerAction.Move) {
         const plan = this.#planPointerMove(core, input);
         if (plan) {
-          const pipeline = this.createSelectRangePipeline(plan, core);
+          const pipeline = this.#createSelectRangePipeline(plan, core);
           pipeline.addPostCommit('update-selection-pointer', () => this.#updatePointerPosition(input.view));
           return new PipelineExecutionCommand(HandleSheetSelectionPointerCommand.id, pipeline);
         }
@@ -1487,7 +1506,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
       return new LocalActionCommand(HandleSheetSelectionPointerCommand.id, () => this.#applyPointerInput(core, input));
     });
     commands.register(ClearSelectedContentsCommand, () => {
-      const cells = this.readCells();
+      const cells = this.#readCells();
       if (!cells)
         return new TransactionPipelineCommand(
           ClearSelectedContentsCommand.id,
@@ -1500,7 +1519,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
         getColumnCount: () => cells.shape[1],
         readCell: (row: number, col: number) => cells.getItem(row, col),
         includeCell: (row: number) => !rowVisibility?.active || !rowVisibility.isRowFiltered(row),
-        validateClearCell: (row: number, col: number) => this.inputValidation?.validateClear(row, col) ?? { reject: false },
+        validateClearCell: (row: number, col: number) => this.#inputValidation?.validateClear(row, col) ?? { reject: false },
       };
       const seen = new Set<string>();
       const operations = this.#queries!.run(GetSelections, void 0).flatMap((range) =>
@@ -1516,9 +1535,9 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
         createSheetTransaction(SheetDataPlugin.pluginKey, operations),
       );
     });
-    if (this.rangeMoves)
+    if (this.#rangeMoves)
       commands.register(MoveSheetRangeCommand, (input) => {
-        const analysis = this.analyzeRangeMove(input);
+        const analysis = this.#analyzeRangeMove(input);
         if (analysis.status === SheetRangeMoveStatus.Blocked) throw new SheetRangeMoveRejectedError(analysis);
         const context = analysis.context;
         const pipeline = new Pipeline(MoveSheetRangeCommand.id);
@@ -1530,7 +1549,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
             'The destination contains existing cell data.',
             { context },
           );
-        this.rangeMoves!.plan(context).forEach((plan, index) => {
+        this.#rangeMoves!.plan(context).forEach((plan, index) => {
           if (plan.operations.length)
             pipeline.add(`move-owner:${index}`, createSheetTransaction(plan.target, [...plan.operations]));
         });
@@ -1557,18 +1576,18 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
       });
     const selectionPlugin = this;
     commands.register(SelectRangeCommand, function createSelectRangeCommand(input) {
-      return selectionPlugin.createSelectRangeCommand(input);
+      return selectionPlugin.#createSelectRangeCommand(input);
     });
     commands.register(EnsureSelectionVisibleCommand, function createEnsureSelectionVisibleCommand(input) {
       return new LocalActionCommand(EnsureSelectionVisibleCommand.id, function ensureSelectionVisible(): void {
-        const core = selectionPlugin.requireCore();
+        const core = selectionPlugin.#requireCore();
         const state = readSheetGeometry(core.getDataEngine());
-        if (state) selectionPlugin.scrollIntoView(core, state, [...input.anchor], [...input.focus]);
+        if (state) selectionPlugin.#scrollIntoView(core, state, [...input.anchor], [...input.focus]);
       });
     });
   }
 
-  private createSelectionPipeline(
+  #createSelectionPipeline(
     transaction: Transaction,
     anchor: Point,
     focus: Point,
@@ -1586,9 +1605,9 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     return pipeline;
   }
 
-  private validateRangeMove(input: MoveSheetRangeInput): SheetRangeMoveContext {
+  #validateRangeMove(input: MoveSheetRangeInput): SheetRangeMoveContext {
     const context = resolveSheetRangeMove(input);
-    const geometry = readSheetGeometry(this.requireCore().getDataEngine());
+    const geometry = readSheetGeometry(this.#requireCore().getDataEngine());
     const valid =
       geometry &&
       [context.source, context.destination].every(
@@ -1606,10 +1625,10 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     return context;
   }
 
-  private analyzeRangeMove(input: MoveSheetRangeInput): SheetRangeMoveAnalysis {
+  #analyzeRangeMove(input: MoveSheetRangeInput): SheetRangeMoveAnalysis {
     let context: SheetRangeMoveContext;
     try {
-      context = this.validateRangeMove(input);
+      context = this.#validateRangeMove(input);
     } catch (error) {
       if (!(error instanceof SheetRangeMoveError)) throw error;
       return {
@@ -1623,14 +1642,14 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
         },
       };
     }
-    return this.rangeMoves!.analyze(context);
+    return this.#rangeMoves!.analyze(context);
   }
 
   /** Cancels transient pointer work before this editor is released. */
   public onEditorDestroy(): void {
     this.assertRuntimeWriteAllowed();
     this.#handlePointerUp();
-    this.rangeDrag?.destroy(this.#rangeDragOwnerToken);
+    this.#rangeDrag?.destroy(this.#rangeDragOwnerToken);
     this.#disposeAdditionalHighlight?.();
     this.#disposeAdditionalHighlight = null;
   }
@@ -1646,8 +1665,8 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
   }
 
   #restartNavigation(): void {
-    this.subscribeNavigationHandlers();
-    this.keyboardRouter.startListener();
+    this.#subscribeNavigationHandlers();
+    this.#keyboardRouter.startListener();
   }
 
   /** Applies a transaction to SheetSelectionPlugin state. */
@@ -1689,8 +1708,8 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     }
     for (const operation of transaction.operations) {
       if (!isMatrixStructureOperation(operation)) continue;
-      this.#selectionOrigin = this.rebaseSelectionPoint(this.#selectionOrigin, operation);
-      this.#selectionCursor = this.rebaseSelectionPoint(this.#selectionCursor, operation);
+      this.#selectionOrigin = this.#rebaseSelectionPoint(this.#selectionOrigin, operation);
+      this.#selectionCursor = this.#rebaseSelectionPoint(this.#selectionCursor, operation);
     }
     const selection = this.getState();
     const range = selection[1];
@@ -1718,7 +1737,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     Object.freeze(state);
   }
 
-  private rebaseSelectionPoint(point: Point | null, operation: MatrixStructureOTOperation<unknown>): Point | null {
+  #rebaseSelectionPoint(point: Point | null, operation: MatrixStructureOTOperation<unknown>): Point | null {
     if (!point) return null;
     const rect = new RectRange([[...point], [...point]]);
     RectOT.apply(rect, [operation]);

@@ -62,7 +62,7 @@ export class SearCoreEditSession implements SheetEditSession {
     this.#originalDocument = ensureEditableDocument(document);
     const initialSelection = createDocumentEndSelection(this.#originalDocument);
     const runtimeDocument = this.#runtime.core.materializeSnapshot(this.#originalDocument);
-    this.replaceSessionDocument('sheet.embedded.startSession', runtimeDocument, initialSelection);
+    this.#replaceSessionDocument('sheet.embedded.startSession', runtimeDocument, initialSelection);
   }
 
   public getDocument(): readonly Schema[] {
@@ -85,19 +85,19 @@ export class SearCoreEditSession implements SheetEditSession {
 
   public getCursor(): SheetCursorState | null {
     this.#assertLive();
-    return this.readCursor();
+    return this.#readCursor();
   }
 
   public getComposition(): SheetCompositionState | null {
     this.#assertLive();
     const text = this.#runtime.composition.getText();
-    return text ? { active: true, text, rect: this.readCursor()?.rect } : null;
+    return text ? { active: true, text, rect: this.#readCursor()?.rect } : null;
   }
 
   public render(renderContext = this.#context.renderContext, options: SheetEditRenderOptions = {}): SheetRenderUpdate {
     this.#assertLive();
     const cursorVisible = options.cursorVisible ?? true;
-    const update = this.update('content', undefined, cursorVisible);
+    const update = this.#update('content', undefined, cursorVisible);
     this.#runtime.drawEditor(
       this.#context,
       this.#runtime.core.exportSnapshot(this.#runtime.input.session.pendingDoc),
@@ -115,7 +115,7 @@ export class SearCoreEditSession implements SheetEditSession {
       input,
       this.#runtime.pluginContext(this.#context, this.getDocument()),
     );
-    if (!transformed) return this.update('selection');
+    if (!transformed) return this.#update('selection');
     input = transformed;
     if (input.type === 'insertText') {
       this.#runtime.composition.clear();
@@ -123,12 +123,12 @@ export class SearCoreEditSession implements SheetEditSession {
       let recorded = false;
       for (const [index, line] of lines.entries()) {
         if (index > 0) {
-          this.executeTransaction('sheet.embedded.pasteLineBreak', () => this.#runtime.input.createSoftEnterTransaction());
+          this.#executeTransaction('sheet.embedded.pasteLineBreak', () => this.#runtime.input.createSoftEnterTransaction());
           if (recorded) this.#history.mergeLastTwo();
           recorded = true;
         }
         if (!line && lines.length > 1) continue;
-        this.executeTransaction('sheet.embedded.insertText', () => this.#runtime.input.createInputTransaction(line));
+        this.#executeTransaction('sheet.embedded.insertText', () => this.#runtime.input.createInputTransaction(line));
         if (Object.keys(this.#typingStyle).length && line.length) {
           const after = this.#runtime.input.session.docSelection.head;
           const caretOffset = getDocumentOffset(this.#runtime.input.session.pendingDoc, after);
@@ -137,80 +137,80 @@ export class SearCoreEditSession implements SheetEditSession {
             head: { path: [...after.path], offset: after.offset },
           });
           this.setInlineStyle({ attrs: this.#typingStyle });
-          this.#runtime.input.restoreSelection(this.selectionAtOffset(caretOffset));
+          this.#runtime.input.restoreSelection(this.#selectionAtOffset(caretOffset));
           this.#history.mergeLastTwo();
         }
         if (recorded) this.#history.mergeLastTwo();
         recorded = true;
       }
-      return this.update('content');
+      return this.#update('content');
     }
     if (input.type === 'deleteContent') {
       this.#runtime.composition.clear();
       const count = Math.max(1, input.count ?? 1);
       for (let index = 0; index < count; index += 1) {
         if (input.direction === 'forward' && isCollapsed(this.#runtime.input.session.docSelection)) {
-          this.executeTransaction('sheet.embedded.moveRight', () =>
+          this.#executeTransaction('sheet.embedded.moveRight', () =>
             this.#runtime.input.createArrowTransaction(DocCursorDirection.Right, false),
           );
         }
-        this.executeTransaction('sheet.embedded.deleteContent', () => this.#runtime.input.createDeleteTransaction());
+        this.#executeTransaction('sheet.embedded.deleteContent', () => this.#runtime.input.createDeleteTransaction());
       }
-      return this.update('content');
+      return this.#update('content');
     }
     if (input.type === 'compositionStart' || input.type === 'compositionUpdate') {
       this.#runtime.composition.setText(input.text ?? '');
-      return this.update('composition');
+      return this.#update('composition');
     }
     if (input.type === 'compositionEnd') {
       this.#runtime.composition.clear();
-      return this.update('composition', { active: false, text: '' });
+      return this.#update('composition', { active: false, text: '' });
     }
 
-    if (input.type !== 'keyDown') return this.update('selection');
+    if (input.type !== 'keyDown') return this.#update('selection');
     if ((input.ctrlKey || input.metaKey) && input.key.toLowerCase() === 'z') {
       if (input.shiftKey) this.#history.redo();
       else this.#history.undo();
       this.#onHistoryChange();
-      return this.update('content');
+      return this.#update('content');
     }
     if ((input.ctrlKey || input.metaKey) && !input.shiftKey && input.key.toLowerCase() === 'y') {
       this.#history.redo();
       this.#onHistoryChange();
-      return this.update('content');
+      return this.#update('content');
     }
     if ((input.ctrlKey || input.metaKey) && !input.shiftKey) {
       const key = input.key.toLowerCase();
-      if (key === 'b') return this.toggleInlineStyle(BoldTextStyleKey.Bold);
-      if (key === 'i') return this.toggleInlineStyle(ItalicTextStyleKey.Italic);
-      if (key === 'u') return this.toggleInlineStyle(UnderlineTextStyleKey.Underline);
+      if (key === 'b') return this.#toggleInlineStyle(BoldTextStyleKey.Bold);
+      if (key === 'i') return this.#toggleInlineStyle(ItalicTextStyleKey.Italic);
+      if (key === 'u') return this.#toggleInlineStyle(UnderlineTextStyleKey.Underline);
     }
     if ((input.ctrlKey || input.metaKey) && input.shiftKey && input.key.toLowerCase() === 'x') {
-      return this.toggleInlineStyle(StrikethroughTextStyleKey.Strikethrough);
+      return this.#toggleInlineStyle(StrikethroughTextStyleKey.Strikethrough);
     }
     if ((input.metaKey || input.ctrlKey) && input.key.toLowerCase() === 'a') {
-      this.executeTransaction('sheet.embedded.selectAll', () => this.#runtime.input.createSelectAllTransaction());
-      return this.update('selection');
+      this.#executeTransaction('sheet.embedded.selectAll', () => this.#runtime.input.createSelectAllTransaction());
+      return this.#update('selection');
     }
     const direction = keyDirection(input.key);
     if (direction) {
-      this.executeTransaction(`sheet.embedded.arrow.${direction}`, () =>
+      this.#executeTransaction(`sheet.embedded.arrow.${direction}`, () =>
         this.#runtime.input.createArrowTransaction(direction, input.shiftKey === true),
       );
-      return this.update('selection');
+      return this.#update('selection');
     }
     if (input.key === 'Enter') {
-      this.executeTransaction('sheet.embedded.softEnter', () => this.#runtime.input.createSoftEnterTransaction());
-      return this.update('content');
+      this.#executeTransaction('sheet.embedded.softEnter', () => this.#runtime.input.createSoftEnterTransaction());
+      return this.#update('content');
     }
     if (input.key === 'Backspace') {
-      this.executeTransaction('sheet.embedded.deleteBackward', () => this.#runtime.input.createDeleteTransaction());
-      return this.update('content');
+      this.#executeTransaction('sheet.embedded.deleteBackward', () => this.#runtime.input.createDeleteTransaction());
+      return this.#update('content');
     }
-    return this.update('selection');
+    return this.#update('selection');
   }
 
-  private toggleInlineStyle(styleKey: string): SheetRenderUpdate {
+  #toggleInlineStyle(styleKey: string): SheetRenderUpdate {
     const state = this.#runtime.input.getState();
     const patches = buildInlineTextRangePatchPlan(state.pendingDoc, state.docSelection, () => ({}));
     const styles = patches.map((patch) => this.#runtime.inlineStyles.readTextNodeStyle(patch.oldNode));
@@ -244,11 +244,11 @@ export class SearCoreEditSession implements SheetEditSession {
         while (start > 0 && isWordCharacter(text[start - 1])) start -= 1;
         while (end < text.length && isWordCharacter(text[end])) end += 1;
         if (start !== end) {
-          const anchor = this.selectionAtOffset(start).anchor;
-          const head = this.selectionAtOffset(end).head;
+          const anchor = this.#selectionAtOffset(start).anchor;
+          const head = this.#selectionAtOffset(end).head;
           this.#pointerAnchor = { anchor, head };
           this.#runtime.input.restoreSelection({ anchor, head });
-          return this.update('selection');
+          return this.#update('selection');
         }
       }
       this.#pointerAnchor = { anchor: position, head: position };
@@ -256,14 +256,14 @@ export class SearCoreEditSession implements SheetEditSession {
     const anchor = this.#pointerAnchor?.anchor ?? this.#runtime.input.session.docSelection.anchor;
     this.#runtime.input.restoreSelection({ anchor, head: position });
     if (input.type === 'pointerUp') this.#pointerAnchor = null;
-    return this.update('selection');
+    return this.#update('selection');
   }
 
   public setSelection(selection: SheetTextSelection): SheetRenderUpdate {
     this.#assertLive();
     this.#assertCommand();
     this.#runtime.input.restoreSelection(toDocSelection(selection));
-    return this.update('selection');
+    return this.#update('selection');
   }
 
   public setInlineStyle(update: SheetInlineStyleUpdate): SheetRenderUpdate {
@@ -273,18 +273,18 @@ export class SearCoreEditSession implements SheetEditSession {
       update,
       this.#runtime.pluginContext(this.#context, this.getDocument()),
     );
-    if (!transformed) return this.update('selection');
+    if (!transformed) return this.#update('selection');
     update = transformed;
     const entries = Object.entries(update.attrs);
-    if (entries.length === 0) return this.update('selection');
+    if (entries.length === 0) return this.#update('selection');
     if (isCollapsed(this.#runtime.input.session.docSelection)) {
       entries.forEach(([property, value]) => {
         this.#typingStyle[property] = value === undefined ? undefined : JSON.parse(JSON.stringify(value));
       });
       this.#onStyleChange();
-      return this.update('selection');
+      return this.#update('selection');
     }
-    this.executeTransaction('sheet.embedded.inlineStyle', () =>
+    this.#executeTransaction('sheet.embedded.inlineStyle', () =>
       this.#runtime.input.createTransaction((transaction, state) => {
         for (const [property, value] of entries) {
           const mutation = this.#runtime.inlineStyles.getMutation(property);
@@ -299,7 +299,7 @@ export class SearCoreEditSession implements SheetEditSession {
         return transaction;
       }),
     );
-    return this.update('content');
+    return this.#update('content');
   }
 
   public commit(): readonly Schema[] {
@@ -328,7 +328,7 @@ export class SearCoreEditSession implements SheetEditSession {
     this.#assertLive();
     this.#assertCommand();
     if (this.#finished) return;
-    this.replaceSessionDocument(
+    this.#replaceSessionDocument(
       'sheet.embedded.cancelSession',
       this.#runtime.core.materializeSnapshot(this.#originalDocument),
     );
@@ -354,7 +354,7 @@ export class SearCoreEditSession implements SheetEditSession {
     this.#onFinish();
   }
 
-  private executeTransaction(name: string, create: () => ReturnType<DocInputPlugin['createInputTransaction']>): void {
+  #executeTransaction(name: string, create: () => ReturnType<DocInputPlugin['createInputTransaction']>): void {
     const before = this.#runtime.input.session.docSelection;
     const transaction = create();
     runInsideCommandExecution(name, () => {
@@ -364,14 +364,14 @@ export class SearCoreEditSession implements SheetEditSession {
     this.#onHistoryChange();
   }
 
-  private replaceSessionDocument(name: string, document: RichDocNode[], selection?: DocSelection): void {
+  #replaceSessionDocument(name: string, document: RichDocNode[], selection?: DocSelection): void {
     const transaction = this.#runtime.input.createReplaceDocumentTransaction(document, selection);
     runInsideCommandExecution(name, () => {
       this.#runtime.core.executePipeline(new Pipeline(name).addTransaction(name, transaction));
     });
   }
 
-  private selectionAtOffset(offset: number): DocSelection {
+  #selectionAtOffset(offset: number): DocSelection {
     const doc = this.#runtime.input.session.pendingDoc as RichDocNode[];
     let remaining = offset;
     for (let paragraph = 0; paragraph < doc.length; paragraph += 1) {
@@ -389,7 +389,7 @@ export class SearCoreEditSession implements SheetEditSession {
     return createDocumentEndSelection(doc);
   }
 
-  private update(
+  #update(
     kind: 'content' | 'selection' | 'composition',
     composition?: SheetCompositionState,
     cursorVisible = true,
@@ -405,8 +405,8 @@ export class SearCoreEditSession implements SheetEditSession {
       this.#context,
       kind,
       selection,
-      this.readCursor(),
-      composition ?? this.readComposition(),
+      this.#readCursor(),
+      composition ?? this.#readComposition(),
       {
         width: layout.positionRect.width,
         height: layout.positionRect.height,
@@ -419,7 +419,7 @@ export class SearCoreEditSession implements SheetEditSession {
     return update;
   }
 
-  private readCursor(): SheetCursorState | null {
+  #readCursor(): SheetCursorState | null {
     const info = this.#runtime.cursor.getCursor();
     if (!info) return null;
     const cell = this.#context.geometry.cellRect;
@@ -429,9 +429,9 @@ export class SearCoreEditSession implements SheetEditSession {
     };
   }
 
-  private readComposition(): SheetCompositionState | null {
+  #readComposition(): SheetCompositionState | null {
     const text = this.#runtime.composition.getText();
-    const cursor = this.readCursor();
+    const cursor = this.#readCursor();
     return text ? { active: true, text, rect: cursor?.rect } : null;
   }
 

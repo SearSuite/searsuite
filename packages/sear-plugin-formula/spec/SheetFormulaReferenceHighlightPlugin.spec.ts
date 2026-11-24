@@ -149,27 +149,16 @@ describe('SheetFormulaReferenceHighlightPlugin', () => {
       [],
     );
 
-    const resolveBounds = (
-      plugin as unknown as {
-        resolveDependencyBounds: (
-          dep: { kind: FormulaNodeKind; startCol?: number; endCol?: number; startRow?: number; endRow?: number },
-          shape: { rowCount: number; colCount: number },
-        ) => unknown;
-      }
-    ).resolveDependencyBounds.bind(plugin as never);
 
-    expect(
-      resolveBounds({ kind: FormulaNodeKind.ColumnRange, startCol: 1, endCol: 2 }, { rowCount: 0, colCount: 3 }),
-    ).toBeNull();
-    expect(
-      resolveBounds({ kind: FormulaNodeKind.RowRange, startRow: 1, endRow: 2 }, { rowCount: 3, colCount: 0 }),
-    ).toBeNull();
   });
 
-  it('returns no highlight when dependency bounds cannot be resolved from empty shape', () => {
+  it.each([
+    { dependency: { kind: FormulaNodeKind.RowRange, startRow: 0, endRow: 1 }, rows: 3, columns: 0 },
+    { dependency: { kind: FormulaNodeKind.ColumnRange, startCol: 1, endCol: 2 }, rows: 0, columns: 3 },
+  ])('returns no highlight for unresolved bounds in a $rows × $columns sheet', ({ dependency, rows, columns }) => {
     const statusProvider = {
       getFormulaCellStatus: jest.fn(() => ({
-        dependencies: [{ kind: FormulaNodeKind.RowRange, startRow: 0, endRow: 1 }],
+        dependencies: [dependency],
         dependents: [],
       })),
     };
@@ -189,7 +178,7 @@ describe('SheetFormulaReferenceHighlightPlugin', () => {
     );
 
     const highlights = plugin.getHighlights({
-      searCore: createCore({ type: CellType.Formula, formula: '=1' }, 0, 0),
+      searCore: createCore({ type: CellType.Formula, formula: '=1' }, rows, columns),
     } as never);
 
     expect(highlights).toEqual([]);

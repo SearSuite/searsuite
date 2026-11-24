@@ -48,6 +48,20 @@ interface RangeDragSession {
 /** Owns one local range-border gesture; document changes enter through the move command. */
 @Injectable()
 export class SheetRangeDrag {
+  readonly #queries: SheetQueryRegistry;
+  readonly #coordinates: CoordinateEngine;
+  readonly #pointer: PointerCapture;
+  readonly #keyboard: KeyboardRouter;
+  readonly #cursorRules: CursorRegistry;
+  readonly #cursor: CursorEngine;
+  readonly #highlights: SheetHighlightRegistry;
+  readonly #platform: Platform;
+  readonly #interactions: SheetInteractionStore;
+  readonly #inputValidation: SheetCellInputValidationRegistry;
+  readonly #cellCodecs: CellClipboardCodecRegistry;
+  readonly #formats: SheetFormatTransferRegistry;
+  readonly #ownerData: SheetClipboardTransferRegistry;
+
   public static readonly symbol = Symbol.for('SheetRangeDrag');
   #core: SearCoreSheet | null = null;
   #readSelection: (() => Rect) | null = null;
@@ -64,20 +78,33 @@ export class SheetRangeDrag {
 
   public constructor(
     @Inject(SheetCommandBus.symbol) commands: SheetCommandBus,
-    @Inject(SheetQueryRegistry.symbol) private readonly queries: SheetQueryRegistry,
-    @Inject(CoordinateEngine.symbol) private readonly coordinates: CoordinateEngine,
-    @Inject(PointerCapture.symbol) private readonly pointer: PointerCapture,
-    @Inject(KeyboardRouter.symbol) private readonly keyboard: KeyboardRouter,
-    @Inject(CursorRegistry.symbol) private readonly cursorRules: CursorRegistry,
-    @Inject(CursorEngine.symbol) private readonly cursor: CursorEngine,
-    @Inject(SheetHighlightRegistry.symbol) private readonly highlights: SheetHighlightRegistry,
-    @Inject(Platform.symbol) private readonly platform: Platform,
-    @Inject(SheetInteractionStore.symbol) private readonly interactions: SheetInteractionStore,
-    @Inject(SheetCellInputValidationRegistry.symbol) private readonly inputValidation: SheetCellInputValidationRegistry,
-    @Inject(CellClipboardCodecRegistry.symbol) private readonly cellCodecs: CellClipboardCodecRegistry,
-    @Inject(SheetFormatTransferRegistry.symbol) private readonly formats: SheetFormatTransferRegistry,
-    @Inject(SheetClipboardTransferRegistry.symbol) private readonly ownerData: SheetClipboardTransferRegistry,
+    @Inject(SheetQueryRegistry.symbol) queries: SheetQueryRegistry,
+    @Inject(CoordinateEngine.symbol) coordinates: CoordinateEngine,
+    @Inject(PointerCapture.symbol) pointer: PointerCapture,
+    @Inject(KeyboardRouter.symbol) keyboard: KeyboardRouter,
+    @Inject(CursorRegistry.symbol) cursorRules: CursorRegistry,
+    @Inject(CursorEngine.symbol) cursor: CursorEngine,
+    @Inject(SheetHighlightRegistry.symbol) highlights: SheetHighlightRegistry,
+    @Inject(Platform.symbol) platform: Platform,
+    @Inject(SheetInteractionStore.symbol) interactions: SheetInteractionStore,
+    @Inject(SheetCellInputValidationRegistry.symbol) inputValidation: SheetCellInputValidationRegistry,
+    @Inject(CellClipboardCodecRegistry.symbol) cellCodecs: CellClipboardCodecRegistry,
+    @Inject(SheetFormatTransferRegistry.symbol) formats: SheetFormatTransferRegistry,
+    @Inject(SheetClipboardTransferRegistry.symbol) ownerData: SheetClipboardTransferRegistry,
   ) {
+    this.#queries = queries;
+    this.#coordinates = coordinates;
+    this.#pointer = pointer;
+    this.#keyboard = keyboard;
+    this.#cursorRules = cursorRules;
+    this.#cursor = cursor;
+    this.#highlights = highlights;
+    this.#platform = platform;
+    this.#interactions = interactions;
+    this.#inputValidation = inputValidation;
+    this.#cellCodecs = cellCodecs;
+    this.#formats = formats;
+    this.#ownerData = ownerData;
     this.#commands = commands;
   }
 
@@ -90,10 +117,10 @@ export class SheetRangeDrag {
   /** Routes local pointer and animation inputs through the editor command boundary. */
   public registerCommands(commands: SheetCommandBus): void {
     if (commands !== this.#commands) throw new SearError('Sheet range drag commands are already bound to an editor.');
-    registerSheetFillRangeCommand(commands, this.queries, this.inputValidation, this.cellCodecs,
+    registerSheetFillRangeCommand(commands, this.#queries, this.#inputValidation, this.#cellCodecs,
       () => this.#core ? readSheetCellMerges(this.#core.getDataEngine()) : null,
       () => this.#core ? readSheetRowVisibility(this.#core.getDataEngine()) : null,
-      this.formats, this.ownerData);
+      this.#formats, this.#ownerData);
     commands.register(
       HandleSheetRangeDragCommand,
       (input) => new LocalActionCommand(HandleSheetRangeDragCommand.id, () => this.#applyInput(input)),
@@ -124,7 +151,7 @@ export class SheetRangeDrag {
     }
   }
 
-  private escape = (): void => {
+  #escape = (): void => {
     if (!this.#destroyed) this.#commands.run(HandleSheetRangeDragCommand, { action: SheetRangeDragAction.Cancel });
   };
 
@@ -135,25 +162,25 @@ export class SheetRangeDrag {
     this.#core = core;
     this.#readSelection = readSelection;
     this.#disposers.push(
-      this.cursorRules.registerPosition({
+      this.#cursorRules.registerPosition({
         key: 'sheet.selection.fill-handle',
         layer: 95,
         cursor: CursorToken.Copy,
-        test: ({ world, view, target }) => target?.region === CellRegion.Grid && this.hitsFillHandle(world, view),
+        test: ({ world, view, target }) => target?.region === CellRegion.Grid && this.#hitsFillHandle(world, view),
       }),
     );
     this.#disposers.push(
-      this.cursorRules.registerPosition({
+      this.#cursorRules.registerPosition({
         key: 'sheet.selection.move',
         layer: 90,
         cursor: CursorToken.Grab,
         test: ({ world, view, target }) =>
-          (target?.region === CellRegion.Grid && this.hitsBorder(world, view)) ||
-          this.hitsSelectedHeader(world, view, target?.region),
+          (target?.region === CellRegion.Grid && this.#hitsBorder(world, view)) ||
+          this.#hitsSelectedHeader(world, view, target?.region),
       }),
     );
     this.#disposers.push(
-      this.highlights.register({
+      this.#highlights.register({
         key: 'sheet.selection.move-preview',
         getHighlights: () => {
           const session = this.#session;
@@ -164,7 +191,7 @@ export class SheetRangeDrag {
             stroke: '#16834b', strokeWidth: 2, fill: 'rgba(22, 131, 75, 0.08)', skipHit: true,
           }];
           if (session.axis !== null) {
-            const geometry = this.geometry()!;
+            const geometry = this.#geometry()!;
             return [
               createAxisDragHighlight(
                 { ...session, axis: session.axis },
@@ -177,7 +204,7 @@ export class SheetRangeDrag {
         },
       }),
     );
-    this.keyboard.subscribe({ onEscape: this.escape });
+    this.#keyboard.subscribe({ onEscape: this.#escape });
     this.#disposers.push(
       this.#commands.subscribe((event) => {
         if (event.result?.pipeline.steps.some((step) => step.transaction?.operations.length)) {
@@ -196,11 +223,11 @@ export class SheetRangeDrag {
     if (!this.#core || this.#destroyed || !event.target) return false;
     if ((event.clickCount ?? event.origin.detail ?? 0) < 2) this.#suppressDoubleClick = false;
     const { offsetX, offsetY } = event.origin;
-    const world = this.coordinates.screenToWorld(offsetX, offsetY);
-    const view = this.coordinates.screenToView(offsetX, offsetY);
+    const world = this.#coordinates.screenToWorld(offsetX, offsetY);
+    const view = this.#coordinates.screenToView(offsetX, offsetY);
     const target = event.target.properties;
     if (target.region === CellRegion.Grid) {
-      if (this.hitsFillHandle(world, view)) {
+      if (this.#hitsFillHandle(world, view)) {
         if ((event.clickCount ?? event.origin.detail ?? 0) >= 2) {
           this.onFillHandleDoubleClick(event);
           this.#suppressDoubleClick = true;
@@ -212,13 +239,13 @@ export class SheetRangeDrag {
         });
         return true;
       }
-      if (!this.hitsBorder(world, view)) return false;
+      if (!this.#hitsBorder(world, view)) return false;
     } else {
-      if (!this.hitsSelectedHeader(world, view, target.region)) return false;
+      if (!this.#hitsSelectedHeader(world, view, target.region)) return false;
       // Higher-layer handle rules keep resize and hidden-marker gestures available.
       const properties: CellProperties = { ...target, type: target.type ?? CellRenderType.Affix };
       if (
-        this.cursorRules.resolve(properties, {
+        this.#cursorRules.resolve(properties, {
           core: this.#core,
           origin: event.origin,
           world,
@@ -243,11 +270,11 @@ export class SheetRangeDrag {
     }
     if (!this.#core || !this.#readSelection || event.target?.properties.region !== CellRegion.Grid) return false;
     const { offsetX, offsetY } = event.origin;
-    if (!this.hitsFillHandle(this.coordinates.screenToWorld(offsetX, offsetY),
-      this.coordinates.screenToView(offsetX, offsetY))) return false;
+    if (!this.#hitsFillHandle(this.#coordinates.screenToWorld(offsetX, offsetY),
+      this.#coordinates.screenToView(offsetX, offsetY))) return false;
     const range = this.#readSelection();
     const source = { start: [...range.getPoint(0)] as [number, number], end: [...range.getPoint(1)] as [number, number] };
-    const cells = this.queries.run(ReadSheetCellDataQuery, void 0);
+    const cells = this.#queries.run(ReadSheetCellDataQuery, void 0);
     const adjacent = [source.start[1] - 1, source.end[1] + 1].find((col) =>
       col >= 0 && col < cells.shape[1] && cells.getItem(source.start[0], col));
     if (adjacent === undefined) return true;
@@ -257,7 +284,7 @@ export class SheetRangeDrag {
       try {
         this.#commands.run(FillSheetRangeCommand, { source, target: [last, source.end[1]] });
       } catch (error) {
-        void this.reportFillError(error);
+        void this.#reportFillError(error);
         return true;
       }
       this.#commands.run(SelectRangeCommand, { anchor: source.start, focus: [last, source.end[1]] });
@@ -267,17 +294,17 @@ export class SheetRangeDrag {
 
   #begin(point: PointerCapturePoint, fill = false): void {
     if (!this.#core || !this.#readSelection) return;
-    const world = this.coordinates.screenToWorld(point.view.x, point.view.y);
-    const view = this.coordinates.screenToView(point.view.x, point.view.y);
-    if (fill ? !this.hitsFillHandle(world, view) : !this.hitsBorder(world, view) && !this.hitsSelectedHeader(world, view)) return;
+    const world = this.#coordinates.screenToWorld(point.view.x, point.view.y);
+    const view = this.#coordinates.screenToView(point.view.x, point.view.y);
+    if (fill ? !this.#hitsFillHandle(world, view) : !this.#hitsBorder(world, view) && !this.#hitsSelectedHeader(world, view)) return;
     const selection = this.#readSelection!();
     const source = {
       start: [...selection.getPoint(0)] as [number, number],
       end: [...selection.getPoint(1)] as [number, number],
     };
     this.#cancel();
-    this.keyboard.subscribe({ onEscape: this.escape });
-    const axis = this.selectedAxis();
+    this.#keyboard.subscribe({ onEscape: this.#escape });
+    const axis = this.#selectedAxis();
     this.#session = {
       mode: fill ? 'fill' : 'move',
       source,
@@ -288,20 +315,20 @@ export class SheetRangeDrag {
       fillDirection: null,
       axis,
       before: source.start[axis ?? 0],
-      analysis: fill || axis !== null ? null : this.queries.run(AnalyzeSheetRangeMove, { source, target: source.start }),
+      analysis: fill || axis !== null ? null : this.#queries.run(AnalyzeSheetRangeMove, { source, target: source.start }),
     };
-    this.cursor.override(fill ? CursorToken.Copy : CursorToken.Grabbing);
-    this.#disposeCapture = this.pointer.start({
+    this.#cursor.override(fill ? CursorToken.Copy : CursorToken.Grabbing);
+    this.#disposeCapture = this.#pointer.start({
       onMove: (point) => this.#commands.run(HandleSheetRangeDragCommand, { action: SheetRangeDragAction.Update, point }),
       onRelease: (point) => {
         this.#commands.run(HandleSheetRangeDragCommand, { action: SheetRangeDragAction.Release, point });
       },
     });
-    this.highlights.invalidate();
+    this.#highlights.invalidate();
     this.#scheduleScroll();
   }
 
-  private geometry() {
+  #geometry() {
     if (!this.#core) return null;
     const rows = readSheetRowSizes(this.#core.getDataEngine());
     const columns = readSheetColumnSizes(this.#core.getDataEngine());
@@ -309,11 +336,11 @@ export class SheetRangeDrag {
     return rows && columns ? { rows, columns, x: config.sheetOffsetX ?? 50, y: config.sheetOffsetY ?? 24 } : null;
   }
 
-  private hitsBorder(world: { x: number; y: number }, view: { x: number; y: number }): boolean {
-    const geometry = this.geometry();
+  #hitsBorder(world: { x: number; y: number }, view: { x: number; y: number }): boolean {
+    const geometry = this.#geometry();
     const range = this.#readSelection?.();
     if (!geometry || !range || range.getPoint(0)[0] < 0 || view.x <= geometry.x || view.y <= geometry.y) return false;
-    if (this.interactions.getState().editSession) return false;
+    if (this.#interactions.getState().editSession) return false;
     const start = range.getPoint(0);
     const end = range.getPoint(1);
     if (
@@ -328,7 +355,7 @@ export class SheetRangeDrag {
     const top = geometry.rows.getDimensionLeftBoundaryByIndex(start[0]) + geometry.y;
     const bottom = geometry.rows.getDimensionRightBoundaryByIndex(end[0]) + geometry.y;
     const tolerance = 4;
-    const axis = this.selectedAxis();
+    const axis = this.#selectedAxis();
     if (axis === SheetDragAxis.Row)
       return Math.abs(world.y - top) <= tolerance || Math.abs(world.y - bottom) <= tolerance;
     if (axis === SheetDragAxis.Column)
@@ -343,20 +370,20 @@ export class SheetRangeDrag {
     );
   }
 
-  private hitsFillHandle(world: { x: number; y: number }, view: { x: number; y: number }): boolean {
-    const geometry = this.geometry();
+  #hitsFillHandle(world: { x: number; y: number }, view: { x: number; y: number }): boolean {
+    const geometry = this.#geometry();
     const range = this.#readSelection?.();
     if (!geometry || !range || range.getPoint(0)[0] < 0 || view.x <= geometry.x || view.y <= geometry.y)
       return false;
-    if (this.interactions.getState().editSession || this.selectedAxis() !== null) return false;
+    if (this.#interactions.getState().editSession || this.#selectedAxis() !== null) return false;
     const end = range.getPoint(1);
     const right = geometry.columns.getDimensionRightBoundaryByIndex(end[1]) + geometry.x;
     const bottom = geometry.rows.getDimensionRightBoundaryByIndex(end[0]) + geometry.y;
     return Math.abs(world.x - right) <= 6 && Math.abs(world.y - bottom) <= 6;
   }
 
-  private selectedAxis(): SheetDragAxis | null {
-    const geometry = this.geometry();
+  #selectedAxis(): SheetDragAxis | null {
+    const geometry = this.#geometry();
     const selection = this.#readSelection?.();
     if (!geometry || !selection) return null;
     const start = selection.getPoint(0);
@@ -374,15 +401,15 @@ export class SheetRangeDrag {
     return null;
   }
 
-  private hitsSelectedHeader(
+  #hitsSelectedHeader(
     world: { x: number; y: number },
     view: { x: number; y: number },
     region?: CellRegion,
   ): boolean {
-    const geometry = this.geometry();
+    const geometry = this.#geometry();
     const selection = this.#readSelection?.();
-    const axis = this.selectedAxis();
-    if (!geometry || !selection || axis === null || this.interactions.getState().editSession) return false;
+    const axis = this.#selectedAxis();
+    if (!geometry || !selection || axis === null || this.#interactions.getState().editSession) return false;
     const rowHeader = view.x >= 0 && view.x < geometry.x && view.y > geometry.y;
     const columnHeader = view.y >= 0 && view.y < geometry.y && view.x > geometry.x;
     if (axis === SheetDragAxis.Row ? !rowHeader : !columnHeader) return false;
@@ -399,8 +426,8 @@ export class SheetRangeDrag {
     );
   }
 
-  private cellAt(world: { x: number; y: number }): [number, number] {
-    const geometry = this.geometry()!;
+  #cellAt(world: { x: number; y: number }): [number, number] {
+    const geometry = this.#geometry()!;
     const containingCell = (dimensions: typeof geometry.rows, coordinate: number): number => {
       const last = dimensions.shape[1] - 1;
       const position = Math.max(0, Math.min(dimensions.getDimensionRightBoundaryByIndex(last), coordinate));
@@ -417,19 +444,19 @@ export class SheetRangeDrag {
 
   #update(point: PointerCapturePoint, refresh = false): void {
     const session = this.#session;
-    const geometry = this.geometry();
+    const geometry = this.#geometry();
     if (!session || !geometry) return;
     session.pointer = point;
-    const world = this.coordinates.screenToWorld(point.view.x, point.view.y);
+    const world = this.#coordinates.screenToWorld(point.view.x, point.view.y);
     if (session.axis !== null) {
       session.before =
         session.axis === SheetDragAxis.Row
           ? resolveAxisInsertionBoundary(geometry.rows, world.y - geometry.y)
           : resolveAxisInsertionBoundary(geometry.columns, world.x - geometry.x);
-      this.highlights.invalidate();
+      this.#highlights.invalidate();
       return;
     }
-    const cell = this.cellAt(world);
+    const cell = this.#cellAt(world);
     if (session.mode === 'fill') {
       if (!session.fillDirection) {
         const dx = point.view.x - session.origin.view.x;
@@ -442,7 +469,7 @@ export class SheetRangeDrag {
         : session.fillDirection === 'column'
           ? [session.source.end[0], cell[1]]
           : cell;
-      this.highlights.invalidate();
+      this.#highlights.invalidate();
       return;
     }
     const target: [number, number] = [
@@ -451,15 +478,15 @@ export class SheetRangeDrag {
     ];
     if (!refresh && session.target[0] === target[0] && session.target[1] === target[1]) return;
     session.target = target;
-    session.analysis = this.queries.run(AnalyzeSheetRangeMove, { source: session.source, target });
-    this.cursor.override(
+    session.analysis = this.#queries.run(AnalyzeSheetRangeMove, { source: session.source, target });
+    this.#cursor.override(
       session.analysis.status === SheetRangeMoveStatus.Blocked ? CursorToken.NotAllowed : CursorToken.Grabbing,
     );
-    this.highlights.invalidate();
+    this.#highlights.invalidate();
   }
 
   #scheduleScroll(): void {
-    this.#frame = this.platform.requestAnimationFrame(() => {
+    this.#frame = this.#platform.requestAnimationFrame(() => {
       this.#frame = null;
       if (!this.#destroyed) this.#commands.run(HandleSheetRangeDragCommand, { action: SheetRangeDragAction.Tick });
     });
@@ -467,9 +494,9 @@ export class SheetRangeDrag {
 
   #advanceScroll(): void {
     const session = this.#session;
-    const geometry = this.geometry();
+    const geometry = this.#geometry();
     if (!session || !geometry || !this.#core) return;
-    const view = this.coordinates.screenToView(session.pointer.view.x, session.pointer.view.y);
+    const view = this.#coordinates.screenToView(session.pointer.view.x, session.pointer.view.y);
     const scroll = this.#core.renderEngine.scrollManager;
     const [width, height] = scroll.getShape();
     const speed = (value: number, start: number, end: number) => (value < start + 24 ? -12 : value > end - 24 ? 12 : 0);
@@ -494,7 +521,7 @@ export class SheetRangeDrag {
         try {
           this.#commands.run(FillSheetRangeCommand, { source: session.source, target: session.target });
         } catch (error) {
-          await this.reportFillError(error);
+          await this.#reportFillError(error);
           return;
         }
         this.#commands.run(SelectRangeCommand, {
@@ -512,7 +539,7 @@ export class SheetRangeDrag {
       try {
         commitAxisDrag(this.#commands, { ...session, axis: session.axis });
       } catch (error) {
-        this.platform.warn('Sheet axis move rejected.', error);
+        this.#platform.warn('Sheet axis move rejected.', error);
         if (!this.#destroyed && error instanceof SearError) {
           await this.#interaction
             ?.confirm({
@@ -521,7 +548,7 @@ export class SheetRangeDrag {
               confirmLabel: 'OK',
               cancelLabel: 'Close',
             })
-            .catch((feedbackError) => this.platform.warn('Sheet axis move feedback failed.', feedbackError));
+            .catch((feedbackError) => this.#platform.warn('Sheet axis move feedback failed.', feedbackError));
         }
       }
       return;
@@ -530,7 +557,7 @@ export class SheetRangeDrag {
     const generation = ++this.#generation;
     const input = { source: session.source, target: session.target };
     try {
-      const analysis = this.queries.run(AnalyzeSheetRangeMove, input);
+      const analysis = this.#queries.run(AnalyzeSheetRangeMove, input);
       if (analysis.status === SheetRangeMoveStatus.Blocked) throw new SheetRangeMoveRejectedError(analysis);
       const conflict = analysis.status === SheetRangeMoveStatus.RequiresConfirmation;
       if (
@@ -546,7 +573,7 @@ export class SheetRangeDrag {
       if (this.#destroyed || generation !== this.#generation) return;
       this.#commands.run(MoveSheetRangeCommand, { ...input, overwrite: conflict });
     } catch (error) {
-      this.platform.warn('Sheet range move rejected.', error);
+      this.#platform.warn('Sheet range move rejected.', error);
       if (!this.#destroyed && generation === this.#generation && error instanceof SearError) {
         await this.#interaction
           ?.confirm({
@@ -555,28 +582,28 @@ export class SheetRangeDrag {
             confirmLabel: 'OK',
             cancelLabel: 'Close',
           })
-          .catch((feedbackError) => this.platform.warn('Sheet range move feedback failed.', feedbackError));
+          .catch((feedbackError) => this.#platform.warn('Sheet range move feedback failed.', feedbackError));
       }
     }
   }
 
-  private async reportFillError(error: unknown): Promise<void> {
-    this.platform.warn('Sheet range fill rejected.', error);
+  async #reportFillError(error: unknown): Promise<void> {
+    this.#platform.warn('Sheet range fill rejected.', error);
     if (!this.#destroyed && error instanceof SearError) {
       await this.#interaction?.confirm({
         title: 'Cannot fill cells', message: error.message, confirmLabel: 'OK', cancelLabel: 'Close',
-      }).catch((feedbackError) => this.platform.warn('Sheet range fill feedback failed.', feedbackError));
+      }).catch((feedbackError) => this.#platform.warn('Sheet range fill feedback failed.', feedbackError));
     }
   }
 
   #clearGesture(): void {
     this.#disposeCapture?.();
     this.#disposeCapture = null;
-    if (this.#frame !== null) this.platform.cancelAnimationFrame(this.#frame);
+    if (this.#frame !== null) this.#platform.cancelAnimationFrame(this.#frame);
     this.#frame = null;
     this.#session = null;
-    this.cursor.override(null);
-    this.highlights.invalidate();
+    this.#cursor.override(null);
+    this.#highlights.invalidate();
   }
 
   #cancel(): void {

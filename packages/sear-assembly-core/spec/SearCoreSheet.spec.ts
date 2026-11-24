@@ -228,6 +228,12 @@ function createCoreWithPlugins(
   );
 }
 
+function emitScroll(core: SearCoreSheet): void {
+  const subscribe = jest.mocked(core.renderEngine.scrollManager.subscribeScroll);
+  const [listener] = subscribe.mock.calls[0];
+  listener({ x: 0, y: 0, deltaX: 0, deltaY: 0 });
+}
+
 describe('SearCoreSheet coverage', () => {
   it('keeps the owning plugin manager fixed after core construction', () => {
     const core = createCoreWithPlugins([], {} as SheetDataEngine);
@@ -362,9 +368,10 @@ describe('SearCoreSheet coverage', () => {
       platform,
     );
 
-    const scrollCore = core as unknown as { handleScrollReRender(state: unknown): void };
-    scrollCore.handleScrollReRender({});
-    scrollCore.handleScrollReRender({});
+    core.start();
+    jest.mocked(core.renderEngine.render).mockClear();
+    emitScroll(core);
+    emitScroll(core);
 
     expect(platform.requestAnimationFrame).toHaveBeenCalledTimes(1);
     expect(render).not.toHaveBeenCalled();
@@ -384,7 +391,8 @@ describe('SearCoreSheet coverage', () => {
     );
     (core.renderEngine.scrollManager.hasUnrenderedScroll as jest.Mock).mockReturnValue(false);
 
-    (core as unknown as { renderScrollFrame(): void }).renderScrollFrame();
+    core.start();
+    emitScroll(core);
 
     expect(core.renderEngine.invalidateScreenCache).toHaveBeenCalledTimes(1);
     expect(core.renderEngine.render).toHaveBeenCalledWith(core.getStage());
@@ -406,9 +414,10 @@ describe('SearCoreSheet coverage', () => {
       void 0,
       platform,
     );
-    const scrollCore = core as unknown as { handleScrollReRender(state: unknown): void };
+    core.start();
+    jest.mocked(core.renderEngine.render).mockClear();
 
-    scrollCore.handleScrollReRender({});
+    emitScroll(core);
     core.destroy();
     frameCallbacks[0](0);
 
@@ -458,7 +467,7 @@ describe('SearCoreSheet coverage', () => {
     } as never;
     core.renderEngine.scrollManager.getShape = jest.fn(() => [800, 600]);
 
-    (core as unknown as { expandTreeBoundaryToSheetSize(): void }).expandTreeBoundaryToSheetSize();
+    core.initialize();
 
     expect(core.renderEngine.scrollManager.setContentBoundary).toHaveBeenCalledWith(
       1_638_400 - (800 - 50),
@@ -578,8 +587,6 @@ describe('SearCoreSheet coverage', () => {
     pipelineMissing.addCustom('missingStep', 'missingKind', {});
     expect(() => core.executePipeline(pipelineMissing)).toThrow();
 
-    // 8. Line 396: expandTreeBoundaryToSheetSize with no state
-    (core as any).expandTreeBoundaryToSheetSize(); // should return early
   });
 
   it('covers uncovered branch fallbacks and no-op guards', () => {
@@ -721,11 +728,12 @@ describe('SearCoreSheet coverage', () => {
     expect(stage.addPluginNode).toHaveBeenCalledWith(pluginKeyA.key, []);
 
     // handleScrollReRender should skip plugins without render and support fallback for undefined render output.
-    (core as any).handleScrollReRender({});
+    emitScroll(core);
     expect(eventEngine.renderHitOnNextFrame).toHaveBeenCalled();
 
     // expandTreeBoundaryToSheetSize with missing tree should skip tree-update branch.
-    (core as any).expandTreeBoundaryToSheetSize();
+    const { refreshSheetBoundaries } = lifecycleCoordinator.start.mock.calls[0][0];
+    refreshSheetBoundaries();
 
     const tree = {
       getBoundary: jest.fn(() => ({ x: 0, y: 0, width: 20, height: 20 })),
@@ -734,7 +742,7 @@ describe('SearCoreSheet coverage', () => {
     (stage as any).positionRectStorage = tree;
     (dataEngine.getDataType as jest.Mock).mockImplementation(createSheetViewDataTypeReader(state));
     (dataEngine.readDataViewField as jest.Mock).mockImplementation(createSheetDataFieldReader(state));
-    (core as any).expandTreeBoundaryToSheetSize();
+    refreshSheetBoundaries();
     expect(tree.updateBoundary).toHaveBeenCalled();
 
     const stopSpy = renderEngine.scrollManager.subscribeScroll.mock.results[0].value;
@@ -743,7 +751,7 @@ describe('SearCoreSheet coverage', () => {
 
     // registerBuiltInPipelineStepExecutor should not register duplicate kinds.
     const duplicate = { kind: PipelineStepKind.Transaction, execute: jest.fn() };
-    (core as any).registerBuiltInPipelineStepExecutor(duplicate);
+    core.start();
     const duplicateRegisters = stepExecutorRegistry.register.mock.calls.filter(
       (args: any[]) => args[0].kind === duplicate.kind,
     );
@@ -844,42 +852,19 @@ describe('SearCoreSheet coverage', () => {
     postRenderPipeline.addPostRender('branch-post-render', pluginKey);
     core.executePipeline(postRenderPipeline);
 
-    // handleScrollReRender fallback: plugin.render(this) || []
-    (core as any).handleScrollReRender({});
-
-    // A real start owns the scroll subscription released by destroy.
     const stop = jest.fn();
     renderEngine.scrollManager.subscribeScroll.mockReturnValue(stop);
+    const initialDataConsumer = { onInitialDataCell: jest.fn(), onInitialDataComplete: jest.fn() };
+    pluginManager.getAllPlugins.mockReturnValueOnce([initialDataConsumer]);
+    dataEngine.readDataViewField.mockReturnValueOnce(null);
     core.start();
+    expect(initialDataConsumer.onInitialDataCell).not.toHaveBeenCalled();
+    emitScroll(core);
+    const localKey = new PluginKey('private-state');
+    core.registerPlugin({ registerState: () => ({ key: localKey, state: {}, dataEngine: { enabled: false } }) } as never);
+    expect(dataEngine.registerDataType.mock.calls.some(([key]: [PluginKey]) => key === localKey)).toBe(false);
     core.destroy();
     expect(stop).toHaveBeenCalledTimes(1);
-
-    // expandTreeBoundaryToSheetSize: state exists but tree is absent (if false branch)
-    (core as any).expandTreeBoundaryToSheetSize();
-
-    // expandTreeBoundaryToSheetSize: DataEngine without data-view field capability.
-    const originalDataEngine = (core as any).dataEngine;
-    (core as any).dataEngine = { getDataType: jest.fn() };
-    (core as any).expandTreeBoundaryToSheetSize();
-    (core as any).dataEngine = originalDataEngine;
-
-    // processInitialData: consumer exists but sheet data field is unavailable.
-    const initialDataConsumer = { onInitialDataCell: jest.fn(), onInitialDataComplete: jest.fn() };
-    dataEngine.readDataViewField.mockReturnValueOnce(null);
-    (core as any).processInitialData([initialDataConsumer]);
-    expect(initialDataConsumer.onInitialDataCell).not.toHaveBeenCalled();
-
-    // handlePlugin: private state can opt out of DataEngine registration.
-    (core as any).handlePlugin([
-      {
-        registerState: () => ({
-          key: new PluginKey('private-state'),
-          state: {},
-          dataEngine: { enabled: false },
-        }),
-      },
-    ]);
-    expect(dataEngine.registerDataType).not.toHaveBeenCalledWith(new PluginKey('private-state'), expect.anything());
 
     // executeTransactionStep: dirtyRect can mark a concrete dirty rectangle instead of re-rendering plugin nodes.
     (fallbackPlugin.dirtyRect as jest.Mock).mockReturnValueOnce(new PositionRect(1, 2, 3, 4));
@@ -1385,14 +1370,26 @@ describe('SearCoreSheet coverage', () => {
 
   it('staged cloning snapshots accessor objects and skips missing descriptors defensively', () => {
     const pluginKey = new PluginKey('accessor-staging');
+    const missingDescriptorProxy = new Proxy(
+      {},
+      {
+        ownKeys: () => ['ghost'],
+        getOwnPropertyDescriptor: () => void 0,
+      },
+    );
+
     const state = {
+      nested: missingDescriptorProxy,
       get value() {
         return 'before';
       },
     };
     const plugin = {
       key: pluginKey,
-      apply: jest.fn(() => state),
+      apply: jest.fn((staged: typeof state) => {
+        expect(staged.nested).toEqual({});
+        return staged;
+      }),
       render: jest.fn(() => []),
       setState: jest.fn(),
     };
@@ -1406,16 +1403,6 @@ describe('SearCoreSheet coverage', () => {
       },
     });
     const core = createCoreWithPlugins([plugin], dataEngine, executors);
-    const missingDescriptorProxy = new Proxy(
-      {},
-      {
-        ownKeys: () => ['ghost'],
-        getOwnPropertyDescriptor: () => void 0,
-      },
-    );
-
-    expect((core as any).cloneStagedState(missingDescriptorProxy)).toEqual({});
-
     const pipeline = new Pipeline('accessor-staging');
     pipeline.addTransaction('mutate', createTransaction(pluginKey));
     pipeline.addCustom('fail', 'failing-step');

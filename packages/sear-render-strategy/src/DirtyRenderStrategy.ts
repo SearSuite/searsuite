@@ -23,24 +23,6 @@ export class DirtyRenderStrategy<NodeTypeProperties extends NodeProperties> exte
   /** DI token for resolving DirtyRenderStrategy. */
   public static readonly symbol = Symbol.for('DirtyRenderStrategy');
 
-  /** @internal Compatibility shim for existing geometry-focused tests. */
-  private static dedupePoints(points: [number, number][]): [number, number][] {
-    return DirtyRegionCollector.dedupePoints(points);
-  }
-
-  /** @internal Compatibility shim for existing geometry-focused tests. */
-  private static removeCollinear(points: [number, number][]): [number, number][] {
-    return DirtyRegionCollector.removeCollinear(points);
-  }
-
-  /** @internal Compatibility shim for existing geometry-focused tests. */
-  private static traceUnionBoundary(
-    rectA: { x1: number; y1: number; x2: number; y2: number },
-    rectB: { x1: number; y1: number; x2: number; y2: number },
-  ): [number, number][] {
-    return DirtyRegionCollector.traceUnionBoundary(rectA, rectB);
-  }
-
   /**
    * Redraws all dirty regions for both render targets.
    *

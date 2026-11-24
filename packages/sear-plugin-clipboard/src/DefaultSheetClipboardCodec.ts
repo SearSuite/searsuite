@@ -16,10 +16,14 @@ import { decodeSheetClipboardText, encodeSheetClipboardText } from './SheetClipb
 /** Default codec that delegates cell serialization to the cell-type registry. */
 @Injectable()
 export class DefaultSheetClipboardCodec implements SheetClipboardCodec {
+  readonly #cellCodecs: CellClipboardCodecRegistry;
+
   public constructor(
     @Inject(CellClipboardCodecRegistry.symbol)
-    private readonly cellCodecs: CellClipboardCodecRegistry,
-  ) {}
+    cellCodecs: CellClipboardCodecRegistry,
+  ) {
+    this.#cellCodecs = cellCodecs;
+  }
 
   public encode(range: SheetRangeBounds, source: SheetClipboardDataSource, visibleRowsOnly = false): SheetClipboardPayload {
     const sourceRows: number[] = [];
@@ -42,9 +46,9 @@ export class DefaultSheetClipboardCodec implements SheetClipboardCodec {
       for (let column = range.start[1]; column <= range.end[1]; column++) {
         const cell = source.readCopyCell?.(row, column) ?? source.readCell(row, column);
         const valueCell = source.readCopyValueCell ? source.readCopyValueCell(row, column) : cell;
-        cells.push(cell ? this.cellCodecs.encode(cell) : null);
-        valueCells.push(valueCell ? this.cellCodecs.encode(valueCell) : null);
-        plainTextCells.push(valueCell ? this.cellCodecs.toPlainText(valueCell) : '');
+        cells.push(cell ? this.#cellCodecs.encode(cell) : null);
+        valueCells.push(valueCell ? this.#cellCodecs.encode(valueCell) : null);
+        plainTextCells.push(valueCell ? this.#cellCodecs.toPlainText(valueCell) : '');
         formatCells.push(source.readCellFormat(row, column));
       }
       rows.push(cells);
@@ -134,7 +138,7 @@ export class DefaultSheetClipboardCodec implements SheetClipboardCodec {
       return {
         rows: rows.map((row, rowIndex) =>
           row.map((cell: SheetClipboardRow[number]) =>
-            cell ? this.cellCodecs.decode(cell, {
+            cell ? this.#cellCodecs.decode(cell, {
               rowDelta: structured.isCut ? 0 : context.target[0] + rowIndex - (sourceRows?.[rowIndex] ?? source[0] + rowIndex),
               columnDelta,
             }) : null,
@@ -148,7 +152,7 @@ export class DefaultSheetClipboardCodec implements SheetClipboardCodec {
       };
     }
     const rows = decodeSheetClipboardText(payload.plainText).map((row) =>
-      row.map((text) => this.cellCodecs.decodePlainText(text)),
+      row.map((text) => this.#cellCodecs.decodePlainText(text)),
     );
     return { rows };
   }

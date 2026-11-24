@@ -78,25 +78,30 @@ export class SheetClipboardPlugin
   extends Plugin<unknown, CellProperties, Record<string, never>>
   implements PluginExtension<SheetCommandBus>
 {
+  readonly #source: SheetClipboardDataSource;
+  readonly #codec: SheetClipboardCodec;
+
   public static readonly symbol = Symbol.for('SheetClipboardPlugin');
   public static readonly pluginKey = pluginKey;
 
   public constructor(
     @Inject(SheetClipboardDataSourceSymbol)
-    private readonly source: SheetClipboardDataSource,
+    source: SheetClipboardDataSource,
     @Inject(SheetClipboardCodecSymbol)
-    private readonly codec: SheetClipboardCodec,
+    codec: SheetClipboardCodec,
   ) {
     super({ key: pluginKey, state: {} });
+    this.#source = source;
+    this.#codec = codec;
   }
 
   /** Registers the three semantic clipboard commands on this editor's bus. */
   public registerCommands(commands: SheetCommandBus): void {
-    commands.register(CopyRangeCommand, (input) => new CopyRangeSheetCommand(this.source, this.codec, input));
-    commands.register(CutRangeCommand, (input) => new CutRangeSheetCommand(this.source, this.codec, input));
+    commands.register(CopyRangeCommand, (input) => new CopyRangeSheetCommand(this.#source, this.#codec, input));
+    commands.register(CutRangeCommand, (input) => new CutRangeSheetCommand(this.#source, this.#codec, input));
     commands.register(CancelCutRangeCommand, () =>
-      new LocalActionCommand(CancelCutRangeCommand.id, () => this.source.cutSession?.cancel()));
-    commands.register(PasteRangeCommand, (input) => new PasteRangeSheetCommand(this.source, this.codec, input));
+      new LocalActionCommand(CancelCutRangeCommand.id, () => this.#source.cutSession?.cancel()));
+    commands.register(PasteRangeCommand, (input) => new PasteRangeSheetCommand(this.#source, this.#codec, input));
   }
 
   public registerState() {

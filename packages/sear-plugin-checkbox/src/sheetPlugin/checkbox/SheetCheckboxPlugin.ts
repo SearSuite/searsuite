@@ -23,6 +23,8 @@ import { type SheetCheckboxOptions, type CheckboxCellWrite } from '../../SheetCh
 /** Stateless feature; persistent values, history and collaboration belong to the ordinary cell owner. */
 @Injectable()
 export class SheetCheckboxPlugin extends Plugin<unknown, CellProperties, null> {
+  readonly #options: SheetCheckboxOptions;
+
   /** Editor-local DI token. */ public static readonly symbol = Symbol.for('SheetCheckboxPlugin');
   /** Intercepts glyph hits before selection and text editing. */ public override readonly depth = -25;
   /** Stateless input features need no duplicate-depth warning. */ public override readonly warnOnDuplicateDepth =
@@ -30,9 +32,10 @@ export class SheetCheckboxPlugin extends Plugin<unknown, CellProperties, null> {
   #commands: SheetCommandBus | null = null;
   readonly #disposers: (() => void)[] = [];
   /** Installs all type capabilities atomically into the owning editor's registries. */ public constructor(
-    private readonly options: SheetCheckboxOptions,
+    options: SheetCheckboxOptions,
   ) {
     super({ key: new PluginKey('SheetCheckboxPlugin'), state: null });
+    this.#options = options;
     try {
       if (options.cursor)
         this.#disposers.push(
@@ -76,36 +79,36 @@ export class SheetCheckboxPlugin extends Plugin<unknown, CellProperties, null> {
       throw new SearError('Sheet checkbox commands are already bound to an editor.');
     }
     this.#commands = commands;
-    const range = (input: SheetRangeInput) => normalizeCheckboxRange(input, this.options.readShape()),
+    const range = (input: SheetRangeInput) => normalizeCheckboxRange(input, this.#options.readShape()),
       pipeline = (id: string, writes: readonly CheckboxCellWrite[]) => {
         const p = new Pipeline(id);
-        if (writes.length) p.addTransaction('checkbox.cells', this.options.createTransaction(writes));
+        if (writes.length) p.addTransaction('checkbox.cells', this.#options.createTransaction(writes));
         return { id, execute: () => ({ pipeline: p }) };
       };
     commands.register(InsertCheckboxesCommand, (input) =>
-      pipeline(InsertCheckboxesCommand.id, planInsertCheckboxes(input, range(input), this.options)),
+      pipeline(InsertCheckboxesCommand.id, planInsertCheckboxes(input, range(input), this.#options)),
     );
     commands.register(SetCheckboxesCommand, (input) =>
-      pipeline(SetCheckboxesCommand.id, planCheckboxChanges(range(input), this.options, input.checked)),
+      pipeline(SetCheckboxesCommand.id, planCheckboxChanges(range(input), this.#options, input.checked)),
     );
     commands.register(ToggleCheckboxesCommand, (input) => {
       const r = range(input),
-        state = readCheckboxRange(r, this.options);
+        state = readCheckboxRange(r, this.#options);
       return pipeline(
         ToggleCheckboxesCommand.id,
-        planCheckboxChanges(r, this.options, state.count === 0 ? true : state.checked !== state.count),
+        planCheckboxChanges(r, this.#options, state.count === 0 ? true : state.checked !== state.count),
       );
     });
     commands.register(RemoveCheckboxesCommand, (input) =>
       pipeline(
         RemoveCheckboxesCommand.id,
-        planCheckboxChanges(range(input), this.options, null, input.mode ?? CheckboxRemovalMode.Text),
+        planCheckboxChanges(range(input), this.#options, null, input.mode ?? CheckboxRemovalMode.Text),
       ),
     );
   }
   /** Publishes sparse range-state reads. */ public registerQueries(queries: SheetQueryRegistry): void {
     queries.register(ReadCheckboxRangeQuery, (input) =>
-      readCheckboxRange(normalizeCheckboxRange(input, this.options.readShape()), this.options),
+      readCheckboxRange(normalizeCheckboxRange(input, this.#options.readShape()), this.#options),
     );
   }
   /** Changes a glyph through typed selection and toggle commands, never through direct matrix mutation. */ public onMouseDown(
@@ -118,7 +121,7 @@ export class SheetCheckboxPlugin extends Plugin<unknown, CellProperties, null> {
       column = props.startColIndex;
     if (row === undefined || column === undefined || !this.#commands) return false;
     event.origin.preventDefault();
-    if (this.options.beforeToggle && !this.options.beforeToggle()) return false;
+    if (this.#options.beforeToggle && !this.#options.beforeToggle()) return false;
     if (this.#commands.has(SelectRangeCommand))
       this.#commands.run(SelectRangeCommand, { anchor: [row, column], focus: [row, column] });
     this.#commands.run(ToggleCheckboxesCommand, { anchor: [row, column], focus: [row, column] });

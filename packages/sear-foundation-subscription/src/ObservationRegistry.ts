@@ -23,6 +23,8 @@ type ObservationListenerScope = <Value>(callback: () => Value) => Value;
 /** Editor-local typed observation registry exposed to plugins and third-party hosts. */
 @Injectable()
 export class ObservationRegistry {
+  readonly #platform: Platform | undefined;
+
   /** DI token for resolving the registry owned by one editor instance. */
   public static readonly symbol = Symbol.for('ObservationRegistry');
 
@@ -33,7 +35,9 @@ export class ObservationRegistry {
   #detachValue: (value: unknown, definition: ObservationDefinition<unknown>) => unknown = (value) => value;
 
   /** Creates a registry that reports isolated host listener failures through the platform. */
-  public constructor(@Inject(Platform.symbol) private readonly platform?: Platform) {}
+  public constructor(@Inject(Platform.symbol) platform?: Platform) {
+    this.#platform = platform;
+  }
 
   /** Requires editor command dispatch for source registration changes after assembly. */
   public enforceWriteBoundary(
@@ -56,9 +60,9 @@ export class ObservationRegistry {
     source: StateObservationSource<Value>,
   ): () => void;
   public register<Value>(definition: ObservationDefinition<Value>, source: ObservationSource<Value>): () => void {
-    this.assertLive();
+    this.#assertLive();
     this.#assertWrite?.();
-    this.assertDefinition(definition);
+    this.#assertDefinition(definition);
     const registeredDefinition = Object.freeze({ id: definition.id, kind: definition.kind });
     if (registeredDefinition.kind === ObservationKind.State && !hasSnapshot(source)) {
       throw new ObservationError(
@@ -87,21 +91,21 @@ export class ObservationRegistry {
     return function unregisterObservation(): void {
       registry.#assertWrite?.();
       if (registry.#registrations.get(registeredDefinition.id) !== registration) return;
-      registry.disposeRegistration(registration);
+      registry.#disposeRegistration(registration);
       registry.#registrations.delete(registeredDefinition.id);
     };
   }
 
   /** Subscribes to a typed observation and returns an idempotent disposer. */
   public subscribe<Value>(definition: ObservationDefinition<Value>, listener: (value: Value) => void): () => void {
-    const registration = this.resolveRegistration(definition);
+    const registration = this.#resolveRegistration(definition);
     const registeredDefinition = registration.definition;
     const safeListener = (value: Value): void => {
       this.#runListener(() => {
         try {
           listener(this.#detachValue(value, registeredDefinition) as Value);
         } catch (error) {
-          this.platform?.warn?.(`Observation "${registeredDefinition.id}" listener failed.`, error);
+          this.#platform?.warn?.(`Observation "${registeredDefinition.id}" listener failed.`, error);
         }
       });
     };
@@ -139,7 +143,7 @@ export class ObservationRegistry {
 
   /** Returns the current snapshot for a state observation without subscribing. */
   public getSnapshot<Value>(definition: StateObservationDefinition<Value>): Value {
-    const registration = this.resolveRegistration(definition);
+    const registration = this.#resolveRegistration(definition);
     if (!hasSnapshot(registration.source)) {
       throw new ObservationError(
         ObservationErrorCode.SnapshotUnavailable,
@@ -152,13 +156,13 @@ export class ObservationRegistry {
 
   /** Returns whether an observation id is registered in this editor instance. */
   public has(definition: ObservationDefinition<unknown> | string): boolean {
-    this.assertLive();
+    this.#assertLive();
     return this.#registrations.has(typeof definition === 'string' ? definition : definition.id);
   }
 
   /** Returns a stable snapshot of registered observation definitions sorted by id. */
   public getRegisteredObservations(): readonly ObservationDefinition<unknown>[] {
-    this.assertLive();
+    this.#assertLive();
     return [...this.#registrations.values()]
       .map(({ identity }) => identity)
       .sort((left, right) => left.id.localeCompare(right.id));
@@ -169,12 +173,12 @@ export class ObservationRegistry {
     if (this.#destroyed) return;
     this.#assertWrite?.();
     this.#destroyed = true;
-    this.#registrations.forEach((registration) => this.disposeRegistration(registration));
+    this.#registrations.forEach((registration) => this.#disposeRegistration(registration));
     this.#registrations.clear();
   }
 
-  private resolveRegistration<Value>(definition: ObservationDefinition<Value>): ObservationRegistration {
-    this.assertLive();
+  #resolveRegistration<Value>(definition: ObservationDefinition<Value>): ObservationRegistration {
+    this.#assertLive();
     const registration = this.#registrations.get(definition.id);
     if (!registration) {
       throw new ObservationError(
@@ -193,12 +197,12 @@ export class ObservationRegistry {
     return registration;
   }
 
-  private assertLive(): void {
+  #assertLive(): void {
     if (!this.#destroyed) return;
     throw new ObservationError(ObservationErrorCode.RegistryDestroyed, 'ObservationRegistry has been destroyed.');
   }
 
-  private assertDefinition(definition: ObservationDefinition<unknown>): void {
+  #assertDefinition(definition: ObservationDefinition<unknown>): void {
     if (definition.id.trim().length > 0) return;
     throw new ObservationError(
       ObservationErrorCode.InvalidDefinition,
@@ -207,7 +211,7 @@ export class ObservationRegistry {
     );
   }
 
-  private disposeRegistration(registration: ObservationRegistration): void {
+  #disposeRegistration(registration: ObservationRegistration): void {
     [...registration.subscriptions].forEach((dispose) => dispose());
     registration.subscriptions.clear();
   }

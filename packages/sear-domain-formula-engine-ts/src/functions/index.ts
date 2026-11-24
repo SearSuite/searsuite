@@ -302,7 +302,7 @@ export class FunctionRegistry implements IFunctionRegistry {
     const changedNames = [...new Set(batch.map(({ key }) => key))];
     const id = this.#nextRegistrationId++;
     this.#batches.set(id, { entries: batch, changedNames });
-    this.emitChanged(changedNames);
+    this.#emitChanged(changedNames);
     const registry = this;
     return function unregisterFormulaFunctions(): void {
       registry.unregisterRegistration(id);
@@ -330,7 +330,7 @@ export class FunctionRegistry implements IFunctionRegistry {
         if (remaining.length > 0) this.#functions.set(key, remaining);
         else this.#functions.delete(key);
     });
-    this.emitChanged(batch.changedNames);
+    this.#emitChanged(batch.changedNames);
   }
 
   /** Returns the value. */
@@ -354,7 +354,7 @@ export class FunctionRegistry implements IFunctionRegistry {
     return () => this.#listeners.delete(listener);
   }
 
-  private emitChanged(names: readonly string[]): void {
+  #emitChanged(names: readonly string[]): void {
     if (names.length === 0) return;
     this.#listeners.forEach((listener) => listener(names));
   }

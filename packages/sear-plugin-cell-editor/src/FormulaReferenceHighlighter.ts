@@ -38,23 +38,28 @@ type ReferenceBounds =
 /** Formula implementation of the editor's generic Highlighter contract. */
 @Injectable()
 export class FormulaReferenceHighlighter extends Highlighter {
+  readonly #parser: IFormulaParser;
+  readonly #configEngine: ConfigEngine;
+
   /** DI token for resolving FormulaReferenceHighlighter. */
   public static readonly symbol: symbol = Symbol.for('FormulaReferenceHighlighter');
 
   /** Creates a FormulaReferenceHighlighter instance. */
   constructor(
-    @Inject(IFormulaParser.symbol) private readonly parser: IFormulaParser,
-    @Inject(ConfigEngine.symbol) private readonly configEngine: ConfigEngine,
+    @Inject(IFormulaParser.symbol) parser: IFormulaParser,
+    @Inject(ConfigEngine.symbol) configEngine: ConfigEngine,
   ) {
     super();
+    this.#parser = parser;
+    this.#configEngine = configEngine;
   }
 
   /** @inheritdoc */
   public override highlight(formula: string, context?: HighlightContext): Highlighting {
     if (!formula.startsWith('=')) return { cellRanges: [], textAttributes: [] };
 
-    const references = this.readReferenceNodes(formula);
-    const candidates = this.findReferenceTokens(formula);
+    const references = this.#readReferenceNodes(formula);
+    const candidates = this.#findReferenceTokens(formula);
     const count = Math.min(references.length, candidates.length);
     const cellRanges: Highlighting['cellRanges'] = [];
     const textAttributes: Highlighting['textAttributes'] = [];
@@ -62,19 +67,19 @@ export class FormulaReferenceHighlighter extends Highlighter {
     for (let index = 0; index < count; index++) {
       const reference = references[index];
       const candidate = candidates[index];
-      const color = this.getColor(index);
+      const color = this.#getColor(index);
       const isCursorInside =
         context?.cursorOffset !== void 0 &&
         context.cursorOffset >= candidate.start &&
         context.cursorOffset <= candidate.end;
-      const config = this.getConfig();
+      const config = this.#getConfig();
       const fillOpacity = isCursorInside ? config.activeReferenceFillOpacity : config.referenceFillOpacity;
-      const bounds = this.getCurrentSheetBounds(reference);
+      const bounds = this.#getCurrentSheetBounds(reference);
       if (bounds) {
         cellRanges.push({
           ...bounds,
           color,
-          fill: this.toTransparentColor(color, fillOpacity),
+          fill: this.#toTransparentColor(color, fillOpacity),
         });
       }
       textAttributes.push({
@@ -89,18 +94,18 @@ export class FormulaReferenceHighlighter extends Highlighter {
   /** @inheritdoc */
   public override clear(): void {}
 
-  private readReferenceNodes(formula: string): FormulaReferenceNode[] {
+  #readReferenceNodes(formula: string): FormulaReferenceNode[] {
     try {
       const nodes: FormulaReferenceNode[] = [];
-      this.collectReferenceNodes(this.parser.parse(formula), nodes);
+      this.#collectReferenceNodes(this.#parser.parse(formula), nodes);
       return nodes;
     } catch {
       // Incomplete expressions (such as "=D4+") still use parser kinds
       // for every independently valid reference token.
-      return this.findReferenceTokens(formula).flatMap((token) => {
+      return this.#findReferenceTokens(formula).flatMap((token) => {
         try {
-          const ast = this.parser.parse(`=${token.text}`);
-          return this.isReferenceNode(ast) ? [ast] : [];
+          const ast = this.#parser.parse(`=${token.text}`);
+          return this.#isReferenceNode(ast) ? [ast] : [];
         } catch {
           return [];
         }
@@ -108,7 +113,7 @@ export class FormulaReferenceHighlighter extends Highlighter {
     }
   }
 
-  private collectReferenceNodes(node: FormulaAST, nodes: FormulaReferenceNode[]): void {
+  #collectReferenceNodes(node: FormulaAST, nodes: FormulaReferenceNode[]): void {
     switch (node.kind) {
       case FormulaNodeKind.Cell:
       case FormulaNodeKind.Range:
@@ -119,32 +124,32 @@ export class FormulaReferenceHighlighter extends Highlighter {
         nodes.push(node);
         return;
       case FormulaNodeKind.Call:
-        node.args.forEach((arg) => this.collectReferenceNodes(arg, nodes));
+        node.args.forEach((arg) => this.#collectReferenceNodes(arg, nodes));
         return;
       case FormulaNodeKind.Invoke:
-        this.collectReferenceNodes(node.callee, nodes);
-        node.args.forEach((arg) => this.collectReferenceNodes(arg, nodes));
+        this.#collectReferenceNodes(node.callee, nodes);
+        node.args.forEach((arg) => this.#collectReferenceNodes(arg, nodes));
         return;
       case FormulaNodeKind.Binary:
       case FormulaNodeKind.Intersection:
-        this.collectReferenceNodes(node.left, nodes);
-        this.collectReferenceNodes(node.right, nodes);
+        this.#collectReferenceNodes(node.left, nodes);
+        this.#collectReferenceNodes(node.right, nodes);
         return;
       case FormulaNodeKind.Unary:
-        this.collectReferenceNodes(node.operand, nodes);
+        this.#collectReferenceNodes(node.operand, nodes);
         return;
       case FormulaNodeKind.Tuple:
-        node.items.forEach((item) => this.collectReferenceNodes(item, nodes));
+        node.items.forEach((item) => this.#collectReferenceNodes(item, nodes));
     }
   }
 
-  private findReferenceTokens(formula: string): Array<{ text: string; start: number; end: number }> {
+  #findReferenceTokens(formula: string): Array<{ text: string; start: number; end: number }> {
     const tokens: Array<{ text: string; start: number; end: number }> = [];
     const reference =
       /'(?:[^']|'')+'!\$?[A-Za-z]{1,3}\$?\d+(?::\$?[A-Za-z]{1,3}\$?\d+)?|[A-Za-z_][A-Za-z0-9_$.]*!\$?[A-Za-z]{1,3}\$?\d+(?::\$?[A-Za-z]{1,3}\$?\d+)?|\$?[A-Za-z]{1,3}\$?\d+(?::\$?[A-Za-z]{1,3}\$?\d+)?|\$?[A-Za-z]{1,3}:\$?[A-Za-z]{1,3}|\$?\d+:\$?\d+/g;
     let match: RegExpExecArray | null;
     while ((match = reference.exec(formula)) !== null) {
-      if (!this.isInsideStringLiteral(formula, match.index)) {
+      if (!this.#isInsideStringLiteral(formula, match.index)) {
         tokens.push({
           text: match[0],
           start: match.index,
@@ -155,7 +160,7 @@ export class FormulaReferenceHighlighter extends Highlighter {
     return tokens;
   }
 
-  private isInsideStringLiteral(formula: string, index: number): boolean {
+  #isInsideStringLiteral(formula: string, index: number): boolean {
     let quoted = false;
     for (let cursor = 0; cursor < index; cursor++) {
       if (formula[cursor] !== '"') continue;
@@ -168,11 +173,11 @@ export class FormulaReferenceHighlighter extends Highlighter {
     return quoted;
   }
 
-  private getColor(referenceIndex: number): HexColor {
-    return getFormulaReferenceColor(referenceIndex, this.getConfig().referenceColors) as HexColor;
+  #getColor(referenceIndex: number): HexColor {
+    return getFormulaReferenceColor(referenceIndex, this.#getConfig().referenceColors) as HexColor;
   }
 
-  private getCurrentSheetBounds(reference: FormulaReferenceNode): ReferenceBounds | null {
+  #getCurrentSheetBounds(reference: FormulaReferenceNode): ReferenceBounds | null {
     switch (reference.kind) {
       case FormulaNodeKind.Cell:
         return {
@@ -199,7 +204,7 @@ export class FormulaReferenceHighlighter extends Highlighter {
     }
   }
 
-  private isReferenceNode(node: FormulaAST): node is FormulaReferenceNode {
+  #isReferenceNode(node: FormulaAST): node is FormulaReferenceNode {
     return (
       node.kind === FormulaNodeKind.Cell ||
       node.kind === FormulaNodeKind.Range ||
@@ -210,15 +215,15 @@ export class FormulaReferenceHighlighter extends Highlighter {
     );
   }
 
-  private toTransparentColor(color: HexColor, opacity: number): string {
+  #toTransparentColor(color: HexColor, opacity: number): string {
     const red = Number.parseInt(color.slice(1, 3), 16);
     const green = Number.parseInt(color.slice(3, 5), 16);
     const blue = Number.parseInt(color.slice(5, 7), 16);
     return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
   }
 
-  private getConfig(): FormulaReferenceHighlightConfig {
-    const config = this.configEngine.getPluginConfig<FormulaReferenceHighlightConfig>(sheetFormulaPluginKey);
+  #getConfig(): FormulaReferenceHighlightConfig {
+    const config = this.#configEngine.getPluginConfig<FormulaReferenceHighlightConfig>(sheetFormulaPluginKey);
     return config ? (config as FormulaReferenceHighlightConfig) : formulaReferenceHighlightConfig;
   }
 }

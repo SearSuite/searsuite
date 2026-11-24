@@ -47,12 +47,14 @@ export class SheetI18nPlugin
   extends Plugin<SearCoreSheet, CellProperties, null>
   implements IFormulaLocaleProvider, ICellFormatLocaleProvider
 {
+  readonly #locales: SheetI18nLocaleRegistry;
+
   /** DI token for resolving SheetI18nPlugin. */
   public static readonly symbol = Symbol.for('SheetI18nPlugin');
   /** Stable plugin key for SheetI18nPlugin. */
   public static readonly pluginKey = pluginKey;
 
-  private readonly listeners = new Set<(state: SheetI18nState) => void>();
+  readonly #listeners = new Set<(state: SheetI18nState) => void>();
   #locale: SheetI18nLocale = SheetI18nBuiltInLocale.English;
   #commands: SheetCommandBus | null = null;
   #scheduler: RecalcScheduler | null = null;
@@ -78,11 +80,12 @@ export class SheetI18nPlugin
   /** Creates a SheetI18nPlugin instance. */
   public constructor(
     @Inject(SheetI18nLocaleRegistry.symbol)
-    private readonly locales: SheetI18nLocaleRegistry,
+    locales: SheetI18nLocaleRegistry,
   ) {
     super({ key: pluginKey, state: null });
+    this.#locales = locales;
     Object.defineProperty(this, 'locales', { writable: false, configurable: false });
-    registerBuiltInSheetI18nLocales(this.locales);
+    registerBuiltInSheetI18nLocales(this.#locales);
   }
 
   /** Registers language switching commands. */
@@ -104,14 +107,14 @@ export class SheetI18nPlugin
         );
       });
     });
-    registerSheetI18nLocaleCommands(commands, this.locales);
+    registerSheetI18nLocaleCommands(commands, this.#locales);
   }
 
   public sealRuntimeWrites(): void {
     if (!this.#commands) throw new SearError('Sheet i18n commands must be registered before sealing locales.');
     if (this.#runtimeWritesSealed) throw new SearError('Sheet i18n runtime writes are already sealed.');
     const commands = this.#commands;
-    SheetI18nLocaleRegistry.prototype.enforceCommandBoundary.call(this.locales, commands.isExecuting.bind(commands),
+    SheetI18nLocaleRegistry.prototype.enforceCommandBoundary.call(this.#locales, commands.isExecuting.bind(commands),
       (id) => commands.run(UnregisterSheetI18nLocaleCommand, id));
     this.#runtimeWritesSealed = true;
   }
@@ -119,8 +122,8 @@ export class SheetI18nPlugin
   /** Registers the current i18n state observation. */
   public registerObservations(observations: ObservationRegistry): void {
     observations.register(SheetI18nStateObservation, {
-      getSnapshot: this.getStateSnapshot.bind(this),
-      subscribe: (listener) => this.subscribe(listener),
+      getSnapshot: this.#getStateSnapshot.bind(this),
+      subscribe: (listener) => this.#subscribe(listener),
     });
   }
 
@@ -129,7 +132,7 @@ export class SheetI18nPlugin
     this.registerOwnedSessionState(registry, () => {
       registry.register(SheetI18nSessionStateDefinition, {
         restorePhase: SessionStateRestorePhase.BeforeInitialize,
-        capture: this.getStateSnapshot.bind(this),
+        capture: this.#getStateSnapshot.bind(this),
         restore: (state) => {
           SessionStateRegistry.prototype.assertRestorationOpen.call(registry);
           if (isSheetI18nLocale(state?.locale)) this.#locale = state.locale;
@@ -140,7 +143,7 @@ export class SheetI18nPlugin
 
   /** Publishes the i18n locale registry for third-party locale contributions. */
   public registerCapabilities(registry: RuntimeCapabilityRegistry): void {
-    registry.register(SheetI18nLocaleRegistryCapability, this.locales);
+    registry.register(SheetI18nLocaleRegistryCapability, this.#locales);
   }
 
   /** Discovers formula scheduling after the formula runtime has registered its services. */
@@ -152,17 +155,17 @@ export class SheetI18nPlugin
 
   /** IFormulaLocaleProvider implementation. */
   public getDateTimeLocale(): FormulaDateTimeLocale {
-    return (this.locales.get(this.#locale) ?? this.locales.require(SheetI18nBuiltInLocale.English)).dateTimeLocale;
+    return (this.#locales.get(this.#locale) ?? this.#locales.require(SheetI18nBuiltInLocale.English)).dateTimeLocale;
   }
 
   /** IFormulaLocaleProvider implementation. */
   public getTextLocale(): FormulaTextLocale {
-    return (this.locales.get(this.#locale) ?? this.locales.require(SheetI18nBuiltInLocale.English)).textLocale;
+    return (this.#locales.get(this.#locale) ?? this.#locales.require(SheetI18nBuiltInLocale.English)).textLocale;
   }
 
   /** ICellFormatLocaleProvider implementation. */
   public getCellFormatLocale(): CellFormatLocale {
-    return (this.locales.get(this.#locale) ?? this.locales.require(SheetI18nBuiltInLocale.English)).cellFormatLocale;
+    return (this.#locales.get(this.#locale) ?? this.#locales.require(SheetI18nBuiltInLocale.English)).cellFormatLocale;
   }
 
   /** Returns the active locale. */
@@ -181,10 +184,10 @@ export class SheetI18nPlugin
 
   #applyLocale(locale: SheetI18nLocale): void {
     if (!isSheetI18nLocale(locale)) throw new SearError(`Unsupported sheet i18n locale "${String(locale)}".`);
-    if (!this.locales.has(locale)) throw new SearError(`Sheet i18n locale "${locale}" is not registered.`);
+    if (!this.#locales.has(locale)) throw new SearError(`Sheet i18n locale "${locale}" is not registered.`);
     if (locale === this.#locale) return;
     this.#locale = locale;
-    this.publish();
+    this.#publish();
     this.#scheduler?.markDirty([...this.#scheduler.getFormulaKeys()]);
   }
 
@@ -219,17 +222,17 @@ export class SheetI18nPlugin
     return [];
   }
 
-  private subscribe(listener: (state: SheetI18nState) => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+  #subscribe(listener: (state: SheetI18nState) => void): () => void {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
   }
 
-  private publish(): void {
-    const snapshot = this.getStateSnapshot();
-    runOutsideCommandExecution(() => this.listeners.forEach((listener) => listener(snapshot)));
+  #publish(): void {
+    const snapshot = this.#getStateSnapshot();
+    runOutsideCommandExecution(() => this.#listeners.forEach((listener) => listener(snapshot)));
   }
 
-  private getStateSnapshot(): SheetI18nState {
+  #getStateSnapshot(): SheetI18nState {
     return { locale: this.#locale };
   }
 }

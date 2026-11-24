@@ -16,6 +16,11 @@ import { assertCellExtensionWrite, createDefaultCellFormatLocaleProvider, ICellF
 /** Coordinates cell projection and rendering for a Sheet frame. */
 @Injectable()
 export class SheetRenderCoordinatorManager {
+  readonly #formulaResultProvider: IFormulaResultProvider;
+  readonly #platform: Platform | undefined;
+  readonly #cellFormatLocaleProvider: ICellFormatLocaleProvider;
+  readonly #formulaRichResultProvider: IFormulaRichResultProvider | undefined;
+
   /** DI token for resolving SheetRenderCoordinatorManager. */
   public static readonly symbol: symbol = Symbol.for('SheetRenderCoordinatorManager');
   readonly #storedValueValidators = new Map<CellProperties['type'], (cell: CellProperties) => boolean>();
@@ -26,13 +31,18 @@ export class SheetRenderCoordinatorManager {
     @Inject(RendererRegistry.symbol)
     public readonly rendererRegistry: SheetRendererRegistry<CellProperties>,
     @Inject(IFormulaResultProvider.symbol)
-    private readonly formulaResultProvider: IFormulaResultProvider,
-    @Inject(Platform.symbol) private readonly platform: Platform | undefined = undefined,
+    formulaResultProvider: IFormulaResultProvider,
+    @Inject(Platform.symbol) platform: Platform | undefined = undefined,
     @Inject(ICellFormatLocaleProvider.symbol)
-    private readonly cellFormatLocaleProvider: ICellFormatLocaleProvider = createDefaultCellFormatLocaleProvider(),
+    cellFormatLocaleProvider: ICellFormatLocaleProvider = createDefaultCellFormatLocaleProvider(),
     @Inject(IFormulaRichResultProvider.symbol)
-    private readonly formulaRichResultProvider?: IFormulaRichResultProvider,
-  ) {}
+    formulaRichResultProvider?: IFormulaRichResultProvider,
+  ) {
+    this.#formulaResultProvider = formulaResultProvider;
+    this.#platform = platform;
+    this.#cellFormatLocaleProvider = cellFormatLocaleProvider;
+    this.#formulaRichResultProvider = formulaRichResultProvider;
+  }
 
   /** Registers the stored value validator. */
   registerStoredValueValidator(type: CellProperties['type'], validator: (cell: CellProperties) => boolean): () => void {
@@ -95,9 +105,9 @@ export class SheetRenderCoordinatorManager {
   /** Builds the explicit, read-only context shared by render and measurement paths. */
   createCellContext(row?: number, col?: number): CellContext {
     return {
-      formulaResultProvider: this.formulaResultProvider,
-      ...(this.formulaRichResultProvider && { formulaRichResultProvider: this.formulaRichResultProvider }),
-      cellFormatLocale: this.cellFormatLocaleProvider.getCellFormatLocale(),
+      formulaResultProvider: this.#formulaResultProvider,
+      ...(this.#formulaRichResultProvider && { formulaRichResultProvider: this.#formulaRichResultProvider }),
+      cellFormatLocale: this.#cellFormatLocaleProvider.getCellFormatLocale(),
       ...(row !== void 0 && { row }),
       ...(col !== void 0 && { col }),
     };
@@ -113,7 +123,7 @@ export class SheetRenderCoordinatorManager {
   ): Node<CellProperties> | Node<CellProperties>[] {
     const validator = this.#storedValueValidators.get(data.type);
     if (validator && !validator(data)) {
-      this.platform?.warn(
+      this.#platform?.warn(
         `[Cell] Invalid stored value for cell type "${String(data.type)}". Rendering an empty fallback.`,
       );
       return new FixBoxNode(positionRect, properties);

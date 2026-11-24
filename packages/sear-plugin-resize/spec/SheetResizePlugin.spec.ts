@@ -1,3 +1,4 @@
+import * as geometry from '../src/sheetResize/SheetResizeGeometry';
 import {
   HideSheetColumnsCommand,
   HideSheetRowsCommand,
@@ -124,6 +125,11 @@ interface ResizePluginInternals {
   } | null;
 }
 
+const readResizeSheetFields = geometry.readResizeSheetFields as unknown as ResizePluginInternals['readResizeSheetFields'];
+const getSelectedIndices = geometry.getSelectedIndices as unknown as ResizePluginInternals['getSelectedIndices'];
+const detectResizeHandle = geometry.detectResizeHandle as unknown as ResizePluginInternals['detectResizeHandle'];
+const detectHiddenMarkerClick = geometry.detectHiddenMarkerClick as unknown as ResizePluginInternals['detectHiddenMarkerClick'];
+
 class TestPointerCapture extends PointerCapture {
   public capture: PointerCaptureHandlers | null = null;
 
@@ -216,14 +222,13 @@ function createResizeDataEngine({
   };
 }
 
-function createPlugin(
-  measureLines = jest.fn(() => ({ width: 10, height: 8 })),
-  commands: SheetCommandBus | null = createResizeTestCommandBus(),
-  platform?: { warn: jest.Mock },
-  cursorRegistry?: CursorRegistry,
-  pointerCapture: PointerCapture = new HeadlessPointerCapture(),
-): SheetResizePlugin {
-  const coordinates = {
+let cursor = { apply: jest.fn(), override: jest.fn() };
+let displayText = { getDisplayText: jest.fn(() => 'cell') };
+let coordinates: ReturnType<typeof createCoordinates>;
+let commandBus: SheetCommandBus | null;
+
+function createCoordinates() {
+  return {
     screenToWorld: jest.fn((x: number, y: number) => ({
       x: x + 10,
       y: y + 20,
@@ -232,14 +237,25 @@ function createPlugin(
     getCurrentMouseWorld: jest.fn(() => ({ x: 30, y: 40 })),
     getCurrentMouseView: jest.fn(() => ({ x: 3, y: 4 })),
   };
-  const cursor = { apply: jest.fn(), override: jest.fn() };
+}
+
+function createPlugin(
+  measureLines = jest.fn(() => ({ width: 10, height: 8 })),
+  commands: SheetCommandBus | null = createResizeTestCommandBus(),
+  platform?: { warn: jest.Mock },
+  cursorRegistry?: CursorRegistry,
+  pointerCapture: PointerCapture = new HeadlessPointerCapture(),
+): SheetResizePlugin {
+  coordinates = createCoordinates();
+  cursor = { apply: jest.fn(), override: jest.fn() };
+  commandBus = commands;
   const textShaper = {
     shape: jest.fn(() => {
       const measured = measureLines();
       return { width: measured.width, height: measured.height };
     }),
   };
-  const displayText = { getDisplayText: jest.fn(() => 'cell') };
+  displayText = { getDisplayText: jest.fn(() => 'cell') };
 
   const plugin = new SheetResizePlugin(
     coordinates as never,
@@ -253,6 +269,24 @@ function createPlugin(
   );
   if (commands) plugin.registerCommands(commands);
   return plugin;
+}
+
+function finishDrag(plugin: object, core: object, handle: NonNullable<ReturnType<ResizePluginInternals['detectResizeHandle']>>, start: { x: number; y: number }, end: { x: number; y: number }): void {
+  commandBus!.run(BeginSheetResizeDragCommand, {
+    axis: handle.type, primaryIndex: handle.primaryIndex,
+    initialSizes: Array.from(handle.initialSizes, ([index, size]) => ({ index, size })), world: start,
+  });
+  (plugin as SheetResizePlugin).onMouseUp({ requestRender: jest.fn(), ...core } as never, { origin: { offsetX: end.x - 10, offsetY: end.y - 20 } } as never);
+}
+
+function doubleClickHandle(plugin: object, core: object, handle: NonNullable<ReturnType<ResizePluginInternals['detectResizeHandle']>>): void {
+  jest.spyOn(geometry, 'detectResizeHandle').mockReturnValue(handle);
+  (plugin as SheetResizePlugin).onDblClick(core as never, { origin: { offsetX: 0, offsetY: 0 } } as never);
+}
+
+function clickMarker(plugin: object, core: object, type: 'row' | 'col', index: number): void {
+  jest.spyOn(geometry, 'detectHiddenMarkerClick').mockReturnValue({ type, index });
+  (plugin as SheetResizePlugin).onMouseDown(core as never, { origin: { offsetX: 0, offsetY: 0 } } as never);
 }
 
 function setUnassembledDragState(plugin: Pick<ResizePluginInternals, 'beginResizeDrag' | 'updateResizeDrag'>, state: {
@@ -353,6 +387,7 @@ describe('SheetResizePlugin', () => {
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     currentCore = null;
     container.reset();
   });
@@ -596,7 +631,7 @@ describe('SheetResizePlugin', () => {
   });
 
   it('reads resize fields from registered data view fields', () => {
-    const plugin = createPlugin() as unknown as ResizePluginInternals;
+
     const sheetData = { shape: [2, 2] as [number, number], getItem: jest.fn(() => null) };
     const rowSizes = {
       shape: [1, 2] as [number, number],
@@ -626,12 +661,12 @@ describe('SheetResizePlugin', () => {
         }),
     };
 
-    const dataViewFields = plugin.readResizeSheetFields(dataViewCore);
+    const dataViewFields = readResizeSheetFields(dataViewCore);
     expect(dataViewFields?.cellAlignments.getItem(0, 0)).toBeNull();
   });
 
   it('returns null when required registered resize fields are unavailable', () => {
-    const plugin = createPlugin() as unknown as ResizePluginInternals;
+
     const partialDataViewCore = {
       getDataEngine: () => ({
         readDataViewField: (_viewKey: string, fieldKey: string) =>
@@ -639,12 +674,12 @@ describe('SheetResizePlugin', () => {
       }),
     };
 
-    expect(plugin.readResizeSheetFields(partialDataViewCore)).toBeNull();
-    expect(plugin.readResizeSheetFields({})).toBeNull();
+    expect(readResizeSheetFields(partialDataViewCore)).toBeNull();
+    expect(readResizeSheetFields({})).toBeNull();
   });
 
   it('reads resize fields from a direct dataEngine property when no getter is exposed', () => {
-    const plugin = createPlugin() as unknown as ResizePluginInternals;
+
     const sheetData = { shape: [1, 1] as [number, number], getItem: jest.fn(() => null) };
     const rowSizes = new RowShapeDimensionsCSRMatrix(void 0, [1, 1]);
     const columnSizes = new ColumnShapeDimensionsCSRMatrix(void 0, [1, 1]);
@@ -666,7 +701,7 @@ describe('SheetResizePlugin', () => {
       },
     };
 
-    expect(plugin.readResizeSheetFields(core)?.cellAlignments.getItem(0, 0)).toBe('right');
+    expect(readResizeSheetFields(core)?.cellAlignments.getItem(0, 0)).toBe('right');
   });
 
   it('registers resize drag commands on the standard command bus', () => {
@@ -798,29 +833,26 @@ describe('SheetResizePlugin', () => {
 
     expect(() => plugin.registerCommands(registeredCommands)).toThrow('already bound');
     Object.assign(plugin, { registeredCommandBus: registeredCommands, commandCore: {} });
-    const internals = plugin as unknown as {
-      runCommand(core: object, definition: typeof EndSheetResizeDragCommand, input: void): void;
-    };
-    expect(() => internals.runCommand({ requestRender: jest.fn() }, EndSheetResizeDragCommand, void 0)).not.toThrow();
+    expect(() => plugin.onMouseUp({ requestRender: jest.fn() } as never, { origin: { offsetX: 0, offsetY: 0 } } as never)).not.toThrow();
 
     expect(registeredCommands.has(EndSheetResizeDragCommand)).toBe(false);
     expect(injectedCommands.has(EndSheetResizeDragCommand)).toBe(true);
   });
 
   it('maps pointer coordinates from events and current coordinate state', () => {
-    const plugin = createPlugin() as unknown as ResizePluginInternals;
+    coordinates = createCoordinates();
 
-    expect(plugin.getResizePointer({ origin: { offsetX: 1, offsetY: 2 } })).toEqual({
+    expect(geometry.getResizePointer(coordinates as never, { origin: { offsetX: 1, offsetY: 2 } } as never)).toEqual({
       world: { x: 11, y: 22 },
       view: { x: 1, y: 2 },
     });
-    expect(plugin.getResizePointer()).toEqual({
+    expect(geometry.getResizePointer(coordinates as never)).toEqual({
       world: { x: 30, y: 40 },
       view: { x: 3, y: 4 },
     });
 
     expect(
-      plugin.getResizePointer({
+      geometry.getResizePointer(coordinates as never, {
         origin: { offsetX: 7, offsetY: 9 },
         target: { properties: { region: 'columnHeader' } },
       } as never),
@@ -832,7 +864,7 @@ describe('SheetResizePlugin', () => {
   });
 
   it('finds row and column resize handles using view coordinates for sticky header membership', () => {
-    const plugin = createPlugin() as unknown as ResizePluginInternals;
+
     const rowSizes = {
       getRightBoundaryColIndexByDimension: jest.fn((value: number) => Math.floor(value / 20)),
       getDimensionRightBoundaryByIndex: jest.fn((index: number) => (index + 1) * 20),
@@ -848,25 +880,25 @@ describe('SheetResizePlugin', () => {
     };
 
     expect(
-      plugin.detectResizeHandle(core, {
+      detectResizeHandle(core, {
         world: { x: 430, y: 164 },
         view: { x: 10, y: 60 },
       }),
     ).toEqual(expect.objectContaining({ type: 'row', primaryIndex: 6 }));
     expect(
-      plugin.detectResizeHandle(core, {
+      detectResizeHandle(core, {
         world: { x: 170, y: 460 },
         view: { x: 90, y: 10 },
       }),
     ).toEqual(expect.objectContaining({ type: 'col', primaryIndex: 3 }));
 
-    const rowCurrentBoundary = plugin.detectResizeHandle(core, {
+    const rowCurrentBoundary = detectResizeHandle(core, {
       world: { x: 0, y: 104 },
       view: { x: 10, y: 40 },
     });
     expect(rowCurrentBoundary).toEqual(expect.objectContaining({ type: 'row', primaryIndex: 3 }));
 
-    const colCurrentBoundary = plugin.detectResizeHandle(core, {
+    const colCurrentBoundary = detectResizeHandle(core, {
       world: { x: 170, y: 10 },
       view: { x: 90, y: 10 },
     });
@@ -874,10 +906,10 @@ describe('SheetResizePlugin', () => {
   });
 
   it('does not expose resize handles when sheet dimensions are unavailable', () => {
-    const plugin = createPlugin() as unknown as ResizePluginInternals;
+
     const core = { getDataEngine: () => ({ readDataViewField: () => null }) };
 
-    expect(plugin.detectResizeHandle(core, { world: { x: 0, y: 0 }, view: { x: 0, y: 0 } })).toBeNull();
+    expect(detectResizeHandle(core, { world: { x: 0, y: 0 }, view: { x: 0, y: 0 } })).toBeNull();
   });
 
   it('leaves normal cursor presentation to the registered position rules', () => {
@@ -887,8 +919,8 @@ describe('SheetResizePlugin', () => {
       detectResizeHandle: jest.Mock;
       cursorEngine: { apply: jest.Mock };
     };
-    plugin.detectHiddenMarkerClick = jest.fn(() => null) as never;
-    plugin.detectResizeHandle = jest.fn(() => ({ type: 'row' })) as never;
+    jest.spyOn(geometry, 'detectHiddenMarkerClick').mockReturnValue(null);
+    jest.spyOn(geometry, 'detectResizeHandle').mockImplementation(jest.fn(() => ({ type: 'row' })) as never);
 
     const core = {
       requestRender: jest.fn(),
@@ -897,7 +929,7 @@ describe('SheetResizePlugin', () => {
 
     plugin.onMouseMove(core, { origin: { offsetX: 10, offsetY: 10 } });
 
-    expect(plugin.cursorEngine.apply).not.toHaveBeenCalled();
+    expect(cursor.apply).not.toHaveBeenCalled();
   });
 
   it('registers coordinate rules for hidden markers and row/column resize boundaries', () => {
@@ -919,18 +951,18 @@ describe('SheetResizePlugin', () => {
       target: null,
     };
 
-    plugin.detectHiddenMarkerClick = jest.fn(() => ({ type: 'row', index: 0 })) as never;
-    plugin.detectResizeHandle = jest.fn(() => ({ type: 'row' })) as never;
+    jest.spyOn(geometry, 'detectHiddenMarkerClick').mockImplementation(jest.fn(() => ({ type: 'row', index: 0 })) as never);
+    jest.spyOn(geometry, 'detectResizeHandle').mockImplementation(jest.fn(() => ({ type: 'row' })) as never);
     expect(registry.resolve(null, position)).toBe(CursorToken.Pointer);
 
-    plugin.detectHiddenMarkerClick = jest.fn(() => null) as never;
-    plugin.detectResizeHandle = jest.fn(() => ({ type: 'row' })) as never;
+    jest.spyOn(geometry, 'detectHiddenMarkerClick').mockReturnValue(null);
+    jest.spyOn(geometry, 'detectResizeHandle').mockImplementation(jest.fn(() => ({ type: 'row' })) as never);
     expect(registry.resolve(null, position)).toBe(CursorToken.RowResize);
 
-    plugin.detectResizeHandle = jest.fn(() => ({ type: 'col' })) as never;
+    jest.spyOn(geometry, 'detectResizeHandle').mockImplementation(jest.fn(() => ({ type: 'col' })) as never);
     expect(registry.resolve(null, position)).toBe(CursorToken.ColumnResize);
 
-    plugin.detectResizeHandle = jest.fn(() => null) as never;
+    jest.spyOn(geometry, 'detectResizeHandle').mockReturnValue(null);
     expect(registry.resolve(null, { ...position, target: { type: 'cell', region: 'grid' } as never })).toBe(
       CursorToken.Default,
     );
@@ -943,8 +975,8 @@ describe('SheetResizePlugin', () => {
       detectResizeHandle: jest.Mock;
       cursorEngine: { apply: jest.Mock };
     };
-    plugin.detectHiddenMarkerClick = jest.fn(() => null) as never;
-    plugin.detectResizeHandle = jest.fn(() => null) as never;
+    jest.spyOn(geometry, 'detectHiddenMarkerClick').mockReturnValue(null);
+    jest.spyOn(geometry, 'detectResizeHandle').mockReturnValue(null);
 
     const core = {
       requestRender: jest.fn(),
@@ -952,7 +984,7 @@ describe('SheetResizePlugin', () => {
     };
 
     expect(plugin.onMouseMove(core, { origin: { offsetX: 10, offsetY: 10 } })).toBe(void 0);
-    expect(plugin.cursorEngine.apply).not.toHaveBeenCalled();
+    expect(cursor.apply).not.toHaveBeenCalled();
   });
 
   it('shows a pointer for a hidden row marker and restores the saved size when it is clicked', () => {
@@ -974,7 +1006,7 @@ describe('SheetResizePlugin', () => {
       getDataEngine: () => createResizeDataEngine(dataState),
     };
     currentCore = core;
-    plugin.dispatchResize(
+    finishDrag(plugin,
       core,
       { type: 'row', primaryIndex: 0, initialSizes: new Map([[0, 20]]) },
       { x: 0, y: 44 },
@@ -983,7 +1015,7 @@ describe('SheetResizePlugin', () => {
     const event = { origin: { offsetX: 1, offsetY: 24 } };
 
     expect(plugin.onMouseMove(core, event)).toBe(void 0);
-    expect((plugin as unknown as { cursorEngine: { apply: jest.Mock } }).cursorEngine.apply).not.toHaveBeenCalled();
+    expect(cursor.apply).not.toHaveBeenCalled();
     expect(plugin.onMouseDown(core, event)).toBe(false);
     expect(appliedTransactions).toHaveLength(2);
   });
@@ -1002,12 +1034,12 @@ describe('SheetResizePlugin', () => {
         currentWorld: { x: number; y: number } | null;
       };
     };
-    plugin.detectResizeHandle = jest.fn(() => ({
+    jest.spyOn(geometry, 'detectResizeHandle').mockImplementation(jest.fn(() => ({
       type: 'row',
       primaryIndex: 0,
       initialSizes: new Map([[0, 10]]),
-    })) as never;
-    plugin.getSelectedIndices = jest.fn(() => [0, 1]);
+    })) as never);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue([0, 1]);
     const appliedTransactions: Transaction[] = [];
     const requestRender = jest.fn();
     const markDirty = jest.fn();
@@ -1035,7 +1067,7 @@ describe('SheetResizePlugin', () => {
         [1, 10],
       ]),
     );
-    expect(plugin.cursorEngine.override).toHaveBeenCalledWith('row-resize');
+    expect(cursor.override).toHaveBeenCalledWith('row-resize');
 
     expect(plugin.onMouseMove(core, { origin: { offsetX: 3, offsetY: 8 } })).toBe(false);
     expect(plugin.getResizeState().currentWorld).toEqual({ x: 13, y: 28 });
@@ -1044,7 +1076,7 @@ describe('SheetResizePlugin', () => {
     plugin.onMouseUp(core, { origin: { offsetX: 4, offsetY: 10 } });
 
     expect(appliedTransactions).toHaveLength(1);
-    expect(plugin.cursorEngine.override).toHaveBeenLastCalledWith(null);
+    expect(cursor.override).toHaveBeenLastCalledWith(null);
     expect(markDirty).not.toHaveBeenCalled();
     expect(plugin.dirtyRect(core as never, appliedTransactions[0])).toEqual(
       expect.objectContaining({ x: 5, y: 7, width: 200, height: 100 }),
@@ -1062,13 +1094,13 @@ describe('SheetResizePlugin', () => {
         dragTarget: { primaryIndex: number; initialSizes: Map<number, number> } | null;
       };
     };
-    plugin.detectHiddenMarkerClick = jest.fn(() => null) as never;
-    plugin.detectResizeHandle = jest.fn(() => ({
+    jest.spyOn(geometry, 'detectHiddenMarkerClick').mockReturnValue(null);
+    jest.spyOn(geometry, 'detectResizeHandle').mockImplementation(jest.fn(() => ({
       type: 'row',
       primaryIndex: 3,
       initialSizes: new Map([[3, 12]]),
-    })) as never;
-    plugin.getSelectedIndices = jest.fn(() => null);
+    })) as never);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue(null);
 
     const appliedTransactions: Transaction[] = [];
     const core = {
@@ -1090,8 +1122,8 @@ describe('SheetResizePlugin', () => {
       onMouseDown(core: object, event: object): boolean | void;
       getResizeState(): { isDragging: boolean; dragTarget: unknown };
     };
-    plugin.detectHiddenMarkerClick = jest.fn(() => null) as never;
-    plugin.detectResizeHandle = jest.fn(() => null) as never;
+    jest.spyOn(geometry, 'detectHiddenMarkerClick').mockReturnValue(null);
+    jest.spyOn(geometry, 'detectResizeHandle').mockReturnValue(null);
 
     const appliedTransactions: Transaction[] = [];
     const core = {
@@ -1114,11 +1146,11 @@ describe('SheetResizePlugin', () => {
       onMouseDown(core: object, event: object): boolean | void;
       getResizeState(): { dragTarget: { initialSizes: Map<number, number> } | null };
     };
-    plugin.detectHiddenMarkerClick = jest.fn(() => null) as never;
-    plugin.detectResizeHandle = jest
+    jest.spyOn(geometry, 'detectHiddenMarkerClick').mockReturnValue(null);
+    jest.spyOn(geometry, 'detectResizeHandle').mockImplementation(jest
       .fn()
       .mockReturnValueOnce({ type: 'row', primaryIndex: 1, initialSizes: new Map([[1, 0]]) })
-      .mockReturnValueOnce({ type: 'col', primaryIndex: 2, initialSizes: new Map([[2, 0]]) }) as never;
+      .mockReturnValueOnce({ type: 'col', primaryIndex: 2, initialSizes: new Map([[2, 0]]) }) as never);
 
     const rowSizes = { getItem: jest.fn((_r: number, idx: number) => (idx === 1 ? 13 : 17)) };
     const columnSizes = { getItem: jest.fn((_r: number, idx: number) => (idx === 2 ? 22 : 0)) };
@@ -1130,7 +1162,7 @@ describe('SheetResizePlugin', () => {
       getDataEngine: () => createResizeDataEngine({ rowSizes, columnSizes }),
     };
 
-    plugin.getSelectedIndices = jest.fn(() => [1, 2]);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue([1, 2]);
     expect(plugin.onMouseDown(core, { origin: { offsetX: 1, offsetY: 1 } })).toBe(false);
     expect(plugin.getResizeState().dragTarget?.initialSizes).toEqual(
       new Map([
@@ -1139,7 +1171,7 @@ describe('SheetResizePlugin', () => {
       ]),
     );
 
-    plugin.getSelectedIndices = jest.fn(() => null);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue(null);
     expect(plugin.onMouseDown(core, { origin: { offsetX: 2, offsetY: 2 } })).toBe(false);
     expect(plugin.getResizeState().dragTarget?.initialSizes).toEqual(new Map([[2, 22]]));
   });
@@ -1152,11 +1184,11 @@ describe('SheetResizePlugin', () => {
       onMouseDown(core: object, event: object): boolean | void;
       getResizeState(): { dragTarget: { initialSizes: Map<number, number> } | null };
     };
-    plugin.detectHiddenMarkerClick = jest.fn(() => null) as never;
-    plugin.detectResizeHandle = jest
+    jest.spyOn(geometry, 'detectHiddenMarkerClick').mockReturnValue(null);
+    jest.spyOn(geometry, 'detectResizeHandle').mockImplementation(jest
       .fn()
       .mockReturnValueOnce({ type: 'col', primaryIndex: 1, initialSizes: new Map([[1, 0]]) })
-      .mockReturnValueOnce({ type: 'row', primaryIndex: 2, initialSizes: new Map([[2, 0]]) }) as never;
+      .mockReturnValueOnce({ type: 'row', primaryIndex: 2, initialSizes: new Map([[2, 0]]) }) as never);
 
     const appliedTransactions: Transaction[] = [];
     const core = {
@@ -1170,11 +1202,11 @@ describe('SheetResizePlugin', () => {
         }),
     };
 
-    plugin.getSelectedIndices = jest.fn(() => [1]);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue([1]);
     expect(plugin.onMouseDown(core, { origin: { offsetX: 1, offsetY: 1 } })).toBe(false);
     expect(plugin.getResizeState().dragTarget?.initialSizes).toEqual(new Map([[1, 26]]));
 
-    plugin.getSelectedIndices = jest.fn(() => null);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue(null);
     expect(plugin.onMouseDown(core, { origin: { offsetX: 2, offsetY: 2 } })).toBe(false);
     expect(plugin.getResizeState().dragTarget?.initialSizes).toEqual(new Map([[2, 31]]));
   });
@@ -1187,12 +1219,12 @@ describe('SheetResizePlugin', () => {
       onMouseDown(core: object, event: object): boolean | void;
       getResizeState(): { dragTarget: { initialSizes: Map<number, number> } | null };
     };
-    plugin.detectHiddenMarkerClick = jest.fn(() => null) as never;
-    plugin.detectResizeHandle = jest
+    jest.spyOn(geometry, 'detectHiddenMarkerClick').mockReturnValue(null);
+    jest.spyOn(geometry, 'detectResizeHandle').mockImplementation(jest
       .fn()
       .mockReturnValueOnce({ type: 'row', primaryIndex: 1, initialSizes: new Map([[1, 0]]) })
       .mockReturnValueOnce({ type: 'col', primaryIndex: 2, initialSizes: new Map([[2, 0]]) })
-      .mockReturnValueOnce({ type: 'col', primaryIndex: 4, initialSizes: new Map([[4, 0]]) }) as never;
+      .mockReturnValueOnce({ type: 'col', primaryIndex: 4, initialSizes: new Map([[4, 0]]) }) as never);
 
     const appliedTransactions: Transaction[] = [];
     const core = {
@@ -1202,21 +1234,21 @@ describe('SheetResizePlugin', () => {
       pluginManager: { getPluginState: jest.fn(() => void 0) },
     };
 
-    plugin.getSelectedIndices = jest.fn(() => [1]);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue([1]);
     expect(plugin.onMouseDown(core, { origin: { offsetX: 1, offsetY: 1 } })).toBe(false);
     expect(plugin.getResizeState().dragTarget?.initialSizes).toEqual(new Map([[1, 0]]));
 
-    plugin.getSelectedIndices = jest.fn(() => [2]);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue([2]);
     expect(plugin.onMouseDown(core, { origin: { offsetX: 2, offsetY: 2 } })).toBe(false);
     expect(plugin.getResizeState().dragTarget?.initialSizes).toEqual(new Map([[2, 0]]));
 
-    plugin.getSelectedIndices = jest.fn(() => null);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue(null);
     expect(plugin.onMouseDown(core, { origin: { offsetX: 3, offsetY: 3 } })).toBe(false);
     expect(plugin.getResizeState().dragTarget?.initialSizes).toEqual(new Map([[4, 0]]));
   });
 
   it('covers getSelectedIndices guard and success branches for row and column selections', () => {
-    const plugin = createPlugin() as unknown as ResizePluginInternals;
+
     const bounds = {
       getPoint: jest.fn((index: number) => {
         if (index === 0) return [1, 0];
@@ -1228,28 +1260,28 @@ describe('SheetResizePlugin', () => {
     const nullSelectionCore = {
       pluginManager: { getPluginState: jest.fn(() => null) },
     };
-    expect(plugin.getSelectedIndices(nullSelectionCore, 'row', 1)).toBeNull();
+    expect(getSelectedIndices(nullSelectionCore, 'row', 1)).toBeNull();
 
     const missingBoundsCore = {
       pluginManager: {
         getPluginState: jest.fn().mockReturnValueOnce([null, null]),
       },
     };
-    expect(plugin.getSelectedIndices(missingBoundsCore, 'row', 1)).toBeNull();
+    expect(getSelectedIndices(missingBoundsCore, 'row', 1)).toBeNull();
 
     const missingPointsCore = {
       pluginManager: {
         getPluginState: jest.fn().mockReturnValueOnce([bounds, { getPoint: () => null }]),
       },
     };
-    expect(plugin.getSelectedIndices(missingPointsCore, 'row', 1)).toBeNull();
+    expect(getSelectedIndices(missingPointsCore, 'row', 1)).toBeNull();
 
     const missingDataCore = {
       pluginManager: {
         getPluginState: jest.fn().mockReturnValueOnce([bounds, bounds]).mockReturnValueOnce(null),
       },
     };
-    expect(plugin.getSelectedIndices(missingDataCore, 'row', 1)).toBeNull();
+    expect(getSelectedIndices(missingDataCore, 'row', 1)).toBeNull();
 
     const rowState = {
       rowSizes: { shape: [1, 6] },
@@ -1261,7 +1293,7 @@ describe('SheetResizePlugin', () => {
         getPluginState: jest.fn().mockReturnValueOnce([bounds, bounds]),
       },
     };
-    expect(plugin.getSelectedIndices(rowCore, 'row', 0)).toBeNull();
+    expect(getSelectedIndices(rowCore, 'row', 0)).toBeNull();
 
     const rowCoreOutOfRange = {
       getDataEngine: () => createResizeDataEngine(rowState),
@@ -1269,7 +1301,7 @@ describe('SheetResizePlugin', () => {
         getPluginState: jest.fn().mockReturnValueOnce([bounds, bounds]),
       },
     };
-    expect(plugin.getSelectedIndices(rowCoreOutOfRange, 'row', 4)).toBeNull();
+    expect(getSelectedIndices(rowCoreOutOfRange, 'row', 4)).toBeNull();
 
     const rowCoreSelected = {
       getDataEngine: () => createResizeDataEngine(rowState),
@@ -1277,7 +1309,7 @@ describe('SheetResizePlugin', () => {
         getPluginState: jest.fn().mockReturnValueOnce([bounds, bounds]),
       },
     };
-    expect(plugin.getSelectedIndices(rowCoreSelected, 'row', 2)).toEqual([1, 2, 3]);
+    expect(getSelectedIndices(rowCoreSelected, 'row', 2)).toEqual([1, 2, 3]);
 
     const rowNotFullWidthBounds = {
       getPoint: jest.fn((index: number) => (index === 0 ? [1, 1] : [3, 3])),
@@ -1288,7 +1320,7 @@ describe('SheetResizePlugin', () => {
         getPluginState: jest.fn().mockReturnValueOnce([rowNotFullWidthBounds, rowNotFullWidthBounds]),
       },
     };
-    expect(plugin.getSelectedIndices(rowNotFullWidthCore, 'row', 2)).toBeNull();
+    expect(getSelectedIndices(rowNotFullWidthCore, 'row', 2)).toBeNull();
 
     const columnBounds = {
       getPoint: jest.fn((index: number) => (index === 0 ? [0, 2] : [5, 4])),
@@ -1303,7 +1335,7 @@ describe('SheetResizePlugin', () => {
         getPluginState: jest.fn().mockReturnValueOnce([columnBounds, columnBounds]),
       },
     };
-    expect(plugin.getSelectedIndices(columnCore, 'col', 1)).toBeNull();
+    expect(getSelectedIndices(columnCore, 'col', 1)).toBeNull();
 
     const columnCoreOutOfRange = {
       getDataEngine: () => createResizeDataEngine(colState),
@@ -1311,7 +1343,7 @@ describe('SheetResizePlugin', () => {
         getPluginState: jest.fn().mockReturnValueOnce([columnBounds, columnBounds]),
       },
     };
-    expect(plugin.getSelectedIndices(columnCoreOutOfRange, 'col', 5)).toBeNull();
+    expect(getSelectedIndices(columnCoreOutOfRange, 'col', 5)).toBeNull();
 
     const columnCoreSelected = {
       getDataEngine: () => createResizeDataEngine(colState),
@@ -1319,7 +1351,7 @@ describe('SheetResizePlugin', () => {
         getPluginState: jest.fn().mockReturnValueOnce([columnBounds, columnBounds]),
       },
     };
-    expect(plugin.getSelectedIndices(columnCoreSelected, 'col', 3)).toEqual([2, 3, 4]);
+    expect(getSelectedIndices(columnCoreSelected, 'col', 3)).toEqual([2, 3, 4]);
 
     const colNotFullHeightBounds = {
       getPoint: jest.fn((index: number) => (index === 0 ? [1, 2] : [4, 4])),
@@ -1330,11 +1362,11 @@ describe('SheetResizePlugin', () => {
         getPluginState: jest.fn().mockReturnValueOnce([colNotFullHeightBounds, colNotFullHeightBounds]),
       },
     };
-    expect(plugin.getSelectedIndices(colNotFullHeightCore, 'col', 3)).toBeNull();
+    expect(getSelectedIndices(colNotFullHeightCore, 'col', 3)).toBeNull();
   });
 
   it('resolves previous row/column boundaries and swallows dimension lookup errors', () => {
-    const plugin = createPlugin() as unknown as ResizePluginInternals;
+
     const rowSizes = {
       getRightBoundaryColIndexByDimension: jest.fn(() => 2),
       getDimensionRightBoundaryByIndex: jest.fn((index: number) => (index === 2 ? 200 : 40)),
@@ -1351,26 +1383,26 @@ describe('SheetResizePlugin', () => {
     };
 
     expect(
-      plugin.detectResizeHandle(core, {
+      detectResizeHandle(core, {
         world: { x: 300, y: 68 },
         view: { x: 10, y: 40 },
       }),
     ).toEqual(expect.objectContaining({ type: 'row', primaryIndex: 1 }));
 
-    const rowCurrent = plugin.detectResizeHandle(core, {
+    const rowCurrent = detectResizeHandle(core, {
       world: { x: 0, y: 224 },
       view: { x: 10, y: 40 },
     });
     expect(rowCurrent).toEqual(expect.objectContaining({ type: 'row', primaryIndex: 2 }));
 
     expect(
-      plugin.detectResizeHandle(core, {
+      detectResizeHandle(core, {
         world: { x: 118, y: 10 },
         view: { x: 90, y: 10 },
       }),
     ).toEqual(expect.objectContaining({ type: 'col', primaryIndex: 1 }));
 
-    const colCurrent = plugin.detectResizeHandle(core, {
+    const colCurrent = detectResizeHandle(core, {
       world: { x: 350, y: 10 },
       view: { x: 90, y: 10 },
     });
@@ -1394,7 +1426,7 @@ describe('SheetResizePlugin', () => {
     };
 
     expect(
-      plugin.detectResizeHandle(throwingCore, {
+      detectResizeHandle(throwingCore, {
         world: { x: 10, y: 40 },
         view: { x: 10, y: 40 },
       }),
@@ -1402,7 +1434,7 @@ describe('SheetResizePlugin', () => {
   });
 
   it('keeps searching when previous boundary probes do not hit resize handles', () => {
-    const plugin = createPlugin() as unknown as ResizePluginInternals;
+
     const core = {
       pluginManager: {
         getPluginState: jest.fn(() => ({
@@ -1421,13 +1453,13 @@ describe('SheetResizePlugin', () => {
     };
 
     expect(
-      plugin.detectResizeHandle(core, {
+      detectResizeHandle(core, {
         world: { x: 0, y: 180 },
         view: { x: 10, y: 40 },
       }),
     ).toBeNull();
     expect(
-      plugin.detectResizeHandle(core, {
+      detectResizeHandle(core, {
         world: { x: 310, y: 10 },
         view: { x: 90, y: 10 },
       }),
@@ -1435,7 +1467,7 @@ describe('SheetResizePlugin', () => {
   });
 
   it('skips previous-boundary probing when resolved row/column index is zero', () => {
-    const plugin = createPlugin() as unknown as ResizePluginInternals;
+
     const core = {
       pluginManager: {
         getPluginState: jest.fn(() => ({
@@ -1454,13 +1486,13 @@ describe('SheetResizePlugin', () => {
     };
 
     expect(
-      plugin.detectResizeHandle(core, {
+      detectResizeHandle(core, {
         world: { x: 0, y: 130 },
         view: { x: 10, y: 40 },
       }),
     ).toBeNull();
     expect(
-      plugin.detectResizeHandle(core, {
+      detectResizeHandle(core, {
         world: { x: 170, y: 10 },
         view: { x: 90, y: 10 },
       }),
@@ -1468,7 +1500,7 @@ describe('SheetResizePlugin', () => {
   });
 
   it('uses fallback size for previous boundary handles when stored size is missing', () => {
-    const plugin = createPlugin() as unknown as ResizePluginInternals;
+
     const core = {
       getDataEngine: () =>
         createResizeDataEngine({
@@ -1485,11 +1517,11 @@ describe('SheetResizePlugin', () => {
         }),
     };
 
-    const rowPrev = plugin.detectResizeHandle(core, {
+    const rowPrev = detectResizeHandle(core, {
       world: { x: 0, y: 68 },
       view: { x: 10, y: 40 },
     });
-    const colPrev = plugin.detectResizeHandle(core, {
+    const colPrev = detectResizeHandle(core, {
       world: { x: 118, y: 10 },
       view: { x: 90, y: 10 },
     });
@@ -1507,12 +1539,12 @@ describe('SheetResizePlugin', () => {
       cursorEngine: { override: jest.Mock };
     };
 
-    plugin.detectHiddenMarkerClick = jest.fn(() => null) as never;
-    plugin.detectResizeHandle = jest.fn(() => ({
+    jest.spyOn(geometry, 'detectHiddenMarkerClick').mockReturnValue(null);
+    jest.spyOn(geometry, 'detectResizeHandle').mockImplementation(jest.fn(() => ({
       type: 'col',
       primaryIndex: 2,
       initialSizes: new Map([[2, 10]]),
-    })) as never;
+    })) as never);
 
     const appliedTransactions: Transaction[] = [];
     const core = {
@@ -1528,9 +1560,9 @@ describe('SheetResizePlugin', () => {
       requestRender: jest.fn(),
     };
 
-    plugin.getSelectedIndices = jest.fn(() => [2, 3]);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue([2, 3]);
     expect(plugin.onMouseDown(core, { origin: { offsetX: 1, offsetY: 1 } })).toBe(false);
-    expect(plugin.cursorEngine.override).toHaveBeenCalledWith('col-resize');
+    expect(cursor.override).toHaveBeenCalledWith('col-resize');
     expect(plugin.getResizeState().dragTarget?.initialSizes).toEqual(
       new Map([
         [2, 15],
@@ -1538,7 +1570,7 @@ describe('SheetResizePlugin', () => {
       ]),
     );
 
-    plugin.getSelectedIndices = jest.fn(() => null);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue(null);
     expect(plugin.onMouseDown(core, { origin: { offsetX: 2, offsetY: 2 } })).toBe(false);
     expect(plugin.getResizeState().dragTarget?.initialSizes).toEqual(new Map([[2, 15]]));
   });
@@ -1557,13 +1589,13 @@ describe('SheetResizePlugin', () => {
       getSelectedIndices: jest.Mock;
       getResizeState(): { isDragging: boolean; currentWorld: { x: number; y: number } | null };
     };
-    plugin.detectHiddenMarkerClick = jest.fn(() => null) as never;
-    plugin.detectResizeHandle = jest.fn(() => ({
+    jest.spyOn(geometry, 'detectHiddenMarkerClick').mockReturnValue(null);
+    jest.spyOn(geometry, 'detectResizeHandle').mockImplementation(jest.fn(() => ({
       type: 'col',
       primaryIndex: 2,
       initialSizes: new Map([[2, 15]]),
-    })) as never;
-    plugin.getSelectedIndices = jest.fn(() => null);
+    })) as never);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue(null);
     const appliedTransactions: Transaction[] = [];
     const core = {
       getDataEngine: () =>
@@ -1602,20 +1634,20 @@ describe('SheetResizePlugin', () => {
       getResizeState(): { isDragging: boolean };
       onDblClick(core: object, event: object): boolean | void;
     };
-    const target = { type: 'col', primaryIndex: 2, initialSizes: new Map([[2, 30]]) };
-    plugin.detectHiddenMarkerClick = jest.fn(() => null) as never;
-    plugin.detectResizeHandle = jest.fn(() => target) as never;
-    plugin.dispatchAutoFit = jest.fn();
+    const target = { type: 'col' as const, primaryIndex: 2, initialSizes: new Map([[2, 30]]) };
+    jest.spyOn(geometry, 'detectHiddenMarkerClick').mockReturnValue(null);
+    jest.spyOn(geometry, 'detectResizeHandle').mockImplementation(jest.fn(() => target) as never);
+    const hitTest = jest.mocked(geometry.detectResizeHandle);
     const core = { pluginManager: { getPluginState: jest.fn() } };
 
     expect(plugin.onMouseDown(core, { origin: { offsetX: 1, offsetY: 2 }, clickCount: 2 })).toBe(false);
-    expect(plugin.dispatchAutoFit).toHaveBeenCalledWith(core, target);
-    expect(plugin.cursorEngine.override).not.toHaveBeenCalled();
+    expect(hitTest).toHaveBeenCalled();
+    expect(cursor.override).not.toHaveBeenCalled();
     expect(plugin.getResizeState().isDragging).toBe(false);
 
-    plugin.detectResizeHandle.mockReturnValue(null);
+    jest.mocked(geometry.detectResizeHandle).mockReturnValue(null);
     expect(plugin.onDblClick(core, { origin: { offsetX: 1, offsetY: 2 } })).toBe(false);
-    expect(plugin.dispatchAutoFit).toHaveBeenCalledTimes(1);
+    expect(hitTest).toHaveBeenCalledTimes(1);
     expect(plugin.onDblClick(core, { origin: { offsetX: 1, offsetY: 2 } })).toBe(void 0);
   });
 
@@ -1625,26 +1657,26 @@ describe('SheetResizePlugin', () => {
       detectResizeHandle: jest.Mock;
       dispatchAutoFit: jest.Mock;
     };
-    plugin.detectResizeHandle = jest.fn(() => null) as never;
-    plugin.dispatchAutoFit = jest.fn();
+    jest.spyOn(geometry, 'detectResizeHandle').mockReturnValue(null);
+    const hitTest = jest.mocked(geometry.detectResizeHandle);
     const core = { pluginManager: { getPluginState: jest.fn() } };
     const event = { origin: { offsetX: 1, offsetY: 2 } };
 
     expect(plugin.onDblClick(core, event)).toBe(void 0);
-    expect(plugin.dispatchAutoFit).not.toHaveBeenCalled();
+    expect(hitTest).toHaveBeenCalledTimes(1);
 
-    const target = { type: 'col', primaryIndex: 2, initialSizes: new Map([[2, 30]]) };
-    plugin.detectResizeHandle.mockReturnValue(target);
+    const target = { type: 'col' as const, primaryIndex: 2, initialSizes: new Map([[2, 30]]) };
+    jest.mocked(geometry.detectResizeHandle).mockReturnValue(target);
 
     expect(plugin.onDblClick(core, event)).toBe(false);
-    expect(plugin.dispatchAutoFit).toHaveBeenCalledWith(core, target);
+    expect(hitTest).toHaveBeenCalled();
   });
 
   it('dispatches resize operations and remembers sizes hidden at zero', () => {
     const plugin = createPlugin() as unknown as ResizePluginInternals;
     const core = createCore();
 
-    plugin.dispatchResize(
+    finishDrag(plugin,
       core,
       { type: 'row', primaryIndex: 2, initialSizes: new Map([[2, 12]]) },
       { x: 0, y: 10 },
@@ -1657,7 +1689,7 @@ describe('SheetResizePlugin', () => {
       prev: 12,
     });
 
-    plugin.dispatchUnhide(
+    clickMarker(plugin,
       {
         ...core,
         getDataEngine: () =>
@@ -1677,13 +1709,13 @@ describe('SheetResizePlugin', () => {
     });
 
     // Column unhide path
-    plugin.dispatchResize(
+    finishDrag(plugin,
       core,
       { type: 'col', primaryIndex: 4, initialSizes: new Map([[4, 15]]) },
       { x: 10, y: 0 },
       { x: -20, y: 0 },
     );
-    plugin.dispatchUnhide(
+    clickMarker(plugin,
       {
         ...core,
         getDataEngine: () =>
@@ -1706,7 +1738,7 @@ describe('SheetResizePlugin', () => {
     const plugin = createPlugin() as unknown as ResizePluginInternals;
     const core = createCore();
 
-    plugin.dispatchResize(
+    finishDrag(plugin,
       core,
       { type: 'row', primaryIndex: 1, initialSizes: new Map([[1, 12]]) },
       { x: 0, y: 20 },
@@ -1717,7 +1749,7 @@ describe('SheetResizePlugin', () => {
       prev: 12,
     });
 
-    plugin.dispatchResize(
+    finishDrag(plugin,
       core,
       { type: 'row', primaryIndex: 4, initialSizes: new Map([[4, 10]]) },
       { x: 0, y: 10 },
@@ -1728,7 +1760,7 @@ describe('SheetResizePlugin', () => {
       prev: 10,
     });
 
-    plugin.dispatchResize(
+    finishDrag(plugin,
       core,
       { type: 'row', primaryIndex: 5, initialSizes: new Map([[5, 0]]) },
       { x: 0, y: 0 },
@@ -1744,7 +1776,7 @@ describe('SheetResizePlugin', () => {
     const plugin = createPlugin() as unknown as ResizePluginInternals;
     const core = createCore();
 
-    plugin.dispatchResize(
+    finishDrag(plugin,
       core,
       { type: 'col', primaryIndex: 1, initialSizes: new Map([[1, 30]]) },
       { x: 4, y: 0 },
@@ -1761,7 +1793,7 @@ describe('SheetResizePlugin', () => {
     const plugin = createPlugin() as unknown as ResizePluginInternals;
     const core = createCore();
 
-    plugin.dispatchResize(
+    finishDrag(plugin,
       core,
       { type: 'row', primaryIndex: 2, initialSizes: new Map([[1, 24], [2, 58]]) },
       { x: 0, y: 0 },
@@ -1771,7 +1803,7 @@ describe('SheetResizePlugin', () => {
     expect(readResizeOperation(core.appliedTransactions[0], 0)[MatrixOTActionName.ResizeRow]).toEqual({ value: 88, prev: 24 });
     expect(readResizeOperation(core.appliedTransactions[0], 1)[MatrixOTActionName.ResizeRow]).toEqual({ value: 88, prev: 58 });
 
-    plugin.dispatchResize(
+    finishDrag(plugin,
       core,
       { type: 'col', primaryIndex: 1, initialSizes: new Map([[0, 76], [1, 100]]) },
       { x: 0, y: 0 },
@@ -1809,7 +1841,7 @@ describe('SheetResizePlugin', () => {
       rowSizes: { getItem: jest.fn(() => 20) },
     };
 
-    plugin.dispatchAutoFit(core, {
+    doubleClickHandle(plugin, core, {
       type: 'col',
       primaryIndex: 1,
       initialSizes: new Map([[1, 20]]),
@@ -1844,7 +1876,7 @@ describe('SheetResizePlugin', () => {
       },
     };
 
-    plugin.dispatchAutoFit(core, {
+    doubleClickHandle(plugin, core, {
       type: 'row',
       primaryIndex: 2,
       initialSizes: new Map([[2, 11]]),
@@ -1885,8 +1917,8 @@ describe('SheetResizePlugin', () => {
       },
     };
 
-    plugin.dispatchAutoFit(core, { type: 'col', primaryIndex: 1, initialSizes: new Map([[1, 100]]) });
-    plugin.dispatchAutoFit(core, { type: 'row', primaryIndex: 0, initialSizes: new Map([[0, 24]]) });
+    doubleClickHandle(plugin, core, { type: 'col', primaryIndex: 1, initialSizes: new Map([[1, 100]]) });
+    doubleClickHandle(plugin, core, { type: 'row', primaryIndex: 0, initialSizes: new Map([[0, 24]]) });
 
     expect(projectedRanges).toEqual([[0, 1, 9, 1], [0, 0, 0, 4]]);
     expect(readResizeOperation(core.appliedTransactions[0])[MatrixOTActionName.ResizeCol]).toEqual({ value: 156, prev: 100 });
@@ -2003,7 +2035,7 @@ describe('SheetResizePlugin', () => {
       renderEngine: { scrollManager: { getShape: () => [100, 100], getState: () => ({ x: 0, y: 0 }) } },
     };
 
-    const nodes = plugin.renderHiddenMarkers(core);
+    const nodes = plugin.render(core);
     expect(nodes).toBeDefined();
     expect(nodes.length).toBe(4);
 
@@ -2042,8 +2074,8 @@ describe('SheetResizePlugin', () => {
       renderEngine: { scrollManager: { getShape: () => [100, 100], getState: () => ({ x: 0, y: 0 }) } },
     };
 
-    expect(plugin.renderHiddenMarkers(core)).toBeNull();
-    expect(plugin.detectHiddenMarkerClick(core, { world: { x: 0, y: 0 }, view: { x: 0, y: 0 } })).toBeNull();
+    expect(plugin.render(core)).toBeNull();
+    expect(detectHiddenMarkerClick(core, { world: { x: 0, y: 0 }, view: { x: 0, y: 0 } })).toBeNull();
 
     setUnassembledDragState(plugin, {
       dragTarget: { type: 'row', primaryIndex: 1, initialSizes: new Map([[1, 10]]) },
@@ -2063,7 +2095,7 @@ describe('SheetResizePlugin', () => {
       },
     };
     (plugin as unknown as { textShaper: TextShaper | undefined }).textShaper = undefined;
-    plugin.dispatchAutoFit(coreMetrics, { type: 'row', primaryIndex: 1, initialSizes: new Map() });
+    doubleClickHandle(plugin, coreMetrics, { type: 'row', primaryIndex: 1, initialSizes: new Map() });
     expect(appliedTransactions).toHaveLength(0);
   });
 
@@ -2075,7 +2107,7 @@ describe('SheetResizePlugin', () => {
       ) => { type: 'row' | 'col'; index: number } | null;
     };
 
-    const result = plugin.detectHiddenMarkerClick(
+    const result = detectHiddenMarkerClick(
       {
         getDataEngine: () =>
           createResizeDataEngine({
@@ -2094,7 +2126,7 @@ describe('SheetResizePlugin', () => {
 
     expect(result).toEqual({ type: 'col', index: 2 });
 
-    const noMatch = plugin.detectHiddenMarkerClick(
+    const noMatch = detectHiddenMarkerClick(
       {
         getDataEngine: () =>
           createResizeDataEngine({
@@ -2112,7 +2144,7 @@ describe('SheetResizePlugin', () => {
     expect(noMatch).toBeNull();
 
     expect(
-      plugin.detectHiddenMarkerClick(
+      detectHiddenMarkerClick(
         {
           getDataEngine: () =>
             createResizeDataEngine({
@@ -2132,7 +2164,7 @@ describe('SheetResizePlugin', () => {
   });
 
   it('keeps scanning hidden markers when header is active but marker distance does not match', () => {
-    const plugin = createPlugin() as unknown as ResizePluginInternals;
+
 
     const core = {
       getDataEngine: () =>
@@ -2145,14 +2177,14 @@ describe('SheetResizePlugin', () => {
     };
 
     expect(
-      plugin.detectHiddenMarkerClick(core, {
+      detectHiddenMarkerClick(core, {
         world: { x: 5, y: 200 },
         view: { x: 5, y: 40 },
       }),
     ).toBeNull();
 
     expect(
-      plugin.detectHiddenMarkerClick(core, {
+      detectHiddenMarkerClick(core, {
         world: { x: 200, y: 5 },
         view: { x: 60, y: 5 },
       }),
@@ -2173,7 +2205,7 @@ describe('SheetResizePlugin', () => {
       render: (core: object) => Array<object> | null;
     };
 
-    const rowMatch = plugin.detectHiddenMarkerClick(
+    const rowMatch = detectHiddenMarkerClick(
       {
         getDataEngine: () =>
           createResizeDataEngine({
@@ -2192,7 +2224,7 @@ describe('SheetResizePlugin', () => {
     expect(rowMatch).toEqual({ type: 'row', index: 1 });
 
     expect(
-      plugin.renderHiddenMarkers({
+      plugin.render({
         getDataEngine: () =>
           createResizeDataEngine({
             rowSizes: { getDimensionRightBoundaryByIndex: () => 0 },
@@ -2222,10 +2254,10 @@ describe('SheetResizePlugin', () => {
     const plugin = createPlugin() as unknown as ResizePluginInternals;
     const core = createCore();
 
-    plugin.dispatchUnhide(core, 'row', 999);
+    clickMarker(plugin, core, 'row', 999);
     expect(core.appliedTransactions).toHaveLength(0);
 
-    plugin.dispatchUnhide(core, 'row', 0);
+    clickMarker(plugin, core, 'row', 0);
     expect(core.appliedTransactions).toHaveLength(0);
 
     const platform = { warn: jest.fn() };
@@ -2234,12 +2266,12 @@ describe('SheetResizePlugin', () => {
       createResizeTestCommandBus(),
       platform,
     ) as unknown as ResizePluginInternals;
-    missingManagerPlugin.dispatchUnhide({} as never, 'row', 0);
+    clickMarker(missingManagerPlugin, {} as never, 'row', 0);
     expect(platform.warn).not.toHaveBeenCalledWith(
       'SheetResizePlugin dispatchUnhide skipped: PluginManager is missing.',
     );
 
-    plugin.dispatchAutoFit(
+    doubleClickHandle(plugin,
       {
         getDataEngine: () => ({ readDataViewField: () => null }),
       },
@@ -2251,7 +2283,7 @@ describe('SheetResizePlugin', () => {
   it('covers optional hidden-size lookups and hidden-marker early exits', () => {
     const plugin = createPlugin(void 0, createResizeTestCommandBus()) as unknown as ResizePluginInternals;
 
-    plugin.dispatchUnhide({} as never, 'row', 0);
+    clickMarker(plugin, {} as never, 'row', 0);
 
     const appliedTransactions: Transaction[] = [];
     const core = {
@@ -2267,24 +2299,24 @@ describe('SheetResizePlugin', () => {
     };
     currentCore = core;
 
-    plugin.dispatchUnhide(core, 'row', 1);
-    plugin.dispatchUnhide(core, 'col', 1);
+    clickMarker(plugin, core, 'row', 1);
+    clickMarker(plugin, core, 'col', 1);
     const missingStateCore = {
       ...core,
       getDataEngine: () => ({ readDataViewField: () => null }),
     };
-    plugin.dispatchUnhide(missingStateCore, 'row', 1);
-    plugin.dispatchUnhide(missingStateCore, 'col', 1);
+    clickMarker(plugin, missingStateCore, 'row', 1);
+    clickMarker(plugin, missingStateCore, 'col', 1);
     expect(appliedTransactions).toHaveLength(0);
 
     expect(
-      plugin.detectHiddenMarkerClick(core, {
+      detectHiddenMarkerClick(core, {
         world: { x: 5, y: 40 },
         view: { x: 5, y: 40 },
       }),
     ).toBeNull();
     expect(
-      plugin.detectHiddenMarkerClick(core, {
+      detectHiddenMarkerClick(core, {
         world: { x: 90, y: 5 },
         view: { x: 90, y: 5 },
       }),
@@ -2309,7 +2341,7 @@ describe('SheetResizePlugin', () => {
     };
 
     expect(
-      plugin.detectHiddenMarkerClick(hitCore, {
+      detectHiddenMarkerClick(hitCore, {
         world: { x: 5, y: 24 },
         view: { x: 5, y: 40 },
       }),
@@ -2317,7 +2349,7 @@ describe('SheetResizePlugin', () => {
     expect(rowHiddenOriginalSizes.forEachStored).toHaveBeenCalledTimes(1);
 
     expect(
-      plugin.detectHiddenMarkerClick(hitCore, {
+      detectHiddenMarkerClick(hitCore, {
         world: { x: 50, y: 5 },
         view: { x: 90, y: 5 },
       }),
@@ -2332,7 +2364,7 @@ describe('SheetResizePlugin', () => {
       render: (core: object) => Array<object> | null;
     };
 
-    plugin.getSelectedIndices = jest.fn(() => []);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue([]);
 
     const appliedTransactions: Transaction[] = [];
     const core = {
@@ -2353,7 +2385,7 @@ describe('SheetResizePlugin', () => {
       },
     };
 
-    plugin.dispatchAutoFit(core, { type: 'row', primaryIndex: 1, initialSizes: new Map([[1, 10]]) });
+    doubleClickHandle(plugin, core, { type: 'row', primaryIndex: 1, initialSizes: new Map([[1, 10]]) });
     expect(appliedTransactions).toHaveLength(0);
 
     setUnassembledDragState(plugin, {
@@ -2377,8 +2409,8 @@ describe('SheetResizePlugin', () => {
       displayTextRegistry: { getDisplayText: jest.Mock };
     };
 
-    plugin.getSelectedIndices = jest.fn(() => [1]);
-    plugin.displayTextRegistry.getDisplayText = jest.fn(() => '');
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue([1]);
+    displayText.getDisplayText = jest.fn(() => '');
 
     const appliedTransactions: Transaction[] = [];
     const core = {
@@ -2400,8 +2432,8 @@ describe('SheetResizePlugin', () => {
     };
     currentCore = core;
 
-    plugin.dispatchAutoFit(core, { type: 'col', primaryIndex: 1, initialSizes: new Map([[1, 10]]) });
-    plugin.dispatchAutoFit(core, { type: 'row', primaryIndex: 1, initialSizes: new Map([[1, 10]]) });
+    doubleClickHandle(plugin, core, { type: 'col', primaryIndex: 1, initialSizes: new Map([[1, 10]]) });
+    doubleClickHandle(plugin, core, { type: 'row', primaryIndex: 1, initialSizes: new Map([[1, 10]]) });
 
     expect(appliedTransactions).toHaveLength(0);
   });
@@ -2410,7 +2442,7 @@ describe('SheetResizePlugin', () => {
     const plugin = createPlugin() as unknown as ResizePluginInternals & {
       getSelectedIndices: jest.Mock;
     };
-    plugin.getSelectedIndices = jest.fn(() => [1, 2]);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue([1, 2]);
     const appliedTransactions: Transaction[] = [];
     const core = {
       appliedTransactions,
@@ -2434,8 +2466,8 @@ describe('SheetResizePlugin', () => {
     };
     currentCore = core;
 
-    plugin.dispatchAutoFit(core, { type: 'col', primaryIndex: 1, initialSizes: new Map([[1, 100], [2, 100]]) });
-    plugin.dispatchAutoFit(core, { type: 'row', primaryIndex: 1, initialSizes: new Map([[1, 24], [2, 24]]) });
+    doubleClickHandle(plugin, core, { type: 'col', primaryIndex: 1, initialSizes: new Map([[1, 100], [2, 100]]) });
+    doubleClickHandle(plugin, core, { type: 'row', primaryIndex: 1, initialSizes: new Map([[1, 24], [2, 24]]) });
 
     expect(appliedTransactions).toHaveLength(2);
     expect(appliedTransactions[0].operations[0].p).toEqual([2]);
@@ -2447,7 +2479,7 @@ describe('SheetResizePlugin', () => {
       getSelectedIndices: jest.Mock;
       dispatchAutoFit: ResizePluginInternals['dispatchAutoFit'];
     };
-    plugin.getSelectedIndices = jest.fn(() => [1]);
+    jest.spyOn(geometry, 'getSelectedIndices').mockReturnValue([1]);
 
     const getSpy = jest.spyOn(Map.prototype, 'get');
     const originalGet = getSpy.getMockImplementation() ?? Map.prototype.get;
@@ -2481,7 +2513,7 @@ describe('SheetResizePlugin', () => {
     currentCore = core;
 
     try {
-      plugin.dispatchAutoFit(core, { type: 'col', primaryIndex: 1, initialSizes: new Map([[1, 10]]) });
+      doubleClickHandle(plugin, core, { type: 'col', primaryIndex: 1, initialSizes: new Map([[1, 10]]) });
     } finally {
       getSpy.mockRestore();
     }
@@ -2509,7 +2541,7 @@ describe('SheetResizePlugin', () => {
         }),
       renderEngine: { scrollManager: { getShape: () => [100, 100], getState: () => ({ x: 0, y: 0 }) } },
     };
-    const node = plugin.renderHiddenMarkers(core)[0];
+    const node = plugin.render(core)[0];
     const ctx = {
       save: jest.fn(),
       beginPath: jest.fn(),
@@ -2610,59 +2642,12 @@ describe('SheetResizePlugin', () => {
     expect(colNodes).toBeTruthy();
   });
 
-  it('exposes helper methods for cell metrics and command dispatch', () => {
-    const commands = new SheetCommandBus();
-    commands.bind({ executePipeline: createPipelineExecutor(), applyEffect: () => void 0 });
-    const measureLines = jest.fn(() => ({ width: 9, height: 8 }));
-    const plugin = createPlugin(measureLines, commands) as unknown as ResizePluginInternals & {
-      measureCellMetrics: (text: string, font: string) => { width: number; height: number };
-      runCommand: <Input>(core: object, definition: { id: string }, input: Input) => void;
-      commands: SheetCommandBus | undefined;
-    };
-    const core = createCore();
-
-    expect(plugin.measureCellMetrics('abc', '16px sans-serif')).toEqual({
-      width: 9,
-      height: 8,
-    });
-
-    plugin.runCommand(core as never, BeginSheetResizeDragCommand, {
-      axis: 'row',
-      primaryIndex: 2,
-      initialSizes: [{ index: 2, size: 24 }],
-      world: { x: 1, y: 2 },
-    });
-    expect(plugin.commands?.has(BeginSheetResizeDragCommand)).toBe(true);
-  });
-
-  it('warns instead of creating a resize-only command bus when commands are missing', () => {
+  it.each([true, false])('ends a gesture safely with a missing command bus (platform present: %s)', (withPlatform) => {
     const platform = { warn: jest.fn() };
-    const plugin = createPlugin(void 0, null, platform) as unknown as ResizePluginInternals & {
-      runCommand: <Input>(core: object, definition: { id: string }, input: Input) => void;
-    };
-
-    plugin.runCommand({} as never, BeginSheetResizeDragCommand, {
-      axis: 'row',
-      primaryIndex: 0,
-      initialSizes: [],
-      world: { x: 0, y: 0 },
-    });
-
-    expect(platform.warn).toHaveBeenCalledWith('SheetResizePlugin runCommand skipped: SheetCommandBus is missing.');
-  });
-
-  it('skips command dispatch without throwing when commands and platform are both missing', () => {
-    const plugin = createPlugin(void 0, null) as unknown as ResizePluginInternals & {
-      runCommand: <Input>(core: object, definition: { id: string }, input: Input) => void;
-    };
-
-    expect(() =>
-      plugin.runCommand({} as never, BeginSheetResizeDragCommand, {
-        axis: 'row',
-        primaryIndex: 0,
-        initialSizes: [],
-        world: { x: 0, y: 0 },
-      }),
-    ).not.toThrow();
+    const plugin = createPlugin(undefined, null, withPlatform ? platform : undefined);
+    plugin.onMouseUp({} as never, { origin: { offsetX: 0, offsetY: 0 } } as never);
+    expect(platform.warn.mock.calls).toEqual(withPlatform
+      ? [['SheetResizePlugin runCommand skipped: SheetCommandBus is missing.']]
+      : []);
   });
 });

@@ -35,8 +35,8 @@ export class UnderlineTextStylePlugin extends InlineTextStylePluginBase {
   }
 
   public override registerCommands(commands: DocCommandBus): void {
-    commands.register(SetDocUnderlineCommand, this.createSetUnderlineCommand.bind(this));
-    commands.register(ToggleDocUnderlineCommand, this.createToggleUnderlineCommand.bind(this));
+    commands.register(SetDocUnderlineCommand, this.#createSetUnderlineCommand.bind(this));
+    commands.register(ToggleDocUnderlineCommand, this.#createToggleUnderlineCommand.bind(this));
   }
 
   public override registerKeyboardHandlers({ bindings, commands }: DocKeyboardHandlerRegistrationContext): void {
@@ -45,25 +45,25 @@ export class UnderlineTextStylePlugin extends InlineTextStylePluginBase {
     });
   }
 
-  private createSetUnderlineCommand(input: SetDocUnderlineInput) {
+  #createSetUnderlineCommand(input: SetDocUnderlineInput) {
     const underline = normalizeBoolean(input?.underline, 'SetDocUnderlineCommand.underline');
     return createDocCommand(SetDocUnderlineCommand.id, DocContentRenderPluginKey, () =>
-      this.createUnderlineTransaction(underline),
+      this.#createUnderlineTransaction(underline),
     );
   }
 
-  private createToggleUnderlineCommand() {
+  #createToggleUnderlineCommand() {
     return createDocCommand(ToggleDocUnderlineCommand.id, DocContentRenderPluginKey, () => {
       const runtime = this.requireRuntime();
       const state = runtime.document.input.getState();
       const patches = buildInlineTextRangePatchPlan(state.pendingDoc, state.docSelection, () => ({}));
       const allUnderline =
         patches.length > 0 && patches.every((patch) => isUnderline(readTextStyleAttrs(patch.oldNode.attrs)));
-      return this.createUnderlineTransaction(allUnderline ? null : true);
+      return this.#createUnderlineTransaction(allUnderline ? null : true);
     });
   }
 
-  private createUnderlineTransaction(underline: boolean | null) {
+  #createUnderlineTransaction(underline: boolean | null) {
     const runtime = this.requireRuntime();
     const mutation = runtime.document.inlineStyles.requireMutation(UnderlineTextStyleKey.Underline);
     return runtime.document.input.createTransaction(

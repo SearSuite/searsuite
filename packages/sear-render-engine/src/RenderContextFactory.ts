@@ -4,7 +4,7 @@ import { RenderContext } from '@searsuite/sear-render-context';
 /** Factory registry for render-context implementations. */
 export class RenderContextFactory {
   /** Registered context builders keyed by host or adapter type. */
-  private static contextMap = new Map<string | symbol, (args: unknown) => RenderContext>();
+  static #contextMap = new Map<string | symbol, (args: unknown) => RenderContext>();
 
   /**
    * Registers a render-context creator.
@@ -12,7 +12,7 @@ export class RenderContextFactory {
    * @param contextCreator - Factory invoked by createContext().
    */
   static registerContext(type: string | symbol, contextCreator: (args: unknown) => RenderContext): void {
-    this.contextMap.set(type, contextCreator);
+    RenderContextFactory.#contextMap.set(type, contextCreator);
   }
 
   /**
@@ -22,7 +22,7 @@ export class RenderContextFactory {
    * @returns New render context instance.
    */
   static createContext(type: string | symbol, args: unknown): RenderContext {
-    const contextCreator = this.contextMap.get(type);
+    const contextCreator = RenderContextFactory.#contextMap.get(type);
     if (!contextCreator) {
       throw new SearError(`No context registered for type ${type.toString()}`);
     }

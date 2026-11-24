@@ -11,13 +11,13 @@ import { columnIndexToLabel, columnLabelToIndex } from '@searsuite/sear-foundati
  */
 export class Range {
   /** One-based starting column index. */
-  private startColumn: number;
+  #startColumn: number;
   /** One-based starting row index. */
-  private startRow: number;
+  #startRow: number;
   /** One-based ending column index. */
-  private endColumn: number;
+  #endColumn: number;
   /** One-based ending row index. */
-  private endRow: number;
+  #endRow: number;
 
   /**
    * Constructs a range from an A1-style string.
@@ -29,12 +29,12 @@ export class Range {
       throw new SearError("Invalid range format. Expected format 'A1:B2'.");
     }
 
-    this.startColumn = Range.columnToNumber(match[1]);
-    this.startRow = parseInt(match[2], 10);
-    this.endColumn = Range.columnToNumber(match[3]);
-    this.endRow = parseInt(match[4], 10);
+    this.#startColumn = Range.columnToNumber(match[1]);
+    this.#startRow = parseInt(match[2], 10);
+    this.#endColumn = Range.columnToNumber(match[3]);
+    this.#endRow = parseInt(match[4], 10);
 
-    if (!this.isValidRange()) {
+    if (!this.#isValidRange()) {
       throw new SearError('Invalid range: Start must be less than or equal to end.');
     }
   }
@@ -58,29 +58,29 @@ export class Range {
   }
 
   /** Returns whether the start coordinate is before or equal to the end coordinate. */
-  private isValidRange(): boolean {
-    return this.startColumn <= this.endColumn && this.startRow <= this.endRow;
+  #isValidRange(): boolean {
+    return this.#startColumn <= this.#endColumn && this.#startRow <= this.#endRow;
   }
 
   /** Range coordinates as [[startColumn, startRow], [endColumn, endRow]]. */
   public get range(): [[number, number], [number, number]] {
     return [
-      [this.startColumn, this.startRow],
-      [this.endColumn, this.endRow],
+      [this.#startColumn, this.#startRow],
+      [this.#endColumn, this.#endRow],
     ];
   }
 
   /** Range dimensions as [width, height]. */
   public get shape(): [number, number] {
-    const width = this.endColumn - this.startColumn + 1;
-    const height = this.endRow - this.startRow + 1;
+    const width = this.#endColumn - this.#startColumn + 1;
+    const height = this.#endRow - this.#startRow + 1;
     return [width, height];
   }
 
   /** Serializes the range back to A1 notation. */
   public toString(): string {
-    return `${Range.numberToColumn(this.startColumn)}${this.startRow}:${Range.numberToColumn(this.endColumn)}${
-      this.endRow
+    return `${Range.numberToColumn(this.#startColumn)}${this.#startRow}:${Range.numberToColumn(this.#endColumn)}${
+      this.#endRow
     }`;
   }
 
@@ -91,6 +91,6 @@ export class Range {
    * @returns True when the coordinate falls inside the range.
    */
   public contains(x: number, y: number): boolean {
-    return x >= this.startColumn && x <= this.endColumn && y >= this.startRow && y <= this.endRow;
+    return x >= this.#startColumn && x <= this.#endColumn && y >= this.#startRow && y <= this.#endRow;
   }
 }

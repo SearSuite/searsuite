@@ -71,7 +71,7 @@ export class SearCoreEditorRuntime {
   public readonly composition: DocCompositionManager;
   public readonly inlineStyles: RichTextInlineStyleRegistry;
   public readonly runRenderRegistry: RichTextRunRenderRegistry;
-  private readonly lineRenderer: RichTextLineRenderer;
+  readonly #lineRenderer: RichTextLineRenderer;
   public readonly lineBoxes: RichTextLineBoxRegistry;
   public readonly fontSize: number;
   public readonly fontFamily: string;
@@ -79,15 +79,15 @@ export class SearCoreEditorRuntime {
   public readonly padding: number;
   public readonly sheetPlugins: SheetEmbeddedEditorPluginRegistry;
 
-  private readonly measurementContext: RenderContext;
-  private destroyed = false;
+  readonly #measurementContext: RenderContext;
+  #destroyed = false;
   #isCommandExecuting: (() => boolean) | null = null;
   readonly #teardownToken = {};
   #ownerToken: object | null = null;
 
   public constructor(context: SheetEmbeddedEditorContext, options: SearCoreEditorAdapterOptions) {
     lockSheetEmbeddedEditorContext(context);
-    this.measurementContext = context.renderContext;
+    this.#measurementContext = context.renderContext;
     this.fontSize = options.embeddedDocConfig?.fontSize ?? defaultEmbeddedDocConfig.fontSize;
     this.fontFamily = options.embeddedDocConfig?.fontFamily ?? defaultEmbeddedDocConfig.fontFamily;
     this.fontDescriptor = createFontDescriptor({ fontSize: this.fontSize, fontFamily: this.fontFamily });
@@ -123,7 +123,7 @@ export class SearCoreEditorRuntime {
     this.runRenderRegistry.register(createStrikethroughRenderContribution());
     this.runRenderRegistry.register(createTextColorRenderContribution());
     const runRenderer = new RichTextRunRenderer(this.runRenderRegistry);
-    this.lineRenderer = new RichTextLineRenderer(this.inlineStyles, runRenderer);
+    this.#lineRenderer = new RichTextLineRenderer(this.inlineStyles, runRenderer);
     this.lineBoxes = new RichTextLineBoxRegistry();
     this.lineBoxes.register(createDefaultRichTextLineBoxContribution());
     const nodes = new DocNodeRegistry();
@@ -183,7 +183,7 @@ export class SearCoreEditorRuntime {
   }
 
   public measureUnwrapped(document: SheetDocument, font: string): { width: number; height: number } {
-    this.assertLive();
+    this.#assertLive();
     const blocks = this.core.blockManager.createDetached();
     blocks.setBaseFont(font);
     for (const node of this.core.materializeSnapshot(document)) blocks.add(node);
@@ -198,9 +198,9 @@ export class SearCoreEditorRuntime {
     renderContext = context.renderContext,
     font = this.fontDescriptor,
   ): DocPreparedEditorRenderLayout {
-    this.assertLive();
-    return this.withFont(renderContext, font, () =>
-      this.withFont(this.measurementContext, font, () =>
+    this.#assertLive();
+    return this.#withFont(renderContext, font, () =>
+      this.#withFont(this.#measurementContext, font, () =>
         this.core.prepareEditorRenderLayout({
           document: this.core.materializeSnapshot(document),
           selection,
@@ -227,8 +227,8 @@ export class SearCoreEditorRuntime {
     cursorVisible = false,
     fontOverride?: string,
   ): DocPreparedEditorRenderLayout {
-    const font = fontOverride ?? this.resolveContextFont(context);
-    const prepared = this.withFont(renderContext, font, () =>
+    const font = fontOverride ?? this.#resolveContextFont(context);
+    const prepared = this.#withFont(renderContext, font, () =>
       this.prepare(context, document, selection, cursorVisible, renderContext, font),
     );
     const node = new RichTextContentNode({
@@ -237,7 +237,7 @@ export class SearCoreEditorRuntime {
       lines: prepared.snapshot.lines,
       origin: { x: prepared.positionRect.x, y: prepared.positionRect.y },
       font,
-      lineRenderer: this.lineRenderer,
+      lineRenderer: this.#lineRenderer,
     });
     node.drawScene(
       renderContext,
@@ -299,11 +299,11 @@ export class SearCoreEditorRuntime {
   }
 
   public destroy(ownerToken?: object): void {
-    if (this.destroyed) return;
+    if (this.#destroyed) return;
     if (this.#ownerToken && ownerToken !== this.#ownerToken) {
       throw new SearError('Sheet embedded runtime destruction requires its editor owner.');
     }
-    this.destroyed = true;
+    this.#destroyed = true;
     this.sheetPlugins.dispose(this.#teardownToken);
     this.core.destroy(this.#teardownToken);
     this.cursor.clearCursor(this.#teardownToken);
@@ -314,7 +314,7 @@ export class SearCoreEditorRuntime {
     return { editor: context, document };
   }
 
-  private withFont<T>(context: RenderContext, font: string, callback: () => T): T {
+  #withFont<T>(context: RenderContext, font: string, callback: () => T): T {
     context.save();
     context.setFont(font);
     try {
@@ -324,14 +324,14 @@ export class SearCoreEditorRuntime {
     }
   }
 
-  private resolveContextFont(context: SheetEmbeddedEditorContext): string {
+  #resolveContextFont(context: SheetEmbeddedEditorContext): string {
     return createFontDescriptor({
       fontSize: context.defaultFontSize ?? this.fontSize,
       fontFamily: context.defaultFontFamily ?? this.fontFamily,
     });
   }
 
-  private assertLive(): void {
-    if (this.destroyed) throw new SearError('SearCoreEditorAdapter runtime has been disposed.');
+  #assertLive(): void {
+    if (this.#destroyed) throw new SearError('SearCoreEditorAdapter runtime has been disposed.');
   }
 }

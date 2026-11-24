@@ -47,6 +47,8 @@ const pluginKey = new PluginKey('SheetCellMergePlugin');
 /** Owns sparse merged-cell state, commands, structure projection, collaboration, and export. */
 @Injectable()
 export class SheetCellMergePlugin extends Plugin<unknown, CellProperties, SheetCellMergePluginState> {
+  readonly #cellContent: SheetCellMergeContentSource | undefined;
+
   public override readonly warnOnDuplicateDepth = false;
   public override readonly transactionOT = {
     ownerId: 'sheet.cellMerge',
@@ -83,29 +85,30 @@ export class SheetCellMergePlugin extends Plugin<unknown, CellProperties, SheetC
     MatrixOTActionName.ColMove,
   ];
 
-  public constructor(state: SheetCellMergePluginState, private readonly cellContent?: SheetCellMergeContentSource) {
+  public constructor(state: SheetCellMergePluginState, cellContent?: SheetCellMergeContentSource) {
     super({ key: pluginKey, state });
+    this.#cellContent = cellContent;
   }
 
   public registerCommands(commands: SheetCommandBus): void {
-    if (!this.cellContent)
+    if (!this.#cellContent)
       throw new SearError('SheetCellMergePlugin requires a cell content reader to register commands.');
     const plugin = this;
     registerSheetCellMergeCommands(commands, {
       target: this.key,
       readMatrix: () => plugin.getState().cellMerges,
-      cellContent: this.cellContent,
+      cellContent: this.#cellContent,
     });
   }
 
   public registerQueries(queries: SheetQueryRegistry): void {
-    if (!this.cellContent)
+    if (!this.#cellContent)
       throw new SearError('SheetCellMergePlugin requires a cell content reader to register queries.');
     const plugin = this;
     registerSheetCellMergeQueries(queries, {
       target: this.key,
       readMatrix: () => plugin.getState().cellMerges,
-      cellContent: this.cellContent,
+      cellContent: this.#cellContent,
     });
   }
 

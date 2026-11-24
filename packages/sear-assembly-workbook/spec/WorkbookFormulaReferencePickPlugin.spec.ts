@@ -57,7 +57,8 @@ describe('WorkbookFormulaReferencePickPlugin', () => {
     const { dispose, plugin, sheetCommands } = createHarness();
     Object.assign(plugin, { assertCommandBoundary: () => void 0 });
 
-    expect(() => (plugin as unknown as { captureDraft(): void }).captureDraft()).toThrow('Workbook command');
+    expect(plugin).not.toHaveProperty('captureDraft');
+    expect(plugin.hasPendingPick()).toBe(false);
     expect(sheetCommands.run).not.toHaveBeenCalled();
     dispose?.();
   });

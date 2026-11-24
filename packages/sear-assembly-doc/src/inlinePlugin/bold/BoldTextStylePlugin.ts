@@ -42,8 +42,8 @@ export class BoldTextStylePlugin extends InlineTextStylePluginBase {
   }
 
   public override registerCommands(commands: DocCommandBus): void {
-    commands.register(SetDocBoldCommand, this.createSetBoldCommand.bind(this));
-    commands.register(ToggleDocBoldCommand, this.createToggleBoldCommand.bind(this));
+    commands.register(SetDocBoldCommand, this.#createSetBoldCommand.bind(this));
+    commands.register(ToggleDocBoldCommand, this.#createToggleBoldCommand.bind(this));
   }
 
   public override registerKeyboardHandlers({ bindings, commands }: DocKeyboardHandlerRegistrationContext): void {
@@ -52,22 +52,22 @@ export class BoldTextStylePlugin extends InlineTextStylePluginBase {
     });
   }
 
-  private createSetBoldCommand(input: SetDocBoldInput) {
+  #createSetBoldCommand(input: SetDocBoldInput) {
     const bold = normalizeBold(input?.bold);
-    return createDocCommand(SetDocBoldCommand.id, DocContentRenderPluginKey, () => this.createBoldTransaction(bold));
+    return createDocCommand(SetDocBoldCommand.id, DocContentRenderPluginKey, () => this.#createBoldTransaction(bold));
   }
 
-  private createToggleBoldCommand() {
+  #createToggleBoldCommand() {
     return createDocCommand(ToggleDocBoldCommand.id, DocContentRenderPluginKey, () => {
       const runtime = this.requireRuntime();
       const state = runtime.document.input.getState();
       const patches = buildInlineTextRangePatchPlan(state.pendingDoc, state.docSelection, () => ({}));
       const allBold = patches.length > 0 && patches.every((patch) => isBold(readTextStyleAttrs(patch.oldNode.attrs)));
-      return this.createBoldTransaction(allBold ? null : true);
+      return this.#createBoldTransaction(allBold ? null : true);
     });
   }
 
-  private createBoldTransaction(bold: boolean | null) {
+  #createBoldTransaction(bold: boolean | null) {
     const runtime = this.requireRuntime();
     const mutation = runtime.document.inlineStyles.requireMutation(BoldTextStyleKey.Bold);
     return runtime.document.input.createTransaction(

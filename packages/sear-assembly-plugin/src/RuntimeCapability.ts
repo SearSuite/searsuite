@@ -59,17 +59,21 @@ export function createRuntimeCapabilityReader(
 
 /** Editor-local registry shared by Sheet, Doc and Workbook assemblies. */
 export class RuntimeCapabilityRegistry implements RuntimeCapabilityReader {
+  readonly #owner: string;
+
   readonly #entries = new Map<symbol, { capability: RuntimeCapability<unknown>; value: unknown }>();
   #destroyed = false;
   #assertWrite: (() => void) | null = null;
 
-  public constructor(private readonly owner: string = 'editor runtime') {}
+  public constructor(owner: string = 'editor runtime') {
+    this.#owner = owner;
+  }
 
   /** Requires editor command dispatch for capability changes after assembly. */
   public enforceWriteBoundary(assertWrite: () => void): void {
     if (this.#assertWrite) {
       throw new RuntimeCapabilityError(RuntimeCapabilityErrorCode.RegistrationConflict,
-        `Runtime capability write boundary is already installed for ${this.owner}.`, { owner: this.owner });
+        `Runtime capability write boundary is already installed for ${this.#owner}.`, { owner: this.#owner });
     }
     this.#assertWrite = assertWrite;
     Object.freeze(this);
@@ -77,14 +81,14 @@ export class RuntimeCapabilityRegistry implements RuntimeCapabilityReader {
 
   /** Registers one value and returns an idempotent disposer for that registration. */
   public register<T>(capability: RuntimeCapability<T>, value: T): () => void {
-    this.assertLive();
+    this.#assertLive();
     this.#assertWrite?.();
     const existing = this.#entries.get(capability.symbol);
     if (existing) {
       throw new RuntimeCapabilityError(
         RuntimeCapabilityErrorCode.RegistrationConflict,
-        `Runtime capability "${capability.id}" is already registered for ${this.owner}.`,
-        { owner: this.owner, capabilityId: capability.id, registeredCapabilityId: existing.capability.id },
+        `Runtime capability "${capability.id}" is already registered for ${this.#owner}.`,
+        { owner: this.#owner, capabilityId: capability.id, registeredCapabilityId: existing.capability.id },
       );
     }
     this.#entries.set(capability.symbol, { capability, value });
@@ -99,7 +103,7 @@ export class RuntimeCapabilityRegistry implements RuntimeCapabilityReader {
   }
 
   public get<T>(capability: RuntimeCapability<T>): T | undefined {
-    this.assertLive();
+    this.#assertLive();
     return this.#entries.get(capability.symbol)?.value as T | undefined;
   }
 
@@ -108,20 +112,20 @@ export class RuntimeCapabilityRegistry implements RuntimeCapabilityReader {
     if (value === void 0) {
       throw new RuntimeCapabilityError(
         RuntimeCapabilityErrorCode.NotRegistered,
-        `Runtime capability "${capability.id}" is not registered for ${this.owner}.`,
-        { owner: this.owner, capabilityId: capability.id },
+        `Runtime capability "${capability.id}" is not registered for ${this.#owner}.`,
+        { owner: this.#owner, capabilityId: capability.id },
       );
     }
     return value;
   }
 
   public has(capability: RuntimeCapability<unknown>): boolean {
-    this.assertLive();
+    this.#assertLive();
     return this.#entries.has(capability.symbol);
   }
 
   public getRegisteredCapabilityIds(): readonly string[] {
-    this.assertLive();
+    this.#assertLive();
     return [...this.#entries.values()].map(({ capability }) => capability.id).sort();
   }
 
@@ -133,12 +137,12 @@ export class RuntimeCapabilityRegistry implements RuntimeCapabilityReader {
     this.#entries.clear();
   }
 
-  private assertLive(): void {
+  #assertLive(): void {
     if (!this.#destroyed) return;
     throw new RuntimeCapabilityError(
       RuntimeCapabilityErrorCode.RegistryDestroyed,
-      `Runtime capability registry for ${this.owner} has been destroyed.`,
-      { owner: this.owner },
+      `Runtime capability registry for ${this.#owner} has been destroyed.`,
+      { owner: this.#owner },
     );
   }
 }

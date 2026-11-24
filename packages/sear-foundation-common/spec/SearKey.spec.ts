@@ -238,16 +238,16 @@ describe('SearKey', () => {
 
     it('should support registry pattern', () => {
       class PluginRegistry {
-        private plugins: Map<string, unknown> = new Map();
+        #plugins: Map<string, unknown> = new Map();
 
         registerPlugin(name: string, config: unknown) {
           const key = new SearKey(name);
-          this.plugins.set(key.key, config);
+          this.#plugins.set(key.key, config);
           return key.key;
         }
 
         getPluginCount() {
-          return this.plugins.size;
+          return this.#plugins.size;
         }
       }
 

@@ -27,22 +27,22 @@ export interface DocNodeDefinition {
   readonly defaultText?: boolean;
 }
 
+const creators: Record<string, (schema: Schema) => RichDocNode> = {
+  paragraph: createDefaultDocNode,
+  text: createDefaultDocNode,
+};
+const roles = new Map<string, DocNodeRole>([
+  ['paragraph', DocNodeRole.Block],
+  ['text', DocNodeRole.Text],
+]);
+let defaultBlockType: string | null = 'paragraph';
+let defaultTextType: string | null = 'text';
+
 /** Registry that maps persisted rich-document node types to constructors. */
 @Injectable()
 export class DocNodeRegistry {
   /** DI token for resolving the document node registry. */
   public static readonly symbol = Symbol.for('DocNodeRegistry');
-  private static creators: Record<string, (schema: Schema) => RichDocNode> = {
-    paragraph: createDefaultDocNode,
-    text: createDefaultDocNode,
-  };
-  private static roles = new Map<string, DocNodeRole>([
-    ['paragraph', DocNodeRole.Block],
-    ['text', DocNodeRole.Text],
-  ]);
-  private static defaultBlockType: string | null = 'paragraph';
-  private static defaultTextType: string | null = 'text';
-
   /** Registers a node factory for a persisted node type. */
   static register(type: string, creator: (schema: Schema) => RichDocNode): void;
   /** Registers a complete node definition for a persisted node type. */
@@ -58,15 +58,15 @@ export class DocNodeRegistry {
       typeof typeOrDefinition === 'string'
         ? createLegacyDefinition(typeOrDefinition, creator)
         : typeOrDefinition;
-    this.creators[definition.type] = definition.create;
-    if (definition.role) this.roles.set(definition.type, definition.role);
-    if (definition.defaultBlock) this.defaultBlockType = definition.type;
-    if (definition.defaultText) this.defaultTextType = definition.type;
+    creators[definition.type] = definition.create;
+    if (definition.role) roles.set(definition.type, definition.role);
+    if (definition.defaultBlock) defaultBlockType = definition.type;
+    if (definition.defaultText) defaultTextType = definition.type;
   }
 
   /** Creates a rich-document node from persisted schema. */
   static create(schema: Schema): RichDocNode {
-    const creator = this.creators[schema.type];
+    const creator = creators[schema.type];
     if (!creator) throw new SearError(`Unknown node type: ${schema.type}`);
     return creator(schema);
   }
@@ -83,24 +83,24 @@ export class DocNodeRegistry {
 
   /** Returns whether the persisted type has been registered as text-like. */
   static isTextType(type: string): boolean {
-    return this.roles.get(type) === DocNodeRole.Text;
+    return roles.get(type) === DocNodeRole.Text;
   }
 
   /** Returns whether the persisted type has been registered as a block container. */
   static isBlockType(type: string): boolean {
-    return this.roles.get(type) === DocNodeRole.Block;
+    return roles.get(type) === DocNodeRole.Block;
   }
 
   /** Returns the registered default block type for generic text editing. */
   static requireDefaultBlockType(): string {
-    if (!this.defaultBlockType) throw new SearError('No default document block node type has been registered.');
-    return this.defaultBlockType;
+    if (!defaultBlockType) throw new SearError('No default document block node type has been registered.');
+    return defaultBlockType;
   }
 
   /** Returns the registered default text type for generic text editing. */
   static requireDefaultTextType(): string {
-    if (!this.defaultTextType) throw new SearError('No default document text node type has been registered.');
-    return this.defaultTextType;
+    if (!defaultTextType) throw new SearError('No default document text node type has been registered.');
+    return defaultTextType;
   }
 
   /** Instance method: returns whether the persisted type has been registered as text-like. */

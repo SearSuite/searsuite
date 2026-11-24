@@ -32,7 +32,7 @@ interface WorkbookTransactionStep {
  * Reducers stage state only; the WorkbookEditor owns validation and commit.
  */
 export class WorkbookTransaction {
-  private readonly steps: WorkbookTransactionStep[] = [];
+  readonly #steps: WorkbookTransactionStep[] = [];
 
   public constructor(
     public readonly id: string,
@@ -48,18 +48,18 @@ export class WorkbookTransaction {
   /** Adds one pure reducer to the staged transaction. */
   public addStep(name: string, reduce: WorkbookTransactionReducer): this {
     if (!name.trim()) throw new SearError('Workbook transaction steps require a non-empty name.');
-    this.steps.push({ name, reduce });
+    this.#steps.push({ name, reduce });
     return this;
   }
 
   /** @internal Applies every reducer without mutating the source snapshot. */
   public stage(initial: WorkbookTransactionState): WorkbookTransactionState {
-    return this.steps.reduce((state, step) => step.reduce(state), initial);
+    return this.#steps.reduce((state, step) => step.reduce(state), initial);
   }
 
   /** Returns stable step names for diagnostics and tests. */
   public getStepNames(): readonly string[] {
-    return this.steps.map((step) => step.name);
+    return this.#steps.map((step) => step.name);
   }
 }
 

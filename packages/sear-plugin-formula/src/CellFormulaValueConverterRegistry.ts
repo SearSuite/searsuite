@@ -82,6 +82,8 @@ function getFormulaErrorValue(value: unknown): FormulaValue | null {
  */
 @Injectable()
 export class CellFormulaValueConverterRegistry {
+  readonly #platform: Platform;
+
   /** DI token for resolving CellFormulaValueConverterRegistry. */
   public static readonly symbol = Symbol.for('CellFormulaValueConverterRegistry');
 
@@ -91,7 +93,8 @@ export class CellFormulaValueConverterRegistry {
    * Creates a registry with the built-in cell-to-formula semantics.
    * @param platform - Platform adapter used for diagnostics when unknown cell types fall back to text.
    */
-  constructor(@Inject(Platform.symbol) private readonly platform: Platform) {
+  constructor(@Inject(Platform.symbol) platform: Platform) {
+    this.#platform = platform;
     this.register({
       cellType: CellType.Empty,
       toFormulaValue: convertEmptyCellToFormulaValue,
@@ -157,7 +160,7 @@ export class CellFormulaValueConverterRegistry {
     const converter = this.#converters.get(cell.type);
     if (converter) return converter.toFormulaValue(cell);
 
-    this.platform.warn(
+    this.#platform.warn(
       `[Formula] No value converter registered for cell type "${cell.type}". Falling back to coercible text.`,
     );
     return textValue(cell.value, 'allow');

@@ -22,14 +22,14 @@ export class FakeSheetEmbeddedEditor implements SheetEmbeddedEditor {
   public readonly editContexts: SheetEmbeddedEditorContext[] = [];
   public readonly renderSessions: FakeRenderSession[] = [];
 
-  private disposed = false;
+  #disposed = false;
   #isCommandExecuting: (() => boolean) | undefined;
   #teardownToken: object | null = null;
   readonly #sessionOwnerToken = {};
   readonly #editSessions = new Set<FakeEditSession>();
 
   public initialize(context: SheetEmbeddedEditorContext): void {
-    this.assertLive();
+    this.#assertLive();
     if (this.#isCommandExecuting && context.isCommandExecuting && context.isCommandExecuting !== this.#isCommandExecuting) {
       throw new SearError('Sheet edit command boundary is already bound to an editor.');
     }
@@ -38,7 +38,7 @@ export class FakeSheetEmbeddedEditor implements SheetEmbeddedEditor {
   }
 
   public createRenderSession(context: SheetEmbeddedEditorContext): SheetRenderSession {
-    this.assertLive();
+    this.#assertLive();
     this.renderContexts.push(context);
     const session = new FakeRenderSession(context);
     this.renderSessions.push(session);
@@ -46,7 +46,7 @@ export class FakeSheetEmbeddedEditor implements SheetEmbeddedEditor {
   }
 
   public createEditSession(context: SheetEmbeddedEditorContext): SheetEditSession {
-    this.assertLive();
+    this.#assertLive();
     const isCommandExecuting = this.#isCommandExecuting ?? context.isCommandExecuting;
     if (isCommandExecuting && !isCommandExecuting()) {
       throw new SearError('Sheet edit session creation must run through editor.commands.run(...).');
@@ -72,18 +72,18 @@ export class FakeSheetEmbeddedEditor implements SheetEmbeddedEditor {
   }
 
   public dispose(ownerToken?: object): void {
-    if (this.disposed) return;
+    if (this.#disposed) return;
     if (this.#teardownToken && ownerToken !== this.#teardownToken) {
       throw new SearError('Sheet embedded editor destruction requires its editor owner.');
     }
-    this.disposed = true;
+    this.#disposed = true;
     for (const session of [...this.#editSessions].reverse()) session.dispose(this.#sessionOwnerToken);
     this.#editSessions.clear();
     this.observations.destroy();
     this.disposeCount += 1;
   }
 
-  private assertLive(): void {
-    if (this.disposed) throw new SearError('FakeSheetEmbeddedEditor has been disposed.');
+  #assertLive(): void {
+    if (this.#disposed) throw new SearError('FakeSheetEmbeddedEditor has been disposed.');
   }
 }

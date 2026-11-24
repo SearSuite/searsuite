@@ -11,7 +11,7 @@ export class Container extends EventListener<string> {
   /** Unique random color key for hit detection. */
   public readonly randomColorKey: HexColor | null = getRandomColor();
 
-  private childrenKeys: Set<HexColor> = new Set();
+  #childrenKeys: Set<HexColor> = new Set();
   /** The direct scene children in paint order. */
   public get children(): HexColor[] {
     return [];

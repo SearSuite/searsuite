@@ -18,6 +18,14 @@ import { ResizeDocViewportCommand } from './DocViewportCommands';
 /** Owns standalone document root geometry, viewport state, and host resize observation. */
 @Injectable()
 export class DocViewportEnvironment {
+  readonly #configuration: DocEditorRuntimeConfiguration;
+  readonly #configEngine: ConfigEngine;
+  readonly #platform: Platform;
+  readonly #renderContext: RenderContext;
+  readonly #renderEngine: DocRenderEngine;
+  readonly #scrollManager: ScrollManager;
+  readonly #lifecycle: DocEditorLifecycleState;
+
   /** DI token for resolving the document viewport environment. */
   public static readonly symbol = Symbol.for('DocViewportEnvironment');
 
@@ -32,28 +40,35 @@ export class DocViewportEnvironment {
   public enforceTeardownBoundary(ownerToken: object): void {
     if (this.#teardownToken) throw new SearError('Doc viewport teardown boundary is already installed.');
     this.#teardownToken = ownerToken;
-    this.scrollManager.enforceTeardownBoundary(ownerToken);
+    this.#scrollManager.enforceTeardownBoundary(ownerToken);
   }
 
   /** Creates a viewport environment for one document editor instance. */
   public constructor(
     @Inject(DocEditorRuntimeConfigurationSymbol)
-    private readonly configuration: DocEditorRuntimeConfiguration,
+    configuration: DocEditorRuntimeConfiguration,
     @Inject(ConfigEngine.symbol)
-    private readonly configEngine: ConfigEngine,
+    configEngine: ConfigEngine,
     @Inject(Platform.symbol)
-    private readonly platform: Platform,
+    platform: Platform,
     @Inject(RenderContext.symbol)
-    private readonly renderContext: RenderContext,
+    renderContext: RenderContext,
     @Inject(DocRenderEngine.symbol)
-    private readonly renderEngine: DocRenderEngine,
+    renderEngine: DocRenderEngine,
     @Inject(ScrollManager.symbol)
-    private readonly scrollManager: ScrollManager,
+    scrollManager: ScrollManager,
     @Inject(DocCommandBus.symbol)
     commands: DocCommandBus,
     @Inject(DocEditorLifecycleState.symbol)
-    private readonly lifecycle: DocEditorLifecycleState,
+    lifecycle: DocEditorLifecycleState,
   ) {
+    this.#configuration = configuration;
+    this.#configEngine = configEngine;
+    this.#platform = platform;
+    this.#renderContext = renderContext;
+    this.#renderEngine = renderEngine;
+    this.#scrollManager = scrollManager;
+    this.#lifecycle = lifecycle;
     this.#commands = commands;
     this.#currentViewport = { ...configuration.initialViewport };
     this.#currentContentRect = { ...configuration.resolveContentRect(this.#currentViewport) };
@@ -63,7 +78,7 @@ export class DocViewportEnvironment {
   public start(): void {
     if (this.#destroyed) throw new SearError('Doc viewport environment has been destroyed.');
     if (this.#disposeResize) return;
-    this.#disposeResize = this.platform.observeResize(this.getRoot(), this.handleResize.bind(this));
+    this.#disposeResize = this.#platform.observeResize(this.getRoot(), this.#handleResize.bind(this));
   }
 
   /** Stops observing root resize changes and disconnects scroll publishers. */
@@ -75,12 +90,12 @@ export class DocViewportEnvironment {
     this.#destroyed = true;
     this.#disposeResize?.();
     this.#disposeResize = null;
-    this.scrollManager.destroy(ownerToken);
+    this.#scrollManager.destroy(ownerToken);
   }
 
   /** Returns the render root that receives pointer events. */
   public getRoot(): unknown {
-    return this.renderContext.getRoot();
+    return this.#renderContext.getRoot();
   }
 
   /** Returns the current viewport model. */
@@ -95,7 +110,7 @@ export class DocViewportEnvironment {
 
   /** Resolves render-root offset in host-view coordinates. */
   public readRootViewOffset(): { x: number; y: number } {
-    return this.platform.readViewOffset(this.getRoot());
+    return this.#platform.readViewOffset(this.getRoot());
   }
 
   /** Applies a command-owned viewport resize local action. */
@@ -104,17 +119,17 @@ export class DocViewportEnvironment {
       throw new SearError('Doc viewport changes must run through editor.commands.run(...).');
     }
     this.#currentViewport = { width: size.width, height: size.height };
-    this.#currentContentRect = { ...this.configuration.resolveContentRect(this.#currentViewport) };
-    this.renderEngine.resize(
+    this.#currentContentRect = { ...this.#configuration.resolveContentRect(this.#currentViewport) };
+    this.#renderEngine.resize(
       this.#currentViewport.width,
       this.#currentViewport.height,
-      this.configEngine.getDefaultConfig().devicePixelRatio,
+      this.#configEngine.getDefaultConfig().devicePixelRatio,
     );
-    this.scrollManager.resize(this.#currentViewport.width, this.#currentViewport.height);
+    this.#scrollManager.resize(this.#currentViewport.width, this.#currentViewport.height);
   }
 
-  private handleResize(size: DocEditorViewport): void {
-    if (this.lifecycle.isDestroyed()) return;
+  #handleResize(size: DocEditorViewport): void {
+    if (this.#lifecycle.isDestroyed()) return;
     this.#commands.run(ResizeDocViewportCommand, size);
   }
 }

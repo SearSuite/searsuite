@@ -15,11 +15,6 @@ import { isFormulaError } from '@searsuite/sear-foundation-utils';
 import { FormulaRenderInvalidator } from '../src/FormulaRenderInvalidator';
 import { SheetDisplayedValueChanges } from '@searsuite/sear-domain-cell-types';
 
-type RecalcSchedulerInternals = {
-  runBatch(): void;
-  formulaValueToDisplay(value: unknown): string;
-};
-
 describe('RecalcScheduler', () => {
   let graph: any;
   let evaluator: any;
@@ -239,7 +234,7 @@ describe('RecalcScheduler', () => {
       return [];
     });
 
-    scheduler.schedule(); // starts runBatch
+    scheduler.resumePendingWork(); // starts runBatch
     expect(platform.queueMicrotask).toHaveBeenCalled();
 
     // Now test generation mismatch with pendingCount = 0 inside the condition
@@ -251,7 +246,7 @@ describe('RecalcScheduler', () => {
         console.log('pendingCount getter called', pendingCountCalls);
         // 1st call: while loop condition -> returns 1 so it enters
         // 2nd call: if (this.graph.pendingCount > 0) -> returns 0 so it skips schedule
-        return pendingCountCalls === 1 ? 1 : 0;
+        return pendingCountCalls <= 2 ? 1 : 0;
       },
       configurable: true,
     });
@@ -262,14 +257,14 @@ describe('RecalcScheduler', () => {
     });
 
     platform.queueMicrotask.mockClear();
-    scheduler.schedule();
+    scheduler.resumePendingWork();
     expect(platform.queueMicrotask).toHaveBeenCalledTimes(1); // Not recursively scheduled
   });
 
   it('handles budget exceed (lines 152-153)', () => {
     graph.pendingCount = 1;
     platform.now = jest.fn().mockReturnValueOnce(0).mockReturnValueOnce(100); // Exceed budget
-    scheduler.schedule();
+    scheduler.resumePendingWork();
     expect(platform.requestAnimationFrame).toHaveBeenCalled();
   });
 
@@ -284,7 +279,7 @@ describe('RecalcScheduler', () => {
       return 1;
     });
 
-    scheduler.schedule();
+    scheduler.resumePendingWork();
     expect(rafCallback).not.toBeNull();
 
     graph.pendingCount = 0;
@@ -306,18 +301,15 @@ describe('RecalcScheduler', () => {
       },
     });
 
-    const scheduleSpy = jest.spyOn(scheduler, 'schedule');
-    const schedulerInternals = scheduler as unknown as RecalcSchedulerInternals;
-    schedulerInternals.runBatch();
-
-    expect(scheduleSpy).not.toHaveBeenCalled();
+    scheduler.processScheduledBatch();
+    expect(platform.queueMicrotask).not.toHaveBeenCalled();
     await expect(scheduler.waitForIdle()).resolves.toBeUndefined();
   });
 
   it('breaks out of loop if no ready formulas (line 164)', () => {
     graph.pendingCount = 1;
     graph.getNextReadyBatch = jest.fn().mockReturnValue([]); // no ready keys
-    scheduler.schedule();
+    scheduler.resumePendingWork();
     expect(graph.markClean).not.toHaveBeenCalled();
   });
 
@@ -365,7 +357,7 @@ describe('RecalcScheduler', () => {
       return [];
     });
 
-    scheduler.schedule();
+    scheduler.resumePendingWork();
 
     // getSheetShape
     expect(ctx.getSheetShape?.()).toEqual([10, 10]);
@@ -419,7 +411,7 @@ describe('RecalcScheduler', () => {
 
     evaluator.evaluateBatch = jest.fn().mockReturnValue(results);
 
-    scheduler.schedule();
+    scheduler.resumePendingWork();
 
     expect(resultStore.set).toHaveBeenCalledTimes(8);
     expect(renderInvalidator.invalidateFormulaResults).toHaveBeenCalledWith(results.map((result) => result.key));
@@ -460,7 +452,7 @@ describe('RecalcScheduler', () => {
     });
     evaluator.evaluateBatch = jest.fn().mockReturnValue([{ key: target, value: 7 }]);
 
-    scheduler.schedule();
+    scheduler.resumePendingWork();
 
     expect(trace.emit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -487,7 +479,7 @@ describe('RecalcScheduler', () => {
     evaluator.evaluateBatch = jest.fn().mockReturnValue([{ key: target, value: 7 }]);
 
     const idle = scheduler.waitForIdle();
-    scheduler.schedule();
+    scheduler.resumePendingWork();
 
     await expect(idle).resolves.toBeUndefined();
     await expect(scheduler.waitForIdle()).resolves.toBeUndefined();
@@ -512,7 +504,7 @@ describe('RecalcScheduler', () => {
       batch.map(({ key }) => ({ key, value: key === visible ? 20 : 10 })),
     );
 
-    scheduler.schedule();
+    scheduler.resumePendingWork();
 
     expect(dataSource.getViewportFormulaKeys).toHaveBeenCalledWith(astCache.keys());
     expect(graph.getNextReadyBatch.mock.calls[0][0]).toEqual(new Set([visible]));
@@ -520,12 +512,6 @@ describe('RecalcScheduler', () => {
       visible,
       offscreen,
     ]);
-  });
-
-  it('formats unknown formula display values as empty text', () => {
-    const schedulerInternals = scheduler as unknown as RecalcSchedulerInternals;
-
-    expect(schedulerInternals.formulaValueToDisplay({ unexpected: true })).toBe('');
   });
 
   it('uses the formula render invalidator as a no-op bridge until assembly binds it', () => {

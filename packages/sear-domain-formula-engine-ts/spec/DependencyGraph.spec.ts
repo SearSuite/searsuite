@@ -1,7 +1,7 @@
 import { DependencyGraph } from '../src/DependencyGraph';
 import { cellKey } from '../src/cellKey';
 import { type Dependency } from '@searsuite/sear-domain-formula-engine';
-import { FormulaNodeKind } from '@searsuite/sear-domain-formula-engine';
+import { FormulaNodeKind, StructureChangeAxis, shiftStructureCoordinate, type StructureChange } from '@searsuite/sear-domain-formula-engine';
 import { MatrixOTActionName } from '@searsuite/sear-domain-ot';
 
 describe('DependencyGraph', () => {
@@ -451,21 +451,21 @@ describe('DependencyGraph', () => {
     });
 
     it('covers shiftColumn and shiftRow delete branches for both retained and removed indices', () => {
-      const changesColDelete = [{ type: MatrixOTActionName.ColDelete, index: 3, count: 2 }];
-      expect((graph as any).shiftColumn(10, changesColDelete)).toBe(8);
-      expect((graph as any).shiftColumn(3, changesColDelete)).toBe(-1);
+      const changesColDelete: StructureChange[] = [{ type: MatrixOTActionName.ColDelete, index: 3, count: 2 }];
+      expect(shiftStructureCoordinate({ coordinate: 10, axis: StructureChangeAxis.Col, changes: changesColDelete }).value).toBe(8);
+      expect(shiftStructureCoordinate({ coordinate: 3, axis: StructureChangeAxis.Col, changes: changesColDelete }).value).toBe(-1);
 
-      const changesRowDelete = [{ type: MatrixOTActionName.RowDelete, index: 4, count: 3 }];
-      expect((graph as any).shiftRow(10, changesRowDelete)).toBe(7);
-      expect((graph as any).shiftRow(4, changesRowDelete)).toBe(-1);
+      const changesRowDelete: StructureChange[] = [{ type: MatrixOTActionName.RowDelete, index: 4, count: 3 }];
+      expect(shiftStructureCoordinate({ coordinate: 10, axis: StructureChangeAxis.Row, changes: changesRowDelete }).value).toBe(7);
+      expect(shiftStructureCoordinate({ coordinate: 4, axis: StructureChangeAxis.Row, changes: changesRowDelete }).value).toBe(-1);
     });
 
     it('covers shiftColumn and shiftRow delete non-overlap branch (value before delete window)', () => {
-      const changesColDelete = [{ type: MatrixOTActionName.ColDelete, index: 5, count: 2 }];
-      const changesRowDelete = [{ type: MatrixOTActionName.RowDelete, index: 7, count: 3 }];
+      const changesColDelete: StructureChange[] = [{ type: MatrixOTActionName.ColDelete, index: 5, count: 2 }];
+      const changesRowDelete: StructureChange[] = [{ type: MatrixOTActionName.RowDelete, index: 7, count: 3 }];
 
-      expect((graph as any).shiftColumn(1, changesColDelete)).toBe(1);
-      expect((graph as any).shiftRow(2, changesRowDelete)).toBe(2);
+      expect(shiftStructureCoordinate({ coordinate: 1, axis: StructureChangeAxis.Col, changes: changesColDelete }).value).toBe(1);
+      expect(shiftStructureCoordinate({ coordinate: 2, axis: StructureChangeAxis.Row, changes: changesRowDelete }).value).toBe(2);
     });
 
   });

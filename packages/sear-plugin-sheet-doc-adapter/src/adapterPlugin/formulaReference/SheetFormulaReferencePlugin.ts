@@ -10,11 +10,11 @@ export class SheetFormulaReferencePlugin implements SheetEmbeddedEditorPlugin {
   #references: string[] = [];
 
   public initialize(context: SheetEmbeddedEditorPluginContext): void {
-    this.#references = this.collectReferences(context.document);
+    this.#references = this.#collectReferences(context.document);
   }
 
   public onRender(_update: SheetRenderUpdate, context: SheetEmbeddedEditorPluginContext): void {
-    this.#references = this.collectReferences(context.document);
+    this.#references = this.#collectReferences(context.document);
   }
 
   public getReferences(): readonly string[] {
@@ -25,7 +25,7 @@ export class SheetFormulaReferencePlugin implements SheetEmbeddedEditorPlugin {
     this.#references = [];
   }
 
-  private collectReferences(document: SheetDocument): string[] {
+  #collectReferences(document: SheetDocument): string[] {
     const references: string[] = [];
     const visit = (nodes: SheetDocument): void => {
       nodes.forEach((node) => {

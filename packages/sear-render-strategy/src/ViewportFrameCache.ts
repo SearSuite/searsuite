@@ -13,7 +13,9 @@ import { clearViewport } from './ViewportRenderHelpers';
  * priming after first paint, and refreshing after an incremental scroll redraw.
  */
 export class ViewportFrameCache {
-  private readonly copyExecutor: RasterCopyExecutor;
+  readonly #cacheContext: RenderContext;
+
+  readonly #copyExecutor: RasterCopyExecutor;
 
   /**
    * Creates a viewport frame cache facade.
@@ -22,25 +24,26 @@ export class ViewportFrameCache {
    * @param copyExecutor Raster copy executor used for cache synchronization.
    */
   public constructor(
-    private readonly cacheContext: RenderContext,
+    cacheContext: RenderContext,
     copyExecutor: RasterCopyExecutor,
   ) {
-    this.copyExecutor = copyExecutor;
+    this.#cacheContext = cacheContext;
+    this.#copyExecutor = copyExecutor;
   }
 
   /** Returns whether the cache already contains a complete base frame. */
   public isReady(): boolean {
-    return this.cacheContext.isDrawn;
+    return this.#cacheContext.isDrawn;
   }
 
   /** Marks the cached frame invalid so the next render performs a full prime. */
   public invalidate(): void {
-    this.cacheContext.isDrawn = false;
+    this.#cacheContext.isDrawn = false;
   }
 
   /** Marks the cached frame ready after a complete frame has been copied in. */
   public markReady(): void {
-    this.cacheContext.isDrawn = true;
+    this.#cacheContext.isDrawn = true;
   }
 
   /**
@@ -49,7 +52,7 @@ export class ViewportFrameCache {
    * @param viewport Viewport-space rectangle to erase from the cache.
    */
   public clear(viewport: PositionRectProps): void {
-    clearViewport(this.cacheContext, viewport);
+    clearViewport(this.#cacheContext, viewport);
   }
 
   /**
@@ -60,7 +63,7 @@ export class ViewportFrameCache {
    */
   public primeFromVisibleFrame(visibleContext: RenderContext, viewport: PositionRectProps): void {
     this.clear(viewport);
-    this.copyExecutor.copy(visibleContext, this.cacheContext, RasterCopyPlan.createViewportToCacheCopy(viewport));
+    this.#copyExecutor.copy(visibleContext, this.#cacheContext, RasterCopyPlan.createViewportToCacheCopy(viewport));
     this.markReady();
   }
 
@@ -72,7 +75,7 @@ export class ViewportFrameCache {
    */
   public refreshFromVisibleFrame(visibleContext: RenderContext, viewport: PositionRectProps): void {
     this.clear(viewport);
-    this.copyExecutor.copy(visibleContext, this.cacheContext, RasterCopyPlan.createViewportToCacheCopy(viewport));
+    this.#copyExecutor.copy(visibleContext, this.#cacheContext, RasterCopyPlan.createViewportToCacheCopy(viewport));
     this.markReady();
   }
 }

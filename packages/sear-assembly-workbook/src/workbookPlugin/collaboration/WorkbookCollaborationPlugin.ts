@@ -49,6 +49,9 @@ export const WorkbookCollaborationCapability = defineWorkbookRuntimeCapability<W
 /** Owns collaboration state beyond the lifetime of any temporary active SheetEditor. */
 @Injectable()
 export class WorkbookCollaborationPlugin extends WorkbookPlugin implements WorkbookCollaborationSession {
+  readonly #transports: WorkbookCollaborationTransportFactory;
+  readonly #platform: Platform;
+
   public static readonly symbol = Symbol.for('WorkbookCollaborationPlugin');
 
   readonly #channels = new Map<WorkbookSheetId, CollaborationChannel>();
@@ -57,10 +60,12 @@ export class WorkbookCollaborationPlugin extends WorkbookPlugin implements Workb
 
   public constructor(
     @Inject(WorkbookCollaborationTransportFactory.symbol)
-    private readonly transports: WorkbookCollaborationTransportFactory,
-    @Inject(Platform.symbol) private readonly platform: Platform,
+    transports: WorkbookCollaborationTransportFactory,
+    @Inject(Platform.symbol) platform: Platform,
   ) {
     super();
+    this.#transports = transports;
+    this.#platform = platform;
   }
 
   public registerCapabilities(registry: WorkbookRuntimeExtensionRegistry): void {
@@ -72,11 +77,11 @@ export class WorkbookCollaborationPlugin extends WorkbookPlugin implements Workb
 
   public registerCommands(commands: WorkbookCommandBus): void {
     commands.register(ConnectWorkbookCollaborationCommand, ({ sheetId, options }) => {
-      this.assertKnownSheet(sheetId);
-      return this.getOrCreateChannel(sheetId).connect(options);
+      this.#assertKnownSheet(sheetId);
+      return this.#getOrCreateChannel(sheetId).connect(options);
     });
     commands.register(DisconnectWorkbookCollaborationCommand, ({ sheetId }) => {
-      this.assertKnownSheet(sheetId);
+      this.#assertKnownSheet(sheetId);
       this.#channels.get(sheetId)?.disconnect();
     });
     commands.register(ApplyWorkbookCollaborationEventCommand, ({ sheetId, event }) => {
@@ -89,7 +94,7 @@ export class WorkbookCollaborationPlugin extends WorkbookPlugin implements Workb
       {
         token: CollaborationChannelBinding.symbol,
         value: {
-          channel: this.getOrCreateChannel(context.sheetId),
+          channel: this.#getOrCreateChannel(context.sheetId),
           owner: 'host',
         } satisfies CollaborationChannelBinding,
       },
@@ -120,7 +125,7 @@ export class WorkbookCollaborationPlugin extends WorkbookPlugin implements Workb
   }
 
   public getSheetStatus(sheetId: WorkbookSheetId): CollaborationStatus | undefined {
-    this.assertKnownSheet(sheetId);
+    this.#assertKnownSheet(sheetId);
     return this.#channels.get(sheetId)?.getStatus();
   }
 
@@ -138,10 +143,10 @@ export class WorkbookCollaborationPlugin extends WorkbookPlugin implements Workb
     this.#runtime = null;
   }
 
-  private getOrCreateChannel(sheetId: WorkbookSheetId): CollaborationChannel {
+  #getOrCreateChannel(sheetId: WorkbookSheetId): CollaborationChannel {
     const existing = this.#channels.get(sheetId);
     if (existing) return existing;
-    const channel = new CollaborationChannel(() => this.transports.create(), this.platform);
+    const channel = new CollaborationChannel(() => this.#transports.create(), this.#platform);
     if (this.#runtime) CollaborationChannel.prototype.enforceCommandBoundary.call(channel,
       this.#assertChannelWrite, this.#runtime.commands.runWithoutMutationAuthority.bind(this.#runtime.commands),
       (event) => { this.#runtime?.commands.run(ApplyWorkbookCollaborationEventCommand, { sheetId, event }); },
@@ -160,7 +165,7 @@ export class WorkbookCollaborationPlugin extends WorkbookPlugin implements Workb
     throw new SearContractViolationError('Collaboration state must change through editor.commands.run(...).');
   };
 
-  private assertKnownSheet(sheetId: WorkbookSheetId): void {
+  #assertKnownSheet(sheetId: WorkbookSheetId): void {
     if (!this.#runtime) return;
     if (this.#runtime.document.getState().sheets.some((sheet) => sheet.id === sheetId)) return;
     throw new SearError(`Workbook sheet "${sheetId}" does not exist.`, { sheetId });

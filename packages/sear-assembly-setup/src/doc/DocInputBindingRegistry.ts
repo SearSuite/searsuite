@@ -35,7 +35,7 @@ export class DocInputBindingRegistry {
     this.#assertWritable();
     const registered = Object.freeze({ ...handlers });
     this.#textHandlers.add(registered);
-    return this.unregisterTextHandlers.bind(this, registered);
+    return this.#unregisterTextHandlers.bind(this, registered);
   }
 
   /** Adds keyboard-action handlers and returns a disposer. */
@@ -43,38 +43,38 @@ export class DocInputBindingRegistry {
     this.#assertWritable();
     const registered = Object.freeze({ ...handlers });
     this.#keyboardHandlers.add(registered);
-    return this.unregisterKeyboardHandlers.bind(this, registered);
+    return this.#unregisterKeyboardHandlers.bind(this, registered);
   }
 
   /** Creates the composed text handlers passed to the host text adapter. */
   public createTextHandlers(): TextInputHandlers {
     return {
-      onTextInput: this.dispatchTextInput.bind(this),
-      onDelete: this.dispatchTextDelete.bind(this),
+      onTextInput: this.#dispatchTextInput.bind(this),
+      onDelete: this.#dispatchTextDelete.bind(this),
     };
   }
 
   /** Creates the composed keyboard handlers passed to the host keyboard adapter. */
   public createKeyboardHandlers(): KeyboardRouterHandlers {
     return {
-      onDelete: this.dispatchKeyboardDelete.bind(this),
-      onEnter: this.dispatchKeyboardEnter.bind(this),
-      onEscape: this.dispatchKeyboardEscape.bind(this),
-      onArrowLeft: this.dispatchKeyboardArrowLeft.bind(this),
-      onArrowRight: this.dispatchKeyboardArrowRight.bind(this),
-      onArrowUp: this.dispatchKeyboardArrowUp.bind(this),
-      onArrowDown: this.dispatchKeyboardArrowDown.bind(this),
-      onSelectAll: this.dispatchKeyboardSelectAll.bind(this),
-      onToggleBold: this.dispatchKeyboardToggleBold.bind(this),
-      onToggleItalic: this.dispatchKeyboardToggleItalic.bind(this),
-      onToggleUnderline: this.dispatchKeyboardToggleUnderline.bind(this),
-      onToggleStrikethrough: this.dispatchKeyboardToggleStrikethrough.bind(this),
-      onSoftEnter: this.dispatchKeyboardSoftEnter.bind(this),
-      onZoomIn: this.dispatchKeyboardZoomIn.bind(this),
-      onZoomOut: this.dispatchKeyboardZoomOut.bind(this),
-      onZoomReset: this.dispatchKeyboardZoomReset.bind(this),
-      onUndo: this.dispatchKeyboardUndo.bind(this),
-      onRedo: this.dispatchKeyboardRedo.bind(this),
+      onDelete: this.#dispatchKeyboardDelete.bind(this),
+      onEnter: this.#dispatchKeyboardEnter.bind(this),
+      onEscape: this.#dispatchKeyboardEscape.bind(this),
+      onArrowLeft: this.#dispatchKeyboardArrowLeft.bind(this),
+      onArrowRight: this.#dispatchKeyboardArrowRight.bind(this),
+      onArrowUp: this.#dispatchKeyboardArrowUp.bind(this),
+      onArrowDown: this.#dispatchKeyboardArrowDown.bind(this),
+      onSelectAll: this.#dispatchKeyboardSelectAll.bind(this),
+      onToggleBold: this.#dispatchKeyboardToggleBold.bind(this),
+      onToggleItalic: this.#dispatchKeyboardToggleItalic.bind(this),
+      onToggleUnderline: this.#dispatchKeyboardToggleUnderline.bind(this),
+      onToggleStrikethrough: this.#dispatchKeyboardToggleStrikethrough.bind(this),
+      onSoftEnter: this.#dispatchKeyboardSoftEnter.bind(this),
+      onZoomIn: this.#dispatchKeyboardZoomIn.bind(this),
+      onZoomOut: this.#dispatchKeyboardZoomOut.bind(this),
+      onZoomReset: this.#dispatchKeyboardZoomReset.bind(this),
+      onUndo: this.#dispatchKeyboardUndo.bind(this),
+      onRedo: this.#dispatchKeyboardRedo.bind(this),
     };
   }
 
@@ -86,95 +86,95 @@ export class DocInputBindingRegistry {
     this.#destroyed = true;
   }
 
-  private unregisterTextHandlers(handlers: TextInputHandlers): void {
+  #unregisterTextHandlers(handlers: TextInputHandlers): void {
     if (!this.#textHandlers.has(handlers)) return;
     this.#assertWritable(true);
     this.#textHandlers.delete(handlers);
   }
 
-  private unregisterKeyboardHandlers(handlers: KeyboardRouterHandlers): void {
+  #unregisterKeyboardHandlers(handlers: KeyboardRouterHandlers): void {
     if (!this.#keyboardHandlers.has(handlers)) return;
     this.#assertWritable(true);
     this.#keyboardHandlers.delete(handlers);
   }
 
-  private dispatchTextInput(event: TextInputEvent): void {
+  #dispatchTextInput(event: TextInputEvent): void {
     for (const handler of this.#textHandlers) handler.onTextInput?.(event);
   }
 
-  private dispatchTextDelete(): void {
+  #dispatchTextDelete(): void {
     for (const handler of this.#textHandlers) handler.onDelete?.();
   }
 
-  private dispatchKeyboardDelete(): void {
+  #dispatchKeyboardDelete(): void {
     for (const handler of this.#keyboardHandlers) handler.onDelete?.();
   }
 
-  private dispatchKeyboardEnter(): void {
+  #dispatchKeyboardEnter(): void {
     for (const handler of this.#keyboardHandlers) handler.onEnter?.(false);
   }
 
-  private dispatchKeyboardEscape(): void {
+  #dispatchKeyboardEscape(): void {
     for (const handler of this.#keyboardHandlers) handler.onEscape?.();
   }
 
-  private dispatchKeyboardArrowLeft(shiftKey: boolean, metaKey: boolean): void {
+  #dispatchKeyboardArrowLeft(shiftKey: boolean, metaKey: boolean): void {
     for (const handler of this.#keyboardHandlers) handler.onArrowLeft?.(shiftKey, metaKey);
   }
 
-  private dispatchKeyboardArrowRight(shiftKey: boolean, metaKey: boolean): void {
+  #dispatchKeyboardArrowRight(shiftKey: boolean, metaKey: boolean): void {
     for (const handler of this.#keyboardHandlers) handler.onArrowRight?.(shiftKey, metaKey);
   }
 
-  private dispatchKeyboardArrowUp(shiftKey: boolean, metaKey: boolean): void {
+  #dispatchKeyboardArrowUp(shiftKey: boolean, metaKey: boolean): void {
     for (const handler of this.#keyboardHandlers) handler.onArrowUp?.(shiftKey, metaKey);
   }
 
-  private dispatchKeyboardArrowDown(shiftKey: boolean, metaKey: boolean): void {
+  #dispatchKeyboardArrowDown(shiftKey: boolean, metaKey: boolean): void {
     for (const handler of this.#keyboardHandlers) handler.onArrowDown?.(shiftKey, metaKey);
   }
 
-  private dispatchKeyboardSelectAll(): void {
+  #dispatchKeyboardSelectAll(): void {
     for (const handler of this.#keyboardHandlers) handler.onSelectAll?.();
   }
 
-  private dispatchKeyboardToggleBold(): void {
+  #dispatchKeyboardToggleBold(): void {
     for (const handler of this.#keyboardHandlers) handler.onToggleBold?.();
   }
 
-  private dispatchKeyboardToggleItalic(): void {
+  #dispatchKeyboardToggleItalic(): void {
     for (const handler of this.#keyboardHandlers) handler.onToggleItalic?.();
   }
 
-  private dispatchKeyboardToggleUnderline(): void {
+  #dispatchKeyboardToggleUnderline(): void {
     for (const handler of this.#keyboardHandlers) handler.onToggleUnderline?.();
   }
 
-  private dispatchKeyboardToggleStrikethrough(): void {
+  #dispatchKeyboardToggleStrikethrough(): void {
     for (const handler of this.#keyboardHandlers) handler.onToggleStrikethrough?.();
   }
 
-  private dispatchKeyboardSoftEnter(): void {
+  #dispatchKeyboardSoftEnter(): void {
     for (const handler of this.#keyboardHandlers) handler.onSoftEnter?.();
   }
 
-  private dispatchKeyboardZoomIn(): void {
+  #dispatchKeyboardZoomIn(): void {
     for (const handler of this.#keyboardHandlers) handler.onZoomIn?.();
   }
 
-  private dispatchKeyboardZoomOut(): void {
+  #dispatchKeyboardZoomOut(): void {
     for (const handler of this.#keyboardHandlers) handler.onZoomOut?.();
   }
 
-  private dispatchKeyboardZoomReset(): void {
+  #dispatchKeyboardZoomReset(): void {
     for (const handler of this.#keyboardHandlers) handler.onZoomReset?.();
   }
 
-  private dispatchKeyboardUndo(): void {
+  #dispatchKeyboardUndo(): void {
     for (const handler of this.#keyboardHandlers) handler.onUndo?.();
   }
 
-  private dispatchKeyboardRedo(): void {
+  #dispatchKeyboardRedo(): void {
     for (const handler of this.#keyboardHandlers) handler.onRedo?.();
   }
 }

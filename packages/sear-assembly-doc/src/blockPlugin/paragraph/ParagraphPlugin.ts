@@ -42,7 +42,7 @@ export class ParagraphPlugin extends DocPlugin<null> {
   /** DI token for resolving ParagraphPlugin. */
   public static readonly symbol = Symbol.for('ParagraphPlugin');
 
-  private runtime: DocPluginRuntime | null = null;
+  #runtime: DocPluginRuntime | null = null;
 
   /** Creates a ParagraphPlugin instance. */
   public constructor() {
@@ -71,7 +71,7 @@ export class ParagraphPlugin extends DocPlugin<null> {
   }
 
   public configure(context: DocPluginSetupContext): void {
-    this.runtime = context.runtime;
+    this.#runtime = context.runtime;
   }
 
   public registerKeyboardHandlers({ bindings, commands }: DocKeyboardHandlerRegistrationContext): void {
@@ -90,54 +90,54 @@ export class ParagraphPlugin extends DocPlugin<null> {
   }
 
   public onEditorDestroy(): void {
-    this.runtime = null;
+    this.#runtime = null;
   }
 
   public registerCommands(commands: DocCommandBus): void {
-    commands.register(LoadDocumentCommand, this.createLoadDocumentCommand.bind(this));
-    commands.register(SplitDocParagraphCommand, this.createSplitParagraphCommand.bind(this));
-    commands.register(RenderDocCommand, this.createRenderCommand.bind(this));
-    commands.register(SetDocLineSpacingCommand, this.createSetLineSpacingCommand.bind(this));
-    commands.register(SetDocParagraphSpacingAfterCommand, this.createSetParagraphSpacingAfterCommand.bind(this));
+    commands.register(LoadDocumentCommand, this.#createLoadDocumentCommand.bind(this));
+    commands.register(SplitDocParagraphCommand, this.#createSplitParagraphCommand.bind(this));
+    commands.register(RenderDocCommand, this.#createRenderCommand.bind(this));
+    commands.register(SetDocLineSpacingCommand, this.#createSetLineSpacingCommand.bind(this));
+    commands.register(SetDocParagraphSpacingAfterCommand, this.#createSetParagraphSpacingAfterCommand.bind(this));
   }
 
-  private createLoadDocumentCommand(input: LoadDocumentInput) {
+  #createLoadDocumentCommand(input: LoadDocumentInput) {
     const plugin = this;
     function createLoadDocumentTransaction() {
-      return plugin.requireRuntime().document.input.createReplaceDocumentTransaction(input.document);
+      return plugin.#requireRuntime().document.input.createReplaceDocumentTransaction(input.document);
     }
     return createDocCommand(LoadDocumentCommand.id, DocContentRenderPluginKey, createLoadDocumentTransaction);
   }
 
-  private createSplitParagraphCommand() {
+  #createSplitParagraphCommand() {
     return createDocCommand(
       SplitDocParagraphCommand.id,
       DocContentRenderPluginKey,
-      this.createSplitParagraphTransaction.bind(this),
+      this.#createSplitParagraphTransaction.bind(this),
       [{ type: 'reset-caret-blink' }],
     );
   }
 
-  private createRenderCommand() {
+  #createRenderCommand() {
     return createDocCommand(RenderDocCommand.id, DocContentRenderPluginKey);
   }
 
-  private createSetLineSpacingCommand(input: SetDocLineSpacingInput) {
+  #createSetLineSpacingCommand(input: SetDocLineSpacingInput) {
     const lineSpacing = normalizeLineSpacing(input?.lineSpacing);
     return createDocCommand(SetDocLineSpacingCommand.id, DocContentRenderPluginKey, () =>
-      this.createParagraphAttributeTransaction(RichTextParagraphAttribute.LineSpacing, lineSpacing),
+      this.#createParagraphAttributeTransaction(RichTextParagraphAttribute.LineSpacing, lineSpacing),
     );
   }
 
-  private createSetParagraphSpacingAfterCommand(input: SetDocParagraphSpacingAfterInput) {
+  #createSetParagraphSpacingAfterCommand(input: SetDocParagraphSpacingAfterInput) {
     const spacingAfter = normalizeSpacingAfter(input?.spacingAfter);
     return createDocCommand(SetDocParagraphSpacingAfterCommand.id, DocContentRenderPluginKey, () =>
-      this.createParagraphAttributeTransaction(RichTextParagraphAttribute.SpacingAfter, spacingAfter),
+      this.#createParagraphAttributeTransaction(RichTextParagraphAttribute.SpacingAfter, spacingAfter),
     );
   }
 
-  private createParagraphAttributeTransaction(key: string, value: unknown | undefined) {
-    const runtime = this.requireRuntime();
+  #createParagraphAttributeTransaction(key: string, value: unknown | undefined) {
+    const runtime = this.#requireRuntime();
     return runtime.document.input.createTransaction((transaction, currentState) => {
       const [start, end] = resolveSelectedParagraphRange(currentState.docSelection, currentState.pendingDoc.length);
       for (let index = start; index <= end; index++) {
@@ -149,13 +149,13 @@ export class ParagraphPlugin extends DocPlugin<null> {
     }, new ReflowDocTransaction());
   }
 
-  private createSplitParagraphTransaction() {
-    return this.requireRuntime().document.input.createSoftEnterTransaction();
+  #createSplitParagraphTransaction() {
+    return this.#requireRuntime().document.input.createSoftEnterTransaction();
   }
 
-  private requireRuntime(): DocPluginRuntime {
-    if (!this.runtime) throw new SearError('ParagraphPlugin is not configured.');
-    return this.runtime;
+  #requireRuntime(): DocPluginRuntime {
+    if (!this.#runtime) throw new SearError('ParagraphPlugin is not configured.');
+    return this.#runtime;
   }
 }
 

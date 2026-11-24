@@ -44,6 +44,8 @@ export const SheetFilterViewSessionStateDefinition = defineSessionState<SheetFil
 /** Owns persisted filter rules and a derived, editor-local row visibility view. */
 @Injectable()
 export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilterPluginState> implements SheetRowVisibility {
+  readonly #dependencies: SheetFilterDependencies;
+
   public static readonly symbol = Symbol.for('SheetFilterPlugin');
   public static readonly pluginKey = key;
   public static readonly documentState: PluginDocumentStateContribution<SheetFilterPluginState, SheetFilterPluginState> = {
@@ -77,10 +79,11 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
   #blankFiltered = false;
   #commandBus: SheetCommandBus | null = null;
   readonly #visibilityView: SheetRowVisibility;
-  private readonly disposeValueChanges: (() => void) | undefined;
+  readonly #disposeValueChanges: (() => void) | undefined;
 
-  public constructor(state: SheetFilterPluginState, private readonly dependencies: SheetFilterDependencies) {
+  public constructor(state: SheetFilterPluginState, dependencies: SheetFilterDependencies) {
     super({ key, state });
+    this.#dependencies = dependencies;
     const owner = this;
     this.#visibilityView = Object.freeze({
       get version() { return owner.version; },
@@ -88,7 +91,7 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
       isRowFiltered(row: number) { return owner.isRowFiltered(row); },
     });
     this.#currentDefinition = state.filters.getItem(0, 0);
-    this.disposeValueChanges = dependencies.displayedValueChanges?.subscribe(() => this.#invalidate());
+    this.#disposeValueChanges = dependencies.displayedValueChanges?.subscribe(() => this.#invalidate());
   }
 
   public get version(): number { return this.#revision; }
@@ -104,10 +107,10 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
     if (cached !== undefined) return cached;
     const filtered = definition.rules.some(({ column, predicate }) => !evaluateSheetFilter(
       predicate,
-      this.dependencies.readValue(row, column),
-      (property) => this.dependencies.readColor(row, column, property),
-      this.dependencies.platform,
-      this.dependencies.parseDate,
+      this.#dependencies.readValue(row, column),
+      (property) => this.#dependencies.readColor(row, column, property),
+      this.#dependencies.platform,
+      this.#dependencies.parseDate,
     ));
     if (this.#rowResults.size >= 4096) this.#rowResults.clear();
     this.#rowResults.set(row, filtered);
@@ -186,7 +189,7 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
     return changed ? state : null;
   }
 
-  public dispose(): void { this.assertRuntimeWriteAllowed(); this.disposeValueChanges?.(); this.#rowResults.clear(); }
+  public dispose(): void { this.assertRuntimeWriteAllowed(); this.#disposeValueChanges?.(); this.#rowResults.clear(); }
   public getPluginConfig(): null { return null; }
   public render(): [] { return []; }
 
@@ -198,9 +201,9 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
     if (transaction.pluginKey === key) {
       this.#privateDefinition = null;
       this.#invalidate(this.getState().filters.getItem(0, 0));
-      this.dependencies.invalidateVisibilityAggregates?.();
+      this.#dependencies.invalidateVisibilityAggregates?.();
       if (transaction.getMeta<TransactionOrigin>(TRANSACTION_ORIGIN_META_KEY) === TransactionOrigin.History)
-        this.dependencies.requestRenderAll?.();
+        this.#dependencies.requestRenderAll?.();
       return;
     }
     if (structure.length) this.#invalidate(this.getState().filters.getItem(0, 0));
@@ -212,7 +215,7 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
           projected = projected ? projectSheetFilterDefinition(projected, operation) : null;
         }
         this.#setPrivateDefinition(projected);
-        this.dependencies.requestRenderAll?.();
+        this.#dependencies.requestRenderAll?.();
         return;
       }
     }
@@ -221,14 +224,14 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
     const readsColor = definition.rules.some(({ predicate }) => predicate.kind === 'color');
     if (readsColor) {
       if (transaction.operations.some((operation) => isUpdateCellOperation(operation)))
-        this.dependencies.requestRenderAll?.();
+        this.#dependencies.requestRenderAll?.();
       return;
     }
-    if (transaction.pluginKey !== this.dependencies.dataTarget) return;
+    if (transaction.pluginKey !== this.#dependencies.dataTarget) return;
     const columns = new Set(definition.rules.map((rule) => rule.column));
     if (transaction.operations.some((operation) => isUpdateCellOperation(operation) &&
       operation.p[0] >= definition.range.start[0] && operation.p[0] <= definition.range.end[0] &&
-      columns.has(operation.p[1]))) this.dependencies.requestRenderAll?.();
+      columns.has(operation.p[1]))) this.#dependencies.requestRenderAll?.();
   }
 
   #invalidate(definition?: SheetFilterDefinition | null): void {
@@ -241,7 +244,7 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
   #setPrivateDefinition(definition: SheetFilterDefinition | null): void {
     this.#privateDefinition = definition ? cloneSheetFilterDefinition(definition) : null;
     this.#invalidate();
-    this.dependencies.invalidateVisibilityAggregates?.();
+    this.#dependencies.invalidateVisibilityAggregates?.();
   }
 
   #prepareSparseCandidates(definition: SheetFilterDefinition): void {
@@ -249,10 +252,10 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
     const candidates = new Set<number>();
     const first = definition.range.start[0] + Number(definition.firstRowIsHeader);
     for (const { column } of definition.rules) {
-      this.dependencies.forEachStoredInRange(first, column, definition.range.end[0], (row) => candidates.add(row));
+      this.#dependencies.forEachStoredInRange(first, column, definition.range.end[0], (row) => candidates.add(row));
     }
     this.#blankFiltered = definition.rules.some(({ predicate }) => !evaluateSheetFilter(
-      predicate, null, () => null, this.dependencies.platform, this.dependencies.parseDate,
+      predicate, null, () => null, this.#dependencies.platform, this.#dependencies.parseDate,
     ));
     this.#candidateRows = candidates;
   }
@@ -267,19 +270,19 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
       },
       readPrivateDefinition: () => this.#privateDefinition ? cloneSheetFilterDefinition(this.#privateDefinition) : null,
       setPrivateDefinition: (definition) => this.#setPrivateDefinition(definition),
-      readShape: this.dependencies.readShape,
-      readValue: this.dependencies.readValue,
-      ...(this.dependencies.readDisplayValue ? { readDisplayValue: this.dependencies.readDisplayValue } : {}),
+      readShape: this.#dependencies.readShape,
+      readValue: this.#dependencies.readValue,
+      ...(this.#dependencies.readDisplayValue ? { readDisplayValue: this.#dependencies.readDisplayValue } : {}),
       matchesPredicate: (row, column, predicate) => evaluateSheetFilter(
         predicate,
-        row === null ? null : this.dependencies.readValue(row, column),
-        (property) => row === null ? null : this.dependencies.readColor(row, column, property),
-        this.dependencies.platform,
-        this.dependencies.parseDate,
+        row === null ? null : this.#dependencies.readValue(row, column),
+        (property) => row === null ? null : this.#dependencies.readColor(row, column, property),
+        this.#dependencies.platform,
+        this.#dependencies.parseDate,
       ),
-      normalizeSearch: (value) => this.dependencies.platform.toLowerCase(value),
-      forEachStoredInRange: this.dependencies.forEachStoredInRange,
-      ...(this.dependencies.renderKeys ? { renderKeys: this.dependencies.renderKeys } : {}),
+      normalizeSearch: (value) => this.#dependencies.platform.toLowerCase(value),
+      forEachStoredInRange: this.#dependencies.forEachStoredInRange,
+      ...(this.#dependencies.renderKeys ? { renderKeys: this.#dependencies.renderKeys } : {}),
     };
   }
 }

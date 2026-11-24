@@ -23,8 +23,8 @@ export interface CollaborationContribution<OperationType extends OTOperation = O
 
 /** Owner-to-OT mapping used by clients, authorities, and editor bridges. */
 export class CollaborationContributorRegistry {
-  private readonly contributors = new Map<string, CollaborationContributor>();
-  private destroyed = false;
+  readonly #contributors = new Map<string, CollaborationContributor>();
+  #destroyed = false;
 
   public constructor(public readonly operations: TransactionOTRegistry) {}
 
@@ -34,7 +34,7 @@ export class CollaborationContributorRegistry {
     definition: TransactionOTDefinition<OperationType>,
     relations: readonly OTTransformRelation[] = [],
   ): () => void {
-    this.assertLive();
+    this.#assertLive();
     if (ownerId.trim().length === 0) {
       throw new CollaborationError(
         CollaborationErrorCode.InvalidIdentity,
@@ -46,7 +46,7 @@ export class CollaborationContributorRegistry {
       this.operations.registerType(definition),
       ...relations.map((relation) => this.operations.registerRelation(relation)),
     ];
-    const existing = this.contributors.get(ownerId);
+    const existing = this.#contributors.get(ownerId);
     if (existing && existing.definition !== definition) {
       [...algebraDisposers].reverse().forEach((dispose) => dispose());
       throw new CollaborationError(
@@ -61,23 +61,23 @@ export class CollaborationContributorRegistry {
       registrations: new Set<readonly (() => void)[]>(),
     };
     contributor.registrations.add(algebraDisposers);
-    this.contributors.set(ownerId, contributor);
+    this.#contributors.set(ownerId, contributor);
     let disposed = false;
     return () => {
       if (disposed) return;
       disposed = true;
       contributor.registrations.delete(algebraDisposers);
       [...algebraDisposers].reverse().forEach((dispose) => dispose());
-      if (contributor.registrations.size === 0 && this.contributors.get(ownerId) === contributor) {
-        this.contributors.delete(ownerId);
+      if (contributor.registrations.size === 0 && this.#contributors.get(ownerId) === contributor) {
+        this.#contributors.delete(ownerId);
       }
     };
   }
 
   /** Resolves one registered owner and optionally validates its wire operation type. */
   public require(ownerId: string, operationType?: CollaborationOperationType): TransactionOTDefinition {
-    this.assertLive();
-    const contributor = this.contributors.get(ownerId);
+    this.#assertLive();
+    const contributor = this.#contributors.get(ownerId);
     if (!contributor) {
       throw new CollaborationError(
         CollaborationErrorCode.OwnerNotRegistered,
@@ -100,27 +100,27 @@ export class CollaborationContributorRegistry {
   }
 
   public has(ownerId: string): boolean {
-    this.assertLive();
-    return this.contributors.has(ownerId);
+    this.#assertLive();
+    return this.#contributors.has(ownerId);
   }
 
   public getRegisteredOwnerIds(): readonly string[] {
-    this.assertLive();
-    return [...this.contributors.keys()].sort();
+    this.#assertLive();
+    return [...this.#contributors.keys()].sort();
   }
 
   public destroy(): void {
-    if (this.destroyed) return;
-    this.destroyed = true;
-    this.contributors.forEach((contributor) => {
+    if (this.#destroyed) return;
+    this.#destroyed = true;
+    this.#contributors.forEach((contributor) => {
       contributor.registrations.forEach((disposers) => [...disposers].reverse().forEach((dispose) => dispose()));
       contributor.registrations.clear();
     });
-    this.contributors.clear();
+    this.#contributors.clear();
   }
 
-  private assertLive(): void {
-    if (!this.destroyed) return;
+  #assertLive(): void {
+    if (!this.#destroyed) return;
     throw new CollaborationError(
       CollaborationErrorCode.RegistryDestroyed,
       'Collaboration contributor registry has been destroyed.',

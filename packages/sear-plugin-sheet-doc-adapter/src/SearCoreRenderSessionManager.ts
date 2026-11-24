@@ -5,19 +5,23 @@ import { SearCoreRenderSession } from './SearCoreRenderSession';
 
 /** Owns all static cell render sessions for one adapter lifetime. */
 export class SearCoreRenderSessionManager {
-  private readonly sessions = new Set<SearCoreRenderSession>();
+  readonly #runtime: SearCoreEditorRuntime;
 
-  public constructor(private readonly runtime: SearCoreEditorRuntime) {}
+  readonly #sessions = new Set<SearCoreRenderSession>();
+
+  public constructor(runtime: SearCoreEditorRuntime) {
+    this.#runtime = runtime;
+  }
 
   public create(context: SheetEmbeddedEditorContext, document: SheetDocument): SheetRenderSession {
     let session: SearCoreRenderSession;
-    session = new SearCoreRenderSession(this.runtime, context, document, () => this.sessions.delete(session));
-    this.sessions.add(session);
+    session = new SearCoreRenderSession(this.#runtime, context, document, () => this.#sessions.delete(session));
+    this.#sessions.add(session);
     return session;
   }
 
   public dispose(): void {
-    for (const session of [...this.sessions].reverse()) session.dispose();
-    this.sessions.clear();
+    for (const session of [...this.#sessions].reverse()) session.dispose();
+    this.#sessions.clear();
   }
 }

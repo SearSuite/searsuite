@@ -14,6 +14,13 @@ const key = new PluginKey('SheetFindReplacePlugin');
 /** Stateless Sheet feature; matches always read the current staged data owner. */
 @Injectable()
 export class SheetFindReplacePlugin extends Plugin<unknown, CellProperties, null> {
+  readonly #data: SheetDataPlugin;
+  readonly #codecs: CellClipboardCodecRegistry;
+  readonly #commits: CellCommitStrategyRegistry;
+  readonly #projection: Pick<SheetFindSource,
+      'readValue' | 'forEachProjectedValueInRange' | 'isArrayResultAnchor' | 'isCoveredMergeCell' | 'isRowHidden'>;
+  readonly #inputValidation: SheetCellInputValidationRegistry | undefined;
+
   public static readonly symbol = Symbol.for('SheetFindReplacePlugin');
   public static readonly pluginKey = key;
   public override readonly warnOnDuplicateDepth = false;
@@ -21,14 +28,19 @@ export class SheetFindReplacePlugin extends Plugin<unknown, CellProperties, null
   #commands: SheetCommandBus | null = null;
 
   public constructor(
-    private readonly data: SheetDataPlugin,
-    private readonly codecs: CellClipboardCodecRegistry,
-    private readonly commits: CellCommitStrategyRegistry,
-    private readonly projection: Pick<SheetFindSource,
+    data: SheetDataPlugin,
+    codecs: CellClipboardCodecRegistry,
+    commits: CellCommitStrategyRegistry,
+    projection: Pick<SheetFindSource,
       'readValue' | 'forEachProjectedValueInRange' | 'isArrayResultAnchor' | 'isCoveredMergeCell' | 'isRowHidden'> = {},
-    private readonly inputValidation?: SheetCellInputValidationRegistry,
+    inputValidation?: SheetCellInputValidationRegistry,
   ) {
     super({ key, state: null });
+    this.#data = data;
+    this.#codecs = codecs;
+    this.#commits = commits;
+    this.#projection = projection;
+    this.#inputValidation = inputValidation;
   }
 
   public registerCommands(commands: SheetCommandBus): void {
@@ -36,11 +48,11 @@ export class SheetFindReplacePlugin extends Plugin<unknown, CellProperties, null
       throw new SearError('Sheet find commands are already bound to an editor.');
     }
     this.#commands = commands;
-    registerSheetFindReplaceCommands(commands, this.source());
+    registerSheetFindReplaceCommands(commands, this.#source());
   }
 
   public registerQueries(queries: SheetQueryRegistry): void {
-    registerSheetFindReplaceQueries(queries, this.source());
+    registerSheetFindReplaceQueries(queries, this.#source());
   }
 
   public registerState() { return { key: this.key, state: this.getState() }; }
@@ -54,15 +66,15 @@ export class SheetFindReplacePlugin extends Plugin<unknown, CellProperties, null
     if (transaction.pluginKey === SheetDataPlugin.pluginKey) this.#revision += 1;
   }
 
-  private source() {
+  #source() {
     const plugin = this;
     return {
-      get matrix() { return plugin.data.getState().sheetData; },
+      get matrix() { return plugin.#data.getState().sheetData; },
       getRevision: () => plugin.#revision,
-      codecs: this.codecs,
-      commitStrategies: this.commits,
-      ...(this.inputValidation ? { inputValidation: this.inputValidation } : {}),
-      ...this.projection,
+      codecs: this.#codecs,
+      commitStrategies: this.#commits,
+      ...(this.#inputValidation ? { inputValidation: this.#inputValidation } : {}),
+      ...this.#projection,
     };
   }
 }

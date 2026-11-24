@@ -50,25 +50,25 @@ export interface ColorPoolStats {
  */
 class ColorPool {
   // Use Uint32Array to store color usage as bits (32 colors per element)
-  private used: Uint32Array;
-  private availableCount: number;
-  private readonly maxColors = 0xffffff + 1; // 16,777,216 colors
-  private readonly bitsPerElement = 32;
-  private readonly arraySize: number;
+  #used: Uint32Array;
+  #availableCount: number;
+  readonly #maxColors = 0xffffff + 1; // 16,777,216 colors
+  readonly #bitsPerElement = 32;
+  readonly #arraySize: number;
 
   /** Creates a ColorPool instance. */
   constructor() {
     // Calculate array size needed to store all possible colors as bits
-    this.arraySize = Math.ceil(this.maxColors / this.bitsPerElement);
-    this.used = new Uint32Array(this.arraySize);
-    this.availableCount = this.maxColors;
+    this.#arraySize = Math.ceil(this.#maxColors / this.#bitsPerElement);
+    this.#used = new Uint32Array(this.#arraySize);
+    this.#availableCount = this.#maxColors;
   }
 
   /**
    * Generate random unused color
    */
   getRandomColor(): HexColor | null {
-    if (this.availableCount === 0) {
+    if (this.#availableCount === 0) {
       return null; // All colors used
     }
 
@@ -78,14 +78,14 @@ class ColorPool {
 
     // Find unused color using random sampling
     do {
-      color = Math.floor(Math.random() * this.maxColors);
-      arrayIndex = Math.floor(color / this.bitsPerElement);
-      bitIndex = color % this.bitsPerElement;
-    } while (this.used[arrayIndex] & (1 << bitIndex));
+      color = Math.floor(Math.random() * this.#maxColors);
+      arrayIndex = Math.floor(color / this.#bitsPerElement);
+      bitIndex = color % this.#bitsPerElement;
+    } while (this.#used[arrayIndex] & (1 << bitIndex));
 
     // Mark color as used
-    this.used[arrayIndex] |= 1 << bitIndex;
-    this.availableCount--;
+    this.#used[arrayIndex] |= 1 << bitIndex;
+    this.#availableCount--;
 
     // Convert to hex string
     let hexColor = color.toString(16).padStart(6, ZERO);
@@ -99,22 +99,22 @@ class ColorPool {
     const colorStr = hexColor.replace(HASH, '');
     const color = parseInt(colorStr, 16);
 
-    if (color < 0 || color >= this.maxColors) {
+    if (color < 0 || color >= this.#maxColors) {
       return false;
     }
 
-    const arrayIndex = Math.floor(color / this.bitsPerElement);
-    const bitIndex = color % this.bitsPerElement;
+    const arrayIndex = Math.floor(color / this.#bitsPerElement);
+    const bitIndex = color % this.#bitsPerElement;
     const mask = 1 << bitIndex;
 
     // Check if color is actually used
-    if (!(this.used[arrayIndex] & mask)) {
+    if (!(this.#used[arrayIndex] & mask)) {
       return false; // Color wasn't used
     }
 
     // Release color
-    this.used[arrayIndex] &= ~mask;
-    this.availableCount++;
+    this.#used[arrayIndex] &= ~mask;
+    this.#availableCount++;
     return true;
   }
 
@@ -122,22 +122,22 @@ class ColorPool {
    * Reset all colors to unused state
    */
   reset(): void {
-    this.used.fill(0);
-    this.availableCount = this.maxColors;
+    this.#used.fill(0);
+    this.#availableCount = this.#maxColors;
   }
 
   /**
    * Get number of available colors
    */
   getAvailableCount(): number {
-    return this.availableCount;
+    return this.#availableCount;
   }
 
   /**
    * Get usage percentage
    */
   getUsagePercentage(): number {
-    return ((this.maxColors - this.availableCount) / this.maxColors) * 100;
+    return ((this.#maxColors - this.#availableCount) / this.#maxColors) * 100;
   }
 }
 

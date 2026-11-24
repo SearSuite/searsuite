@@ -28,28 +28,32 @@ const pluginKey = new PluginKey('SheetSortPlugin');
 /** Stateless command owner for stable range sorting. */
 @Injectable()
 export class SheetSortPlugin extends Plugin<unknown, CellProperties, Record<string, never>> {
+  readonly #dependencies: SheetSortDependencies;
+
   public override readonly warnOnDuplicateDepth = false;
   public static readonly symbol = Symbol.for('SheetSortPlugin');
   public static readonly pluginKey = pluginKey;
-  private disposeCommandListener: (() => void) | null = null;
+  #disposeCommandListener: (() => void) | null = null;
 
-  public constructor(private readonly dependencies: SheetSortDependencies) { super({ key: pluginKey, state: {} }); }
+  public constructor(dependencies: SheetSortDependencies) { super({ key: pluginKey, state: {} });
+    this.#dependencies = dependencies;
+   }
 
   public registerCommands(commands: SheetCommandBus): void {
-    this.disposeCommandListener?.();
-    this.disposeCommandListener = commands.subscribe((event) => {
+    this.#disposeCommandListener?.();
+    this.#disposeCommandListener = commands.subscribe((event) => {
       if (event.id === SortSheetRangeCommand.id && event.phase === CommandExecutionPhase.Completed)
-        this.dependencies.reconcileSelection?.();
+        this.#dependencies.reconcileSelection?.();
     });
     commands.register(SortSheetRangeCommand, (input) => ({
       id: SortSheetRangeCommand.id,
       execute: () => {
         const permutation = createSheetSortPermutation(
-          input, this.dependencies.readMatrix(), this.dependencies.readValue,
-          this.dependencies.platform, this.dependencies.compareText,
+          input, this.#dependencies.readMatrix(), this.#dependencies.readValue,
+          this.#dependencies.platform, this.#dependencies.compareText,
         );
         const pipeline = new Pipeline(SortSheetRangeCommand.id);
-        const plans = this.dependencies.reorders.plan(permutation);
+        const plans = this.#dependencies.reorders.plan(permutation);
         if (!permutation.changed) return { pipeline };
         plans.forEach(({ target, operations }) => {
           if (operations.length) pipeline.addTransaction(
@@ -63,8 +67,8 @@ export class SheetSortPlugin extends Plugin<unknown, CellProperties, Record<stri
   }
 
   public dispose(): void {
-    this.disposeCommandListener?.();
-    this.disposeCommandListener = null;
+    this.#disposeCommandListener?.();
+    this.#disposeCommandListener = null;
   }
 
   public registerState() { return { key: this.key, state: this.getState(), dataEngine: { enabled: false } }; }

@@ -27,7 +27,7 @@ export class WorkbookFormulaReferenceShifter {
     changes: readonly StructureChange[];
   }): WorkbookFormulaReferenceShiftResult {
     const brokenReferences: WorkbookFormulaReference[] = [];
-    const ast = this.shiftNode(input.ast, input, brokenReferences);
+    const ast = this.#shiftNode(input.ast, input, brokenReferences);
     return {
       ast,
       changed: ast !== input.ast,
@@ -35,7 +35,7 @@ export class WorkbookFormulaReferenceShifter {
     };
   }
 
-  private shiftNode(
+  #shiftNode(
     ast: FormulaAST,
     input: {
       sheetBindings: ReadonlyMap<string, WorkbookSheetId>;
@@ -46,30 +46,30 @@ export class WorkbookFormulaReferenceShifter {
   ): FormulaAST {
     switch (ast.kind) {
       case FormulaNodeKind.WorkbookCell:
-        return this.shiftWorkbookCell(ast, input, brokenReferences);
+        return this.#shiftWorkbookCell(ast, input, brokenReferences);
       case FormulaNodeKind.WorkbookRange:
-        return this.shiftWorkbookRange(ast, input, brokenReferences);
+        return this.#shiftWorkbookRange(ast, input, brokenReferences);
       case FormulaNodeKind.Spill: {
-        const reference = this.shiftNode(ast.reference, input, brokenReferences);
+        const reference = this.#shiftNode(ast.reference, input, brokenReferences);
         if (reference.kind !== FormulaNodeKind.Cell && reference.kind !== FormulaNodeKind.WorkbookCell) return reference;
         return reference === ast.reference ? ast : { ...ast, reference };
       }
       case FormulaNodeKind.Binary:
       case FormulaNodeKind.Intersection: {
-        const left = this.shiftNode(ast.left, input, brokenReferences);
-        const right = this.shiftNode(ast.right, input, brokenReferences);
+        const left = this.#shiftNode(ast.left, input, brokenReferences);
+        const right = this.#shiftNode(ast.right, input, brokenReferences);
         if (left === ast.left && right === ast.right) return ast;
         return { ...ast, left, right };
       }
       case FormulaNodeKind.Unary: {
-        const operand = this.shiftNode(ast.operand, input, brokenReferences);
+        const operand = this.#shiftNode(ast.operand, input, brokenReferences);
         if (operand === ast.operand) return ast;
         return { ...ast, operand };
       }
       case FormulaNodeKind.Call: {
         let changed = false;
         const args = ast.args.map((arg) => {
-          const shifted = this.shiftNode(arg, input, brokenReferences);
+          const shifted = this.#shiftNode(arg, input, brokenReferences);
           if (shifted !== arg) changed = true;
           return shifted;
         });
@@ -77,10 +77,10 @@ export class WorkbookFormulaReferenceShifter {
         return { ...ast, args };
       }
       case FormulaNodeKind.Invoke: {
-        const callee = this.shiftNode(ast.callee, input, brokenReferences);
+        const callee = this.#shiftNode(ast.callee, input, brokenReferences);
         let changed = callee !== ast.callee;
         const args = ast.args.map((arg) => {
-          const shifted = this.shiftNode(arg, input, brokenReferences);
+          const shifted = this.#shiftNode(arg, input, brokenReferences);
           if (shifted !== arg) changed = true;
           return shifted;
         });
@@ -89,7 +89,7 @@ export class WorkbookFormulaReferenceShifter {
       case FormulaNodeKind.Tuple: {
         let changed = false;
         const items = ast.items.map((item) => {
-          const shifted = this.shiftNode(item, input, brokenReferences);
+          const shifted = this.#shiftNode(item, input, brokenReferences);
           if (shifted !== item) changed = true;
           return shifted;
         });
@@ -100,7 +100,7 @@ export class WorkbookFormulaReferenceShifter {
     }
   }
 
-  private shiftWorkbookCell(
+  #shiftWorkbookCell(
     ast: Extract<FormulaAST, { kind: typeof FormulaNodeKind.WorkbookCell }>,
     input: {
       sheetBindings: ReadonlyMap<string, WorkbookSheetId>;
@@ -112,8 +112,8 @@ export class WorkbookFormulaReferenceShifter {
     const sheetId = input.sheetBindings.get(ast.sheetName);
     if (sheetId !== input.changedSheetId) return ast;
 
-    const row = this.shiftCoordinate(ast.row, ast.absRow, input.changes, StructureChangeAxis.Row);
-    const col = this.shiftCoordinate(ast.col, ast.absCol, input.changes, StructureChangeAxis.Col);
+    const row = this.#shiftCoordinate(ast.row, ast.absRow, input.changes, StructureChangeAxis.Row);
+    const col = this.#shiftCoordinate(ast.col, ast.absCol, input.changes, StructureChangeAxis.Col);
     if (row.deleted || col.deleted) {
       brokenReferences.push({ sheetId, row: ast.row, col: ast.col });
       return { ...ast, row: -1, col: -1, absRow: false, absCol: false };
@@ -122,7 +122,7 @@ export class WorkbookFormulaReferenceShifter {
     return { ...ast, row: row.value, col: col.value };
   }
 
-  private shiftWorkbookRange(
+  #shiftWorkbookRange(
     ast: Extract<FormulaAST, { kind: typeof FormulaNodeKind.WorkbookRange }>,
     input: {
       sheetBindings: ReadonlyMap<string, WorkbookSheetId>;
@@ -134,10 +134,10 @@ export class WorkbookFormulaReferenceShifter {
     const sheetId = input.sheetBindings.get(ast.sheetName);
     if (sheetId !== input.changedSheetId) return ast;
 
-    const startRow = this.shiftCoordinate(ast.start[0], ast.absStartRow, input.changes, StructureChangeAxis.Row);
-    const startCol = this.shiftCoordinate(ast.start[1], ast.absStartCol, input.changes, StructureChangeAxis.Col);
-    const endRow = this.shiftCoordinate(ast.end[0], ast.absEndRow, input.changes, StructureChangeAxis.Row);
-    const endCol = this.shiftCoordinate(ast.end[1], ast.absEndCol, input.changes, StructureChangeAxis.Col);
+    const startRow = this.#shiftCoordinate(ast.start[0], ast.absStartRow, input.changes, StructureChangeAxis.Row);
+    const startCol = this.#shiftCoordinate(ast.start[1], ast.absStartCol, input.changes, StructureChangeAxis.Col);
+    const endRow = this.#shiftCoordinate(ast.end[0], ast.absEndRow, input.changes, StructureChangeAxis.Row);
+    const endCol = this.#shiftCoordinate(ast.end[1], ast.absEndCol, input.changes, StructureChangeAxis.Col);
     if (startRow.deleted || startCol.deleted || endRow.deleted || endCol.deleted) {
       brokenReferences.push({ sheetId, start: ast.start, end: ast.end });
       return {
@@ -165,7 +165,7 @@ export class WorkbookFormulaReferenceShifter {
     };
   }
 
-  private shiftCoordinate(
+  #shiftCoordinate(
     coordinate: number,
     isAbsolute: boolean,
     changes: readonly StructureChange[],

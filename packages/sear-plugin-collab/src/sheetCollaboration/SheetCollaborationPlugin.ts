@@ -31,6 +31,10 @@ export class SheetCollaborationPlugin
   extends Plugin<SearCoreSheet, CellProperties, null>
   implements SheetLifecycleController, CollaborationSession
 {
+  readonly #channelBinding: CollaborationChannelBinding;
+  readonly #plugins: PluginManager<SearCoreSheet, CellProperties>;
+  readonly #commands: SheetCommandBus;
+
   public static readonly symbol = Symbol.for('SheetCollaborationPlugin');
   public override readonly warnOnDuplicateDepth = false;
   public override readonly interestedIn = ['*'];
@@ -41,17 +45,20 @@ export class SheetCollaborationPlugin
 
   public constructor(
     @Inject(CollaborationChannelBinding.symbol)
-    private readonly channelBinding: CollaborationChannelBinding,
+    channelBinding: CollaborationChannelBinding,
     @Inject(PluginManager.symbol)
-    private readonly plugins: PluginManager<SearCoreSheet, CellProperties>,
-    @Inject(SheetCommandBus.symbol) private readonly commands: SheetCommandBus,
+    plugins: PluginManager<SearCoreSheet, CellProperties>,
+    @Inject(SheetCommandBus.symbol) commands: SheetCommandBus,
   ) {
     super({ key: pluginKey, state: null });
-    this.registerContributors();
+    this.#channelBinding = channelBinding;
+    this.#plugins = plugins;
+    this.#commands = commands;
+    this.#registerContributors();
   }
 
-  private get channel(): CollaborationChannel {
-    return this.channelBinding.channel;
+  get #channel(): CollaborationChannel {
+    return this.#channelBinding.channel;
   }
 
   public registerCommands(commands: SheetCommandBus): void {
@@ -72,9 +79,9 @@ export class SheetCollaborationPlugin
     commands.register(DisconnectSheetCollaborationCommand, () =>
       new LocalActionCommand(DisconnectSheetCollaborationCommand.id, () => bridge.disconnect()));
     commands.register(ApplySheetCollaborationEventCommand, (event) =>
-      new LocalActionCommand(ApplySheetCollaborationEventCommand.id, () => bridge.channel.applyExternalEvent(event)));
+      new LocalActionCommand(ApplySheetCollaborationEventCommand.id, () => bridge.#channel.applyExternalEvent(event)));
     commands.register(ApplyRemoteOperationsCommand, function createApplyRemoteOperationsCommand(input) {
-      const owner = bridge.plugins.getCollaborativeTransactionPlugin(input.ownerId);
+      const owner = bridge.#plugins.getCollaborativeTransactionPlugin(input.ownerId);
       if (!owner) throw new SearError(`Collaborative Sheet owner "${input.ownerId}" is not registered.`);
       return new TransactionPipelineCommand(
         ApplyRemoteOperationsCommand.id,
@@ -88,26 +95,26 @@ export class SheetCollaborationPlugin
   public registerObservations(observations: ObservationRegistry): void {
     observations.register(CollaborationStatusObservation, {
       getSnapshot: this.getStatus.bind(this),
-      subscribe: (listener) => this.channel.subscribeStatus(listener),
+      subscribe: (listener) => this.#channel.subscribeStatus(listener),
     });
   }
 
   public async connect(options: CollaborationConnectOptions): Promise<void> {
-    await this.channel.connect(options);
+    await this.#channel.connect(options);
   }
 
   public disconnect(): void {
-    this.channel.disconnect();
+    this.#channel.disconnect();
   }
 
   public getStatus(): CollaborationStatus {
-    return this.channel.getStatus();
+    return this.#channel.getStatus();
   }
 
   public start(_context: SheetLifecycleContext): void {
-    this.registerContributors();
-    this.#detachRemoteApplier = this.channel.attachRemoteApplier((effect) => {
-      this.commands.run(ApplyRemoteOperationsCommand, {
+    this.#registerContributors();
+    this.#detachRemoteApplier = this.#channel.attachRemoteApplier((effect) => {
+      this.#commands.run(ApplyRemoteOperationsCommand, {
         ownerId: effect.ownerId,
         operations: effect.operations as readonly Operation[],
       });
@@ -120,14 +127,14 @@ export class SheetCollaborationPlugin
     this.#destroyed = true;
     this.#detachRemoteApplier?.();
     this.#detachRemoteApplier = null;
-    if (this.channelBinding.owner === 'editor') this.channel.destroy();
+    if (this.#channelBinding.owner === 'editor') this.#channel.destroy();
   }
 
   public override onTransactionCommitted(transaction: Transaction): void {
     if (transaction.getMeta<TransactionOrigin>(TRANSACTION_ORIGIN_META_KEY) === TransactionOrigin.Remote) return;
-    const contribution = this.plugins.getTransactionOTContribution(transaction);
+    const contribution = this.#plugins.getTransactionOTContribution(transaction);
     if (!contribution?.collaborative || transaction.operations.length === 0) return;
-    this.channel.submitLocal(contribution.ownerId, transaction.operations);
+    this.#channel.submitLocal(contribution.ownerId, transaction.operations);
   }
 
   public apply(_state: null, _transaction: Transaction): null {
@@ -146,11 +153,11 @@ export class SheetCollaborationPlugin
     return { key: this.key, state: null, dataEngine: { enabled: false } };
   }
 
-  private registerContributors(): void {
-    this.plugins.getCollaborativeTransactionPlugins().forEach((plugin) => {
+  #registerContributors(): void {
+    this.#plugins.getCollaborativeTransactionPlugins().forEach((plugin) => {
       const contribution = plugin.transactionOT;
       if (!contribution?.collaborative || this.#registeredOwnerIds.has(contribution.ownerId)) return;
-      this.channel.registerContributor({
+      this.#channel.registerContributor({
         ownerId: contribution.ownerId,
         definition: contribution.definition,
         ...(contribution.relations ? { relations: contribution.relations } : {}),

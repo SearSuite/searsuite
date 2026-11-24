@@ -6,9 +6,9 @@ import { Tree } from './Tree';
 /** Hilbert-sorted R-tree style spatial index for rectangular data. */
 export class HilbertRTree<T extends { rect: PositionRect<HexColor> }> extends Tree<T> {
   /** Items sorted by their simplified Hilbert value. */
-  private items: T[] = [];
+  #items: T[] = [];
   /** Maximum child count retained for this tree variant. */
-  private maxChildren: number;
+  #maxChildren: number;
 
   /**
    * Constructs a Hilbert R-tree.
@@ -17,11 +17,11 @@ export class HilbertRTree<T extends { rect: PositionRect<HexColor> }> extends Tr
    */
   constructor(boundary: PositionRect<HexColor>, maxChildren: number = 4) {
     super(boundary, maxChildren);
-    this.maxChildren = maxChildren;
+    this.#maxChildren = maxChildren;
   }
 
   /** Computes a simplified Hilbert ordering value from a rectangle center. */
-  private calculateHilbertValue(rect: PositionRect<HexColor>): number {
+  #calculateHilbertValue(rect: PositionRect<HexColor>): number {
     // Simplified Hilbert curve calculation for 2D space
     const x = rect.x + rect.width / 2; // Center x
     const y = rect.y + rect.height / 2; // Center y
@@ -29,25 +29,25 @@ export class HilbertRTree<T extends { rect: PositionRect<HexColor> }> extends Tr
   }
 
   /** Sorts indexed items by their Hilbert ordering value. */
-  private sortItems(): void {
-    this.items.sort((a, b) => {
-      const hilbertA = this.calculateHilbertValue(a.rect);
-      const hilbertB = this.calculateHilbertValue(b.rect);
+  #sortItems(): void {
+    this.#items.sort((a, b) => {
+      const hilbertA = this.#calculateHilbertValue(a.rect);
+      const hilbertB = this.#calculateHilbertValue(b.rect);
       return hilbertA - hilbertB;
     });
   }
 
   /** Inserts one item and maintains Hilbert ordering. */
   public insert(data: T): boolean {
-    this.items.push(data);
-    this.sortItems(); // Sort items by Hilbert value
+    this.#items.push(data);
+    this.#sortItems(); // Sort items by Hilbert value
     return true;
   }
 
   /** Returns items whose rectangles intersect the query range. */
   public query(range: PositionRect<HexColor>): T[] {
     const result: T[] = [];
-    for (const item of this.items) {
+    for (const item of this.#items) {
       if (PositionRect.intersection(item.rect, range)) {
         result.push(item);
       }
@@ -57,7 +57,7 @@ export class HilbertRTree<T extends { rect: PositionRect<HexColor> }> extends Tr
 
   /** Removes an item by matching rectangle bounds. */
   public remove(data: T): boolean {
-    const index = this.items.findIndex(
+    const index = this.#items.findIndex(
       (item) =>
         item.rect.x === data.rect.x &&
         item.rect.y === data.rect.y &&
@@ -65,7 +65,7 @@ export class HilbertRTree<T extends { rect: PositionRect<HexColor> }> extends Tr
         item.rect.height === data.rect.height,
     );
     if (index !== -1) {
-      this.items.splice(index, 1);
+      this.#items.splice(index, 1);
       return true;
     }
     return false;
@@ -73,7 +73,7 @@ export class HilbertRTree<T extends { rect: PositionRect<HexColor> }> extends Tr
 
   /** Removes all indexed items. */
   clear(): void {
-    this.items = [];
+    this.#items = [];
   }
 
   /** Returns the current tree boundary. */
@@ -89,6 +89,6 @@ export class HilbertRTree<T extends { rect: PositionRect<HexColor> }> extends Tr
 
   /** Serializes debug data for this spatial index. */
   toJSON(): object {
-    return { boundary: this.boundary.toJSON(), size: this.items.length };
+    return { boundary: this.boundary.toJSON(), size: this.#items.length };
   }
 }

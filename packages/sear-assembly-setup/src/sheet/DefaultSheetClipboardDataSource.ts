@@ -37,38 +37,53 @@ import { type SheetClipboardWorkbookBridge } from './SheetClipboardWorkbookBridg
 /** Default data source bridging clipboard commands to the active Sheet data view. */
 @Injectable()
 export class DefaultSheetClipboardDataSource implements SheetClipboardDataSource {
+  readonly #dataEngine: DataEngine;
+  readonly #queries: SheetQueryRegistry;
+  readonly #ownerFormats: SheetFormatTransferRegistry;
+  readonly #ownerClipboard: SheetClipboardTransferRegistry;
+  readonly #platform: Platform;
+  readonly #rangeMoves: SheetRangeMoveRegistry;
+  readonly #inputValidation: SheetCellInputValidationRegistry;
+
   public readonly target = SheetDataPlugin.pluginKey;
   public readonly formatTarget = SheetCellFormatPlugin.pluginKey;
   public readonly cutSourceId: string;
-  private previewRuntime: {
+  #previewRuntime: {
     readonly core: SearCoreSheet;
     readonly plugins: PluginManager<SearCoreSheet, CellProperties>;
     readonly bridge: SheetClipboardWorkbookBridge | null;
   } | null = null;
 
   public constructor(
-    @Inject(DataEngine.symbol) private readonly dataEngine: DataEngine,
-    @Inject(SheetQueryRegistry.symbol) private readonly queries: SheetQueryRegistry,
-    @Inject(SheetFormatTransferRegistry.symbol) private readonly ownerFormats: SheetFormatTransferRegistry,
-    @Inject(SheetClipboardTransferRegistry.symbol) private readonly ownerClipboard: SheetClipboardTransferRegistry,
-    @Inject(Platform.symbol) private readonly platform: Platform,
-    @Inject(SheetRangeMoveRegistry.symbol) private readonly rangeMoves: SheetRangeMoveRegistry,
+    @Inject(DataEngine.symbol) dataEngine: DataEngine,
+    @Inject(SheetQueryRegistry.symbol) queries: SheetQueryRegistry,
+    @Inject(SheetFormatTransferRegistry.symbol) ownerFormats: SheetFormatTransferRegistry,
+    @Inject(SheetClipboardTransferRegistry.symbol) ownerClipboard: SheetClipboardTransferRegistry,
+    @Inject(Platform.symbol) platform: Platform,
+    @Inject(SheetRangeMoveRegistry.symbol) rangeMoves: SheetRangeMoveRegistry,
     @Inject(SheetClipboardCutSession.symbol) public readonly cutSession: SheetClipboardCutSession,
     @Inject(SheetClipboardSheetIdentity.symbol) identity: SheetClipboardSheetIdentity,
-    @Inject(SheetCellInputValidationRegistry.symbol) private readonly inputValidation: SheetCellInputValidationRegistry,
+    @Inject(SheetCellInputValidationRegistry.symbol) inputValidation: SheetCellInputValidationRegistry,
   ) {
+    this.#dataEngine = dataEngine;
+    this.#queries = queries;
+    this.#ownerFormats = ownerFormats;
+    this.#ownerClipboard = ownerClipboard;
+    this.#platform = platform;
+    this.#rangeMoves = rangeMoves;
+    this.#inputValidation = inputValidation;
     this.cutSourceId = identity.id;
   }
 
-  private formulaResults?: IFormulaResultProvider;
+  #formulaResults?: IFormulaResultProvider;
 
   public bindFormulaResults(results: IFormulaResultProvider): void {
-    if (this.formulaResults) throw new SearError('Clipboard formula results are already bound.');
-    this.formulaResults = results;
+    if (this.#formulaResults) throw new SearError('Clipboard formula results are already bound.');
+    this.#formulaResults = results;
   }
 
   public planRangeMove(source: SheetClipboardRangeInput, destination: SheetClipboardRangeInput) {
-    return this.rangeMoves.plan({ source, destination });
+    return this.#rangeMoves.plan({ source, destination });
   }
 
   public bindPreviewRuntime(
@@ -76,11 +91,11 @@ export class DefaultSheetClipboardDataSource implements SheetClipboardDataSource
     plugins: PluginManager<SearCoreSheet, CellProperties>,
     bridge: SheetClipboardWorkbookBridge | null,
   ): void {
-    this.previewRuntime = { core, plugins, bridge };
+    this.#previewRuntime = { core, plugins, bridge };
   }
 
   public prepareCrossSheetCut(cutId: string, clearPipeline: Pipeline): void {
-    const runtime = this.previewRuntime;
+    const runtime = this.#previewRuntime;
     if (!runtime?.bridge) return;
     const transactions = clearPipeline.steps
       .filter((step) => step.kind === PipelineStepKind.Transaction && step.transaction)
@@ -94,7 +109,7 @@ export class DefaultSheetClipboardDataSource implements SheetClipboardDataSource
   }
 
   public scheduleCrossSheetMove(cutId: string, sourceId: string, pastePipeline: Pipeline): Promise<void> {
-    const runtime = this.previewRuntime;
+    const runtime = this.#previewRuntime;
     if (!runtime?.bridge) throw new SearError('Cross-sheet clipboard move requires a Workbook bridge.');
     const transactions = pastePipeline.steps
       .filter((step) => step.kind === PipelineStepKind.Transaction && step.transaction)
@@ -106,35 +121,35 @@ export class DefaultSheetClipboardDataSource implements SheetClipboardDataSource
   }
 
   public getSelection(): SheetRangeBounds | null {
-    return this.queries.run(GetSelection, void 0);
+    return this.#queries.run(GetSelection, void 0);
   }
 
   public getRowCount(): number {
-    return readSheetDataMatrix(this.dataEngine)?.shape[0] ?? 0;
+    return readSheetDataMatrix(this.#dataEngine)?.shape[0] ?? 0;
   }
 
   public getColumnCount(): number {
-    return readSheetDataMatrix(this.dataEngine)?.shape[1] ?? 0;
+    return readSheetDataMatrix(this.#dataEngine)?.shape[1] ?? 0;
   }
 
   public readCell(row: number, column: number): CellMatrixElement | null {
-    return readSheetDataMatrix(this.dataEngine)?.getItem(row, column) ?? null;
+    return readSheetDataMatrix(this.#dataEngine)?.getItem(row, column) ?? null;
   }
 
   public readCopyCell(row: number, column: number): CellMatrixElement | null {
     const stored = this.readCell(row, column);
     if (stored) return stored;
-    return this.readFormulaResultCell(row, column);
+    return this.#readFormulaResultCell(row, column);
   }
 
   public readCopyValueCell(row: number, column: number): CellMatrixElement | null {
     const stored = this.readCell(row, column);
-    return stored?.type === CellType.Formula ? this.readFormulaResultCell(row, column)
-      : stored ?? this.readFormulaResultCell(row, column);
+    return stored?.type === CellType.Formula ? this.#readFormulaResultCell(row, column)
+      : stored ?? this.#readFormulaResultCell(row, column);
   }
 
-  private readFormulaResultCell(row: number, column: number): CellMatrixElement | null {
-    const value = this.formulaResults?.getFormulaResult(row, column);
+  #readFormulaResultCell(row: number, column: number): CellMatrixElement | null {
+    const value = this.#formulaResults?.getFormulaResult(row, column);
     if (typeof value === 'number') return { type: CellType.Number, value };
     if (typeof value === 'boolean') return { type: CellType.Boolean, value };
     if (typeof value === 'string') return { type: CellType.String, value };
@@ -149,56 +164,56 @@ export class DefaultSheetClipboardDataSource implements SheetClipboardDataSource
   }
 
   public validatePasteCell(row: number, column: number, cell: CellMatrixElement | null) {
-    return this.inputValidation.validate(row, column, cell?.value == null ? '' : String(cell.value));
+    return this.#inputValidation.validate(row, column, cell?.value == null ? '' : String(cell.value));
   }
 
   public validateCutCell(row: number, column: number) {
-    return this.inputValidation.validateClear(row, column);
+    return this.#inputValidation.validateClear(row, column);
   }
 
   public readCellFormat(row: number, column: number) {
-    return readSheetCellFormats(this.dataEngine)?.getItem(row, column) ?? null;
+    return readSheetCellFormats(this.#dataEngine)?.getItem(row, column) ?? null;
   }
 
   public isRowVisible(row: number): boolean {
-    return readSheetRowSizes(this.dataEngine)?.getItem(0, row) !== 0;
+    return readSheetRowSizes(this.#dataEngine)?.getItem(0, row) !== 0;
   }
 
   public createClipboardCutId(): string {
-    return this.platform.createId('sheet-cut');
+    return this.#platform.createId('sheet-cut');
   }
 
   public captureOwnerFormats(range: SheetRangeBounds): readonly SheetPortableFormatTransfer[] {
-    return this.ownerFormats.capturePortable(range);
+    return this.#ownerFormats.capturePortable(range);
   }
 
   public planOwnerFormats(captured: readonly SheetPortableFormatTransfer[], target: SheetRangeBounds) {
-    return this.ownerFormats.planPortable(captured, target);
+    return this.#ownerFormats.planPortable(captured, target);
   }
 
   public clearOwnerFormats(range: SheetRangeBounds) {
-    return this.ownerFormats.clear(range);
+    return this.#ownerFormats.clear(range);
   }
 
   public captureOwnerData(range: SheetRangeBounds): readonly SheetPortableClipboardTransfer[] {
-    return this.ownerClipboard.capturePortable(range);
+    return this.#ownerClipboard.capturePortable(range);
   }
 
   public planOwnerData(requests: readonly SheetClipboardTransferRequest[]) {
-    return this.ownerClipboard.planPortable(requests);
+    return this.#ownerClipboard.planPortable(requests);
   }
 
   public clearOwnerData(range: SheetRangeBounds) {
-    return this.ownerClipboard.clear(range);
+    return this.#ownerClipboard.clear(range);
   }
 
   public getMergedRange(row: number, column: number): SheetRangeBounds | null {
-    const range = readSheetCellMerges(this.dataEngine)?.findRange(row, column);
+    const range = readSheetCellMerges(this.#dataEngine)?.findRange(row, column);
     return range ? { start: range.getPoint(0), end: range.getPoint(1) } : null;
   }
 
   public captureMergedRanges(range: SheetRangeBounds): readonly SheetClipboardMergedRange[] {
-    const matrix = readSheetCellMerges(this.dataEngine);
+    const matrix = readSheetCellMerges(this.#dataEngine);
     if (!matrix) return [];
     return matrix.getRanges().flatMap((merge) => {
       const start = merge.getPoint(0);
@@ -221,7 +236,7 @@ export class DefaultSheetClipboardDataSource implements SheetClipboardDataSource
   }
 
   public planPasteMergedRanges(merges: readonly SheetClipboardMergedRange[], target: SheetClipboardCellPoint) {
-    const matrix = readSheetCellMerges(this.dataEngine);
+    const matrix = readSheetCellMerges(this.#dataEngine);
     if (!matrix) throw new SheetClipboardError(SheetClipboardErrorCode.InvalidPayload, 'This sheet has no merge owner.');
     const source = { target: SheetCellMergePlugin.pluginKey, readMatrix: () => matrix };
     return {
@@ -234,7 +249,7 @@ export class DefaultSheetClipboardDataSource implements SheetClipboardDataSource
   }
 
   public planClearMergedRanges(range: SheetRangeBounds) {
-    const matrix = readSheetCellMerges(this.dataEngine);
+    const matrix = readSheetCellMerges(this.#dataEngine);
     const target = SheetCellMergePlugin.pluginKey;
     if (!matrix) return { target, operations: [] };
     const source = { target, readMatrix: () => matrix };

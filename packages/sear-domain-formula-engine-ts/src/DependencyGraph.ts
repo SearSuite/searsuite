@@ -41,6 +41,11 @@ interface SortedInterval {
   formulaKey: CellKey;
 }
 
+/** Threshold for expanding large ranges into columns. */
+const COLUMN_EXPAND_LIMIT = 1000;
+/** Cell-count threshold for expanding a small range into per-cell cellRevDeps. */
+const SMALL_RANGE_LIMIT = 100;
+
 /** Tracks formula dependencies, dirty propagation, evaluation readiness, and cycles. */
 @Injectable()
 export class DependencyGraph implements IDependencyGraph {
@@ -119,11 +124,6 @@ export class DependencyGraph implements IDependencyGraph {
   // Cycle-reference nodes detected by the last markDirty call.
   #lastCycleKeys: CellKey[] = [];
 
-  /** Threshold for expanding large ranges into columns. */
-  private static readonly COLUMN_EXPAND_LIMIT = 1000;
-  /** Cell-count threshold for expanding a small range into per-cell cellRevDeps. */
-  private static readonly SMALL_RANGE_LIMIT = 100;
-
   /**
    * Registers or updates dependencies for one formula cell.
    */
@@ -145,7 +145,7 @@ export class DependencyGraph implements IDependencyGraph {
         const [endRow, endCol] = dep.end;
         const cellCount = (endRow - startRow + 1) * (endCol - startCol + 1);
 
-        if (cellCount < DependencyGraph.SMALL_RANGE_LIMIT) {
+        if (cellCount < SMALL_RANGE_LIMIT) {
           // Small range: expand to per-cell cellRevDeps.
           // Queries are O(1), at the cost of more memory.
           for (let r = startRow; r <= endRow; r++) {
@@ -156,7 +156,7 @@ export class DependencyGraph implements IDependencyGraph {
         } else {
           // Large range: insert sorted intervals by column group.
           const colSpan = endCol - startCol + 1;
-          if (colSpan <= DependencyGraph.COLUMN_EXPAND_LIMIT) {
+          if (colSpan <= COLUMN_EXPAND_LIMIT) {
             // Manageable column count: insert into columnRanges per column.
             for (let c = startCol; c <= endCol; c++) {
               this.#insertColumnRange(c, startRow, endRow, formulaKey);
@@ -210,7 +210,7 @@ export class DependencyGraph implements IDependencyGraph {
         const [endRow, endCol] = dep.end;
         const cellCount = (endRow - startRow + 1) * (endCol - startCol + 1);
 
-        if (cellCount < DependencyGraph.SMALL_RANGE_LIMIT) {
+        if (cellCount < SMALL_RANGE_LIMIT) {
           // Remove per-cell expansion for a small range.
           for (let r = startRow; r <= endRow; r++) {
             for (let c = startCol; c <= endCol; c++) {
@@ -219,7 +219,7 @@ export class DependencyGraph implements IDependencyGraph {
           }
         } else {
           const colSpan = endCol - startCol + 1;
-          if (colSpan <= DependencyGraph.COLUMN_EXPAND_LIMIT) {
+          if (colSpan <= COLUMN_EXPAND_LIMIT) {
             // Remove column-grouped intervals.
             for (let c = startCol; c <= endCol; c++) {
               this.#removeColumnRange(c, startRow, endRow, formulaKey);
@@ -720,16 +720,16 @@ export class DependencyGraph implements IDependencyGraph {
         }
         return dep;
       } else if (dep.kind === FormulaNodeKind.ColumnRange) {
-        const startCol = this.shiftColumn(dep.startCol, changes);
-        const endCol = this.shiftColumn(dep.endCol, changes);
+        const startCol = this.#shiftColumn(dep.startCol, changes);
+        const endCol = this.#shiftColumn(dep.endCol, changes);
         if (startCol !== dep.startCol || endCol !== dep.endCol) {
           anyChanged = true;
           return { ...dep, startCol: Math.min(startCol, endCol), endCol: Math.max(startCol, endCol) };
         }
         return dep;
       } else if (dep.kind === FormulaNodeKind.RowRange) {
-        const startRow = this.shiftRow(dep.startRow, changes);
-        const endRow = this.shiftRow(dep.endRow, changes);
+        const startRow = this.#shiftRow(dep.startRow, changes);
+        const endRow = this.#shiftRow(dep.endRow, changes);
         if (startRow !== dep.startRow || endRow !== dep.endRow) {
           anyChanged = true;
           return { ...dep, startRow: Math.min(startRow, endRow), endRow: Math.max(startRow, endRow) };
@@ -752,11 +752,11 @@ export class DependencyGraph implements IDependencyGraph {
     };
   }
 
-  private shiftColumn(col: number, changes: StructureChange[]): number {
+  #shiftColumn(col: number, changes: StructureChange[]): number {
     return shiftStructureCoordinate({ coordinate: col, axis: StructureChangeAxis.Col, changes }).value;
   }
 
-  private shiftRow(row: number, changes: StructureChange[]): number {
+  #shiftRow(row: number, changes: StructureChange[]): number {
     return shiftStructureCoordinate({ coordinate: row, axis: StructureChangeAxis.Row, changes }).value;
   }
 }

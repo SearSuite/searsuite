@@ -799,41 +799,12 @@ describe('FormulaParser', () => {
       expect(shiftedUnary).not.toBe(unary);
     });
 
-    it('covers shiftRangeCoordinate delete and passthrough helper branches', () => {
-      const parserInternal = parser as unknown as {
-        shiftRangeCoordinate: (
-          value: number,
-          isAbsolute: boolean,
-          change: StructureChange,
-          axis: StructureChangeAxis,
-        ) => { value: number; refError: boolean };
-      };
-
-      expect(
-        parserInternal.shiftRangeCoordinate(
-          4,
-          false,
-          {
-            type: MatrixOTActionName.RowMove,
-            fromIndex: 4,
-            toIndex: 7,
-          },
-          StructureChangeAxis.Row,
-        ),
-      ).toEqual({ value: 7, refError: false });
-
-      expect(
-        parserInternal.shiftRangeCoordinate(
-          5,
-          false,
-          {
-            type: MatrixOTActionName.ColDelete,
-            index: 2,
-            count: 2,
-          },
-          StructureChangeAxis.Col,
-        ),
-      ).toEqual({ value: 3, refError: false });
+    it('rebases range endpoints after moving a row or deleting earlier columns', () => {
+      const range = parser.parse('=F5:F5') as FormulaAST;
+      expect(parser.shiftReferences(range, [{ type: MatrixOTActionName.RowMove, fromIndex: 4, toIndex: 7 }]))
+        .toMatchObject({ start: [7, 5], end: [7, 5] });
+      expect(parser.shiftReferences(range, [{ type: MatrixOTActionName.ColDelete, index: 2, count: 2 }]))
+        .toMatchObject({ start: [4, 3], end: [4, 3] });
     });
   });
 });

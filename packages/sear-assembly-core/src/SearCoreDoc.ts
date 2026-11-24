@@ -150,6 +150,11 @@ export interface DocRenderLayoutState {
 /** Stages and commits rich-document transactions for one editor runtime. */
 @Injectable()
 export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> {
+  readonly #docCursorManager: DocCursorManager;
+  readonly #docCompositionManager: DocCompositionManager;
+  readonly #docLayoutEngine: DocLayoutEngine;
+  readonly #stepExecutorRegistry: PipelineStepExecutorRegistry | undefined;
+
   /** DI token for resolving SearCoreDoc. */
   public static readonly symbol: symbol = Symbol.for('SearCoreDoc');
   /** DI token for resolving the Doc-owned PluginManager without colliding with Sheet managers. */
@@ -167,20 +172,20 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
   public eventEngine: EventEngine<NodeProperties> | null = null;
   /** Configuration layer used by standalone document hosts when configured by assembly. */
   public configEngine: ConfigEngine | null = null;
-  private platform: Platform | null = null;
+  #platform: Platform | null = null;
 
   /** Current state owned by SearCoreDoc. */
   #document: RichDocNode[] = [];
-  private readonly defaultPadding = 0;
-  private docRenderRequestHandler: DocRenderRequestHandler | null = null;
-  private renderRequestCollector: DocRenderRequest[] | null = null;
-  private readonly docRenderRequests: DocRenderRequest[] = [];
+  readonly #defaultPadding = 0;
+  #docRenderRequestHandler: DocRenderRequestHandler | null = null;
+  #renderRequestCollector: DocRenderRequest[] | null = null;
+  readonly #docRenderRequests: DocRenderRequest[] = [];
   #lastLayoutSnapshot: LayoutSnapshot | null = null;
   #docRenderLayoutState: DocRenderLayoutState | null = null;
-  private readonly pluginEventDisposers = new Map<string, Array<() => void>>();
-  private initialized = false;
-  private started = false;
-  private destroyed = false;
+  readonly #pluginEventDisposers = new Map<string, Array<() => void>>();
+  #initialized = false;
+  #started = false;
+  #destroyed = false;
   #commandBoundaryCheck: (() => boolean) | undefined;
   #teardownToken: object | undefined;
   #runWithoutMutationAuthority: (<Value>(callback: () => Value) => Value) | undefined;
@@ -198,7 +203,7 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
       'blockManager', 'docCursorManager', 'docCompositionManager', 'docLayoutEngine',
       'stepExecutorRegistry', 'renderStage', 'renderEngine', 'eventEngine', 'configEngine', 'platform',
     ]) Object.defineProperty(this, key, { writable: false, configurable: false });
-    if (this.initialized) this.sealPluginState();
+    if (this.#initialized) this.#sealPluginState();
   }
 
   /** Reserves assembled Doc Core cleanup for its editor facade. */
@@ -211,30 +216,34 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
   constructor(
     @Inject(BlockManager.symbol) public blockManager: BlockManager,
     @Inject(DocCursorManager.symbol)
-    private readonly docCursorManager: DocCursorManager,
+    docCursorManager: DocCursorManager,
     @Inject(DocCompositionManager.symbol)
-    private readonly docCompositionManager: DocCompositionManager,
+    docCompositionManager: DocCompositionManager,
     @Inject(DocLayoutEngine.symbol)
-    private readonly docLayoutEngine: DocLayoutEngine,
+    docLayoutEngine: DocLayoutEngine,
     @Inject(SearCoreDoc.pluginManagerSymbol)
     pluginManager: PluginManager<SearCoreDoc, NodeProperties>,
     @Inject(PipelineStepExecutorRegistry.symbol)
-    private readonly stepExecutorRegistry?: PipelineStepExecutorRegistry,
+    stepExecutorRegistry?: PipelineStepExecutorRegistry,
     @Inject(SearCoreDoc.runtimeLayersSymbol)
     runtimeLayers?: SearCoreDocRuntimeLayers,
   ) {
     super();
+    this.#docCursorManager = docCursorManager;
+    this.#docCompositionManager = docCompositionManager;
+    this.#docLayoutEngine = docLayoutEngine;
+    this.#stepExecutorRegistry = stepExecutorRegistry;
     const layers = runtimeLayers ?? {};
     Object.defineProperty(this, 'pluginManager', { value: pluginManager, writable: false, configurable: false });
     this.renderStage = layers.renderStage ?? null;
     this.renderEngine = layers.renderEngine ?? null;
     this.eventEngine = layers.eventEngine ?? null;
     this.configEngine = layers.configEngine ?? null;
-    this.platform = layers.platform ?? null;
-    this.registerBuiltInPipelineStepExecutors();
+    this.#platform = layers.platform ?? null;
+    this.#registerBuiltInPipelineStepExecutors();
   }
 
-  private generateDocNodeFromString(content: string): RichDocNode[] {
+  #generateDocNodeFromString(content: string): RichDocNode[] {
     return [
       DocNodeRegistry.create({
         type: DocNodeRegistry.requireDefaultBlockType(),
@@ -243,9 +252,9 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     ];
   }
 
-  private prepareLayoutDocument(state: RichDocNode[] | string, blockManager: BlockManager): void {
+  #prepareLayoutDocument(state: RichDocNode[] | string, blockManager: BlockManager): void {
     blockManager.clear();
-    const richContent = typeof state === 'string' ? this.generateDocNodeFromString(state) : state;
+    const richContent = typeof state === 'string' ? this.#generateDocNodeFromString(state) : state;
     for (const node of richContent) {
       const documentNode = DocNodeRegistry.create(node);
       blockManager.add(documentNode);
@@ -298,52 +307,52 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
   public prepareEditorRenderLayout(input: DocEditorRenderLayoutInput): DocPreparedEditorRenderLayout {
     const mayCommit = !this.#commandBoundaryCheck || this.#commandBoundaryCheck();
     const blockManager = mayCommit ? this.blockManager : this.blockManager.createDetached();
-    const resolved = this.resolveEditorRenderLayoutInput(input);
+    const resolved = this.#resolveEditorRenderLayoutInput(input);
     blockManager.setBaseFont?.(input.font ?? '16px sans-serif');
-    this.prepareLayoutDocument(resolved.input.document, blockManager);
-    const frame = this.prepareEditorLayoutFrame(resolved, blockManager);
+    this.#prepareLayoutDocument(resolved.input.document, blockManager);
+    const frame = this.#prepareEditorLayoutFrame(resolved, blockManager);
     const composition = resolved.compositionProvider.measure(resolved.input.font ?? '16px sans-serif');
-    this.expandEditorFrameForComposition(resolved, frame, composition, blockManager);
-    const prepared = this.createPreparedEditorRenderLayout(resolved, frame, composition);
+    this.#expandEditorFrameForComposition(resolved, frame, composition, blockManager);
+    const prepared = this.#createPreparedEditorRenderLayout(resolved, frame, composition);
     if (mayCommit) {
-      this.commitPreparedEditorRenderLayout(resolved, prepared);
+      this.#commitPreparedEditorRenderLayout(resolved, prepared);
     }
     return prepared;
   }
 
-  private resolveEditorRenderLayoutInput(input: DocEditorRenderLayoutInput): ResolvedDocEditorLayoutInput {
+  #resolveEditorRenderLayoutInput(input: DocEditorRenderLayoutInput): ResolvedDocEditorLayoutInput {
     return {
       input,
-      padding: input.padding ?? this.defaultPadding,
-      compositionProvider: input.compositionProvider ?? this.docCompositionManager ?? new NoopDocCompositionProvider(),
+      padding: input.padding ?? this.#defaultPadding,
+      compositionProvider: input.compositionProvider ?? this.#docCompositionManager ?? new NoopDocCompositionProvider(),
     };
   }
 
-  private prepareEditorLayoutFrame(
+  #prepareEditorLayoutFrame(
     resolved: ResolvedDocEditorLayoutInput,
     blockManager: BlockManager,
   ): MutableDocEditorLayoutFrame {
     const { input, padding } = resolved;
     const naturalWidth = input.fitContentWidth === false ? 0 : blockManager.maxWidth + padding * 2;
     const editorWidth = Math.max(input.minWidth, naturalWidth, input.minContentWidth ?? 0);
-    const editorHeight = this.resolveEditorHeight(editorWidth, input.minHeight, padding, blockManager);
-    const snapshot = this.buildEditorSnapshot(resolved, editorWidth, editorHeight, blockManager);
+    const editorHeight = this.#resolveEditorHeight(editorWidth, input.minHeight, padding, blockManager);
+    const snapshot = this.#buildEditorSnapshot(resolved, editorWidth, editorHeight, blockManager);
     return {
       editorWidth,
       editorHeight,
       snapshot,
-      cursorRelative: this.docLayoutEngine.cursorToPoint(input.selection.head, snapshot),
+      cursorRelative: this.#docLayoutEngine.cursorToPoint(input.selection.head, snapshot),
     };
   }
 
-  private buildEditorSnapshot(
+  #buildEditorSnapshot(
     resolved: ResolvedDocEditorLayoutInput,
     editorWidth: number,
     editorHeight: number,
     blockManager: BlockManager,
   ): LayoutSnapshot {
     const { input, padding } = resolved;
-    return this.docLayoutEngine.buildSnapshot(
+    return this.#docLayoutEngine.buildSnapshot(
       input.document,
       blockManager,
       editorWidth,
@@ -353,7 +362,7 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     );
   }
 
-  private expandEditorFrameForComposition(
+  #expandEditorFrameForComposition(
     resolved: ResolvedDocEditorLayoutInput,
     frame: MutableDocEditorLayoutFrame,
     composition: DocCompositionLayout,
@@ -363,14 +372,14 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     const neededWidth = frame.cursorRelative.x + composition.textWidth + resolved.padding;
     if (neededWidth <= frame.editorWidth) return;
     frame.editorWidth = neededWidth;
-    frame.editorHeight = this.resolveEditorHeight(
+    frame.editorHeight = this.#resolveEditorHeight(
       frame.editorWidth, resolved.input.minHeight, resolved.padding, blockManager,
     );
-    frame.snapshot = this.buildEditorSnapshot(resolved, frame.editorWidth, frame.editorHeight, blockManager);
-    frame.cursorRelative = this.docLayoutEngine.cursorToPoint(resolved.input.selection.head, frame.snapshot);
+    frame.snapshot = this.#buildEditorSnapshot(resolved, frame.editorWidth, frame.editorHeight, blockManager);
+    frame.cursorRelative = this.#docLayoutEngine.cursorToPoint(resolved.input.selection.head, frame.snapshot);
   }
 
-  private createPreparedEditorRenderLayout(
+  #createPreparedEditorRenderLayout(
     resolved: ResolvedDocEditorLayoutInput,
     frame: MutableDocEditorLayoutFrame,
     composition: DocCompositionLayout,
@@ -389,20 +398,20 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     };
   }
 
-  private commitPreparedEditorRenderLayout(
+  #commitPreparedEditorRenderLayout(
     resolved: ResolvedDocEditorLayoutInput,
     prepared: DocPreparedEditorRenderLayout,
   ): void {
     this.#lastLayoutSnapshot = lockLayoutSnapshot(prepared.snapshot);
-    this.setInputLastSnapshot(prepared.snapshot);
-    this.docCursorManager.setCursor({
+    this.#setInputLastSnapshot(prepared.snapshot);
+    this.#docCursorManager.setCursor({
       x: prepared.positionRect.x + prepared.cursorRelative.x,
       y: prepared.positionRect.y + prepared.cursorRelative.y,
       height: prepared.cursorRelative.height,
       visible: resolved.input.cursorVisible ?? true,
     });
-    this.docCursorManager.setSelectionRects(
-      this.docLayoutEngine.getSelectionRects(
+    this.#docCursorManager.setSelectionRects(
+      this.#docLayoutEngine.getSelectionRects(
         resolved.input.selection,
         prepared.snapshot,
         prepared.positionRect.x,
@@ -416,10 +425,10 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
    * document cursor position.
    */
   public resolveCursorFromPoint(x: number, y: number, snapshot: LayoutSnapshot): DocCursorPos {
-    return this.docLayoutEngine.pointToCursor(x, y, snapshot);
+    return this.#docLayoutEngine.pointToCursor(x, y, snapshot);
   }
 
-  private resolveEditorHeight(
+  #resolveEditorHeight(
     editorWidth: number, minHeight: number, padding: number, blockManager: BlockManager,
   ): number {
     const contentWidth = Math.max(0, editorWidth - padding * 2);
@@ -431,7 +440,7 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     return Math.max(minHeight, contentHeight);
   }
 
-  private setInputLastSnapshot(snapshot: LayoutSnapshot): void {
+  #setInputLastSnapshot(snapshot: LayoutSnapshot): void {
     const plugin = this.getPluginInstance(DocInputPlugin.pluginKey);
     if (plugin instanceof DocInputPlugin) {
       plugin.setLastSnapshot(snapshot);
@@ -442,7 +451,7 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
    * Binds the document render scheduler used by hosts that execute document commands.
    */
   public bindDocRenderRequestHandler(handler: DocRenderRequestHandler): void {
-    this.docRenderRequestHandler = handler;
+    this.#docRenderRequestHandler = handler;
   }
 
   /** Executes document command work through the shared observable Pipeline contract. */
@@ -460,19 +469,19 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
         !!(step.transaction || step.interaction || step.localAction || step.prepare || step.postCommit);
     }
     if (pipeline.steps.some(stepMayChangeState)) assertCommandBoundary();
-    warnIfOutsideCommandExecution('SearCoreDoc.executePipeline', this.warn);
+    warnIfOutsideCommandExecution('SearCoreDoc.executePipeline', this.#warn);
     pipeline.emitStart();
     let rendered = false;
     const stagedPluginStates = new Map<PluginKey, DocStagedPluginState>();
     const committedTransactions: Transaction[] = [];
     const postCommitActions: Array<() => void> = [];
     const renderRequests: DocRenderRequest[] = [];
-    const previousCollector = this.renderRequestCollector;
-    this.renderRequestCollector = renderRequests;
+    const previousCollector = this.#renderRequestCollector;
+    this.#renderRequestCollector = renderRequests;
     function executeDocPipelineTransaction(step: PipelineStep): void {
       if (!step.transaction) return;
       assertCommandBoundary();
-      core.stageTransaction(step.transaction, stagedPluginStates);
+      core.#stageTransaction(step.transaction, stagedPluginStates);
       committedTransactions.push(step.transaction);
     }
     function executeDocPipelineRender(step: PipelineStep): void {
@@ -512,15 +521,15 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
       for (const step of pipeline.steps) {
         pipeline.emitStepStart(step);
         if (stepMayChangeState(step)) assertCommandBoundary();
-        this.executePipelineStep(context, step);
+        this.#executePipelineStep(context, step);
         pipeline.emitStepComplete(step);
       }
     } finally {
-      this.renderRequestCollector = previousCollector;
+      this.#renderRequestCollector = previousCollector;
     }
 
     if (stagedPluginStates.size || postCommitActions.length) assertCommandBoundary();
-    this.commitStagedPluginStates(stagedPluginStates);
+    this.#commitStagedPluginStates(stagedPluginStates);
     postCommitActions.forEach((commit) => {
       assertCommandBoundary();
       commit();
@@ -532,7 +541,7 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     }
 
     if (renderRequests.length > 0) {
-      this.dispatchDocRenderRequests(
+      this.#dispatchDocRenderRequests(
         withDocRenderOperations(renderRequests, collectDocRenderOperations(committedTransactions)),
       );
       rendered = true;
@@ -549,44 +558,44 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     }
   }
 
-  private executePipelineStep(context: PipelineStepExecutionContext, step: PipelineStep): void {
-    const executor = this.stepExecutorRegistry?.get(step.kind) ?? this.getFallbackPipelineStepExecutor(step.kind);
+  #executePipelineStep(context: PipelineStepExecutionContext, step: PipelineStep): void {
+    const executor = this.#stepExecutorRegistry?.get(step.kind) ?? this.#getFallbackPipelineStepExecutor(step.kind);
     executor.execute(context, step);
   }
 
-  private registerBuiltInPipelineStepExecutors(): void {
-    if (!this.stepExecutorRegistry) return;
-    this.registerBuiltInPipelineStepExecutor({
+  #registerBuiltInPipelineStepExecutors(): void {
+    if (!this.#stepExecutorRegistry) return;
+    this.#registerBuiltInPipelineStepExecutor({
       kind: PipelineStepKind.Transaction,
       execute: executeDocTransactionStep,
     });
-    this.registerBuiltInPipelineStepExecutor({
+    this.#registerBuiltInPipelineStepExecutor({
       kind: PipelineStepKind.Render,
       execute: executeDocRenderStep,
     });
-    this.registerBuiltInPipelineStepExecutor({
+    this.#registerBuiltInPipelineStepExecutor({
       kind: PipelineStepKind.Interaction,
       execute: executeDocInteractionStep,
     });
-    this.registerBuiltInPipelineStepExecutor({
+    this.#registerBuiltInPipelineStepExecutor({
       kind: PipelineStepKind.LocalAction,
       execute: executeDocLocalActionStep,
     });
-    this.registerBuiltInPipelineStepExecutor({
+    this.#registerBuiltInPipelineStepExecutor({
       kind: PipelineStepKind.PostCommit,
       execute: executeDocPostCommitStep,
     });
-    this.registerBuiltInPipelineStepExecutor({
+    this.#registerBuiltInPipelineStepExecutor({
       kind: PipelineStepKind.PostRender,
       execute: executeDocPostRenderStep,
     });
   }
 
-  private registerBuiltInPipelineStepExecutor(executor: PipelineStepExecutor): void {
-    if (!this.stepExecutorRegistry?.get(executor.kind)) this.stepExecutorRegistry?.register(executor);
+  #registerBuiltInPipelineStepExecutor(executor: PipelineStepExecutor): void {
+    if (!this.#stepExecutorRegistry?.get(executor.kind)) this.#stepExecutorRegistry?.register(executor);
   }
 
-  private getFallbackPipelineStepExecutor(kind: string): PipelineStepExecutor {
+  #getFallbackPipelineStepExecutor(kind: string): PipelineStepExecutor {
     if (kind === PipelineStepKind.Transaction) {
       return { kind, execute: executeDocTransactionStep };
     }
@@ -608,19 +617,19 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     throw new SearPipelineStepExecutorNotFoundError(kind);
   }
 
-  private stageTransaction(transaction: Transaction, stagedPluginStates: Map<PluginKey, DocStagedPluginState>): void {
+  #stageTransaction(transaction: Transaction, stagedPluginStates: Map<PluginKey, DocStagedPluginState>): void {
     const core = this;
     this.pluginManager.forEach(function stageDocPluginTransaction(plugin) {
       const staged = stagedPluginStates.get(plugin.key);
       const previousState = staged?.state ??
-        (plugin instanceof DocInputPlugin ? plugin.getState() : core.cloneStagedState(plugin.getState()));
+        (plugin instanceof DocInputPlugin ? plugin.getState() : core.#cloneStagedState(plugin.getState()));
       const nextState = plugin.apply(previousState, transaction);
       if (nextState === null) return;
       stagedPluginStates.set(plugin.key, { plugin, state: nextState });
     });
   }
 
-  private commitStagedPluginStates(stagedPluginStates: ReadonlyMap<PluginKey, DocStagedPluginState>): void {
+  #commitStagedPluginStates(stagedPluginStates: ReadonlyMap<PluginKey, DocStagedPluginState>): void {
     stagedPluginStates.forEach(({ plugin, state }) => {
       if (plugin instanceof DocInputPlugin) {
         Plugin.prototype.setState.call(
@@ -639,7 +648,7 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     });
   }
 
-  private cloneStagedState<T>(value: T): T {
+  #cloneStagedState<T>(value: T): T {
     if (value === null || typeof value !== 'object') return value;
 
     if (value instanceof CSRMatrix) return CSRMatrix.prototype.cloneForStaging.call(value) as T;
@@ -654,20 +663,20 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
 
     if (Array.isArray(value)) {
       const clonedArray: unknown[] = [];
-      for (const item of value) clonedArray.push(this.cloneStagedState(item));
+      for (const item of value) clonedArray.push(this.#cloneStagedState(item));
       return clonedArray as T;
     }
 
     if (value instanceof Map) {
       const cloned = new Map<unknown, unknown>();
       for (const [mapKey, mapValue] of value)
-        cloned.set(this.cloneStagedState(mapKey), this.cloneStagedState(mapValue));
+        cloned.set(this.#cloneStagedState(mapKey), this.#cloneStagedState(mapValue));
       return cloned as T;
     }
 
     if (value instanceof Set) {
       const cloned = new Set<unknown>();
-      for (const setValue of value) cloned.add(this.cloneStagedState(setValue));
+      for (const setValue of value) cloned.add(this.#cloneStagedState(setValue));
       return cloned as T;
     }
 
@@ -677,7 +686,7 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor) continue;
       if ('value' in descriptor) {
-        descriptor.value = this.cloneStagedState(descriptor.value);
+        descriptor.value = this.#cloneStagedState(descriptor.value);
         descriptor.writable = true;
         descriptor.configurable = true;
       }
@@ -691,51 +700,51 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     if (this.#commandBoundaryCheck && !this.#commandBoundaryCheck()) {
       throw new SearContractViolationError('Document render requests must run through editor.commands.run(...).');
     }
-    warnIfOutsideCommandExecution('SearCoreDoc.requestDocRender', this.warn);
+    warnIfOutsideCommandExecution('SearCoreDoc.requestDocRender', this.#warn);
     const request: DocRenderRequest = pluginKey ? { renderPluginKey: pluginKey } : {};
-    if (this.renderRequestCollector) {
-      this.renderRequestCollector.push(request);
+    if (this.#renderRequestCollector) {
+      this.#renderRequestCollector.push(request);
       return;
     }
-    this.dispatchDocRenderRequests([request]);
+    this.#dispatchDocRenderRequests([request]);
   }
 
   /** Returns a diagnostic snapshot of document render requests seen by this core. */
   public getDocRenderRequests(): readonly DocRenderRequest[] {
-    return [...this.docRenderRequests];
+    return [...this.#docRenderRequests];
   }
 
   /** Clears diagnostic document render request history. */
   public clearDocRenderRequests(): void {
-    this.docRenderRequests.length = 0;
+    this.#docRenderRequests.length = 0;
   }
 
   public override initialize(): void {
-    if (this.initialized || this.destroyed) return;
-    this.initialized = true;
-    this.handlePlugin(this.pluginManager.getAllPlugins());
-    if (this.#commandBoundaryCheck) this.sealPluginState();
+    if (this.#initialized || this.#destroyed) return;
+    this.#initialized = true;
+    this.#handlePlugin(this.pluginManager.getAllPlugins());
+    if (this.#commandBoundaryCheck) this.#sealPluginState();
   }
 
   /** Starts standalone document runtime layers after initial plugin-node construction. */
   public start(): void {
-    if (this.started || this.destroyed) return;
-    if (!this.initialized) this.initialize();
-    this.started = true;
+    if (this.#started || this.#destroyed) return;
+    if (!this.#initialized) this.initialize();
+    this.#started = true;
     if (this.renderStage) this.renderEngine?.render(this.renderStage);
     if (this.renderStage) this.eventEngine?.render(this.renderStage);
   }
 
   /** Releases standalone document runtime ownership held by Core. */
   public destroy(ownerToken?: object): void {
-    if (this.destroyed) return;
+    if (this.#destroyed) return;
     if (this.#teardownToken && ownerToken !== this.#teardownToken) {
       throw new SearContractViolationError('Doc Core cleanup requires its editor owner.');
     }
-    this.destroyed = true;
-    this.started = false;
+    this.#destroyed = true;
+    this.#started = false;
     for (const plugin of this.pluginManager.getAllPlugins()) this.unregisterPlugin(plugin.key);
-    this.pluginEventDisposers.clear();
+    this.#pluginEventDisposers.clear();
   }
 
   /** Registers the plugin. */
@@ -743,12 +752,12 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     if (Plugin.prototype.hasStateWriteBoundary.call(plugin)) {
       throw new SearContractViolationError('Doc plugin state is already owned by another editor.');
     }
-    if (this.initialized && this.#commandBoundaryCheck && !this.#commandBoundaryCheck()) {
+    if (this.#initialized && this.#commandBoundaryCheck && !this.#commandBoundaryCheck()) {
       throw new SearContractViolationError('Document plugin registration must run through editor.commands.run(...).');
     }
     this.pluginManager.registerPlugin(plugin, this.#stateCommitToken);
-    if (this.initialized && !this.destroyed) this.handlePlugin([plugin]);
-    if (this.initialized && this.#commandBoundaryCheck) this.protectPluginState(plugin);
+    if (this.#initialized && !this.#destroyed) this.#handlePlugin([plugin]);
+    if (this.#initialized && this.#commandBoundaryCheck) this.#protectPluginState(plugin);
     const core = this;
     return function unregisterDocPlugin(): void {
       core.unregisterPlugin(plugin.key);
@@ -757,13 +766,13 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
 
   /** Unregisters a plugin and removes core-owned runtime output for it. */
   public unregisterPlugin(pluginKey: PluginKey): void {
-    if (this.initialized && !this.destroyed && this.#commandBoundaryCheck && !this.#commandBoundaryCheck()) {
+    if (this.#initialized && !this.#destroyed && this.#commandBoundaryCheck && !this.#commandBoundaryCheck()) {
       throw new SearContractViolationError('Document plugin removal must run through editor.commands.run(...).');
     }
     const plugin = this.getPluginInstance(pluginKey);
     if (!plugin) return;
-    for (const dispose of this.pluginEventDisposers.get(plugin.key.key) ?? []) dispose();
-    this.pluginEventDisposers.delete(plugin.key.key);
+    for (const dispose of this.#pluginEventDisposers.get(plugin.key.key) ?? []) dispose();
+    this.#pluginEventDisposers.delete(plugin.key.key);
     this.renderStage?.markRemovePluginNode(plugin.key.key);
     this.pluginManager.unregisterPlugin(plugin.key, this.#stateCommitToken);
   }
@@ -780,7 +789,7 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     });
   }
 
-  private handlePlugin(plugins: Plugin<SearCoreDoc, NodeProperties, any>[]): void {
+  #handlePlugin(plugins: Plugin<SearCoreDoc, NodeProperties, any>[]): void {
     for (const plugin of plugins) {
       for (const unit of plugin.registerConfig?.() ?? [])
         this.configEngine?.registerPluginConfig(unit.key, unit.config);
@@ -798,16 +807,16 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     for (const plugin of plugins) {
       const shapes = plugin.render?.(this) || [];
       this.renderStage?.addPluginNode(plugin.key.key, shapes);
-      this.registerPluginEvents(plugin);
+      this.#registerPluginEvents(plugin);
     }
   }
 
-  private sealPluginState(): void {
-    this.pluginManager.getAllPlugins().forEach((plugin) => this.protectPluginState(plugin));
+  #sealPluginState(): void {
+    this.pluginManager.getAllPlugins().forEach((plugin) => this.#protectPluginState(plugin));
     PluginManager.prototype.enforceWriteBoundary.call(this.pluginManager, this.#stateCommitToken);
   }
 
-  private protectPluginState(plugin: Plugin<SearCoreDoc, NodeProperties, unknown>): void {
+  #protectPluginState(plugin: Plugin<SearCoreDoc, NodeProperties, unknown>): void {
     if (!this.#commandBoundaryCheck) return;
     if (Plugin.prototype.hasStateWriteBoundary.call(plugin)) {
       throw new SearContractViolationError('Doc plugin state is already owned by another editor.');
@@ -835,7 +844,7 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
     });
   }
 
-  private registerPluginEvents(plugin: Plugin<SearCoreDoc, NodeProperties, unknown>): void {
+  #registerPluginEvents(plugin: Plugin<SearCoreDoc, NodeProperties, unknown>): void {
     const registeredEvents = this.eventEngine?.eventRegistrar.registeredEvents ?? [];
     const core = this;
     for (const eventName of registeredEvents) {
@@ -852,30 +861,30 @@ export class SearCoreDoc extends SearCore<SearCoreDoc, NodeProperties, unknown> 
           return handler.call(plugin, core, event);
         },
       );
-      if (unregister) this.addPluginEventDisposer(plugin.key.key, unregister);
+      if (unregister) this.#addPluginEventDisposer(plugin.key.key, unregister);
     }
   }
 
-  private addPluginEventDisposer(pluginKey: string, unregister: () => void): void {
-    const disposers = this.pluginEventDisposers.get(pluginKey);
+  #addPluginEventDisposer(pluginKey: string, unregister: () => void): void {
+    const disposers = this.#pluginEventDisposers.get(pluginKey);
     if (disposers) {
       disposers.push(unregister);
       return;
     }
-    this.pluginEventDisposers.set(pluginKey, [unregister]);
+    this.#pluginEventDisposers.set(pluginKey, [unregister]);
   }
 
-  private dispatchDocRenderRequests(requests: readonly DocRenderRequest[]): void {
-    this.docRenderRequestHandler?.(requests);
-    this.docRenderRequests.push(...requests);
+  #dispatchDocRenderRequests(requests: readonly DocRenderRequest[]): void {
+    this.#docRenderRequestHandler?.(requests);
+    this.#docRenderRequests.push(...requests);
   }
 
-  private readPendingDocument(): readonly RichDocNode[] {
+  #readPendingDocument(): readonly RichDocNode[] {
     return this.getPlugin<{ readonly pendingDoc: readonly RichDocNode[] }>(DocInputPlugin.pluginKey)?.pendingDoc ?? [];
   }
 
-  private warn = (message: string, ...details: unknown[]): void => {
-    this.platform?.warn?.(message, ...details);
+  #warn = (message: string, ...details: unknown[]): void => {
+    this.#platform?.warn?.(message, ...details);
   };
 }
 

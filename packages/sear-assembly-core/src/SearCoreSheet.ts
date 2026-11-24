@@ -55,6 +55,11 @@ interface StagedPluginState {
  */
 @Injectable()
 export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, SheetRenderCoordinatorManager> {
+  readonly #lifecycleCoordinator: SheetLifecycleCoordinator;
+  readonly #interactionStore: SheetInteractionStore;
+  readonly #stepExecutorRegistry: PipelineStepExecutorRegistry;
+  readonly #platform: Platform | undefined;
+
   // protected pluginManager: PluginManager<SearCoreSheet>;
   protected renderStage: SceneGraph<CellProperties>;
   /** Data registry for plugin-owned sheet state. */
@@ -110,22 +115,26 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
     // Config engine
     @Inject(ConfigEngine.symbol) configEngine: ConfigEngine,
     @Inject(SheetLifecycleCoordinator.symbol)
-    private readonly lifecycleCoordinator: SheetLifecycleCoordinator,
+    lifecycleCoordinator: SheetLifecycleCoordinator,
     @Inject(SheetInteractionStore.symbol)
-    private readonly interactionStore: SheetInteractionStore,
+    interactionStore: SheetInteractionStore,
     @Inject(PipelineStepExecutorRegistry.symbol)
-    private readonly stepExecutorRegistry: PipelineStepExecutorRegistry,
+    stepExecutorRegistry: PipelineStepExecutorRegistry,
     @Inject(Platform.symbol)
-    private readonly platform?: Platform,
+    platform?: Platform,
   ) {
     super();
+    this.#lifecycleCoordinator = lifecycleCoordinator;
+    this.#interactionStore = interactionStore;
+    this.#stepExecutorRegistry = stepExecutorRegistry;
+    this.#platform = platform;
     this.renderStage = stage;
     Object.defineProperty(this, 'pluginManager', { value: pluginManager, writable: false, configurable: false });
     this.renderEngine = renderEngine;
     this.eventEngine = eventEngine;
     this.configEngine = configEngine;
     this.dataEngine = dataEngine;
-    this.registerBuiltInPipelineStepExecutors();
+    this.#registerBuiltInPipelineStepExecutors();
   }
 
   /** Returns the render engine bound to this sheet core. */
@@ -153,9 +162,9 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
     if (this.#initialized || this.#destroyed) return;
     this.#initialized = true;
     const buildInPlugins = this.pluginManager.getAllPlugins();
-    this.handlePlugin(buildInPlugins, true);
-    this.processInitialData(buildInPlugins);
-    this.expandTreeBoundaryToSheetSize();
+    this.#handlePlugin(buildInPlugins, true);
+    this.#processInitialData(buildInPlugins);
+    this.#expandTreeBoundaryToSheetSize();
     if (this.#commandBoundaryCheck) {
       PluginManager.prototype.enforceWriteBoundary.call(this.pluginManager, this.#stateCommitToken);
     }
@@ -172,17 +181,17 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
     // Refresh boundaries after the first render in case a renderer contributed
     // dimensions during startup. initialize() already establishes them before
     // session viewport restoration so the first frame cannot clamp restored state.
-    this.expandTreeBoundaryToSheetSize();
-    this.lifecycleCoordinator.start({
+    this.#expandTreeBoundaryToSheetSize();
+    this.#lifecycleCoordinator.start({
       core: this,
-      refreshSheetBoundaries: this.expandTreeBoundaryToSheetSize.bind(this),
+      refreshSheetBoundaries: this.#expandTreeBoundaryToSheetSize.bind(this),
     });
 
     // Viewport-culled plugins need to regenerate their scene nodes when the
     // viewport changes. This subscriber runs before the render strategies so
     // new cells are in the QuadTree when strategies query it.
     this.#stopScrollReRender = this.renderEngine.scrollManager.subscribeScroll(
-      this.handleScrollReRender.bind(this),
+      this.#handleScrollReRender.bind(this),
       true,
     );
   }
@@ -196,10 +205,10 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
     this.#destroyed = true;
     this.#stopScrollReRender?.();
     this.#stopScrollReRender = void 0;
-    if (this.#scrollRenderFrame !== null) this.platform?.cancelAnimationFrame(this.#scrollRenderFrame);
+    if (this.#scrollRenderFrame !== null) this.#platform?.cancelAnimationFrame(this.#scrollRenderFrame);
     this.#scrollRenderFrame = null;
     this.eventEngine.destroy(token);
-    this.lifecycleCoordinator.destroy();
+    this.#lifecycleCoordinator.destroy();
     this.renderEngine.scrollManager.destroy(token);
   }
 
@@ -208,7 +217,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
    * interested plugins. This keeps startup indexes from independently
    * walking the row-pointer array (or, worse, the entire sheet shape).
    */
-  private processInitialData(plugins: Plugin<SearCoreSheet, CellProperties, any>[]): void {
+  #processInitialData(plugins: Plugin<SearCoreSheet, CellProperties, any>[]): void {
     const hasInitialDataConsumer = plugins.some((plugin) => plugin.onInitialDataCell || plugin.onInitialDataComplete);
     if (!hasInitialDataConsumer) return;
 
@@ -221,7 +230,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
     plugins.forEach((plugin) => plugin.onInitialDataComplete?.(this));
   }
 
-  private handlePlugin(plugins: Plugin<SearCoreSheet, CellProperties, any>[], sealDataEngine = false) {
+  #handlePlugin(plugins: Plugin<SearCoreSheet, CellProperties, any>[], sealDataEngine = false) {
     plugins.forEach((plugin) => {
       if (plugin.registerConfig) {
         const config = plugin.registerConfig();
@@ -231,7 +240,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
       }
     });
 
-    plugins.forEach((plugin) => this.protectPluginState(plugin));
+    plugins.forEach((plugin) => this.#protectPluginState(plugin));
 
     plugins.forEach((plugin) => {
       if (plugin.registerState) {
@@ -261,11 +270,11 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
         this.getStage().addPluginNode(plugin.key.key, shapes);
       }
 
-      this.registerPluginEvents(plugin);
+      this.#registerPluginEvents(plugin);
     });
   }
 
-  private registerPluginEvents(plugin: Plugin<SearCoreSheet, CellProperties, unknown>) {
+  #registerPluginEvents(plugin: Plugin<SearCoreSheet, CellProperties, unknown>) {
     const {
       eventEngine: {
         eventRegistrar: { registeredEvents },
@@ -297,10 +306,10 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
     if (this.#commandBoundaryCheck && !this.#commandBoundaryCheck()) {
       throw new SearContractViolationError('Sheet plugin registration must run through editor.commands.run(...).');
     }
-    this.handlePlugin([plugin]);
+    this.#handlePlugin([plugin]);
   }
 
-  private protectPluginState(plugin: Plugin<SearCoreSheet, CellProperties, unknown>): void {
+  #protectPluginState(plugin: Plugin<SearCoreSheet, CellProperties, unknown>): void {
     if (!(plugin instanceof Plugin)) {
       if (this.#commandBoundaryCheck) throw new SearContractViolationError('Sheet state owners must extend Plugin.');
       return;
@@ -338,9 +347,9 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
   /** Rebuilds viewport-culled nodes and both render layers after a view-scale change. */
   public refreshViewport(): void {
     if (this.#destroyed) return;
-    this.expandTreeBoundaryToSheetSize();
+    this.#expandTreeBoundaryToSheetSize();
     this.renderEngine.invalidateScreenCache();
-    this.rebuildViewportNodes();
+    this.#rebuildViewportNodes();
     this.renderEngine.render(this.renderStage);
     this.eventEngine.renderImmediate(this.renderStage);
   }
@@ -367,7 +376,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
         !!(step.transaction || step.interaction || step.localAction || step.prepare || step.postCommit);
     }
     if (pipeline.steps.some(stepMayChangeState)) assertCommandBoundary();
-    warnIfOutsideCommandExecution('SearCoreSheet.executePipeline', this.warn);
+    warnIfOutsideCommandExecution('SearCoreSheet.executePipeline', this.#warn);
     pipeline.emitStart();
     let needsRender = false;
     const postRenderSteps: typeof pipeline.steps = [];
@@ -383,7 +392,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
       if (!step.transaction) return;
       assertCommandBoundary();
       committedTransactions.push(step.transaction);
-      if (core.stageTransaction(step.transaction, stagedPluginStates, changedTransactions)) needsRender = true;
+      if (core.#stageTransaction(step.transaction, stagedPluginStates, changedTransactions)) needsRender = true;
     }
     function executeSheetPipelineRender(step: PipelineStep): void {
       if (!step.renderPluginKey) return;
@@ -393,8 +402,8 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
     function executeSheetPipelineInteraction(step: PipelineStep): void {
       if (!step.interaction) return;
       assertCommandBoundary();
-      stagedInteractionState = core.interactionStore.reduce(
-        stagedInteractionState ?? core.interactionStore.getState(),
+      stagedInteractionState = core.#interactionStore.reduce(
+        stagedInteractionState ?? core.#interactionStore.getState(),
         step.interaction,
       );
       stagedInteractions.push(step.interaction);
@@ -451,21 +460,21 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
           pipeline.steps.push(step);
           pipeline.emitStepStart(step);
           if (stepMayChangeState(step)) assertCommandBoundary();
-          const executor = this.stepExecutorRegistry.get(step.kind);
+          const executor = this.#stepExecutorRegistry.get(step.kind);
           if (!executor) throw new SearPipelineStepExecutorNotFoundError(step.kind);
           executor.execute(context, step);
           pipeline.emitStepComplete(step);
         }
       }
       if (stagedPluginStates.size || stagedInteractionState) assertCommandBoundary();
-      this.commitStagedPluginStates(stagedPluginStates);
-      if (stagedInteractionState) this.interactionStore.commit(stagedInteractionState, stagedInteractions);
+      this.#commitStagedPluginStates(stagedPluginStates);
+      if (stagedInteractionState) this.#interactionStore.commit(stagedInteractionState, stagedInteractions);
     } catch (error) {
       stagedRollbackActions.reverse().forEach((rollback) => {
         try {
           rollback();
         } catch (rollbackError) {
-          this.warn(`Sheet pipeline ${pipeline.name} preparation rollback failed.`, rollbackError);
+          this.#warn(`Sheet pipeline ${pipeline.name} preparation rollback failed.`, rollbackError);
         }
       });
       throw error;
@@ -476,7 +485,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
       try {
         commit();
       } catch (error) {
-        this.warn(`Sheet pipeline ${pipeline.name} post-commit action failed.`, error);
+        this.#warn(`Sheet pipeline ${pipeline.name} post-commit action failed.`, error);
       }
     });
     committedTransactions.forEach((transaction) => {
@@ -484,14 +493,14 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
         try {
           plugin.onTransactionCommitted?.(transaction);
         } catch (error) {
-          this.warn('Sheet plugin transaction listener failed.', error);
+          this.#warn('Sheet plugin transaction listener failed.', error);
         }
       });
     });
 
-    if (changedTransactions.size) this.expandTreeBoundaryToSheetSize();
+    if (changedTransactions.size) this.#expandTreeBoundaryToSheetSize();
 
-    if (this.renderCommittedTransactions(changedTransactions, renderPlugins)) needsRender = true;
+    if (this.#renderCommittedTransactions(changedTransactions, renderPlugins)) needsRender = true;
     for (const rect of pipeline.dirtyRects) {
       this.renderEngine.markDirty(rect);
     }
@@ -526,50 +535,50 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
       const prerequisites = projectSheetTransaction(this.pluginManager, transaction, (plugin) =>
         staged.get(plugin.key)?.state ?? plugin.getState());
       for (const projected of [...prerequisites, transaction]) {
-        this.stageTransaction(projected, staged, changed);
+        this.#stageTransaction(projected, staged, changed);
       }
     }
     return new Map([...staged].map(([key, value]) => [key, value.state]));
   }
 
-  private registerBuiltInPipelineStepExecutors(): void {
-    this.registerBuiltInPipelineStepExecutor({
+  #registerBuiltInPipelineStepExecutors(): void {
+    this.#registerBuiltInPipelineStepExecutor({
       kind: PipelineStepKind.Transaction,
       execute: function executeBuiltInSheetTransactionStep(context, step) {
         context.executeTransaction(step);
       },
     });
-    this.registerBuiltInPipelineStepExecutor({
+    this.#registerBuiltInPipelineStepExecutor({
       kind: PipelineStepKind.Render,
       execute: function executeBuiltInSheetRenderStep(context, step) {
         context.renderPlugin(step);
       },
     });
-    this.registerBuiltInPipelineStepExecutor({
+    this.#registerBuiltInPipelineStepExecutor({
       kind: PipelineStepKind.Interaction,
       execute: function executeBuiltInSheetInteractionStep(context, step) {
         context.applyInteraction(step);
       },
     });
-    this.registerBuiltInPipelineStepExecutor({
+    this.#registerBuiltInPipelineStepExecutor({
       kind: PipelineStepKind.LocalAction,
       execute: function executeBuiltInSheetLocalActionStep(context, step) {
         context.runLocalAction(step);
       },
     });
-    this.registerBuiltInPipelineStepExecutor({
+    this.#registerBuiltInPipelineStepExecutor({
       kind: PipelineStepKind.PreparedAction,
       execute: function prepareBuiltInSheetLocalActionStep(context, step) {
         context.prepareLocalAction!(step);
       },
     });
-    this.registerBuiltInPipelineStepExecutor({
+    this.#registerBuiltInPipelineStepExecutor({
       kind: PipelineStepKind.PostCommit,
       execute: function scheduleBuiltInSheetPostCommitStep(context, step) {
         context.schedulePostCommit(step);
       },
     });
-    this.registerBuiltInPipelineStepExecutor({
+    this.#registerBuiltInPipelineStepExecutor({
       kind: PipelineStepKind.PostRender,
       execute: function executeBuiltInSheetPostRenderStep(context, step) {
         context.schedulePostRender(step);
@@ -577,11 +586,11 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
     });
   }
 
-  private registerBuiltInPipelineStepExecutor(executor: {
+  #registerBuiltInPipelineStepExecutor(executor: {
     kind: string;
     execute: (context: PipelineStepExecutionContext, step: Pipeline['steps'][number]) => void;
   }): void {
-    if (!this.stepExecutorRegistry.get(executor.kind)) this.stepExecutorRegistry.register(executor);
+    if (!this.#stepExecutorRegistry.get(executor.kind)) this.#stepExecutorRegistry.register(executor);
   }
 
   /**
@@ -592,7 +601,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
    * @param changedTransactions - Transactions that changed each plugin.
    * @returns True when at least one plugin produced a prospective state.
    */
-  private stageTransaction(
+  #stageTransaction(
     tx: Transaction,
     stagedPluginStates: Map<PluginKey, StagedPluginState>,
     changedTransactions: Map<Plugin<SearCoreSheet, CellProperties, unknown>, Transaction[]>,
@@ -612,7 +621,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
       }
       const staged = stagedPluginStates.get(plugin.key);
       const committedState = plugin.getState?.() ?? this.dataEngine.getDataType(plugin.key);
-      const previousState = staged?.state ?? this.cloneStagedState(committedState);
+      const previousState = staged?.state ?? this.#cloneStagedState(committedState);
       const nextState = plugin.apply(previousState, tx);
       if (nextState === null) return;
       stagedPluginStates.set(plugin.key, {
@@ -633,7 +642,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
   }
 
   /** Commits every successfully staged plugin state to its owner and data view. */
-  private commitStagedPluginStates(stagedPluginStates: ReadonlyMap<PluginKey, StagedPluginState>): void {
+  #commitStagedPluginStates(stagedPluginStates: ReadonlyMap<PluginKey, StagedPluginState>): void {
     stagedPluginStates.forEach((staged) => {
       staged.plugin.lockCommittedState?.(staged.state);
       staged.state = adoptCommittedPluginState(staged.state);
@@ -645,7 +654,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
   }
 
   /** Refreshes nodes and dirty regions only after prospective state has committed. */
-  private renderCommittedTransactions(
+  #renderCommittedTransactions(
     changedTransactions: ReadonlyMap<Plugin<SearCoreSheet, CellProperties, unknown>, readonly Transaction[]>,
     renderPlugins: ReadonlySet<PluginKey>,
   ): boolean {
@@ -668,7 +677,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
   }
 
   /** Deeply copies a committed state before applying speculative pipeline work. */
-  private cloneStagedState<T>(value: T): T {
+  #cloneStagedState<T>(value: T): T {
     if (value === null || typeof value !== 'object') return value;
 
     if (value instanceof CSRMatrix) return CSRMatrix.prototype.cloneForStaging.call(value) as T;
@@ -681,19 +690,19 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
       return copy as T;
     }
 
-    if (Array.isArray(value)) return value.map((item) => this.cloneStagedState(item)) as T;
+    if (Array.isArray(value)) return value.map((item) => this.#cloneStagedState(item)) as T;
 
     if (value instanceof Map) {
       const cloned = new Map<unknown, unknown>();
       value.forEach((mapValue, mapKey) => {
-        cloned.set(this.cloneStagedState(mapKey), this.cloneStagedState(mapValue));
+        cloned.set(this.#cloneStagedState(mapKey), this.#cloneStagedState(mapValue));
       });
       return cloned as T;
     }
 
     if (value instanceof Set) {
       const cloned = new Set<unknown>();
-      value.forEach((setValue) => cloned.add(this.cloneStagedState(setValue)));
+      value.forEach((setValue) => cloned.add(this.#cloneStagedState(setValue)));
       return cloned as T;
     }
 
@@ -703,7 +712,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor) return;
       if ('value' in descriptor) {
-        descriptor.value = this.cloneStagedState(descriptor.value);
+        descriptor.value = this.#cloneStagedState(descriptor.value);
         descriptor.writable = true;
       }
       descriptor.configurable = true;
@@ -719,31 +728,31 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
    * returns the correct clamped position — computeViewportRange()
    * inside each plugin.render() works correctly.
    */
-  private handleScrollReRender(_scrollState: ScrollManagerState): void {
+  #handleScrollReRender(_scrollState: ScrollManagerState): void {
     if (this.#scrollRenderFrame !== null) return;
-    if (!this.platform) {
-      this.renderScrollFrame();
+    if (!this.#platform) {
+      this.#renderScrollFrame();
       return;
     }
-    this.#scrollRenderFrame = this.platform.requestAnimationFrame(this.runScheduledScrollRender.bind(this));
+    this.#scrollRenderFrame = this.#platform.requestAnimationFrame(this.#runScheduledScrollRender.bind(this));
   }
 
-  private runScheduledScrollRender(): void {
+  #runScheduledScrollRender(): void {
     this.#scrollRenderFrame = null;
-    this.renderScrollFrame();
+    this.#renderScrollFrame();
   }
 
   /** Rebuilds viewport-culled nodes and paints one visual frame for the latest scroll position. */
-  private renderScrollFrame(): void {
+  #renderScrollFrame(): void {
     if (this.#destroyed) return;
-    warnIfOutsideCommandExecution('SearCoreSheet.renderScrollFrame', this.warn);
+    warnIfOutsideCommandExecution('SearCoreSheet.renderScrollFrame', this.#warn);
     // A command may paint the old scene after committing the scroll position,
     // consuming the scroll delta before this scheduled scene rebuild runs.
     // Repaint the rebuilt nodes even when the raster cache now looks current.
     if (this.renderEngine.scrollManager.hasUnrenderedScroll?.() === false) {
       this.renderEngine.invalidateScreenCache();
     }
-    this.rebuildViewportNodes();
+    this.#rebuildViewportNodes();
 
     this.renderEngine.render(this.renderStage);
 
@@ -753,7 +762,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
     this.eventEngine.renderHitOnNextFrame(this.renderStage);
   }
 
-  private rebuildViewportNodes(): void {
+  #rebuildViewportNodes(): void {
     this.pluginManager.forEach((plugin) => {
       if (!plugin.render) return;
       const shapes = plugin.render(this) || [];
@@ -771,7 +780,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
    *   scroll position, ensuring getState() always returns the actual
    *   position. This makes ScrollManager the single source of truth.
    */
-  private expandTreeBoundaryToSheetSize(): void {
+  #expandTreeBoundaryToSheetSize(): void {
     const rowSizes = readSheetRowSizes(this.dataEngine);
     const columnSizes = readSheetColumnSizes(this.dataEngine);
     if (!rowSizes || !columnSizes) return;
@@ -811,7 +820,7 @@ export class SearCoreSheet extends SearCore<SearCoreSheet, CellProperties, Sheet
     );
   }
 
-  private warn = (message: string, ...details: unknown[]): void => {
-    this.platform?.warn?.(message, ...details);
+  #warn = (message: string, ...details: unknown[]): void => {
+    this.#platform?.warn?.(message, ...details);
   };
 }

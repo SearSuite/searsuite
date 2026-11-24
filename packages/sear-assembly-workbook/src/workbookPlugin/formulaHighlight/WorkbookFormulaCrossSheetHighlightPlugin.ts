@@ -21,8 +21,8 @@ export class WorkbookFormulaCrossSheetHighlightPlugin
   implements FormulaCrossSheetHighlightSource
 {
   public static readonly symbol = Symbol.for('WorkbookFormulaCrossSheetHighlightPlugin');
-  private context: WorkbookPluginContext | null = null;
-  private snapshot: {
+  #context: WorkbookPluginContext | null = null;
+  #snapshot: {
     sourceId: string;
     dependencies: readonly Dependency[];
     targetId: string | null;
@@ -34,22 +34,22 @@ export class WorkbookFormulaCrossSheetHighlightPlugin
   }
 
   public initialize(context: WorkbookPluginContext): () => void {
-    this.context = context;
+    this.#context = context;
     const unsubscribe = context.runtime.commands.subscribe((event) => {
       if (event.id === ActivateWorkbookSheetCommand.id && event.phase === CommandExecutionPhase.Started) {
-        this.captureSelectedFormula();
+        this.#captureSelectedFormula();
       }
     });
     return () => {
       unsubscribe();
-      this.snapshot = null;
-      this.context = null;
+      this.#snapshot = null;
+      this.#context = null;
     };
   }
 
   public getReferences(selectionRevision: number, selectionSource?: string): readonly FormulaCrossSheetReference[] {
-    const snapshot = this.snapshot;
-    const runtime = this.context?.runtime;
+    const snapshot = this.#snapshot;
+    const runtime = this.#context?.runtime;
     if (!snapshot || !runtime) return [];
     const targetId = runtime.sheets.getActiveId();
     if (targetId === snapshot.sourceId) return [];
@@ -58,7 +58,7 @@ export class WorkbookFormulaCrossSheetHighlightPlugin
       snapshot.selectionRevision = selectionRevision;
     } else if (snapshot.selectionRevision !== selectionRevision) {
       if (selectionSource === SheetSelectionSource.Pointer || selectionSource === SheetSelectionSource.Keyboard) {
-        this.snapshot = null;
+        this.#snapshot = null;
         return [];
       }
       snapshot.selectionRevision = selectionRevision;
@@ -88,11 +88,11 @@ export class WorkbookFormulaCrossSheetHighlightPlugin
     });
   }
 
-  private captureSelectedFormula(): void {
-    const runtime = this.context?.runtime;
+  #captureSelectedFormula(): void {
+    const runtime = this.#context?.runtime;
     if (!runtime) return;
-    if (this.snapshot && runtime.sheets.getActiveId() !== this.snapshot.sourceId) return;
-    this.snapshot = null;
+    if (this.#snapshot && runtime.sheets.getActiveId() !== this.#snapshot.sourceId) return;
+    this.#snapshot = null;
     const editor = runtime.sheets.getActiveEditor();
     if (!editor.queries.has(GetActiveCell) || !editor.commands.has(GetFormulaCellStatusCommand)) return;
     const cell = editor.queries.run(GetActiveCell, void 0);
@@ -106,7 +106,7 @@ export class WorkbookFormulaCrossSheetHighlightPlugin
       )
     )
       return;
-    this.snapshot = {
+    this.#snapshot = {
       sourceId: runtime.sheets.getActiveId(),
       dependencies: status.dependencies,
       targetId: null,

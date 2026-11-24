@@ -5,13 +5,19 @@ import { type XmlXPathEngine } from './XmlXPathEngine';
 
 /** Platform-neutral XML/XPath execution boundary used by formula adapters. */
 export class XmlXPathEvaluator {
+  readonly #parser: XmlDocumentParser;
+  readonly #engine: XmlXPathEngine;
+
   /** DI token for resolving the editor-local XML/XPath adapter. */
   public static readonly symbol: symbol = Symbol.for('XmlXPathEvaluator');
 
   public constructor(
-    private readonly parser: XmlDocumentParser,
-    private readonly engine: XmlXPathEngine,
-  ) {}
+    parser: XmlDocumentParser,
+    engine: XmlXPathEngine,
+  ) {
+    this.#parser = parser;
+    this.#engine = engine;
+  }
 
   /** Evaluates an XPath expression against one XML document. */
   public evaluate(xml: string, xpath: string, options: XmlXPathOptions = {}): XmlXPathEvaluation {
@@ -20,6 +26,6 @@ export class XmlXPathEvaluator {
         xpath,
       });
     }
-    return this.engine.evaluate(this.parser.parse(xml), xpath, options);
+    return this.#engine.evaluate(this.#parser.parse(xml), xpath, options);
   }
 }

@@ -2,6 +2,7 @@ import { DimensionsCSRMatrix } from '@searsuite/sear-domain-matrix';
 import { type DataEngine } from './DataEngine';
 import { SheetDataFieldNamespace } from './SheetDataView';
 
+const rowProjection = new WeakMap<VisibleRowDimensions, { source: DimensionsCSRMatrix; visibility: SheetRowVisibility }>();
 const visibleRowMapCache = new WeakMap<VisibleRowDimensions, { map: number[]; version: number }>();
 
 /** A Sheet presentation contribution that can suppress rows without changing their stored heights. */
@@ -22,25 +23,28 @@ export function readSheetRowVisibility(dataEngine: DataEngine): SheetRowVisibili
 /** Dimension view shared by layout, hit testing, and rendering. */
 export class VisibleRowDimensions extends DimensionsCSRMatrix {
   public constructor(
-    private readonly source: DimensionsCSRMatrix,
-    private readonly visibility: SheetRowVisibility,
+    source: DimensionsCSRMatrix,
+    visibility: SheetRowVisibility,
   ) {
     super(void 0, [...source.shape] as [number, number]);
+    rowProjection.set(this, { source, visibility });
     source.addListener(() => { visibleRowMapCache.delete(this); });
   }
 
   public override getItem(row: number, column: number): number | null {
-    const size = this.source.getItem(row, column);
-    return this.visibility.isRowFiltered(column) ? 0 : size;
+    const { source, visibility } = rowProjection.get(this)!;
+    const size = source.getItem(row, column);
+    return visibility.isRowFiltered(column) ? 0 : size;
   }
 
   public override getDefaultValue(): number | undefined {
-    return this.source.getDefaultValue();
+    return rowProjection.get(this)!.source.getDefaultValue();
   }
 
   public override getDimensionsMap(): number[] {
+    const { visibility } = rowProjection.get(this)!;
     const cached = visibleRowMapCache.get(this);
-    if (cached && cached.version === this.visibility.version) return cached.map;
+    if (cached && cached.version === visibility.version) return cached.map;
     const result = new Array<number>(this.shape[1]);
     let position = 0;
     for (let row = 0; row < result.length; row += 1) {
@@ -48,7 +52,7 @@ export class VisibleRowDimensions extends DimensionsCSRMatrix {
       result[row] = position;
     }
     Object.freeze(result);
-    visibleRowMapCache.set(this, { map: result, version: this.visibility.version });
+    visibleRowMapCache.set(this, { map: result, version: visibility.version });
     return result;
   }
 }

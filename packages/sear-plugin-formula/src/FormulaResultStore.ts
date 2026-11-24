@@ -26,6 +26,8 @@ import { lockFormulaResultValue } from './lockFormulaResultValue';
 /** Stores calculated formula results independently from persisted formula source. */
 @Injectable()
 export class FormulaResultStore {
+  readonly #valueConverters: CellFormulaValueConverterRegistry;
+
   /** DI token for resolving FormulaResultStore. */
   public static readonly symbol = Symbol.for('FormulaResultStore');
 
@@ -51,8 +53,10 @@ export class FormulaResultStore {
   /** Creates a FormulaResultStore instance. */
   constructor(
     @Inject(CellFormulaValueConverterRegistry.symbol)
-    private readonly valueConverters: CellFormulaValueConverterRegistry,
-  ) {}
+    valueConverters: CellFormulaValueConverterRegistry,
+  ) {
+    this.#valueConverters = valueConverters;
+  }
 
   /** Returns the value. */
   get(key: CellKey): FormulaValue | undefined {
@@ -214,6 +218,6 @@ export class FormulaResultStore {
       return cached;
     }
 
-    return this.valueConverters.toFormulaValue(cell);
+    return this.#valueConverters.toFormulaValue(cell);
   }
 }

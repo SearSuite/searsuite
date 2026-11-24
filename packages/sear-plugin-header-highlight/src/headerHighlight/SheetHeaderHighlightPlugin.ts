@@ -92,6 +92,9 @@ interface ISheetHeaderHighlight {}
  */
 @Injectable()
 export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProperties, ISheetHeaderHighlight> {
+  readonly #sheetSelectionPlugin: SheetSelectionPlugin;
+  readonly #sheetCornerPlugin: SheetCornerPlugin;
+
   /** DI token for resolving SheetHeaderHighlightPlugin. */
   public static readonly symbol: symbol = Symbol.for('SheetHeaderHighlightPlugin');
   /** Stable plugin key for SheetHeaderHighlightPlugin. */
@@ -121,14 +124,16 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
   /** Creates a SheetHeaderHighlightPlugin instance. */
   constructor(
     @Inject(SheetSelectionPlugin.symbol)
-    private readonly sheetSelectionPlugin: SheetSelectionPlugin,
+    sheetSelectionPlugin: SheetSelectionPlugin,
     @Inject(SheetCornerPlugin.symbol)
-    private readonly sheetCornerPlugin: SheetCornerPlugin,
+    sheetCornerPlugin: SheetCornerPlugin,
   ) {
     super({
       key,
       state: {},
     });
+    this.#sheetSelectionPlugin = sheetSelectionPlugin;
+    this.#sheetCornerPlugin = sheetCornerPlugin;
   }
 
   /**
@@ -181,7 +186,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
   public render(searCore: SearCoreSheet, offset: { x: number; y: number } = { x: 0, y: 0 }): Node<CellProperties>[] {
     const dataEngine = searCore.getDataEngine();
 
-    const selectionState = dataEngine.getDataType<[RectRange, RectRange]>(this.sheetSelectionPlugin.pluginKey);
+    const selectionState = dataEngine.getDataType<[RectRange, RectRange]>(this.#sheetSelectionPlugin.pluginKey);
     if (!selectionState) return [];
     // Do not render when selection is empty ([-1,-1,-1,-1]).
     if (selectionState[1].shape.join('') === RectRange.Empty.join('')) return [];
@@ -194,7 +199,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
     // Keep aligned with SheetGridPlugin.render:
     // - shift column headers by corner.width on x
     // - shift row headers by corner.height on y
-    const cornerConfig = this.sheetCornerPlugin.getPluginConfig(searCore);
+    const cornerConfig = this.#sheetCornerPlugin.getPluginConfig(searCore);
     const composedOffset = {
       x: offset.x + cornerConfig.width,
       y: offset.y + cornerConfig.height,
@@ -213,7 +218,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
     );
 
     if (mode === 'cross-active') {
-      return this.buildByActiveCellCross(
+      return this.#buildByActiveCellCross(
         searCore,
         selectionState,
         dataState,
@@ -223,7 +228,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
         viewport,
       );
     }
-    return this.buildBySelectionRange(
+    return this.#buildBySelectionRange(
       searCore,
       selectionState,
       dataState,
@@ -242,7 +247,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
    *
    * @returns Header background nodes and emphasis-bar nodes for the selected span.
    */
-  private buildBySelectionRange(
+  #buildBySelectionRange(
     searCore: SearCoreSheet,
     selectionState: [RectRange, RectRange],
     dataState: HeaderHighlightGeometry,
@@ -270,7 +275,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
 
     const nodes: Node<CellProperties>[] = [];
     nodes.push(
-      ...this.buildColumnHeaderHighlight(
+      ...this.#buildColumnHeaderHighlight(
         searCore,
         dataState,
         pluginConfig,
@@ -284,7 +289,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
       ),
     );
     nodes.push(
-      ...this.buildRowHeaderHighlight(
+      ...this.#buildRowHeaderHighlight(
         searCore,
         dataState,
         pluginConfig,
@@ -305,7 +310,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
    *
    * @returns Nodes for exactly one row-header strip and one column-header strip.
    */
-  private buildByActiveCellCross(
+  #buildByActiveCellCross(
     searCore: SearCoreSheet,
     selectionState: [RectRange, RectRange],
     dataState: HeaderHighlightGeometry,
@@ -321,7 +326,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
 
     const nodes: Node<CellProperties>[] = [];
     nodes.push(
-      ...this.buildColumnHeaderHighlight(
+      ...this.#buildColumnHeaderHighlight(
         searCore,
         dataState,
         pluginConfig,
@@ -335,7 +340,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
       ),
     );
     nodes.push(
-      ...this.buildRowHeaderHighlight(
+      ...this.#buildRowHeaderHighlight(
         searCore,
         dataState,
         pluginConfig,
@@ -361,7 +366,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
    * @param colStart Inclusive start column index.
    * @param colEnd Inclusive end column index.
    */
-  private buildColumnHeaderHighlight(
+  #buildColumnHeaderHighlight(
     searCore: SearCoreSheet,
     dataState: HeaderHighlightGeometry,
     pluginConfig: typeof sheetHeaderHighlightPluginConfig,
@@ -376,7 +381,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
     if (colStart < 0 || colEnd < 0 || colStart > colEnd) return [];
 
     const visibleRange = viewport
-      ? this.intersectRange(colStart, colEnd, viewport.startCol, viewport.endCol)
+      ? this.#intersectRange(colStart, colEnd, viewport.startCol, viewport.endCol)
       : ([colStart, colEnd] as const);
     if (!visibleRange) return [];
     [colStart, colEnd] = visibleRange;
@@ -465,7 +470,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
    * @param rowStart Inclusive start row index.
    * @param rowEnd Inclusive end row index.
    */
-  private buildRowHeaderHighlight(
+  #buildRowHeaderHighlight(
     searCore: SearCoreSheet,
     dataState: HeaderHighlightGeometry,
     pluginConfig: typeof sheetHeaderHighlightPluginConfig,
@@ -480,7 +485,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
     if (rowStart < 0 || rowEnd < 0 || rowStart > rowEnd) return [];
 
     const visibleRange = viewport
-      ? this.intersectRange(rowStart, rowEnd, viewport.startRow, viewport.endRow)
+      ? this.#intersectRange(rowStart, rowEnd, viewport.startRow, viewport.endRow)
       : ([rowStart, rowEnd] as const);
     if (!visibleRange) return [];
     [rowStart, rowEnd] = visibleRange;
@@ -554,7 +559,7 @@ export class SheetHeaderHighlightPlugin extends Plugin<SearCoreSheet, CellProper
   }
 
   /** Returns the closed interval shared by a selection and the visible window. */
-  private intersectRange(
+  #intersectRange(
     start: number,
     end: number,
     visibleStart: number,

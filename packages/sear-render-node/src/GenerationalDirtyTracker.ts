@@ -15,19 +15,23 @@ import { Tree } from './Tree';
  * longer generation-based.
  */
 export class GenerationalDirtyTracker {
+  readonly #tree: Tree<PositionRect<HexColor>>;
+
   /** DI token for resolving GenerationalDirtyTracker. */
   public static readonly symbol: symbol = Symbol.for('GenerationalDirtyTracker');
 
-  private readonly entries = new Set<PositionRect<HexColor>>();
+  readonly #entries = new Set<PositionRect<HexColor>>();
 
   /** Creates a GenerationalDirtyTracker instance. */
-  constructor(private readonly tree: Tree<PositionRect<HexColor>>) {}
+  constructor(tree: Tree<PositionRect<HexColor>>) {
+    this.#tree = tree;
+  }
 
   /** Records a region until the current dirty render pass finishes. */
   mark(rect: PositionRect<HexColor>): void {
-    if (this.entries.has(rect)) return;
+    if (this.#entries.has(rect)) return;
 
-    const boundary = this.tree.getBoundary();
+    const boundary = this.#tree.getBoundary();
     const expandedBoundary = PositionRect.merge(boundary, rect);
     if (
       expandedBoundary.x !== boundary.x ||
@@ -35,11 +39,11 @@ export class GenerationalDirtyTracker {
       expandedBoundary.width !== boundary.width ||
       expandedBoundary.height !== boundary.height
     ) {
-      this.tree.updateBoundary(expandedBoundary);
+      this.#tree.updateBoundary(expandedBoundary);
     }
 
-    this.entries.add(rect);
-    this.tree.insert(rect);
+    this.#entries.add(rect);
+    this.#tree.insert(rect);
   }
 
   /**
@@ -47,17 +51,17 @@ export class GenerationalDirtyTracker {
    * All items are removed regardless of generation.
    */
   clear(): void {
-    this.entries.clear();
-    this.tree.clear();
+    this.#entries.clear();
+    this.#tree.clear();
   }
 
   /** Returns dirty nodes for the requested render generation. */
   query(range: PositionRect<HexColor>): PositionRect<HexColor>[] {
-    return this.tree.query(range);
+    return this.#tree.query(range);
   }
 
   /** Returns the boundary. */
   getBoundary(): PositionRect<HexColor> {
-    return this.tree.getBoundary();
+    return this.#tree.getBoundary();
   }
 }

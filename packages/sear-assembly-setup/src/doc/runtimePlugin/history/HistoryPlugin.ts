@@ -77,10 +77,13 @@ const MaxHistoryEntries = 100;
 /** Tracks committed document snapshots and contributes transaction-safe undo/redo commands. */
 @Injectable()
 export class HistoryPlugin extends DocPlugin<null> {
+  readonly #input: DocInputPlugin;
+  readonly #platform: Platform | undefined;
+
   /** DI token for resolving HistoryPlugin. */
   public static readonly symbol = Symbol.for('HistoryPlugin');
 
-  private readonly listeners = new Set<(status: DocHistoryStatus) => void>();
+  readonly #listeners = new Set<(status: DocHistoryStatus) => void>();
   #runtime: DocPluginRuntime | null = null;
   #history: HistoryPluginState = {
     undoStack: [],
@@ -92,19 +95,21 @@ export class HistoryPlugin extends DocPlugin<null> {
 
   public constructor(
     @Inject(DocInputPlugin.symbol)
-    private readonly input: DocInputPlugin,
+    input: DocInputPlugin,
     @Inject(Platform.symbol)
-    private readonly platform?: Platform,
+    platform?: Platform,
   ) {
     super({
       key: new PluginKey('DocHistory'),
       state: null,
     });
+    this.#input = input;
+    this.#platform = platform;
   }
 
   public registerCommands(commands: DocCommandBus): void {
-    commands.register(UndoDocCommand, () => this.createHistoryCommand('undo'));
-    commands.register(RedoDocCommand, () => this.createHistoryCommand('redo'));
+    commands.register(UndoDocCommand, () => this.#createHistoryCommand('undo'));
+    commands.register(RedoDocCommand, () => this.#createHistoryCommand('redo'));
   }
 
   public registerObservations(observations: ObservationRegistry): void {
@@ -141,7 +146,7 @@ export class HistoryPlugin extends DocPlugin<null> {
   public initialize(): void {
     if (this.#initialized) return;
     this.#initialized = true;
-    const current = this.captureCurrentState();
+    const current = this.#captureCurrentState();
     const state = this.#history;
     state.lastDocument = current.document;
     state.lastSelection = current.selection;
@@ -150,7 +155,7 @@ export class HistoryPlugin extends DocPlugin<null> {
   public onEditorDestroy(): void {
     this.assertRuntimeWriteAllowed();
     this.#runtime = null;
-    this.listeners.clear();
+    this.#listeners.clear();
   }
 
   /** Updates history only after Core has committed the owning document transaction. */
@@ -161,7 +166,7 @@ export class HistoryPlugin extends DocPlugin<null> {
     }
     const action = transaction.getMeta<'undo' | 'redo'>(HistoryActionMeta);
     const state = this.#history;
-    const current = this.captureCurrentState();
+    const current = this.#captureCurrentState();
 
     if (action === 'undo') {
       const entry = state.undoStack.pop();
@@ -183,7 +188,7 @@ export class HistoryPlugin extends DocPlugin<null> {
 
     state.lastDocument = current.document;
     state.lastSelection = current.selection;
-    this.emitStatus();
+    this.#emitStatus();
   }
 
   public getStatus(): DocHistoryStatus {
@@ -192,8 +197,8 @@ export class HistoryPlugin extends DocPlugin<null> {
   }
 
   public subscribe(listener: (status: DocHistoryStatus) => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
   }
 
   public registerState() {
@@ -212,7 +217,7 @@ export class HistoryPlugin extends DocPlugin<null> {
     return null;
   }
 
-  private createHistoryCommand(action: 'undo' | 'redo'): DocEditorCommand {
+  #createHistoryCommand(action: 'undo' | 'redo'): DocEditorCommand {
     const plugin = this;
     const id = action === 'undo' ? UndoDocCommand.id : RedoDocCommand.id;
     return {
@@ -234,7 +239,7 @@ export class HistoryPlugin extends DocPlugin<null> {
               )
                 .setMeta(DocInputTransactionMeta.ReplaceSelection, cloneSelection(selection))
                 .setMeta(DocInputTransactionMeta.RenderOperation, DocTransactionRenderOperationType.Reflow)
-            : plugin.input.createReplaceDocumentTransaction(cloneRichDocument(document), cloneSelection(selection));
+            : plugin.#input.createReplaceDocumentTransaction(cloneRichDocument(document), cloneSelection(selection));
         transaction.setMeta(HistoryActionMeta, action);
         pipeline.addTransaction(id, transaction);
         pipeline.addRender(`${id}:render`, DocContentRenderPluginKey);
@@ -253,30 +258,30 @@ export class HistoryPlugin extends DocPlugin<null> {
 
   #restoreSessionState(snapshot: DocHistorySessionState): void {
     if (this.#initialized) throw new SearError('Doc history session restoration is closed for this editor.');
-    const current = this.captureCurrentState();
+    const current = this.#captureCurrentState();
     this.#history = {
       undoStack: cloneHistoryStack(snapshot.undoStack).slice(-MaxHistoryEntries),
       redoStack: cloneHistoryStack(snapshot.redoStack).slice(-MaxHistoryEntries),
       lastDocument: current.document,
       lastSelection: current.selection,
     };
-    this.emitStatus();
+    this.#emitStatus();
   }
 
-  private captureCurrentState(): { document: RichDocNode[]; selection: DocSelection } {
+  #captureCurrentState(): { document: RichDocNode[]; selection: DocSelection } {
     return {
-      document: cloneRichDocument(this.input.session.pendingDoc),
-      selection: cloneSelection(this.input.session.docSelection),
+      document: cloneRichDocument(this.#input.session.pendingDoc),
+      selection: cloneSelection(this.#input.session.docSelection),
     };
   }
 
-  private emitStatus(): void {
+  #emitStatus(): void {
     const status = this.getStatus();
-    runOutsideCommandExecution(() => this.listeners.forEach((listener) => {
+    runOutsideCommandExecution(() => this.#listeners.forEach((listener) => {
       try {
         listener(status);
       } catch (error) {
-        this.platform?.warn('Doc history listener failed.', error);
+        this.#platform?.warn('Doc history listener failed.', error);
       }
     }));
   }

@@ -39,8 +39,8 @@ export class StrikethroughTextStylePlugin extends InlineTextStylePluginBase {
   }
 
   public override registerCommands(commands: DocCommandBus): void {
-    commands.register(SetDocStrikethroughCommand, this.createSetStrikethroughCommand.bind(this));
-    commands.register(ToggleDocStrikethroughCommand, this.createToggleStrikethroughCommand.bind(this));
+    commands.register(SetDocStrikethroughCommand, this.#createSetStrikethroughCommand.bind(this));
+    commands.register(ToggleDocStrikethroughCommand, this.#createToggleStrikethroughCommand.bind(this));
   }
 
   public override registerKeyboardHandlers({ bindings, commands }: DocKeyboardHandlerRegistrationContext): void {
@@ -49,25 +49,25 @@ export class StrikethroughTextStylePlugin extends InlineTextStylePluginBase {
     });
   }
 
-  private createSetStrikethroughCommand(input: SetDocStrikethroughInput) {
+  #createSetStrikethroughCommand(input: SetDocStrikethroughInput) {
     const strikethrough = normalizeBoolean(input?.strikethrough, 'SetDocStrikethroughCommand.strikethrough');
     return createDocCommand(SetDocStrikethroughCommand.id, DocContentRenderPluginKey, () =>
-      this.createStrikethroughTransaction(strikethrough),
+      this.#createStrikethroughTransaction(strikethrough),
     );
   }
 
-  private createToggleStrikethroughCommand() {
+  #createToggleStrikethroughCommand() {
     return createDocCommand(ToggleDocStrikethroughCommand.id, DocContentRenderPluginKey, () => {
       const runtime = this.requireRuntime();
       const state = runtime.document.input.getState();
       const patches = buildInlineTextRangePatchPlan(state.pendingDoc, state.docSelection, () => ({}));
       const allStrikethrough =
         patches.length > 0 && patches.every((patch) => isStrikethrough(readTextStyleAttrs(patch.oldNode.attrs)));
-      return this.createStrikethroughTransaction(allStrikethrough ? null : true);
+      return this.#createStrikethroughTransaction(allStrikethrough ? null : true);
     });
   }
 
-  private createStrikethroughTransaction(strikethrough: boolean | null) {
+  #createStrikethroughTransaction(strikethrough: boolean | null) {
     const runtime = this.requireRuntime();
     const mutation = runtime.document.inlineStyles.requireMutation(StrikethroughTextStyleKey.Strikethrough);
     return runtime.document.input.createTransaction(

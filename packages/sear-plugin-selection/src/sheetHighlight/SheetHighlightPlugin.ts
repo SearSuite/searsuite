@@ -15,6 +15,8 @@ const key = new PluginKey('SheetHighlight');
 /** Renders registered range-highlighter output as a single managed scene layer. */
 @Injectable()
 export class SheetHighlightPlugin extends Plugin<SearCoreSheet, CellProperties, Record<string, never>> {
+  readonly #registry: SheetHighlightRegistry;
+
   /** DI token for resolving SheetHighlightPlugin. */
   public static readonly symbol = Symbol.for('SheetHighlightPlugin');
   /** Stable plugin key for SheetHighlightPlugin. */
@@ -25,13 +27,14 @@ export class SheetHighlightPlugin extends Plugin<SearCoreSheet, CellProperties, 
   /** Creates a SheetHighlightPlugin instance. */
   constructor(
     @Inject(SheetHighlightRegistry.symbol)
-    private readonly registry: SheetHighlightRegistry,
+    registry: SheetHighlightRegistry,
   ) {
     super({ key, state: {} });
-    this.registry.subscribe(this.handleHighlightRegistryChanged.bind(this));
+    this.#registry = registry;
+    this.#registry.subscribe(this.#handleHighlightRegistryChanged.bind(this));
   }
 
-  private handleHighlightRegistryChanged(): void {
+  #handleHighlightRegistryChanged(): void {
     if (this.#searCore) this.#searCore.requestRender(this);
   }
 
@@ -61,7 +64,7 @@ export class SheetHighlightPlugin extends Plugin<SearCoreSheet, CellProperties, 
     const config = searCore.configEngine.getDefaultConfig() as Partial<SheetConfig>;
     const offsetX = config.sheetOffsetX ?? 50;
     const offsetY = config.sheetOffsetY ?? 24;
-    return this.registry.getHighlights({ searCore }).flatMap((highlight) => {
+    return this.#registry.getHighlights({ searCore }).flatMap((highlight) => {
       const positionRect = getSheetRangePositionRect(highlight.start, highlight.end, {
         rowSizes,
         columnSizes,

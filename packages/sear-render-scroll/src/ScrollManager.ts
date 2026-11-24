@@ -44,13 +44,13 @@ export class ScrollManager {
   #state: ScrollManagerState;
   #previousState: ScrollManagerState;
   #renderedState: ScrollManagerState;
-  private isScrolling: boolean = false;
+  #isScrolling: boolean = false;
 
   /** Maximum scrollable position: contentWidth - viewportWidth, contentHeight - viewportHeight. */
   #contentBoundary: [number, number] = [0, 0];
 
-  private scrollPublishers: (() => void)[] = [];
-  private scrollSubscribers: ScrollSubscriber[] = [];
+  #scrollPublishers: (() => void)[] = [];
+  #scrollSubscribers: ScrollSubscriber[] = [];
   #inputUpdateExecutor: ((state: ScrollManagerState) => void) | undefined;
   #scrollToExecutor: ((x: number, y: number) => void) | undefined;
   #commandBoundaryCheck: (() => boolean) | undefined;
@@ -86,13 +86,13 @@ export class ScrollManager {
     }
   }
 
-  private notifyScroll(): void {
-    for (const callback of this.scrollSubscribers) {
+  #notifyScroll(): void {
+    for (const callback of this.#scrollSubscribers) {
       callback(this.#state);
     }
   }
 
-  private update(newState: ScrollManagerState): void {
+  #update(newState: ScrollManagerState): void {
     this.#assertCommandWrite();
     const previousState = this.#state;
 
@@ -114,7 +114,7 @@ export class ScrollManager {
 
     this.#previousState = previousState;
     this.#state = Object.freeze({ ...newState, x, y });
-    this.notifyScroll();
+    this.#notifyScroll();
   }
 
   // public getIsScrolling(): boolean {
@@ -208,7 +208,7 @@ export class ScrollManager {
     if (![x, y, deltaX, deltaY].every(Number.isFinite)) {
       throw new SearError('Scroll input requires finite coordinates and deltas.');
     }
-    this.update({ x, y, deltaX, deltaY });
+    this.#update({ x, y, deltaX, deltaY });
   }
 
   /** Binds programmatic scroll requests to the owning editor's command bus. */
@@ -255,7 +255,7 @@ export class ScrollManager {
       deltaX: this.#state.x - clampedX,
       deltaY: this.#state.y - clampedY,
     });
-    this.notifyScroll();
+    this.#notifyScroll();
   }
 
   /**
@@ -300,13 +300,13 @@ export class ScrollManager {
     const manager = this;
     function updateScrollStateFromPublisher(newState: ScrollManagerState): void {
       if (manager.#inputUpdateExecutor) manager.#inputUpdateExecutor({ ...newState });
-      else manager.update(newState);
+      else manager.#update(newState);
     }
     const cleanup = publisher(this, updateScrollStateFromPublisher);
-    this.scrollPublishers.push(cleanup);
+    this.#scrollPublishers.push(cleanup);
     return function removeScrollPublisher(): void {
-      if (!manager.scrollPublishers.includes(cleanup)) return;
-      manager.scrollPublishers = manager.scrollPublishers.filter((item) => item !== cleanup);
+      if (!manager.#scrollPublishers.includes(cleanup)) return;
+      manager.#scrollPublishers = manager.#scrollPublishers.filter((item) => item !== cleanup);
       cleanup();
     };
   }
@@ -317,15 +317,15 @@ export class ScrollManager {
    */
   public subscribeScroll(callback: ScrollSubscriber, prepend: boolean = false): () => void {
     if (prepend) {
-      this.scrollSubscribers.unshift(callback);
+      this.#scrollSubscribers.unshift(callback);
     } else {
-      this.scrollSubscribers.push(callback);
+      this.#scrollSubscribers.push(callback);
     }
     const manager = this;
     return function unsubscribeScroll(): void {
-      const index = manager.scrollSubscribers.indexOf(callback);
+      const index = manager.#scrollSubscribers.indexOf(callback);
       if (index === -1) return;
-      manager.scrollSubscribers.splice(index, 1);
+      manager.#scrollSubscribers.splice(index, 1);
     };
   }
 
@@ -336,9 +336,9 @@ export class ScrollManager {
       throw new SearError('Scroll cleanup requires its editor owner.');
     }
     this.#destroyed = true;
-    const publishers = this.scrollPublishers;
-    this.scrollPublishers = [];
+    const publishers = this.#scrollPublishers;
+    this.#scrollPublishers = [];
     publishers.forEach((cleanup) => cleanup());
-    this.scrollSubscribers = [];
+    this.#scrollSubscribers = [];
   }
 }

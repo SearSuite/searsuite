@@ -29,19 +29,22 @@ import { planDropdownValue } from '../../planDropdownValue';
 /** Stateless dropdown interaction; rules and values retain their existing document owners. */
 @Injectable()
 export class SheetDropdownPlugin extends Plugin<unknown, CellProperties, null> {
+  readonly #options: SheetDropdownOptions;
+
   /** Editor-local service token. */ public static readonly symbol = Symbol.for('SheetDropdownPlugin');
   /** Handles arrows before ordinary selection. */ public override readonly depth = -24;
   /** Several stateless interaction extensions may share depth. */ public override readonly warnOnDuplicateDepth =
     false;
   #commands: SheetCommandBus | null = null;
   #ownsPointerRelease = false;
-  private readonly listeners = new Set<(input: DropdownCellInput) => void>();
+  readonly #listeners = new Set<(input: DropdownCellInput) => void>();
   /** Receives owner-scoped projections and semantic transaction factories. */
-  constructor(private readonly options: SheetDropdownOptions) {
+  constructor(options: SheetDropdownOptions) {
     super({ key: new PluginKey('SheetDropdownPlugin'), state: null });
+    this.#options = options;
   }
   /** Publishes a typed, current-cell query. */ registerQueries(queries: SheetQueryRegistry): void {
-    queries.register(ReadDropdownCellQuery, (input) => readDropdownCell(input, this.options));
+    queries.register(ReadDropdownCellQuery, (input) => readDropdownCell(input, this.#options));
   }
   /** Registers value changes and a transient picker request command. */ registerCommands(
     commands: SheetCommandBus,
@@ -53,7 +56,7 @@ export class SheetDropdownPlugin extends Plugin<unknown, CellProperties, null> {
     const change = (id: string, input: DropdownCellInput, value: string | number | boolean | null, label?: string) => {
       const text = typeof value === 'number' || typeof value === 'boolean'
         ? label ?? String(value) : value ?? '';
-      const result = this.options.validation.validate(input.row, input.column, text);
+      const result = this.#options.validation.validate(input.row, input.column, text);
       if (result.reject)
         throw new DropdownError(
           DropdownErrorCode.Conflict,
@@ -61,26 +64,26 @@ export class SheetDropdownPlugin extends Plugin<unknown, CellProperties, null> {
         );
       const pipeline = new Pipeline(id);
       const transaction = typeof value === 'number' || typeof value === 'boolean'
-        ? this.options.createTypedValueTransaction?.(input.row, input.column, value)
-          ?? this.options.createValueTransaction(input.row, input.column, text)
-        : this.options.createValueTransaction(input.row, input.column, value);
+        ? this.#options.createTypedValueTransaction?.(input.row, input.column, value)
+          ?? this.#options.createValueTransaction(input.row, input.column, text)
+        : this.#options.createValueTransaction(input.row, input.column, value);
       pipeline.addTransaction('dropdown.value', transaction);
       return { id, execute: () => ({ pipeline }) };
     };
     commands.register(PickDropdownOptionCommand, (input) =>
-      change(PickDropdownOptionCommand.id, input, planDropdownValue(readDropdownCell(input, this.options), input), input.label),
+      change(PickDropdownOptionCommand.id, input, planDropdownValue(readDropdownCell(input, this.#options), input), input.label),
     );
     commands.register(ClearDropdownValueCommand, (input) => {
-      if (!readDropdownCell(input, this.options))
+      if (!readDropdownCell(input, this.#options))
         throw new DropdownError(DropdownErrorCode.Stale, 'Dropdown rule is unavailable.');
       return change(ClearDropdownValueCommand.id, input, null);
     });
     commands.register(OpenDropdownPickerCommand, (input) => {
-      const state = readDropdownCell(input, this.options),
+      const state = readDropdownCell(input, this.#options),
         pipeline = new Pipeline(OpenDropdownPickerCommand.id);
       if (state)
         pipeline.addLocalAction('dropdown.request', () => runOutsideCommandExecution(() =>
-          this.listeners.forEach((listener) => listener({ row: input.row, column: input.column })),
+          this.#listeners.forEach((listener) => listener({ row: input.row, column: input.column })),
         ));
       return { id: OpenDropdownPickerCommand.id, execute: () => ({ pipeline }) };
     });
@@ -90,9 +93,9 @@ export class SheetDropdownPlugin extends Plugin<unknown, CellProperties, null> {
   ): void {
     registry.register(DropdownPickerRequest, {
       subscribe: (listener) => {
-        this.listeners.add(listener);
+        this.#listeners.add(listener);
         return () => {
-          this.listeners.delete(listener);
+          this.#listeners.delete(listener);
         };
       },
     });
@@ -104,14 +107,14 @@ export class SheetDropdownPlugin extends Plugin<unknown, CellProperties, null> {
       id: 'sheet.dropdown',
       properties: ['hideText'],
       read: ({ rowIndex, columnIndex }) => {
-        const entry = this.options.queries
+        const entry = this.#options.queries
           .run(ReadDataValidationCellRulesQuery, [rowIndex, columnIndex])
           .filter(({ rule }) => rule.condition.kind === DataValidationKind.Dropdown)
           .at(-1);
         if (!entry) return [];
         const condition = entry.rule.condition,
           layers = [];
-        const text = this.options.readText(rowIndex, columnIndex);
+        const text = this.#options.readText(rowIndex, columnIndex);
         const selected = text
           ? condition.dropdownMode === DataValidationDropdownMode.Multiple
             ? resolveDropdownSelection(text, (condition.options ?? []).map((option) => option.label))
@@ -157,11 +160,11 @@ export class SheetDropdownPlugin extends Plugin<unknown, CellProperties, null> {
     const render = (core as SearCoreSheet).renderEngine;
     const worldX = event.origin.offsetX / render.renderContext.getViewScale() + render.scrollManager.getState().x;
     if (worldX < node.x + node.width * 0.8 || worldX > node.x + node.width) return;
-    const entries = this.options.queries
+    const entries = this.#options.queries
       .run(ReadDataValidationCellRulesQuery, [row, column])
       .filter(({ rule }) => rule.condition.kind === DataValidationKind.Dropdown);
     if (!entries.length || entries.at(-1)!.rule.condition.showDropdownArrow === false) return;
-    if (this.options.beforeOpen && !this.options.beforeOpen()) return false;
+    if (this.#options.beforeOpen && !this.#options.beforeOpen()) return false;
     this.#ownsPointerRelease = true;
     this.#commands?.run(SelectRangeCommand, { anchor: [row, column], focus: [row, column] });
     this.#commands?.run(OpenDropdownPickerCommand, { row, column });
@@ -190,6 +193,6 @@ export class SheetDropdownPlugin extends Plugin<unknown, CellProperties, null> {
   /** Releases transient host subscriptions. */ destroy(): void {
     this.#commands = null;
     this.#ownsPointerRelease = false;
-    this.listeners.clear();
+    this.#listeners.clear();
   }
 }

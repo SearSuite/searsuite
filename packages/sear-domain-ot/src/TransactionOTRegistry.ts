@@ -22,18 +22,18 @@ interface RegisteredRelation {
 
 /** Local registry of versioned OT families and explicit pair transformations. */
 export class TransactionOTRegistry {
-  private readonly definitions = new Map<string, RegisteredDefinition>();
-  private readonly relations = new Map<string, RegisteredRelation>();
-  private destroyed = false;
+  readonly #definitions = new Map<string, RegisteredDefinition>();
+  readonly #relations = new Map<string, RegisteredRelation>();
+  #destroyed = false;
 
   /** Registers one operation family and returns an idempotent disposer. */
   public registerType<OperationType extends OTOperation>(
     definition: TransactionOTDefinition<OperationType>,
   ): () => void {
-    this.assertLive();
+    this.#assertLive();
     assertDefinition(definition);
     const key = transactionOTTypeKey(definition);
-    const existing = this.definitions.get(key);
+    const existing = this.#definitions.get(key);
     if (existing && existing.definition !== definition) {
       throw new TransactionOTError(
         TransactionOTErrorCode.TypeConflict,
@@ -47,15 +47,15 @@ export class TransactionOTRegistry {
       references: 0,
     };
     registration.references += 1;
-    this.definitions.set(key, registration);
+    this.#definitions.set(key, registration);
     let disposed = false;
     return () => {
       if (disposed) return;
       disposed = true;
-      const current = this.definitions.get(key);
+      const current = this.#definitions.get(key);
       if (current !== registration) return;
       current.references -= 1;
-      if (current.references === 0) this.definitions.delete(key);
+      if (current.references === 0) this.#definitions.delete(key);
     };
   }
 
@@ -63,9 +63,9 @@ export class TransactionOTRegistry {
   public registerRelation<Left extends OTOperation, Right extends OTOperation>(
     relation: OTTransformRelation<Left, Right>,
   ): () => void {
-    this.assertLive();
+    this.#assertLive();
     const key = relationKey(relation.left, relation.right);
-    const existing = this.relations.get(key);
+    const existing = this.#relations.get(key);
     if (existing && existing.relation !== relation) {
       throw new TransactionOTError(
         TransactionOTErrorCode.RelationConflict,
@@ -81,16 +81,16 @@ export class TransactionOTRegistry {
       disposeDefinitions: [this.registerType(relation.left), this.registerType(relation.right)] as const,
     };
     registration.references += 1;
-    this.relations.set(key, registration);
+    this.#relations.set(key, registration);
     let disposed = false;
     return () => {
       if (disposed) return;
       disposed = true;
-      const current = this.relations.get(key);
+      const current = this.#relations.get(key);
       if (current !== registration) return;
       current.references -= 1;
       if (current.references > 0) return;
-      this.relations.delete(key);
+      this.#relations.delete(key);
       [...current.disposeDefinitions].reverse().forEach((dispose) => dispose());
     };
   }
@@ -109,9 +109,9 @@ export class TransactionOTRegistry {
 
   /** Resolves a registered operation family. */
   public requireType(id: string, version: number): TransactionOTDefinition {
-    this.assertLive();
+    this.#assertLive();
     const key = transactionOTTypeKey({ id, version });
-    const registration = this.definitions.get(key);
+    const registration = this.#definitions.get(key);
     if (!registration) {
       throw new TransactionOTError(
         TransactionOTErrorCode.TypeNotRegistered,
@@ -127,7 +127,7 @@ export class TransactionOTRegistry {
     definition: TransactionOTDefinition<OperationType>,
     operations: readonly OperationType[],
   ): OTEncodedValue {
-    this.assertOperations(definition, operations);
+    this.#assertOperations(definition, operations);
     return definition.encode(operations);
   }
 
@@ -135,7 +135,7 @@ export class TransactionOTRegistry {
   public decode(id: string, version: number, payload: unknown): OTOperation[] {
     const definition = this.requireType(id, version);
     const operations = definition.decode(payload);
-    this.assertOperations(definition, operations);
+    this.#assertOperations(definition, operations);
     return operations;
   }
 
@@ -144,7 +144,7 @@ export class TransactionOTRegistry {
     definition: TransactionOTDefinition<OperationType>,
     operations: readonly OperationType[],
   ): OperationType[] {
-    this.assertOperations(definition, operations);
+    this.#assertOperations(definition, operations);
     if (!definition.invert) {
       throw new TransactionOTError(
         TransactionOTErrorCode.InvertUnsupported,
@@ -163,13 +163,13 @@ export class TransactionOTRegistry {
     rightOperations: readonly Right[],
     priority: OTTransformPriority,
   ): OTTransformPair<Left, Right> {
-    this.assertLive();
-    this.assertOperations(leftDefinition, leftOperations);
-    this.assertOperations(rightDefinition, rightOperations);
-    const direct = this.relations.get(relationKey(leftDefinition, rightDefinition));
+    this.#assertLive();
+    this.#assertOperations(leftDefinition, leftOperations);
+    this.#assertOperations(rightDefinition, rightOperations);
+    const direct = this.#relations.get(relationKey(leftDefinition, rightDefinition));
     if (direct)
       return direct.relation.transformPair(leftOperations, rightOperations, priority) as OTTransformPair<Left, Right>;
-    const reverse = this.relations.get(relationKey(rightDefinition, leftDefinition));
+    const reverse = this.#relations.get(relationKey(rightDefinition, leftDefinition));
     if (reverse) {
       const reversePriority =
         priority === OTTransformPriority.LEFT ? OTTransformPriority.RIGHT : OTTransformPriority.LEFT;
@@ -186,13 +186,13 @@ export class TransactionOTRegistry {
 
   /** Permanently clears the registry. */
   public destroy(): void {
-    if (this.destroyed) return;
-    this.destroyed = true;
-    this.relations.clear();
-    this.definitions.clear();
+    if (this.#destroyed) return;
+    this.#destroyed = true;
+    this.#relations.clear();
+    this.#definitions.clear();
   }
 
-  private assertOperations(definition: TransactionOTDefinition, operations: readonly OTOperation[]): void {
+  #assertOperations(definition: TransactionOTDefinition, operations: readonly OTOperation[]): void {
     if (operations.every((operation) => definition.isOperation(operation))) return;
     throw new TransactionOTError(
       TransactionOTErrorCode.InvalidPayload,
@@ -201,8 +201,8 @@ export class TransactionOTRegistry {
     );
   }
 
-  private assertLive(): void {
-    if (!this.destroyed) return;
+  #assertLive(): void {
+    if (!this.#destroyed) return;
     throw new TransactionOTError(
       TransactionOTErrorCode.RegistryDestroyed,
       'Transaction OT registry has been destroyed.',

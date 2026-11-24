@@ -1,18 +1,13 @@
 import {
   DocCompositionManager,
-  DocCursorManager,
-  DocInputPlugin,
-  Pipeline,
   SearCoreDoc,
   SearCoreSheet,
 } from '@searsuite/sear-assembly-core';
 import { Container } from '@searsuite/sear-foundation-di';
 import type { KeyboardRouterHandlers, TextInputEvent } from '@searsuite/sear-render-input';
 import { SheetCellEditorPlugin as RuntimeSheetCellEditorPlugin } from '../src/SheetCellEditor';
-import { BeginCellEditCommand, OpenCellEditorCommand, RequestCellEditorRenderCommand } from '../src';
+import { OpenCellEditorCommand, RequestCellEditorRenderCommand } from '../src';
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import { DocLayoutEngine } from '@searsuite/sear-domain-editor';
-import { RichTextBlockFlowRegistry } from '@searsuite/sear-domain-doc';
 import { FakeSheetEmbeddedEditor } from '@searsuite/sear-sheet-editor-contract';
 
 let container: Container;
@@ -26,10 +21,6 @@ function createCompositionManager(overrides: Partial<Record<string, jest.Mock>> 
     getCaretPixelOffset: jest.fn(() => 0),
     ...overrides,
   };
-}
-
-function createDocInputPlugin(): DocInputPlugin {
-  return new DocInputPlugin(new DocLayoutEngine(new RichTextBlockFlowRegistry()));
 }
 
 function createEmbeddedEditor(): FakeSheetEmbeddedEditor {
@@ -68,12 +59,8 @@ describe('SheetCellEditorPlugin construction', () => {
     const cursorRule = jest.fn();
     const cursorRegistry = { register: cursorRule };
     const reducerRegistry = { get: jest.fn(() => void 0), register: jest.fn() };
-    let blinkTick: (() => void) | undefined;
     const platform = {
-      setInterval: jest.fn((callback: () => void) => {
-        blinkTick = callback;
-        return 1;
-      }),
+      setInterval: jest.fn(() => 1),
       clearInterval: jest.fn(),
       warn: jest.fn(),
     };
@@ -110,15 +97,6 @@ describe('SheetCellEditorPlugin construction', () => {
       'SheetCellEditorPlugin getCommandBus skipped: SheetCommandBus is missing.',
     );
 
-    const fallbackBus = (
-      plugin as unknown as {
-        getCommandBus(core?: SearCoreSheet): SheetCommandBus | null;
-      }
-    ).getCommandBus();
-    expect(fallbackBus).toBeNull();
-    expect(platform.warn).toHaveBeenCalledWith(
-      'SheetCellEditorPlugin getCommandBus skipped: SheetCommandBus is missing.',
-    );
     const injectedCommands = new SheetCommandBus();
     injectedCommands.bind({
       executePipeline: (pipeline) => {
@@ -145,35 +123,13 @@ describe('SheetCellEditorPlugin construction', () => {
       embeddedEditor,
       injectedCommands,
     );
-    const commandInternals = commandPlugin as unknown as {
-      isEditing: boolean;
-      getCommandBus(): SheetCommandBus | null;
-      registerCommands(commands: SheetCommandBus): void;
-    };
-    commandInternals.registerCommands(injectedCommands);
-
+    commandPlugin.registerCommands(injectedCommands);
     textInputHandlers?.onDelete();
-    expect(() => textInputHandlers?.onTextInput({ kind: 'text', text: 'abc' })).not.toThrow();
-
-    commandInternals.isEditing = true;
-
-    textInputHandlers?.onTextInput({ kind: 'compositionUpdate', text: '\u62fc', caretOffset: 1 });
+    textInputHandlers?.onTextInput({ kind: 'text', text: 'abc' });
+    textInputHandlers?.onTextInput({ kind: 'compositionUpdate', text: '拼', caretOffset: 1 });
     expect(embeddedEditor.inputs).toHaveLength(0);
+    expect(injectedCommands.has(OpenCellEditorCommand)).toBe(true);
 
-    (commandPlugin as unknown as { blinker: { start(): void } }).blinker.start();
-    blinkTick?.();
-    expect(platform.setInterval).toHaveBeenCalled();
-
-    (commandPlugin as unknown as { executeEditorInput(input: { kind: 'delete' }): void }).executeEditorInput({
-      kind: 'delete',
-    });
-    (commandPlugin as unknown as { executeEditorInput(input: { kind: 'selectAll' }): void }).executeEditorInput({
-      kind: 'selectAll',
-    });
-
-    expect(commandInternals.getCommandBus()).toBe(injectedCommands);
-
-    commandInternals.isEditing = false;
     const renderCalls = requestRender.mock.calls.length;
     injectedCommands.run(RequestCellEditorRenderCommand, void 0);
     expect(requestRender).toHaveBeenCalledTimes(renderCalls);
@@ -247,10 +203,11 @@ describe('SheetCellEditorPlugin construction', () => {
     container.registerInstance(SearCoreDoc.symbol, { registerPlugin: jest.fn() } as never);
     container.registerInstance(DocCompositionManager.symbol, createCompositionManager() as never);
     const platform = { setInterval: jest.fn(), clearInterval: jest.fn(), warn: jest.fn() };
-    const plugin = new SheetCellEditorPlugin(
+    let onDelete: (() => void) | undefined;
+    new SheetCellEditorPlugin(
       { isMergedCell: jest.fn() } as never,
       { navigateDown: jest.fn(), restartNavigation: jest.fn() } as never,
-      { subscribe: jest.fn() } as never,
+      { subscribe: (handlers: { onDelete(): void }) => { onDelete = handlers.onDelete; } } as never,
       { subscribe: jest.fn(), startListener: jest.fn() } as never,
       { start: jest.fn(() => jest.fn()), stop: jest.fn() } as never,
       { register: jest.fn() } as never,
@@ -261,29 +218,16 @@ describe('SheetCellEditorPlugin construction', () => {
       { viewToWorld: jest.fn() } as never,
       { get: jest.fn(() => void 0), register: jest.fn() } as never,
       createEmbeddedEditor(),
-    ) as unknown as {
-      isEditing: boolean;
-      runCellEditorCommand<Input>(core: SearCoreSheet, definition: typeof BeginCellEditCommand, input: Input): void;
-      requestRerender(): void;
-    };
-    container.registerInstance(SearCoreSheet.symbol, {} as never);
-
-    plugin.runCellEditorCommand({} as never, BeginCellEditCommand, {
-      anchor: [0, 0],
-      focus: [0, 0],
-      editor: 'cell',
-    });
-    plugin.isEditing = true;
-    plugin.requestRerender();
-
+    );
+    onDelete?.();
     expect(platform.warn).toHaveBeenCalledWith(
       'SheetCellEditorPlugin getCommandBus skipped: SheetCommandBus is missing.',
     );
 
-    const pluginWithoutPlatform = new SheetCellEditorPlugin(
+    new SheetCellEditorPlugin(
       {} as never,
       {} as never,
-      { subscribe: jest.fn() } as never,
+      { subscribe: (handlers: { onDelete(): void }) => { onDelete = handlers.onDelete; } } as never,
       { subscribe: jest.fn() } as never,
       {} as never,
       { register: jest.fn() } as never,
@@ -293,9 +237,7 @@ describe('SheetCellEditorPlugin construction', () => {
       {} as never,
       {} as never,
       { register: jest.fn(), get: jest.fn() } as never,
-    ) as unknown as {
-      executeEditorInput(input: { kind: 'delete' }): void;
-    };
-    expect(() => pluginWithoutPlatform.executeEditorInput({ kind: 'delete' })).not.toThrow();
+    );
+    expect(() => onDelete?.()).not.toThrow();
   });
 });

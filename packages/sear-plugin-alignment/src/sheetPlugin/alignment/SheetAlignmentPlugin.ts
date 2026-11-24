@@ -77,6 +77,8 @@ const pluginKey = new PluginKey('SheetAlignmentPlugin');
  */
 @Injectable()
 export class SheetAlignmentPlugin extends Plugin<unknown, CellProperties, SheetAlignmentPluginState> {
+  readonly #readCellData: (() => SheetMatrix) | undefined;
+
   /** Alignment data is state-only; duplicate render/event depth diagnostics do not apply. */
   public override readonly warnOnDuplicateDepth = false;
   /** Alignment transactions share the registered MatrixOT algebra. */
@@ -125,8 +127,9 @@ export class SheetAlignmentPlugin extends Plugin<unknown, CellProperties, SheetA
    * Constructs the alignment plugin.
    * @param state - Shared alignment state.
    */
-  constructor(state: SheetAlignmentPluginState, private readonly readCellData?: () => SheetMatrix) {
+  constructor(state: SheetAlignmentPluginState, readCellData?: () => SheetMatrix) {
     super({ key: pluginKey, state });
+    this.#readCellData = readCellData;
   }
 
   /** Registers the horizontal alignment command owned by this plugin. */
@@ -189,12 +192,12 @@ export class SheetAlignmentPlugin extends Plugin<unknown, CellProperties, SheetA
   /** Transfers only this owner's persisted formats. */
   public registerFormatTransfers(registry: SheetFormatTransferRegistry): void {
     const transfer = createMatrixFormatTransfer('sheet.alignment', this.key, () => this.getState().cellAlignments);
-    registry.register(this.readCellData ? { ...transfer, clear: (range) => this.clearAlignment(range) } : transfer);
+    registry.register(this.#readCellData ? { ...transfer, clear: (range) => this.#clearAlignment(range) } : transfer);
   }
 
-  private clearAlignment(range: SheetFormatRange): readonly SheetFormatTransferPlan[] {
+  #clearAlignment(range: SheetFormatRange): readonly SheetFormatTransferPlan[] {
     const matrix = this.getState().cellAlignments;
-    const cellData = this.readCellData?.();
+    const cellData = this.#readCellData?.();
     const operations = new Map<string, MatrixOTOperation<string>>();
     const append = (row: number, column: number): void => {
       const current = matrix.getItem(row, column) as SheetHorizontalAlignment;
@@ -243,7 +246,7 @@ export class SheetAlignmentPlugin extends Plugin<unknown, CellProperties, SheetA
    * @returns Updated plugin state, or null when the transaction has no relevant operations.
    */
   public apply(pluginState: SheetAlignmentPluginState, transaction: Transaction): SheetAlignmentPluginState | null {
-    const operations = this.createInvertibleAlignmentOperations(pluginState.cellAlignments, transaction);
+    const operations = this.#createInvertibleAlignmentOperations(pluginState.cellAlignments, transaction);
     if (operations.length === 0) return null;
     MatrixOT.apply(pluginState.cellAlignments, operations);
     return pluginState;
@@ -262,7 +265,7 @@ export class SheetAlignmentPlugin extends Plugin<unknown, CellProperties, SheetA
     return [];
   }
 
-  private createInvertibleAlignmentOperations(
+  #createInvertibleAlignmentOperations(
     matrix: AlignmentMatrix,
     transaction: Transaction,
   ): MatrixOTOperation<string>[] {

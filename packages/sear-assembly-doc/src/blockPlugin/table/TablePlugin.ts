@@ -38,7 +38,7 @@ export class TablePlugin extends DocPlugin<null> {
   /** DI token for resolving TablePlugin. */
   public static readonly symbol = Symbol.for('TablePlugin');
 
-  private runtime: DocPluginRuntime | null = null;
+  #runtime: DocPluginRuntime | null = null;
 
   /** Creates a TablePlugin instance. */
   public constructor() {
@@ -67,45 +67,45 @@ export class TablePlugin extends DocPlugin<null> {
   }
 
   public configure(context: DocPluginSetupContext): void {
-    this.runtime = context.runtime;
+    this.#runtime = context.runtime;
   }
 
   public onEditorDestroy(): void {
-    this.runtime = null;
+    this.#runtime = null;
   }
 
   public registerCommands(commands: DocCommandBus): void {
-    commands.register(InsertDocTableCommand, this.createInsertTableCommand.bind(this));
+    commands.register(InsertDocTableCommand, this.#createInsertTableCommand.bind(this));
   }
 
-  private createInsertTableCommand(input: InsertDocTableInput) {
+  #createInsertTableCommand(input: InsertDocTableInput) {
     const plugin = this;
     function createInsertTableTransaction() {
-      return plugin.createInsertTableTransaction(input);
+      return plugin.#createInsertTableTransaction(input);
     }
     return createDocCommand(InsertDocTableCommand.id, DocContentRenderPluginKey, createInsertTableTransaction);
   }
 
-  private createInsertTableTransaction(input: InsertDocTableInput) {
+  #createInsertTableTransaction(input: InsertDocTableInput) {
     const rows = Math.max(1, Math.floor(input.rows));
     const columns = Math.max(1, Math.floor(input.columns));
-    const runtime = this.requireRuntime();
+    const runtime = this.#requireRuntime();
     const state = runtime.document.input.session;
-    const insertIndex = Math.min(state.pendingDoc.length, this.currentBlockIndex() + 1);
+    const insertIndex = Math.min(state.pendingDoc.length, this.#currentBlockIndex() + 1);
     const table = createTableNode(rows, columns);
     return runtime.document.input.createTransaction((transaction, currentState) =>
       transaction.insertNode([insertIndex], table).setSelection(currentState.docSelection),
     );
   }
 
-  private currentBlockIndex(): number {
-    const selection = this.requireRuntime().document.input.session.docSelection;
+  #currentBlockIndex(): number {
+    const selection = this.#requireRuntime().document.input.session.docSelection;
     return Math.max(0, selection.head.path[0] ?? 0);
   }
 
-  private requireRuntime(): DocPluginRuntime {
-    if (!this.runtime) throw new SearError('TablePlugin is not configured.');
-    return this.runtime;
+  #requireRuntime(): DocPluginRuntime {
+    if (!this.#runtime) throw new SearError('TablePlugin is not configured.');
+    return this.#runtime;
   }
 }
 

@@ -68,6 +68,8 @@ function toValidationText(value: unknown): string {
 
 @Injectable()
 export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, SheetDataValidationPluginState> {
+  readonly #dependencies: SheetDataValidationDependencies;
+
   public static readonly symbol = Symbol.for('SheetDataValidationPlugin');
   public static readonly pluginKey = pluginKey;
   /** Numeric controls handle their own clicks before ordinary cell selection. */
@@ -93,32 +95,33 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
     MatrixOTActionName.UpdateCell, MatrixOTActionName.RowInsert, MatrixOTActionName.RowDelete,
     MatrixOTActionName.RowMove, MatrixOTActionName.ColInsert, MatrixOTActionName.ColDelete, MatrixOTActionName.ColMove,
   ];
-  private readonly disposeValidation: () => void;
-  private readonly warningListeners = new Set<(warning: DataValidationWarning) => void>();
+  readonly #disposeValidation: () => void;
+  readonly #warningListeners = new Set<(warning: DataValidationWarning) => void>();
   #commands: SheetCommandBus | null = null;
   #ownsPointerRelease = false;
 
-  public constructor(state: SheetDataValidationPluginState, private readonly dependencies: SheetDataValidationDependencies) {
+  public constructor(state: SheetDataValidationPluginState, dependencies: SheetDataValidationDependencies) {
     super({ key: pluginKey, state });
+    this.#dependencies = dependencies;
     Object.defineProperty(this, 'dependencies', { value: Object.freeze({ ...dependencies }), writable: false, configurable: false });
-    this.disposeValidation = dependencies.inputValidation.register('sheet.dataValidation', (row, column, text) =>
+    this.#disposeValidation = dependencies.inputValidation.register('sheet.dataValidation', (row, column, text) =>
       this.validate(row, column, text));
   }
 
   public registerCommands(commands: SheetCommandBus): void {
     this.#commands = commands;
-    registerDataValidationCommands(commands, this.key, () => this.getState().dataValidations, this.dependencies.createId,
-      (condition, text, row, column) => this.evaluate(condition, text, row, column));
-    registerDataValidationEvaluatorCommands(commands, this.dependencies.evaluators);
-    if (this.dependencies.createNumericControlValueTransaction) {
+    registerDataValidationCommands(commands, this.key, () => this.getState().dataValidations, this.#dependencies.createId,
+      (condition, text, row, column) => this.#evaluate(condition, text, row, column));
+    registerDataValidationEvaluatorCommands(commands, this.#dependencies.evaluators);
+    if (this.#dependencies.createNumericControlValueTransaction) {
       commands.register(SetNumericValidationControlValueCommand, ({ row, column, value }) => {
         const control = readNumericValidationControl(this.getState().dataValidations, row, column,
-          this.dependencies.readValue?.(row, column));
-        if (!control || this.evaluate({ kind: control.kind }, String(value), row, column) !== true ||
+          this.#dependencies.readValue?.(row, column));
+        if (!control || this.#evaluate({ kind: control.kind }, String(value), row, column) !== true ||
           this.validate(row, column, String(value)).reject)
           throw new SearError('Cannot set this data validation control to the requested value.');
         return new TransactionPipelineCommand(SetNumericValidationControlValueCommand.id,
-          this.dependencies.createNumericControlValueTransaction!(row, column, value));
+          this.#dependencies.createNumericControlValueTransaction!(row, column, value));
       });
     }
   }
@@ -126,7 +129,7 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
   public sealRuntimeWrites(): void {
     if (!this.#commands) throw new SearError('Data validation commands must be registered before sealing evaluators.');
     const commands = this.#commands;
-    DataValidationEvaluatorRegistry.prototype.enforceCommandBoundary.call(this.dependencies.evaluators,
+    DataValidationEvaluatorRegistry.prototype.enforceCommandBoundary.call(this.#dependencies.evaluators,
       commands.isExecuting.bind(commands),
       (id) => commands.run(UnregisterDataValidationEvaluatorCommand, id));
   }
@@ -134,7 +137,7 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
   public registerQueries(queries: SheetQueryRegistry): void {
     registerDataValidationQueries(queries, () => this.getState().dataValidations,
       (row, column) => this.readIssue(row, column),
-      (kind) => this.dependencies.evaluators.canEvaluate(kind));
+      (kind) => this.#dependencies.evaluators.canEvaluate(kind));
   }
 
   public registerCommitStrategies(registry: CellCommitStrategyRegistry): void {
@@ -153,9 +156,9 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
     registry.registerConditional({
       id: 'sheet.dataValidation.numericControl', properties: ['hideText'],
       read: ({ rowIndex, columnIndex }) => {
-        if (!this.dependencies.readValue) return [];
+        if (!this.#dependencies.readValue) return [];
         const control = readNumericValidationControl(this.getState().dataValidations, rowIndex, columnIndex,
-          this.dependencies.readValue(rowIndex, columnIndex));
+          this.#dependencies.readValue(rowIndex, columnIndex));
         return control ? [{ id: 'sheet.dataValidation.numericControl', priority: 0,
           properties: { hideText: true }, layers: numericValidationControlLayers(control) }] : [];
       },
@@ -168,9 +171,9 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
     const row = node?.properties.startRowIndex;
     const column = node?.properties.startColIndex;
     if (!node || row === undefined || column === undefined || (event.origin.button ?? 0) !== 0 ||
-      !this.dependencies.readValue || !this.#commands?.has(SetNumericValidationControlValueCommand)) return;
+      !this.#dependencies.readValue || !this.#commands?.has(SetNumericValidationControlValueCommand)) return;
     const control = readNumericValidationControl(this.getState().dataValidations, row, column,
-      this.dependencies.readValue(row, column));
+      this.#dependencies.readValue(row, column));
     if (!control) return;
     const render = (core as SearCoreSheet).renderEngine;
     const scale = render.renderContext.getViewScale();
@@ -179,7 +182,7 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
       event.origin.offsetX / scale + scroll.x, event.origin.offsetY / scale + scroll.y);
     if (value === null) return;
     event.origin.preventDefault();
-    if (this.dependencies.beforeNumericControlChange && !this.dependencies.beforeNumericControlChange()) return false;
+    if (this.#dependencies.beforeNumericControlChange && !this.#dependencies.beforeNumericControlChange()) return false;
     if (this.validate(row, column, String(value)).reject) return false;
     this.#ownsPointerRelease = true;
     if (this.#commands.has(SelectRangeCommand))
@@ -196,34 +199,34 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
   }
 
   public registerCapabilities(registry: RuntimeCapabilityRegistry): void {
-    registry.register(DataValidationEvaluatorRegistryCapability, this.dependencies.evaluators);
+    registry.register(DataValidationEvaluatorRegistryCapability, this.#dependencies.evaluators);
   }
 
   public registerObservations(registry: ObservationRegistry): void {
     registry.register(DataValidationWarningObservation, {
       subscribe: (listener) => {
-        this.warningListeners.add(listener);
-        return () => { this.warningListeners.delete(listener); };
+        this.#warningListeners.add(listener);
+        return () => { this.#warningListeners.delete(listener); };
       },
     });
   }
 
   public onTransactionCommitted(transaction: Transaction): void {
     if (transaction.pluginKey === pluginKey) {
-      this.dependencies.requestRender?.();
+      this.#dependencies.requestRender?.();
       return;
     }
-    if (transaction.pluginKey !== SheetDataPlugin.pluginKey || !this.warningListeners.size || !this.dependencies.readValue) return;
+    if (transaction.pluginKey !== SheetDataPlugin.pluginKey || !this.#warningListeners.size || !this.#dependencies.readValue) return;
     for (const operation of transaction.operations as Operation[]) {
       if (!isUpdateCellOperation(operation)) continue;
       const [row, column] = operation.p;
       if (row === undefined || column === undefined) continue;
-      const value = this.dependencies.readValue(row, column);
+      const value = this.#dependencies.readValue(row, column);
       const result = this.validate(row, column, toValidationText(value));
       if (result.valid || !result.ruleId || !result.message) continue;
       const warning = { row, column, ruleId: result.ruleId, message: result.message };
       const notify = (): void => {
-        for (const listener of this.warningListeners) listener(warning);
+        for (const listener of this.#warningListeners) listener(warning);
       };
       if (this.#commands) this.#commands.runWithoutMutationAuthority(notify);
       else notify();
@@ -233,13 +236,13 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
   public validate(row: number, column: number, text: string): SheetCellInputValidationResult {
     const entries = this.getState().dataValidations.findRules(row, column);
     if (entries.length === 0) return { valid: true, reject: false };
-    const candidate = text.startsWith('=') && this.dependencies.evaluateFormulaInput
-      ? this.dependencies.evaluateFormulaInput(text, row, column) : text;
+    const candidate = text.startsWith('=') && this.#dependencies.evaluateFormulaInput
+      ? this.#dependencies.evaluateFormulaInput(text, row, column) : text;
     const candidateText = toValidationText(candidate);
     let warning: SheetCellInputValidationResult | null = null;
     for (let index = entries.length - 1; index >= 0; index -= 1) {
       const rule = entries[index]!.rule;
-      const result = this.evaluate(rule.condition, candidateText, row, column);
+      const result = this.#evaluate(rule.condition, candidateText, row, column);
       if (result === true) continue;
       const issue = {
         valid: false, reject: rule.inputPolicy === DataValidationInputPolicy.Reject,
@@ -255,13 +258,13 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
 
   /** Returns a definite failure for the cell's current value, including values predating the rule. */
   public readIssue(row: number, column: number): DataValidationIssue | null {
-    if (!this.dependencies.readValue) return null;
-    const value = this.dependencies.readValue(row, column);
+    if (!this.#dependencies.readValue) return null;
+    const value = this.#dependencies.readValue(row, column);
     const text = toValidationText(value);
     const entries = this.getState().dataValidations.findRules(row, column);
     for (let index = entries.length - 1; index >= 0; index -= 1) {
       const rule = entries[index]!.rule;
-      if (this.evaluate(rule.condition, text, row, column) === false) {
+      if (this.#evaluate(rule.condition, text, row, column) === false) {
         return { row, column, ruleId: rule.id,
           message: rule.errorMessage ?? 'Cell value does not satisfy the validation rule.' };
       }
@@ -269,13 +272,13 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
     return null;
   }
 
-  private evaluate(condition: DataValidationCondition, text: string, row: number, column: number): boolean | null {
+  #evaluate(condition: DataValidationCondition, text: string, row: number, column: number): boolean | null {
     return evaluateDataValidation(condition, text, {
       row, column,
-      ...(this.dependencies.currentDateTime ? { currentDateTime: this.dependencies.currentDateTime() } : {}),
-      ...(this.dependencies.readSourceValues ? { readSourceValues: this.dependencies.readSourceValues } : {}),
+      ...(this.#dependencies.currentDateTime ? { currentDateTime: this.#dependencies.currentDateTime() } : {}),
+      ...(this.#dependencies.readSourceValues ? { readSourceValues: this.#dependencies.readSourceValues } : {}),
       evaluateExternal: (condition, value, candidateRow, candidateColumn) =>
-        this.dependencies.evaluators.evaluate(condition, value, candidateRow, candidateColumn),
+        this.#dependencies.evaluators.evaluate(condition, value, candidateRow, candidateColumn),
     });
   }
 
@@ -315,7 +318,7 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
         const preservedIds = new Set<string>();
         for (const { original, range } of fragments) {
           const originalRule = original.rule.rule;
-          const id = preservedIds.has(originalRule.id) ? this.dependencies.createId() : originalRule.id;
+          const id = preservedIds.has(originalRule.id) ? this.#dependencies.createId() : originalRule.id;
           preservedIds.add(originalRule.id);
           changeAt(range.start[0], range.start[1]).next.push({
             ...originalRule, id, endRow: range.end[0], endColumn: range.end[1],
@@ -334,13 +337,13 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
       planCaptured: (instances) => [{
         target: this.key,
         operations: createDataValidationClipboardOperations(
-          this.getState().dataValidations, instances, this.dependencies.createId,
+          this.getState().dataValidations, instances, this.#dependencies.createId,
         ),
       }],
       clear: (range) => [{
         target: this.key,
         operations: createDataValidationClipboardOperations(
-          this.getState().dataValidations, [{ destination: range, portable: [] }], this.dependencies.createId,
+          this.getState().dataValidations, [{ destination: range, portable: [] }], this.#dependencies.createId,
         ),
       }],
     });
@@ -352,7 +355,7 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
       plan: (context) => [{
         target: this.key,
         operations: createDataValidationReorderOperations(
-          this.getState().dataValidations, context, this.dependencies.createId,
+          this.getState().dataValidations, context, this.#dependencies.createId,
         ),
       }],
     });
@@ -405,8 +408,8 @@ export class SheetDataValidationPlugin extends Plugin<unknown, CellProperties, S
   public dispose(): void {
     this.assertRuntimeWriteAllowed();
     this.#ownsPointerRelease = false;
-    this.disposeValidation();
-    this.warningListeners.clear();
+    this.#disposeValidation();
+    this.#warningListeners.clear();
   }
   public getPluginConfig(): null { return null; }
   public render(): Node<CellProperties>[] { return []; }

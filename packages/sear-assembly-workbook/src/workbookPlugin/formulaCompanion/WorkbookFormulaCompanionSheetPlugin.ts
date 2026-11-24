@@ -36,8 +36,8 @@ export class WorkbookFormulaCompanionSheetPlugin extends Plugin<SearCoreSheet, C
     this.#workbookObservations = workbookObservations;
   }
 
-  private unregisterFormulaResultProvider: (() => void) | null = null;
-  private unregisterFormulaSourceProvider: (() => void) | null = null;
+  #unregisterFormulaResultProvider: (() => void) | null = null;
+  #unregisterFormulaSourceProvider: (() => void) | null = null;
   #isSheetCommandExecuting: (() => boolean) | null = null;
   #unsubscribeStructureResults: (() => void) | null = null;
 
@@ -45,11 +45,11 @@ export class WorkbookFormulaCompanionSheetPlugin extends Plugin<SearCoreSheet, C
     const provider: IFormulaResultProvider = {
       getFormulaResult: (row, col) => this.#workbookFormula.getSheetFormulaResult(this.#sheetId, row, col),
     };
-    this.unregisterFormulaResultProvider = context.runtime.formula.results.register({ provider, priority: 100 });
+    this.#unregisterFormulaResultProvider = context.runtime.formula.results.register({ provider, priority: 100 });
     const sourceProvider: IFormulaSourceProvider = {
       getFormulaSource: (row, col) => this.#workbookFormula.getSheetFormulaSource(this.#sheetId, row, col),
     };
-    this.unregisterFormulaSourceProvider = context.runtime.formula.sources.register({
+    this.#unregisterFormulaSourceProvider = context.runtime.formula.sources.register({
       provider: sourceProvider,
       priority: 100,
     });
@@ -103,10 +103,10 @@ export class WorkbookFormulaCompanionSheetPlugin extends Plugin<SearCoreSheet, C
   public onEditorDestroy(): void {
     this.#unsubscribeStructureResults?.();
     this.#unsubscribeStructureResults = null;
-    this.unregisterFormulaResultProvider?.();
-    this.unregisterFormulaResultProvider = null;
-    this.unregisterFormulaSourceProvider?.();
-    this.unregisterFormulaSourceProvider = null;
+    this.#unregisterFormulaResultProvider?.();
+    this.#unregisterFormulaResultProvider = null;
+    this.#unregisterFormulaSourceProvider?.();
+    this.#unregisterFormulaSourceProvider = null;
   }
 
   public render(_searCore: SearCoreSheet): Node<CellProperties>[] {

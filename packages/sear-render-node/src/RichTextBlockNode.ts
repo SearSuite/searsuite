@@ -12,9 +12,9 @@ import { RichTextVisualNode } from './RichTextVisualNode';
 
 /** Scene node that indexes and draws one top-level rich-text block. */
 export class RichTextBlockNode extends RichTextVisualNode {
-  private readonly lines: readonly RichTextRenderLine[];
-  private readonly font: string;
-  private readonly lineRenderer: RichTextLineRenderer;
+  readonly #lines: readonly RichTextRenderLine[];
+  readonly #font: string;
+  readonly #lineRenderer: RichTextLineRenderer;
 
   /** Creates a block-level rich-text scene node. */
   public constructor(input: {
@@ -37,9 +37,9 @@ export class RichTextBlockNode extends RichTextVisualNode {
     const blockTop = input.rect.y - (input.origin?.y ?? 0);
     // Keep line coordinates local to the block. Retained nodes can then move
     // with an updated positionRect without carrying stale document-space y's.
-    this.lines = input.lines.map((line) => ({ ...line, y: line.y - blockTop }));
-    this.font = input.font;
-    this.lineRenderer = input.lineRenderer;
+    this.#lines = input.lines.map((line) => ({ ...line, y: line.y - blockTop }));
+    this.#font = input.font;
+    this.#lineRenderer = input.lineRenderer;
   }
 
   /** Draws all visible text runs inside this block. */
@@ -48,8 +48,8 @@ export class RichTextBlockNode extends RichTextVisualNode {
     context.save();
     applyClip(context, clipRegion);
     const origin = { x: this.positionRect.x, y: this.positionRect.y };
-    for (const line of this.lines) {
-      this.lineRenderer.paint(context, { line, origin, font: this.font });
+    for (const line of this.#lines) {
+      this.#lineRenderer.paint(context, { line, origin, font: this.#font });
     }
     context.restore();
   }

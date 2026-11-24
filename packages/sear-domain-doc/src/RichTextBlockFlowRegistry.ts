@@ -20,12 +20,16 @@ export interface RichTextBlockFlowContribution {
 /** Ordered registry for plugin-owned top-level block flow resolution. */
 @Injectable()
 export class RichTextBlockFlowRegistry {
+  readonly #defaultSpacingAfter: number;
+
   public static readonly symbol = Symbol.for('RichTextBlockFlowRegistry');
 
   readonly #contributions = new Map<string, RichTextBlockFlowContribution>();
   #assertWrite: (() => void) | null = null;
 
-  public constructor(private readonly defaultSpacingAfter: number = 0) {}
+  public constructor(defaultSpacingAfter: number = 0) {
+    this.#defaultSpacingAfter = defaultSpacingAfter;
+  }
 
   public enforceWriteBoundary(assertWrite: () => void): void {
     if (this.#assertWrite) throw new SearError('Rich-text block flow write boundary is already installed.');
@@ -48,7 +52,7 @@ export class RichTextBlockFlowRegistry {
   }
 
   public resolve(input: { readonly node: RichDocNode; readonly index: number; readonly blockCount: number }): number {
-    let spacingAfter = normalizeSpacing(this.defaultSpacingAfter);
+    let spacingAfter = normalizeSpacing(this.#defaultSpacingAfter);
     for (const contribution of this.#contributions.values()) {
       spacingAfter = normalizeSpacing(contribution.resolve({ ...input, spacingAfter }));
     }

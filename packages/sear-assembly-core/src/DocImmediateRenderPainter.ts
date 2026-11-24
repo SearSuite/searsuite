@@ -29,13 +29,23 @@ export interface DocImmediateRenderPainterContentInput {
 
 /** Shared painter for embedded rich-document content and transient viewport output. */
 export class DocImmediateRenderPainter {
+  readonly #cursorManager: DocCursorManager;
+  readonly #scrollManager: ScrollManager;
+  readonly #lineRenderer: RichTextLineRenderer;
+  readonly #compositionManager: DocCompositionManager | null | undefined;
+
   /** Creates a painter over the document cursor and scroll services. */
   public constructor(
-    private readonly cursorManager: DocCursorManager,
-    private readonly scrollManager: ScrollManager,
-    private readonly lineRenderer: RichTextLineRenderer,
-    private readonly compositionManager?: DocCompositionManager | null,
-  ) {}
+    cursorManager: DocCursorManager,
+    scrollManager: ScrollManager,
+    lineRenderer: RichTextLineRenderer,
+    compositionManager?: DocCompositionManager | null,
+  ) {
+    this.#cursorManager = cursorManager;
+    this.#scrollManager = scrollManager;
+    this.#lineRenderer = lineRenderer;
+    this.#compositionManager = compositionManager;
+  }
 
   /** Draws text lines from a layout snapshot in the caller's current transform. */
   public drawContent(context: RenderContext, input: DocImmediateRenderPainterContentInput): void {
@@ -46,13 +56,13 @@ export class DocImmediateRenderPainter {
       origin: input.origin,
       ...(input.font ? { font: input.font } : {}),
       ...(input.blockIndexes ? { blockIndexes: input.blockIndexes } : {}),
-      lineRenderer: this.lineRenderer,
+      lineRenderer: this.#lineRenderer,
     }).drawScene(context, input.clipRect);
   }
 
   /** Draws selection rectangles using the caller's current world transform. */
   public drawSelectionRectsInWorld(context: RenderContext): void {
-    const rects = this.cursorManager.getSelectionRects();
+    const rects = this.#cursorManager.getSelectionRects();
     new RichTextSelectionNode({
       nodeKey: 'doc-immediate:selection',
       rect: createSelectionRect(rects),
@@ -62,8 +72,8 @@ export class DocImmediateRenderPainter {
 
   /** Draws selection rectangles in viewport coordinates under an identity transform. */
   public drawSelectionRectsInViewport(context: RenderContext): void {
-    const rects = this.cursorManager.getSelectionRects();
-    const scroll = this.scrollManager.getState();
+    const rects = this.#cursorManager.getSelectionRects();
+    const scroll = this.#scrollManager.getState();
     new RichTextSelectionNode({
       nodeKey: 'doc-immediate:selection',
       rect: createSelectionRect(rects),
@@ -75,22 +85,22 @@ export class DocImmediateRenderPainter {
 
   /** Draws IME composing text and caret in viewport coordinates. */
   public drawTextCursorOverlayInViewport(context: RenderContext): void {
-    const cursorInfo = this.cursorManager.getCursor();
+    const cursorInfo = this.#cursorManager.getCursor();
     if (cursorInfo) {
-      const scroll = this.scrollManager.getState();
+      const scroll = this.#scrollManager.getState();
       new RichTextCompositionNode({
         nodeKey: 'doc-immediate:composition',
         rect: createCursorRect(cursorInfo.x, cursorInfo.y, cursorInfo.height || 10, scroll),
-        text: this.compositionManager?.getText() ?? '',
+        text: this.#compositionManager?.getText() ?? '',
         anchor: { x: cursorInfo.x, y: cursorInfo.y, height: cursorInfo.height || 10 },
         scroll,
         viewportOverlay: true,
       }).drawScene(context);
     }
 
-    const composingCaretPixelOffset = this.compositionManager?.getCaretPixelOffset() ?? 0;
+    const composingCaretPixelOffset = this.#compositionManager?.getCaretPixelOffset() ?? 0;
     if (cursorInfo?.visible) {
-      const scroll = this.scrollManager.getState();
+      const scroll = this.#scrollManager.getState();
       new RichTextCaretNode({
         nodeKey: 'doc-immediate:caret',
         rect: createCursorRect(cursorInfo.x, cursorInfo.y, cursorInfo.height || 10, scroll),

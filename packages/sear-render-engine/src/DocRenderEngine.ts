@@ -36,16 +36,22 @@ export interface DocRenderViewport {
  */
 @Injectable()
 export class DocRenderEngine extends RenderEngine<NodeProperties, RenderCoordinatorManager> {
+  readonly #stage: SceneGraph<NodeProperties>;
+  readonly #screenRenderStrategy: ScreenRenderStrategy<NodeProperties>;
+  readonly #dirtyRenderStrategy: DirtyRenderStrategy<NodeProperties>;
+  readonly #stickyRenderStrategy: StickyRenderStrategy<NodeProperties>;
+  readonly #overlayRenderStrategy: OverlayRenderStrategy<NodeProperties>;
+
   /** DI token for resolving DocRenderEngine. */
   public static readonly symbol: symbol = Symbol.for('DocRenderEngine');
 
-  private viewport: DocRenderViewport = {
+  #viewport: DocRenderViewport = {
     width: 0,
     height: 0,
     contentRect: { x: 0, y: 0, width: 0, height: 0 },
   };
-  private pendingBlockRasterCopyPlan: BlockRasterCopyPlan | null = null;
-  private lastScreenRenderMode: ScreenRenderFrameMode | null = null;
+  #pendingBlockRasterCopyPlan: BlockRasterCopyPlan | null = null;
+  #lastScreenRenderMode: ScreenRenderFrameMode | null = null;
 
   /** Creates a render engine for one document editor instance. */
   public constructor(
@@ -54,27 +60,32 @@ export class DocRenderEngine extends RenderEngine<NodeProperties, RenderCoordina
     @Inject(ConfigEngine.symbol) configEngine: ConfigEngine,
     @Inject(RenderCoordinatorManager.symbol)
     renderCoordinatorManager: RenderCoordinatorManager,
-    @Inject(SceneGraph.symbol) private readonly stage: SceneGraph<NodeProperties>,
+    @Inject(SceneGraph.symbol) stage: SceneGraph<NodeProperties>,
     @Inject(RenderStrategyManager.symbol)
     renderStrategyManager: RenderStrategyManager<NodeProperties>,
     @Inject(ScreenRenderStrategy.symbol)
-    private readonly screenRenderStrategy: ScreenRenderStrategy<NodeProperties>,
+    screenRenderStrategy: ScreenRenderStrategy<NodeProperties>,
     @Inject(DirtyRenderStrategy.symbol)
-    private readonly dirtyRenderStrategy: DirtyRenderStrategy<NodeProperties>,
+    dirtyRenderStrategy: DirtyRenderStrategy<NodeProperties>,
     @Inject(StickyRenderStrategy.symbol)
-    private readonly stickyRenderStrategy: StickyRenderStrategy<NodeProperties>,
+    stickyRenderStrategy: StickyRenderStrategy<NodeProperties>,
     @Inject(OverlayRenderStrategy.symbol)
-    private readonly overlayRenderStrategy: OverlayRenderStrategy<NodeProperties>,
+    overlayRenderStrategy: OverlayRenderStrategy<NodeProperties>,
   ) {
     super(scrollManager, renderContext, configEngine, renderCoordinatorManager, renderStrategyManager);
-    this.renderStrategyManager.addStrategy(ScreenRenderStrategy.symbol, this.screenRenderStrategy);
-    this.renderStrategyManager.addStrategy(DirtyRenderStrategy.symbol, this.dirtyRenderStrategy);
-    this.renderStrategyManager.addStrategy(StickyRenderStrategy.symbol, this.stickyRenderStrategy);
-    this.renderStrategyManager.addStrategy(OverlayRenderStrategy.symbol, this.overlayRenderStrategy);
-    this.screenRenderStrategy.configureRuntime({
-      getViewport: this.getCurrentViewportRect.bind(this),
-      consumeBlockRasterCopyPlan: this.consumeBlockRasterCopyPlan.bind(this),
-      onFrameRendered: this.recordScreenFrameRendered.bind(this),
+    this.#stage = stage;
+    this.#screenRenderStrategy = screenRenderStrategy;
+    this.#dirtyRenderStrategy = dirtyRenderStrategy;
+    this.#stickyRenderStrategy = stickyRenderStrategy;
+    this.#overlayRenderStrategy = overlayRenderStrategy;
+    this.renderStrategyManager.addStrategy(ScreenRenderStrategy.symbol, this.#screenRenderStrategy);
+    this.renderStrategyManager.addStrategy(DirtyRenderStrategy.symbol, this.#dirtyRenderStrategy);
+    this.renderStrategyManager.addStrategy(StickyRenderStrategy.symbol, this.#stickyRenderStrategy);
+    this.renderStrategyManager.addStrategy(OverlayRenderStrategy.symbol, this.#overlayRenderStrategy);
+    this.#screenRenderStrategy.configureRuntime({
+      getViewport: this.#getCurrentViewportRect.bind(this),
+      consumeBlockRasterCopyPlan: this.#consumeBlockRasterCopyPlan.bind(this),
+      onFrameRendered: this.#recordScreenFrameRendered.bind(this),
     });
     this.initialize();
   }
@@ -84,23 +95,23 @@ export class DocRenderEngine extends RenderEngine<NodeProperties, RenderCoordina
 
   /** Updates the viewport model used by subsequent render frames. */
   public setViewport(viewport: DocRenderViewport): void {
-    this.viewport = viewport;
+    this.#viewport = viewport;
   }
 
   /** Supplies one layout-shift raster-copy plan for the next screen render pass. */
   public setBlockRasterCopyPlan(plan: BlockRasterCopyPlan | null): void {
-    this.pendingBlockRasterCopyPlan = plan;
+    this.#pendingBlockRasterCopyPlan = plan;
   }
 
   /** Runs the configured document render strategies over the current scene graph. */
   public render(node: Node<NodeProperties>): void;
-  public render(node: Node<NodeProperties> = this.stage): void {
+  public render(node: Node<NodeProperties> = this.#stage): void {
     // debugger;
-    this.lastScreenRenderMode = null;
-    this.prepareFrame();
+    this.#lastScreenRenderMode = null;
+    this.#prepareFrame();
     for (const strategy of this.renderStrategyManager.getAllStrategy()) {
-      if (strategy === this.dirtyRenderStrategy && this.shouldSkipDirtyBodyPass()) {
-        this.dirtyRenderStrategy.dirtyTree.clear();
+      if (strategy === this.#dirtyRenderStrategy && this.#shouldSkipDirtyBodyPass()) {
+        this.#dirtyRenderStrategy.dirtyTree.clear();
         continue;
       }
       strategy.render(node);
@@ -109,7 +120,7 @@ export class DocRenderEngine extends RenderEngine<NodeProperties, RenderCoordina
 
   /** Returns the screen strategy mode used by the last render pass, if it painted. */
   public getLastScreenRenderMode(): ScreenRenderFrameMode | null {
-    return this.lastScreenRenderMode;
+    return this.#lastScreenRenderMode;
   }
 
   /** Marks one document-world rectangle dirty for the next dirty pass. */
@@ -141,31 +152,31 @@ export class DocRenderEngine extends RenderEngine<NodeProperties, RenderCoordina
     this.invalidateScreenCache();
   }
 
-  private prepareFrame(): void {
+  #prepareFrame(): void {
     if (this.renderContext.requiresFrameRebuild()) {
       this.renderContext.beginFrame();
     }
   }
 
-  private getCurrentViewportRect(): PositionRect<HexColor> {
-    return new PositionRect<HexColor>(0, 0, this.viewport.width, this.viewport.height);
+  #getCurrentViewportRect(): PositionRect<HexColor> {
+    return new PositionRect<HexColor>(0, 0, this.#viewport.width, this.#viewport.height);
   }
 
-  private consumeBlockRasterCopyPlan(): BlockRasterCopyPlan | null {
-    const plan = this.pendingBlockRasterCopyPlan;
-    this.pendingBlockRasterCopyPlan = null;
+  #consumeBlockRasterCopyPlan(): BlockRasterCopyPlan | null {
+    const plan = this.#pendingBlockRasterCopyPlan;
+    this.#pendingBlockRasterCopyPlan = null;
     return plan;
   }
 
-  private recordScreenFrameRendered(mode: ScreenRenderFrameMode): void {
-    this.lastScreenRenderMode = mode;
+  #recordScreenFrameRendered(mode: ScreenRenderFrameMode): void {
+    this.#lastScreenRenderMode = mode;
   }
 
-  private shouldSkipDirtyBodyPass(): boolean {
+  #shouldSkipDirtyBodyPass(): boolean {
     return (
-      this.lastScreenRenderMode === 'full' ||
-      this.lastScreenRenderMode === 'rebuild' ||
-      this.lastScreenRenderMode === 'block-copy'
+      this.#lastScreenRenderMode === 'full' ||
+      this.#lastScreenRenderMode === 'rebuild' ||
+      this.#lastScreenRenderMode === 'block-copy'
     );
   }
 }

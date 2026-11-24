@@ -38,10 +38,10 @@ export class TextColorStylePlugin extends InlineTextStylePluginBase {
   }
 
   public override registerCommands(commands: DocCommandBus): void {
-    commands.register(SetDocTextColorCommand, this.createSetTextColorCommand.bind(this));
+    commands.register(SetDocTextColorCommand, this.#createSetTextColorCommand.bind(this));
   }
 
-  private createSetTextColorCommand(input: SetDocTextColorInput) {
+  #createSetTextColorCommand(input: SetDocTextColorInput) {
     const color = normalizeTextColor(input?.color);
     return createDocCommand(SetDocTextColorCommand.id, DocContentRenderPluginKey, () => {
       const runtime = this.requireRuntime();

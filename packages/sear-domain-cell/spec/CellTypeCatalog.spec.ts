@@ -43,25 +43,30 @@ function createCommitStrategy(key: string): CellCommitStrategyDefinition {
 }
 
 class ContractCellTypeDefinition extends CellTypeDefinition {
+  readonly #displayText: string;
+  readonly #commitKey: string;
+
   readonly type: string;
 
   constructor(
     type = contractType,
-    private readonly displayText = 'contract display',
-    private readonly commitKey = contractCommitKey,
+    displayText = 'contract display',
+    commitKey = contractCommitKey,
   ) {
     super();
+    this.#displayText = displayText;
+    this.#commitKey = commitKey;
     this.type = type;
   }
 
   override createCommitStrategies(): readonly CellCommitStrategyDefinition[] {
-    return [createCommitStrategy(this.commitKey)];
+    return [createCommitStrategy(this.#commitKey)];
   }
 
   override createDisplayTextProvider(): CellDisplayTextProvider {
     return {
       cellType: this.type,
-      getDisplayText: () => this.displayText,
+      getDisplayText: () => this.#displayText,
     };
   }
 
@@ -91,6 +96,7 @@ class RenderOnlyDefinition extends CellRenderDefinition {
 }
 
 interface CatalogHarness {
+  readonly renderCoordinator: SheetRenderCoordinatorManager;
   readonly commits: CellCommitStrategyRegistry;
   readonly clipboardCodecs: CellClipboardCodecRegistry;
   readonly displays: CellDisplayTextRegistry;
@@ -119,6 +125,7 @@ function createHarness(): CatalogHarness {
     displays,
     nodeFactory,
     rendererRegistry,
+    renderCoordinator,
     catalog: new CellTypeCatalog(commits, displays, renderCoordinator, clipboardCodecs),
   };
 }
@@ -164,13 +171,11 @@ describe('CellTypeCatalog', () => {
   });
 
   it('registers stored value validator that delegates to definition', () => {
-    const { catalog } = createHarness();
+    const { catalog, renderCoordinator } = createHarness();
     const definition = new ContractCellTypeDefinition();
     const spy = jest.fn(() => true);
     Object.assign(definition, { isStoredValue: spy });
 
-    const renderCoordinator = (catalog as unknown as { renderCoordinator: SheetRenderCoordinatorManager })
-      .renderCoordinator;
     const registerSpy = jest.spyOn(renderCoordinator, 'registerStoredValueValidator');
 
     catalog.register(definition);

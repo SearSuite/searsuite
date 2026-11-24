@@ -25,10 +25,10 @@ export class EmptyCell extends Cell<CellProperties<null>> {
       return new FixBoxNode(positionRect, properties).add(new EmbeddedEditorRenderNode([], positionRect, properties));
     }
 
-    const value = this.readResult();
+    const value = this.#readResult();
     const displayValue = this.getDisplayText();
     if (!displayValue) return new FixBoxNode(positionRect, properties);
-    const format = this.getEffectiveFormat();
+    const format = this.#getEffectiveFormat();
     const numericDisplay = typeof value === 'number'
       ? formatCellNumberDisplay(value, format, this.context.cellFormatLocale)
       : null;
@@ -53,18 +53,18 @@ export class EmptyCell extends Cell<CellProperties<null>> {
 
   /** Returns the formatted projection when a formula spills into this cell. */
   getDisplayText(): string {
-    const value = this.readResult();
+    const value = this.#readResult();
     return typeof value === 'number'
-      ? formatCellNumberDisplay(value, this.getEffectiveFormat(), this.context.cellFormatLocale).text
+      ? formatCellNumberDisplay(value, this.#getEffectiveFormat(), this.context.cellFormatLocale).text
       : formatCellText(formatFormulaValue(value), this.properties.format, this.context.cellFormatLocale);
   }
 
-  private readResult(): unknown {
+  #readResult(): unknown {
     const { row, col, formulaResultProvider } = this.context;
     return row === void 0 || col === void 0 ? undefined : formulaResultProvider?.getFormulaResult(row, col);
   }
 
-  private getEffectiveFormat(): unknown {
+  #getEffectiveFormat(): unknown {
     const { row, col, formulaResultProvider } = this.context;
     return this.properties.format ?? (
       row === void 0 || col === void 0 ? undefined : formulaResultProvider?.getFormulaResultFormat?.(row, col)

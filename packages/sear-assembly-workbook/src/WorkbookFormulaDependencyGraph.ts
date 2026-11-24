@@ -120,7 +120,7 @@ export class WorkbookFormulaDependencyGraph {
     );
     this.#dependencies.set(formulaKey, normalizedDependencies);
     this.#dirtyFormulaCells.add(formulaKey);
-    this.rebuildReverseIndex();
+    this.#rebuildReverseIndex();
   }
 
   /** Removes one formula cell and every reverse edge it owns. */
@@ -131,7 +131,7 @@ export class WorkbookFormulaDependencyGraph {
     this.#dependencies.delete(formulaKey);
     this.#dirtyFormulaCells.delete(formulaKey);
     this.#formulaResults.delete(formulaKey);
-    this.rebuildReverseIndex();
+    this.#rebuildReverseIndex();
   }
 
   /** Removes formulas on a deleted sheet and marks references to that sheet as broken. */
@@ -148,7 +148,7 @@ export class WorkbookFormulaDependencyGraph {
       );
       if (this.hasBrokenReferences(parseWorkbookCellKey(formulaKey))) this.#dirtyFormulaCells.add(formulaKey);
     });
-    this.rebuildReverseIndex();
+    this.#rebuildReverseIndex();
   }
 
   /** Marks formulas that depend on changed workbook cells as dirty, including transitive formula chains. */
@@ -269,7 +269,7 @@ export class WorkbookFormulaDependencyGraph {
     return this.#formulaResults.size;
   }
 
-  private rebuildReverseIndex(): void {
+  #rebuildReverseIndex(): void {
     this.#cellDependents.clear();
     this.#dependencies.forEach((dependencies, formulaKey) => {
       dependencies.forEach((dependency) => {

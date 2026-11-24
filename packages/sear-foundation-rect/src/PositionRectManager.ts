@@ -10,7 +10,7 @@ import { PositionRect } from './PositionRect';
  * @typeParam PositionRectKeyType Type used by managed rectangle keys.
  */
 export class PositionRectManager<PositionRectKeyType> {
-  private positionRects: PositionRect<PositionRectKeyType>[] = [];
+  #positionRects: PositionRect<PositionRectKeyType>[] = [];
 
   /** Creates a PositionRectManager instance. */
   constructor() {}
@@ -21,7 +21,7 @@ export class PositionRectManager<PositionRectKeyType> {
    * @param positionRect Rectangle instance to track.
    */
   public addPositionRect(positionRect: PositionRect<PositionRectKeyType>) {
-    this.positionRects.push(positionRect);
+    this.#positionRects.push(positionRect);
   }
 
   /**
@@ -31,7 +31,7 @@ export class PositionRectManager<PositionRectKeyType> {
    * @param newY New vertical origin.
    */
   public updatePosition(newX: number, newY: number) {
-    this.positionRects.forEach((positionRect) => {
+    this.#positionRects.forEach((positionRect) => {
       positionRect.updatePosition(newX, newY);
     });
   }
@@ -40,6 +40,6 @@ export class PositionRectManager<PositionRectKeyType> {
    * Returns the number of registered rectangles.
    */
   public get length() {
-    return this.positionRects.length;
+    return this.#positionRects.length;
   }
 }

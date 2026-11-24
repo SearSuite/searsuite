@@ -30,14 +30,18 @@ export function registerSheetSessionStateCommands(
 }
 
 class CaptureSheetSessionStateSnapshotCommand implements SheetCommand<CaptureSheetSessionStateCommandResult> {
+  readonly #session: SessionStateRegistry;
+
   public readonly id = CaptureSheetSessionStateCommand.id;
 
-  public constructor(private readonly session: SessionStateRegistry) {}
+  public constructor(session: SessionStateRegistry) {
+    this.#session = session;
+  }
 
   public execute(_context: SheetCommandContext): CaptureSheetSessionStateCommandResult {
     return {
       pipeline: new Pipeline(this.id),
-      sessionState: this.session.capture(),
+      sessionState: this.#session.capture(),
     };
   }
 }

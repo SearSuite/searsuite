@@ -104,8 +104,13 @@ function createCursorManager() {
 }
 
 class SheetCellEditorPlugin extends RuntimeSheetCellEditorPlugin {
+  readonly adapter: FakeSheetEmbeddedEditor;
   constructor(...args: ConstructorParameters<typeof RuntimeSheetCellEditorPlugin>) {
+    Object.assign(args[1], { getState: () => [new Rect([[-1, -1], [-1, -1]])] });
+    Object.assign(args[2], { startListener: jest.fn(), stopListener: jest.fn() });
+    Object.assign(args[3], { startListener: jest.fn(), stopListener: jest.fn() });
     super(...args);
+    this.adapter = args[12] as FakeSheetEmbeddedEditor;
     this.bindRuntimeServices(container);
   }
 }
@@ -155,17 +160,7 @@ function prepareRenderDocument(
   active = false,
   configureSession?: (session: SheetEditSession) => void,
 ): { reopen(text: string): void } {
-  const internals = plugin as unknown as {
-    embeddedEditor: FakeSheetEmbeddedEditor;
-    selectionPlugin: { getState?: () => Rect[] };
-    textInput: { startListener?: jest.Mock; stopListener?: jest.Mock };
-    keyboardRouter: { startListener?: jest.Mock; stopListener?: jest.Mock };
-  };
-  internals.selectionPlugin.getState = () => [new Rect([[-1, -1], [-1, -1]])];
-  internals.textInput.startListener = jest.fn();
-  internals.keyboardRouter.startListener = jest.fn();
-  internals.keyboardRouter.stopListener = jest.fn();
-  const adapter = internals.embeddedEditor;
+  const adapter = (plugin as SheetCellEditorPlugin).adapter;
   if (configureSession) {
     const createSession = adapter.createEditSession.bind(adapter);
     jest.spyOn(adapter, 'createEditSession').mockImplementation((context) => {
@@ -901,7 +896,6 @@ describe('SheetCellEditorPlugin render coverage', () => {
       [1, 0],
       [1, 0],
     ]);
-    plugin.originalContentWidth = 200;
 
     let createCount = 0;
     const core = {
@@ -928,7 +922,7 @@ describe('SheetCellEditorPlugin render coverage', () => {
         scrollManager: { getState: () => ({ x: 0, y: 0 }), getShape: () => [200, 120] },
         markDirty: jest.fn(),
         renderCoordinatorManager: {
-          create: jest.fn(() => {
+          create: jest.fn((_data, rect: { y: number; height: number }) => {
             createCount += 1;
             if (createCount === 1) return { render: () => ({ properties: {} }) };
             return void 0;
@@ -940,10 +934,12 @@ describe('SheetCellEditorPlugin render coverage', () => {
     const session = prepareRenderDocument(plugin as unknown as RuntimeSheetCellEditorPlugin, core, 'x');
     expect(plugin.render(core as never).length).toBeGreaterThan(0);
     session.reopen('line1\nline2');
+    core.renderEngine.renderCoordinatorManager.create.mockClear();
     plugin.render(core as never);
-    expect(plugin.lastEditorRect?.height).toBeGreaterThan(20);
-    expect((plugin.lastEditorRect as { y: number } | null)?.y).toBeLessThan(20);
-    expect((plugin.lastEditorRect as { y: number; height: number } | null)?.y! + plugin.lastEditorRect!.height).toBe(40);
+    const rect = core.renderEngine.renderCoordinatorManager.create.mock.calls[0][1];
+    expect(rect.height).toBeGreaterThan(20);
+    expect(rect.y).toBeLessThan(20);
+    expect(rect.y + rect.height).toBe(40);
   });
 
   it('does not mark a separate overflow dirty rect when computed overflow width is zero', () => {

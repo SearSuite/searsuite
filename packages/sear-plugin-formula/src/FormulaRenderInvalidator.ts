@@ -14,13 +14,17 @@ export type FormulaRenderInvalidationHandler = (keys: readonly CellKey[]) => voi
  */
 @Injectable()
 export class FormulaRenderInvalidator {
+  readonly #displayedValueChanges: SheetDisplayedValueChanges;
+
   /** DI token for resolving FormulaRenderInvalidator. */
   public static readonly symbol = Symbol.for('FormulaRenderInvalidator');
-  private handler: FormulaRenderInvalidationHandler | undefined;
+  #handler: FormulaRenderInvalidationHandler | undefined;
 
   public constructor(
-    @Inject(SheetDisplayedValueChanges.symbol) private readonly displayedValueChanges: SheetDisplayedValueChanges,
-  ) {}
+    @Inject(SheetDisplayedValueChanges.symbol) displayedValueChanges: SheetDisplayedValueChanges,
+  ) {
+    this.#displayedValueChanges = displayedValueChanges;
+  }
 
   /**
    * Registers the legacy formula-result callback for one editor instance.
@@ -28,9 +32,9 @@ export class FormulaRenderInvalidator {
    * @returns Disposer that removes this handler if it is still active.
    */
   public bind(handler: FormulaRenderInvalidationHandler): () => void {
-    this.handler = handler;
+    this.#handler = handler;
     return () => {
-      if (this.handler === handler) this.handler = void 0;
+      if (this.#handler === handler) this.#handler = void 0;
     };
   }
 
@@ -40,10 +44,10 @@ export class FormulaRenderInvalidator {
    */
   public invalidateFormulaResults(keys: readonly CellKey[]): void {
     if (keys.length === 0) return;
-    this.displayedValueChanges.publish(keys.map((key) => {
+    this.#displayedValueChanges.publish(keys.map((key) => {
       const [row, column] = fromCellKey(key);
       return { row, column };
     }));
-    this.handler?.(keys);
+    this.#handler?.(keys);
   }
 }

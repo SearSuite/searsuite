@@ -29,7 +29,7 @@ export class SheetQueryRegistry {
     definition: Definition,
     handler: SheetQueryHandler<SheetQueryInput<Definition>, SheetQueryResult<Definition>>,
   ): () => void {
-    this.assertLive();
+    this.#assertLive();
     this.#assertWrite?.();
     const id = definition.id;
     if (this.#handlers.has(id))
@@ -49,7 +49,7 @@ export class SheetQueryRegistry {
     definition: Definition,
     input: SheetQueryInput<Definition>,
   ): SheetQueryResult<Definition> {
-    this.assertLive();
+    this.#assertLive();
     const registration = this.#handlers.get(definition.id);
     if (!registration) throw new SearError(`SheetQueryRegistry has no query registered for ${definition.id}.`);
     const result = registration.handler(input);
@@ -64,12 +64,12 @@ export class SheetQueryRegistry {
   }
 
   public has(definition: SheetQueryDefinition<unknown, unknown> | string): boolean {
-    this.assertLive();
+    this.#assertLive();
     return this.#handlers.has(typeof definition === 'string' ? definition : definition.id);
   }
 
   public getRegisteredQueryIds(): readonly string[] {
-    this.assertLive();
+    this.#assertLive();
     return [...this.#handlers.keys()].sort();
   }
 
@@ -80,7 +80,7 @@ export class SheetQueryRegistry {
     this.#handlers.clear();
   }
 
-  private assertLive(): void {
+  #assertLive(): void {
     if (this.#destroyed) throw new SearError('SheetQueryRegistry has been destroyed.');
   }
 }

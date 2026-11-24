@@ -28,6 +28,8 @@ const sheetGridRenderPluginRenderConfig = {
 /** Renders visible sheet body cells. */
 @Injectable()
 export class SheetGridRender extends Plugin<SearCoreSheet, CellProperties, ISheetGridRender> {
+  readonly #cellVisualReaders: SheetCellVisualReaderRegistry;
+
   /** Registers the stateless body grid renderer with PluginManager. */
   public registerState(): { key: PluginKey; state: ISheetGridRender } {
     return { key: this.key, state: this.getState() };
@@ -43,12 +45,13 @@ export class SheetGridRender extends Plugin<SearCoreSheet, CellProperties, IShee
 
   /** Constructs the body grid renderer. */
   constructor(
-    @Inject(SheetCellVisualReaderRegistry.symbol) private readonly cellVisualReaders: SheetCellVisualReaderRegistry,
+    @Inject(SheetCellVisualReaderRegistry.symbol) cellVisualReaders: SheetCellVisualReaderRegistry,
   ) {
     super({
       key: new PluginKey(),
       state: {},
     });
+    this.#cellVisualReaders = cellVisualReaders;
   }
 
   /** Returns unchanged renderer state for every operation list. */
@@ -135,7 +138,7 @@ export class SheetGridRender extends Plugin<SearCoreSheet, CellProperties, IShee
         const stickyLeft = i < freeze.columns;
         const positionRect = new PositionRect(x + offset.x, fixedY ?? y + offset.y, width, height);
 
-        const visual = this.cellVisualReaders.readVisual({ rowIndex: j, columnIndex: i });
+        const visual = this.#cellVisualReaders.readVisual({ rowIndex: j, columnIndex: i });
         const visualProperties = visual.properties;
         const property: CellProperties = {
           ...visualProperties,

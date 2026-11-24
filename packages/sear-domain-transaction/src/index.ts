@@ -31,7 +31,6 @@ export interface TransactionPluginKey {
 
 /** Transaction public API. */
 export class Transaction<OperationType extends OTOperation = Operation> {
-  // private type: TransactionType = TransactionType.initialize;
   /** Stable plugin key for Transaction. */
   public readonly pluginKey: TransactionPluginKey;
   /** Operations carried by Transaction. */

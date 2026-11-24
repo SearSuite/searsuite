@@ -10,7 +10,7 @@ import { RangeRect } from './RangeRect';
  * @typeParam T Value type stored in each range.
  */
 export class RangeRectManager<T> {
-  private ranges: RangeRect<T>[] = [];
+  #ranges: RangeRect<T>[] = [];
 
   /**
    * Adds a range to the manager.
@@ -18,14 +18,14 @@ export class RangeRectManager<T> {
    * @param range Range definition to register.
    */
   public addRange(range: RangeRect<T>): void {
-    this.ranges.push(range);
+    this.#ranges.push(range);
   }
 
   /**
    * Returns the number of registered ranges.
    */
   public get length(): number {
-    return this.ranges.length;
+    return this.#ranges.length;
   }
 
   /**
@@ -37,7 +37,7 @@ export class RangeRectManager<T> {
    * @param col Column index to query.
    */
   public getValue(row: number, col: number): T | null {
-    const merged = this.ranges.reduce((prev, curr) => ({ ...prev, ...curr.getValue(row, col) }), {} as T);
+    const merged = this.#ranges.reduce((prev, curr) => ({ ...prev, ...curr.getValue(row, col) }), {} as T);
     return Object.keys(Object.assign({}, merged)).length ? merged : null;
   }
 
@@ -48,6 +48,6 @@ export class RangeRectManager<T> {
    * packages start depending on this exact payload shape.
    */
   public toJSON(): Array<{ rect: [number, number, number, number]; value: T }> {
-    return this.ranges.map((range) => range.toJSON());
+    return this.#ranges.map((range) => range.toJSON());
   }
 }

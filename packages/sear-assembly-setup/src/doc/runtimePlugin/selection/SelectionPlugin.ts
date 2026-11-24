@@ -31,30 +31,33 @@ export const DocSelectionObservation = defineStateObservation<DocSelection>('doc
 /** Owns document selection commands, select-all shortcut, and pointer drag selection. */
 @Injectable()
 export class SelectionPlugin extends DocPlugin<null> {
+  readonly #input: DocInputPlugin;
+
   /** DI token for resolving SelectionPlugin. */
   public static readonly symbol = Symbol.for('SelectionPlugin');
 
-  private runtime: DocPluginRuntime | null = null;
-  private interaction: DocInteractionRuntime | null = null;
-  private pointerSelecting = false;
-  private disposePointerCapture: (() => void) | null = null;
-  private pendingPointerMove: DocPointerInput | null = null;
-  private pointerMoveFrame: number | null = null;
-  private disposers: (() => void)[] = [];
+  #runtime: DocPluginRuntime | null = null;
+  #interaction: DocInteractionRuntime | null = null;
+  #pointerSelecting = false;
+  #disposePointerCapture: (() => void) | null = null;
+  #pendingPointerMove: DocPointerInput | null = null;
+  #pointerMoveFrame: number | null = null;
+  #disposers: (() => void)[] = [];
 
   public constructor(
     @Inject(DocInputPlugin.symbol)
-    private readonly input: DocInputPlugin,
+    input: DocInputPlugin,
   ) {
     super({ key: DocSelectionPluginKey, state: null });
+    this.#input = input;
   }
 
   /** Registers the host-facing selection observation. */
   public registerObservations(observations: ObservationRegistry): void {
     observations.register(DocSelectionObservation, {
-      getSnapshot: () => cloneSelection(this.input.session.docSelection),
+      getSnapshot: () => cloneSelection(this.#input.session.docSelection),
       subscribe: (listener) =>
-        this.input.subscribeSelection(() => listener(cloneSelection(this.input.session.docSelection))),
+        this.#input.subscribeSelection(() => listener(cloneSelection(this.#input.session.docSelection))),
     });
   }
 
@@ -62,8 +65,8 @@ export class SelectionPlugin extends DocPlugin<null> {
   public registerSessionState(registry: SessionStateRegistry): void {
     registry.register(DocSelectionSessionStateDefinition, {
       restorePhase: SessionStateRestorePhase.BeforeInitialize,
-      capture: () => cloneSelection(this.input.session.docSelection),
-      restore: (selection) => this.input.restoreSelection(selection),
+      capture: () => cloneSelection(this.#input.session.docSelection),
+      restore: (selection) => this.#input.restoreSelection(selection),
     });
   }
 
@@ -80,14 +83,14 @@ export class SelectionPlugin extends DocPlugin<null> {
   }
 
   public render(): Node<NodeProperties>[] | null {
-    const layout = this.runtime?.document.core.getDocRenderLayoutState();
+    const layout = this.#runtime?.document.core.getDocRenderLayoutState();
     if (!layout) return null;
-    const scroll = this.runtime?.scroll.manager.getState() ?? { x: 0, y: 0 };
+    const scroll = this.#runtime?.scroll.manager.getState() ?? { x: 0, y: 0 };
     return [
       new RichTextSelectionNode({
         nodeKey: `${this.key.key}:selection`,
         rect: createVisibleWorldRect(layout),
-        rects: this.runtime?.document.cursor.getSelectionRects() ?? [],
+        rects: this.#runtime?.document.cursor.getSelectionRects() ?? [],
         offset: { x: -scroll.x, y: -scroll.y },
         viewportOverlay: true,
         depth: 10_010,
@@ -96,8 +99,8 @@ export class SelectionPlugin extends DocPlugin<null> {
   }
 
   public configure(context: DocPluginSetupContext): void {
-    this.runtime = context.runtime;
-    this.interaction = context.runtime.extensions.get(DocPluginRuntimeCapability.Interaction) ?? null;
+    this.#runtime = context.runtime;
+    this.#interaction = context.runtime.extensions.get(DocPluginRuntimeCapability.Interaction) ?? null;
   }
 
   public registerKeyboardHandlers({ bindings, commands }: DocKeyboardHandlerRegistrationContext): void {
@@ -107,36 +110,36 @@ export class SelectionPlugin extends DocPlugin<null> {
   }
 
   public start(): void {
-    if (!this.interaction) return;
-    this.disposers.push(
-      this.interaction.subscribePointerDrag({
-        onStart: this.handlePointerStart.bind(this),
-        onMove: this.handlePointerMove.bind(this),
-        onEnd: this.handlePointerEnd.bind(this),
+    if (!this.#interaction) return;
+    this.#disposers.push(
+      this.#interaction.subscribePointerDrag({
+        onStart: this.#handlePointerStart.bind(this),
+        onMove: this.#handlePointerMove.bind(this),
+        onEnd: this.#handlePointerEnd.bind(this),
       }),
     );
   }
 
   public onEditorDestroy(): void {
     this.assertRuntimeWriteAllowed();
-    this.pointerSelecting = false;
-    this.cancelScheduledPointerMove();
-    this.disposePointerCapture?.();
-    this.disposePointerCapture = null;
-    for (const dispose of this.disposers.splice(0).reverse()) dispose();
-    this.runtime = null;
-    this.interaction = null;
+    this.#pointerSelecting = false;
+    this.#cancelScheduledPointerMove();
+    this.#disposePointerCapture?.();
+    this.#disposePointerCapture = null;
+    for (const dispose of this.#disposers.splice(0).reverse()) dispose();
+    this.#runtime = null;
+    this.#interaction = null;
   }
 
   public registerCommands(commands: DocCommandBus): void {
-    commands.register(SelectAllDocCommand, this.createSelectAllDocCommand.bind(this));
-    commands.register(SetDocSelectionCommand, this.createSetDocSelectionCommand.bind(this));
+    commands.register(SelectAllDocCommand, this.#createSelectAllDocCommand.bind(this));
+    commands.register(SetDocSelectionCommand, this.#createSetDocSelectionCommand.bind(this));
   }
 
-  private createSelectAllDocCommand() {
+  #createSelectAllDocCommand() {
     const plugin = this;
     function createSelectAllDocTransaction() {
-      return plugin.requireRuntime().document.input.createSelectAllTransaction();
+      return plugin.#requireRuntime().document.input.createSelectAllTransaction();
     }
     return createDocCommand(
       SelectAllDocCommand.id,
@@ -146,10 +149,10 @@ export class SelectionPlugin extends DocPlugin<null> {
     );
   }
 
-  private createSetDocSelectionCommand(input: SetDocSelectionInput) {
+  #createSetDocSelectionCommand(input: SetDocSelectionInput) {
     const plugin = this;
     function createSetDocSelectionTransaction() {
-      return plugin.requireRuntime().document.input.createTransaction(function applySetDocSelectionTransaction(tr) {
+      return plugin.#requireRuntime().document.input.createTransaction(function applySetDocSelectionTransaction(tr) {
         return tr.setSelection(input.selection);
       });
     }
@@ -161,39 +164,39 @@ export class SelectionPlugin extends DocPlugin<null> {
     );
   }
 
-  private handlePointerStart(pointer: DocPointerInput): void {
-    const runtime = this.requireRuntime();
-    const interaction = this.requireInteraction();
+  #handlePointerStart(pointer: DocPointerInput): void {
+    const runtime = this.#requireRuntime();
+    const interaction = this.#requireInteraction();
     pointer.preventDefault();
     const cursor = interaction.resolveCursorFromPointer(pointer);
     runtime.commands.run(SetDocSelectionCommand, { selection: { anchor: cursor, head: cursor } });
-    this.pointerSelecting = true;
-    this.disposePointerCapture?.();
-    this.disposePointerCapture = runtime.input.pointer.start({ onRelease: this.stopPointerSelecting.bind(this) });
+    this.#pointerSelecting = true;
+    this.#disposePointerCapture?.();
+    this.#disposePointerCapture = runtime.input.pointer.start({ onRelease: this.#stopPointerSelecting.bind(this) });
     runtime.input.text.refocus();
   }
 
-  private handlePointerMove(pointer: DocPointerInput): void {
-    if (!this.pointerSelecting) return;
+  #handlePointerMove(pointer: DocPointerInput): void {
+    if (!this.#pointerSelecting) return;
     pointer.preventDefault();
-    this.pendingPointerMove = createDeferredPointerInput(pointer);
-    if (this.pointerMoveFrame !== null) return;
-    this.pointerMoveFrame = this.requireRuntime().platform.requestAnimationFrame(
-      this.runScheduledPointerMove.bind(this),
+    this.#pendingPointerMove = createDeferredPointerInput(pointer);
+    if (this.#pointerMoveFrame !== null) return;
+    this.#pointerMoveFrame = this.#requireRuntime().platform.requestAnimationFrame(
+      this.#runScheduledPointerMove.bind(this),
     );
   }
 
-  private runScheduledPointerMove(): void {
-    this.pointerMoveFrame = null;
-    this.applyPendingPointerMove();
+  #runScheduledPointerMove(): void {
+    this.#pointerMoveFrame = null;
+    this.#applyPendingPointerMove();
   }
 
-  private applyPendingPointerMove(): void {
-    const pointer = this.pendingPointerMove;
-    this.pendingPointerMove = null;
-    if (!this.pointerSelecting || !pointer) return;
-    const runtime = this.requireRuntime();
-    const interaction = this.requireInteraction();
+  #applyPendingPointerMove(): void {
+    const pointer = this.#pendingPointerMove;
+    this.#pendingPointerMove = null;
+    if (!this.#pointerSelecting || !pointer) return;
+    const runtime = this.#requireRuntime();
+    const interaction = this.#requireInteraction();
     const cursor = interaction.resolveCursorFromPointer(pointer);
     runtime.commands.run(SetDocSelectionCommand, {
       selection: {
@@ -203,43 +206,43 @@ export class SelectionPlugin extends DocPlugin<null> {
     });
   }
 
-  private handlePointerEnd(): void {
-    this.flushScheduledPointerMove();
-    this.pointerSelecting = false;
-    this.disposePointerCapture?.();
-    this.disposePointerCapture = null;
+  #handlePointerEnd(): void {
+    this.#flushScheduledPointerMove();
+    this.#pointerSelecting = false;
+    this.#disposePointerCapture?.();
+    this.#disposePointerCapture = null;
   }
 
-  private stopPointerSelecting(): void {
-    this.cancelScheduledPointerMove();
-    this.pointerSelecting = false;
-    this.disposePointerCapture = null;
+  #stopPointerSelecting(): void {
+    this.#cancelScheduledPointerMove();
+    this.#pointerSelecting = false;
+    this.#disposePointerCapture = null;
   }
 
-  private requireRuntime(): DocPluginRuntime {
-    if (!this.runtime) throw new SearError('SelectionPlugin is not configured.');
-    return this.runtime;
+  #requireRuntime(): DocPluginRuntime {
+    if (!this.#runtime) throw new SearError('SelectionPlugin is not configured.');
+    return this.#runtime;
   }
 
-  private requireInteraction(): DocInteractionRuntime {
-    if (!this.interaction) throw new SearError('SelectionPlugin has no interaction runtime.');
-    return this.interaction;
+  #requireInteraction(): DocInteractionRuntime {
+    if (!this.#interaction) throw new SearError('SelectionPlugin has no interaction runtime.');
+    return this.#interaction;
   }
 
-  private flushScheduledPointerMove(): void {
-    if (this.pointerMoveFrame !== null) {
-      this.requireRuntime().platform.cancelAnimationFrame(this.pointerMoveFrame);
-      this.pointerMoveFrame = null;
+  #flushScheduledPointerMove(): void {
+    if (this.#pointerMoveFrame !== null) {
+      this.#requireRuntime().platform.cancelAnimationFrame(this.#pointerMoveFrame);
+      this.#pointerMoveFrame = null;
     }
-    this.applyPendingPointerMove();
+    this.#applyPendingPointerMove();
   }
 
-  private cancelScheduledPointerMove(): void {
-    if (this.pointerMoveFrame !== null && this.runtime) {
-      this.runtime.platform.cancelAnimationFrame(this.pointerMoveFrame);
+  #cancelScheduledPointerMove(): void {
+    if (this.#pointerMoveFrame !== null && this.#runtime) {
+      this.#runtime.platform.cancelAnimationFrame(this.#pointerMoveFrame);
     }
-    this.pointerMoveFrame = null;
-    this.pendingPointerMove = null;
+    this.#pointerMoveFrame = null;
+    this.#pendingPointerMove = null;
   }
 }
 

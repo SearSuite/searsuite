@@ -19,7 +19,7 @@ export class StickyRenderStrategy<
   public static readonly symbol = Symbol.for('StickyRenderStrategy');
 
   /** Marks whether sticky layer has completed its first render pass. */
-  private isFirstRender: boolean = true;
+  #isFirstRender: boolean = true;
   /**
    * Renders all StickyNode descendants of the given node.
    * Sticky nodes are positioned according to their sticky logic (top/left).
@@ -36,7 +36,7 @@ export class StickyRenderStrategy<
     const positionRect = this.scrollManager.getPositionRect();
     const { x, y } = this.scrollState;
 
-    this.renderAffix(node, new PositionRect(0, y, positionRect.width, y + positionRect.height), isLeftAffixNode, [
+    this.#renderAffix(node, new PositionRect(0, y, positionRect.width, y + positionRect.height), isLeftAffixNode, [
       1,
       0,
       0,
@@ -44,7 +44,7 @@ export class StickyRenderStrategy<
       0,
       -y,
     ]);
-    this.renderAffix(node, new PositionRect(x, 0, x + positionRect.width, positionRect.height), isTopAffixNode, [
+    this.#renderAffix(node, new PositionRect(x, 0, x + positionRect.width, positionRect.height), isTopAffixNode, [
       1,
       0,
       0,
@@ -52,8 +52,8 @@ export class StickyRenderStrategy<
       -x,
       0,
     ]);
-    this.renderAffix(node, positionRect, isCornerAffixNode, [1, 0, 0, 1, 0, 0]);
-    this.isFirstRender = false;
+    this.#renderAffix(node, positionRect, isCornerAffixNode, [1, 0, 0, 1, 0, 0]);
+    this.#isFirstRender = false;
   }
 
   /** Lets SearCoreSheet paint sticky content after the batched base scroll frame. */
@@ -67,7 +67,7 @@ export class StickyRenderStrategy<
    * Groups are split by sticky mode to ensure each category receives the
    * correct transform behavior during scrolling.
    */
-  private renderAffix(
+  #renderAffix(
     node: Node<NodeTypeProperties>,
     rect: PositionRect<HexColor>,
     filterFn: (n: Node<NodeTypeProperties>) => boolean,

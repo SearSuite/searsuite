@@ -33,13 +33,17 @@ export type CollaborationEngineEffect =
 
 /** Single client-side collaboration algorithm shared by all editor bridges. */
 export class CollaborationEngine {
-  private readonly pending: PendingBatch[] = [];
-  private resourceId: string | null = null;
-  private clientId: string | null = null;
-  private serverRevision = 0;
-  private nextOperationSequence = 1;
+  readonly #contributors: CollaborationContributorRegistry;
 
-  public constructor(private readonly contributors: CollaborationContributorRegistry) {}
+  readonly #pending: PendingBatch[] = [];
+  #resourceId: string | null = null;
+  #clientId: string | null = null;
+  #serverRevision = 0;
+  #nextOperationSequence = 1;
+
+  public constructor(contributors: CollaborationContributorRegistry) {
+    this.#contributors = contributors;
+  }
 
   /** Starts one resource session from a host-supplied document revision. */
   public connect(resourceId: string, clientId: string, revision: number = 0): void {
@@ -57,20 +61,20 @@ export class CollaborationEngine {
         { revision },
       );
     }
-    this.resourceId = resourceId;
-    this.clientId = clientId;
-    this.serverRevision = revision;
-    this.pending.length = 0;
-    this.nextOperationSequence = 1;
+    this.#resourceId = resourceId;
+    this.#clientId = clientId;
+    this.#serverRevision = revision;
+    this.#pending.length = 0;
+    this.#nextOperationSequence = 1;
   }
 
   /** Ends the current session and releases transient pending state. */
   public disconnect(): void {
-    this.resourceId = null;
-    this.clientId = null;
-    this.serverRevision = 0;
-    this.pending.length = 0;
-    this.nextOperationSequence = 1;
+    this.#resourceId = null;
+    this.#clientId = null;
+    this.#serverRevision = 0;
+    this.#pending.length = 0;
+    this.#nextOperationSequence = 1;
   }
 
   /** Queues one already-committed local transaction and emits at most one in-flight submission. */
@@ -78,17 +82,17 @@ export class CollaborationEngine {
     ownerId: string,
     operations: readonly OperationType[],
   ): readonly CollaborationEngineEffect[] {
-    const session = this.requireSession();
-    const definition = this.contributors.require(ownerId);
-    const operationId = `${session.clientId}:${this.nextOperationSequence++}`;
+    const session = this.#requireSession();
+    const definition = this.#contributors.require(ownerId);
+    const operationId = `${session.clientId}:${this.#nextOperationSequence++}`;
     const pending: PendingBatch = { operationId, ownerId, definition, operations: [...operations] };
-    this.pending.push(pending);
-    return this.pending.length === 1 ? [this.createSendEffect(pending)] : [];
+    this.#pending.push(pending);
+    return this.#pending.length === 1 ? [this.#createSendEffect(pending)] : [];
   }
 
   /** Applies one authority message and returns host/transport effects in deterministic order. */
   public receive(message: CollaborationServerMessage): readonly CollaborationEngineEffect[] {
-    const session = this.requireSession();
+    const session = this.#requireSession();
     if (message.protocolVersion !== CollaborationProtocolVersion || message.resourceId !== session.resourceId) {
       throw new CollaborationError(
         CollaborationErrorCode.InvalidProtocol,
@@ -96,40 +100,40 @@ export class CollaborationEngine {
         { resourceId: message.resourceId, expectedResourceId: session.resourceId },
       );
     }
-    if (message.kind === 'rejected') return this.handleRejected(message);
+    if (message.kind === 'rejected') return this.#handleRejected(message);
     if (message.kind === 'sync') {
-      if (message.fromRevision !== this.serverRevision) {
-        throw this.revisionGap(message.fromRevision);
+      if (message.fromRevision !== this.#serverRevision) {
+        throw this.#revisionGap(message.fromRevision);
       }
       const effects: CollaborationEngineEffect[] = [];
-      message.batches.forEach((batch) => effects.push(...this.receiveAccepted(batch)));
-      if (this.serverRevision !== message.serverRevision) throw this.revisionGap(message.serverRevision);
+      message.batches.forEach((batch) => effects.push(...this.#receiveAccepted(batch)));
+      if (this.#serverRevision !== message.serverRevision) throw this.#revisionGap(message.serverRevision);
       return effects;
     }
-    return this.receiveAccepted(message);
+    return this.#receiveAccepted(message);
   }
 
   public getRevision(): number {
-    return this.serverRevision;
+    return this.#serverRevision;
   }
 
   public getPendingCount(): number {
-    return this.pending.length;
+    return this.#pending.length;
   }
 
-  private receiveAccepted(batch: CollaborationAcceptedBatch): CollaborationEngineEffect[] {
-    if (batch.serverRevision <= this.serverRevision) return [];
-    if (batch.serverRevision !== this.serverRevision + 1) throw this.revisionGap(batch.serverRevision);
-    const definition = this.contributors.require(batch.ownerId, batch.operationType);
-    let remoteOperations = this.contributors.operations.decode(
+  #receiveAccepted(batch: CollaborationAcceptedBatch): CollaborationEngineEffect[] {
+    if (batch.serverRevision <= this.#serverRevision) return [];
+    if (batch.serverRevision !== this.#serverRevision + 1) throw this.#revisionGap(batch.serverRevision);
+    const definition = this.#contributors.require(batch.ownerId, batch.operationType);
+    let remoteOperations = this.#contributors.operations.decode(
       batch.operationType.id,
       batch.operationType.version,
       batch.payload,
     );
-    const ownIndex = this.pending.findIndex(({ operationId }) => operationId === batch.operationId);
+    const ownIndex = this.#pending.findIndex(({ operationId }) => operationId === batch.operationId);
     const effects: CollaborationEngineEffect[] = [];
     if (ownIndex === 0) {
-      const own = this.pending.shift();
+      const own = this.#pending.shift();
       if (
         !own ||
         own.ownerId !== batch.ownerId ||
@@ -141,9 +145,9 @@ export class CollaborationEngine {
           { operationId: batch.operationId },
         );
       }
-      this.serverRevision = batch.serverRevision;
-      const next = this.pending[0];
-      if (next) effects.push(this.createSendEffect(next));
+      this.#serverRevision = batch.serverRevision;
+      const next = this.#pending[0];
+      if (next) effects.push(this.#createSendEffect(next));
       return effects;
     }
     if (ownIndex > 0) {
@@ -153,8 +157,8 @@ export class CollaborationEngine {
         { operationId: batch.operationId },
       );
     }
-    for (const local of this.pending) {
-      const transformed = this.contributors.operations.transformPair(
+    for (const local of this.#pending) {
+      const transformed = this.#contributors.operations.transformPair(
         definition,
         remoteOperations,
         local.definition,
@@ -164,7 +168,7 @@ export class CollaborationEngine {
       remoteOperations = transformed.left;
       local.operations = transformed.right;
     }
-    this.serverRevision = batch.serverRevision;
+    this.#serverRevision = batch.serverRevision;
     if (remoteOperations.length > 0) {
       effects.push({
         kind: 'applyRemote',
@@ -176,7 +180,7 @@ export class CollaborationEngine {
     return effects;
   }
 
-  private handleRejected(message: CollaborationRejectedMessage): never {
+  #handleRejected(message: CollaborationRejectedMessage): never {
     throw new CollaborationError(CollaborationErrorCode.OperationRejected, message.message, {
       resourceId: message.resourceId,
       operationId: message.operationId,
@@ -184,8 +188,8 @@ export class CollaborationEngine {
     });
   }
 
-  private createSendEffect(pending: PendingBatch): CollaborationEngineEffect {
-    const session = this.requireSession();
+  #createSendEffect(pending: PendingBatch): CollaborationEngineEffect {
+    const session = this.#requireSession();
     return {
       kind: 'send',
       submission: {
@@ -196,22 +200,22 @@ export class CollaborationEngine {
         operationId: pending.operationId,
         ownerId: pending.ownerId,
         operationType: { id: pending.definition.id, version: pending.definition.version },
-        baseRevision: this.serverRevision,
-        payload: this.contributors.operations.encode(pending.definition, pending.operations),
+        baseRevision: this.#serverRevision,
+        payload: this.#contributors.operations.encode(pending.definition, pending.operations),
       },
     };
   }
 
-  private requireSession(): { resourceId: string; clientId: string } {
-    if (this.resourceId && this.clientId) return { resourceId: this.resourceId, clientId: this.clientId };
+  #requireSession(): { resourceId: string; clientId: string } {
+    if (this.#resourceId && this.#clientId) return { resourceId: this.#resourceId, clientId: this.#clientId };
     throw new CollaborationError(CollaborationErrorCode.EngineDisconnected, 'Collaboration engine is not connected.');
   }
 
-  private revisionGap(receivedRevision: number): CollaborationError {
+  #revisionGap(receivedRevision: number): CollaborationError {
     return new CollaborationError(
       CollaborationErrorCode.RevisionGap,
-      `Expected collaboration revision ${this.serverRevision + 1}, received ${receivedRevision}.`,
-      { expectedRevision: this.serverRevision + 1, receivedRevision },
+      `Expected collaboration revision ${this.#serverRevision + 1}, received ${receivedRevision}.`,
+      { expectedRevision: this.#serverRevision + 1, receivedRevision },
     );
   }
 }

@@ -179,10 +179,10 @@ class RecordingDocRenderContext extends MeasuredHeadlessRenderContext {
 }
 
 class FontAwareRecordingDocRenderContext extends RecordingDocRenderContext {
-  private activeFont = '16px sans-serif';
+  #activeFont = '16px sans-serif';
 
   public override setFont(font: string): void {
-    this.activeFont = font;
+    this.#activeFont = font;
     super.setFont(font);
   }
 
@@ -193,7 +193,7 @@ class FontAwareRecordingDocRenderContext extends RecordingDocRenderContext {
     fontDescent: number;
   } {
     this.calls.push({ name: 'measureText', args: [text] });
-    const fontSize = readFontSize(this.activeFont);
+    const fontSize = readFontSize(this.#activeFont);
     return {
       width: text.length * (fontSize / 10),
       height: fontSize,
@@ -1317,7 +1317,7 @@ describe('createDocEditor', () => {
     @Injectable()
     class HighlightTextStylePlugin extends DocPlugin<null> {
       public static readonly symbol = Symbol.for('HighlightTextStylePlugin');
-      private runtime: DocPluginRuntime | null = null;
+      #runtime: DocPluginRuntime | null = null;
 
       public constructor() {
         super({ key: new PluginKey('HighlightTextStylePlugin'), state: null });
@@ -1342,11 +1342,11 @@ describe('createDocEditor', () => {
       }
 
       public configure(context: DocPluginSetupContext): void {
-        this.runtime = context.runtime;
+        this.#runtime = context.runtime;
       }
 
       public registerCommands(commands: DocCommandBus): void {
-        commands.register(SetHighlightCommand, (input) => this.createSetHighlightCommand(input));
+        commands.register(SetHighlightCommand, (input) => this.#createSetHighlightCommand(input));
       }
 
       public registerState() {
@@ -1365,8 +1365,8 @@ describe('createDocEditor', () => {
         return null;
       }
 
-      private createSetHighlightCommand(input: { readonly color: string | null }) {
-        const runtime = this.runtime;
+      #createSetHighlightCommand(input: { readonly color: string | null }) {
+        const runtime = this.#runtime;
         if (!runtime) throw new Error('HighlightTextStylePlugin is not configured.');
         const mutation = runtime.document.inlineStyles.requireMutation('highlight');
         return {
@@ -2531,8 +2531,8 @@ describe('createDocEditor', () => {
     @Injectable()
     class SessionContributorPlugin extends DocPlugin<null> {
       public static readonly symbol = Symbol.for('SessionContributorPlugin');
-      private early = { value: 'default-early' };
-      private late = { value: 'default-late' };
+      #early = { value: 'default-early' };
+      #late = { value: 'default-late' };
 
       public constructor() {
         super({ key: new PluginKey('SessionContributorPlugin'), state: null });
@@ -2542,17 +2542,17 @@ describe('createDocEditor', () => {
         registry.register(lateState, {
           restorePhase: SessionStateRestorePhase.BeforeInitialize,
           restoreAfter: [earlyState],
-          capture: () => ({ ...this.late }),
+          capture: () => ({ ...this.#late }),
           restore: (state) => {
-            this.late = { ...state };
+            this.#late = { ...state };
             restoreOrder.push('late');
           },
         });
         registry.register(earlyState, {
           restorePhase: SessionStateRestorePhase.BeforeInitialize,
-          capture: () => ({ ...this.early }),
+          capture: () => ({ ...this.#early }),
           restore: (state) => {
-            this.early = { ...state };
+            this.#early = { ...state };
             restoreOrder.push('early');
           },
         });
@@ -2599,19 +2599,19 @@ describe('createDocEditor', () => {
     @Injectable()
     class ThirdPartyMutationPlugin extends DocPlugin<null> {
       public static readonly symbol = Symbol.for('ThirdPartyMutationPlugin');
-      private runtime: DocPluginRuntime | null = null;
+      #runtime: DocPluginRuntime | null = null;
 
       public constructor() {
         super({ key: new PluginKey('ThirdPartyMutationPlugin'), state: null });
       }
 
       public configure(context: DocPluginSetupContext): void {
-        this.runtime = context.runtime;
+        this.#runtime = context.runtime;
       }
 
       public registerCommands(commands: DocCommandBus): void {
-        commands.register(ThirdPartyInsertDocCommand, () => this.createInsertCommand(false));
-        commands.register(FailingThirdPartyInsertDocCommand, () => this.createInsertCommand(true));
+        commands.register(ThirdPartyInsertDocCommand, () => this.#createInsertCommand(false));
+        commands.register(FailingThirdPartyInsertDocCommand, () => this.#createInsertCommand(true));
       }
 
       public registerState() {
@@ -2630,8 +2630,8 @@ describe('createDocEditor', () => {
         return null;
       }
 
-      private createInsertCommand(failAfterStaging: boolean) {
-        const runtime = this.runtime;
+      #createInsertCommand(failAfterStaging: boolean) {
+        const runtime = this.#runtime;
         if (!runtime) throw new Error('ThirdPartyMutationPlugin is not configured.');
         const id = failAfterStaging ? FailingThirdPartyInsertDocCommand.id : ThirdPartyInsertDocCommand.id;
         return {

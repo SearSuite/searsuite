@@ -35,8 +35,8 @@ export class ItalicTextStylePlugin extends InlineTextStylePluginBase {
   }
 
   public override registerCommands(commands: DocCommandBus): void {
-    commands.register(SetDocItalicCommand, this.createSetItalicCommand.bind(this));
-    commands.register(ToggleDocItalicCommand, this.createToggleItalicCommand.bind(this));
+    commands.register(SetDocItalicCommand, this.#createSetItalicCommand.bind(this));
+    commands.register(ToggleDocItalicCommand, this.#createToggleItalicCommand.bind(this));
   }
 
   public override registerKeyboardHandlers({ bindings, commands }: DocKeyboardHandlerRegistrationContext): void {
@@ -45,25 +45,25 @@ export class ItalicTextStylePlugin extends InlineTextStylePluginBase {
     });
   }
 
-  private createSetItalicCommand(input: SetDocItalicInput) {
+  #createSetItalicCommand(input: SetDocItalicInput) {
     const italic = normalizeBoolean(input?.italic, 'SetDocItalicCommand.italic');
     return createDocCommand(SetDocItalicCommand.id, DocContentRenderPluginKey, () =>
-      this.createItalicTransaction(italic),
+      this.#createItalicTransaction(italic),
     );
   }
 
-  private createToggleItalicCommand() {
+  #createToggleItalicCommand() {
     return createDocCommand(ToggleDocItalicCommand.id, DocContentRenderPluginKey, () => {
       const runtime = this.requireRuntime();
       const state = runtime.document.input.getState();
       const patches = buildInlineTextRangePatchPlan(state.pendingDoc, state.docSelection, () => ({}));
       const allItalic =
         patches.length > 0 && patches.every((patch) => isItalic(readTextStyleAttrs(patch.oldNode.attrs)));
-      return this.createItalicTransaction(allItalic ? null : true);
+      return this.#createItalicTransaction(allItalic ? null : true);
     });
   }
 
-  private createItalicTransaction(italic: boolean | null) {
+  #createItalicTransaction(italic: boolean | null) {
     const runtime = this.requireRuntime();
     const mutation = runtime.document.inlineStyles.requireMutation(ItalicTextStyleKey.Italic);
     return runtime.document.input.createTransaction(
