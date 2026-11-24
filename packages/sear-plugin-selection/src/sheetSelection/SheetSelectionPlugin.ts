@@ -381,6 +381,7 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
 
   /** Handles the mouse down lifecycle event. */
   public onMouseDown(searCore: SearCoreSheet, event: EventWithOffsetAndTarget<CellProperties>): boolean | void {
+    if (event.target?.properties.region === CellRegion.Corner && (event.origin?.button ?? 0) !== 0) return;
     if (event.origin?.button === 2 && event.target) {
       const { region, startRowIndex, startColIndex } = event.target.properties;
       const range = this.getState()[1];
@@ -436,6 +437,22 @@ export class SheetSelectionPlugin extends Plugin<SearCoreSheet, CellProperties, 
     const { endRowIndex, endColIndex } = properties;
 
     const region = properties.region;
+    if (region === CellRegion.Corner) {
+      const geometry = readSheetGeometry(searCore.getDataEngine());
+      if (!geometry || !geometry.rowSizes.shape[1] || !geometry.columnSizes.shape[1]) return;
+      const first: Point = [0, 0];
+      this.executeSelectionCommand(
+        searCore,
+        first,
+        [geometry.rowSizes.shape[1] - 1, geometry.columnSizes.shape[1] - 1],
+        SheetSelectionSource.Pointer,
+        false,
+        first,
+        first,
+        SheetAdditionalSelectionMode.Clear,
+      );
+      return;
+    }
     if (region === CellRegion.RowHeader) {
       if (!Number.isSafeInteger(startRowIndex) || !Number.isSafeInteger(endRowIndex ?? startRowIndex)) return;
     } else if (region === CellRegion.ColumnHeader) {

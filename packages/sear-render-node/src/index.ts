@@ -43,7 +43,7 @@ export { CellVisualLayerNode } from './CellVisualLayerNode';
 export { CellVisualIconShape, CellVisualLayerShape, type CellVisualLayer, type CellVisualLabel } from './types';
 export { DashedLineNode } from './DashedLineNode';
 export { createDragGuideNode } from './createDragGuideNode';
-export { AffixNode, AffixTextNode } from './AffixNode';
+export { AffixNode, AffixTextNode, SheetCornerNode } from './AffixNode';
 export { SceneGraph } from './SceneGraph';
 export { StickyNode } from './StickyNode';
 export { TextNode } from './TextNode';

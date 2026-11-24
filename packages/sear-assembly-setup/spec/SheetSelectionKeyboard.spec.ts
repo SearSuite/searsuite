@@ -409,6 +409,22 @@ describe('Sheet selection keyboard regression', () => {
     }
   });
 
+  it('selects the full sheet with a single primary click on the corner from inside a data region', () => {
+    const { editor, core, selection } = createEditor(8, 5, (state) => {
+      state.sheetData.addItem(1, 2, { type: 'string', value: 'adjacent' });
+    });
+    try {
+      editor.commands.run(SelectRangeCommand, { anchor: [1, 1], focus: [1, 1] });
+      const target = { properties: { region: CellRegion.Corner } };
+      selection.onMouseDown(core, { target, origin: { button: 2 } } as never);
+      expect(editor.queries.run(GetSelection, undefined)).toEqual({ start: [1, 1], end: [1, 1] });
+      selection.onMouseDown(core, { target, origin: { button: 0 } } as never);
+      expect(editor.queries.run(GetSelection, undefined)).toEqual({ start: [0, 0], end: [7, 4] });
+    } finally {
+      editor.destroy();
+    }
+  });
+
   it('BUG-936 keeps the selected range when right-clicking inside it', () => {
     const { editor, core, selection } = createEditor(5, 4);
     try {

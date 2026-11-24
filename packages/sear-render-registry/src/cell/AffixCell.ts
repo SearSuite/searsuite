@@ -1,5 +1,5 @@
-import { Node, AffixNode, AffixTextNode } from '@searsuite/sear-render-node';
-import { Cell, CellProperties, CellRenderType } from '../Cell';
+import { Node, AffixNode, AffixTextNode, SheetCornerNode } from '@searsuite/sear-render-node';
+import { Cell, CellProperties, CellRegion, CellRenderType } from '../Cell';
 import { extractRichText } from './DisplayTextUtils';
 import type { SheetDocumentNode } from '@searsuite/sear-sheet-editor-contract';
 
@@ -13,11 +13,11 @@ export class AffixCell extends Cell<CellProperties<string | number | null | Shee
     | Node<CellProperties<string | number | null | SheetDocumentNode>>
     | Node<CellProperties<string | number | null | SheetDocumentNode>>[] {
     const { positionRect, properties } = this;
+    const node = properties.region === CellRegion.Corner
+      ? new SheetCornerNode(positionRect, properties)
+      : new AffixNode(positionRect, properties);
     const text = this.getDisplayText();
-
-    if (!text) return new AffixNode(positionRect, properties);
-
-    return new AffixNode(positionRect, properties).add(new AffixTextNode(text, positionRect, properties));
+    return text ? node.add(new AffixTextNode(text, positionRect, properties)) : node;
   }
 
   /** Returns plain display text for numeric/string labels and rich header content. */
