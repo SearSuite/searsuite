@@ -152,7 +152,7 @@
  * }
  * ```
  *
- * The [browser Canvas example](https://github.com/SearSuite/searsuite-example/blob/main/src/canvas.ts) illustrates
+ * The [npm Workbook example](https://github.com/SearSuite/searsuite-browser/blob/main/examples/npm/src/workbook.ts) illustrates
  * host assembly with Web adapters. Headless assembly does not require visual host adapters.
  */
 
