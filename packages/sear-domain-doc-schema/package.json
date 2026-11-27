@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-domain-doc-schema",
   "description": "Defines the JSON document format shared by standalone and embedded rich-text editors.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

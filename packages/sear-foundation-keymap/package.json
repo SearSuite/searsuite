@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-foundation-keymap",
   "description": "Defines portable key values, chords, and keyboard binding contracts.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

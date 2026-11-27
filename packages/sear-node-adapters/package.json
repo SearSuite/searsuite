@@ -1,6 +1,6 @@
 {
   "name": "@searsuite/sear-node-adapters",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -8,11 +8,17 @@
     "directory": "packages/sear-node-adapters"
   },
   "homepage": "https://searsuite.com/",
-  "keywords": ["searsuite", "nodejs", "platform-adapters"],
+  "keywords": [
+    "searsuite",
+    "nodejs",
+    "platform-adapters"
+  ],
   "description": "Node platform and web-service adapters for SearSuite.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "pnpm run clean && pnpm run compile",
     "clean": "rimraf ./dist",
@@ -23,7 +29,10 @@
     "@searsuite/sear-foundation-platform": "workspace:*"
   },
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
     "./package.json": "./package.json"
   }
 }

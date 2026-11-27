@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-foundation-common",
   "description": "Provides small shared values and contracts without package-specific dependencies.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

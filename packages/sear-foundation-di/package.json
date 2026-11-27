@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-foundation-di",
   "description": "Provides editor-scoped dependency injection with explicit ownership and borrowed instances.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

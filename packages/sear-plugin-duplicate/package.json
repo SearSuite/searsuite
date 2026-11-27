@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-plugin-duplicate",
   "description": "Adds sparse duplicate highlights and duplicate-row commands.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

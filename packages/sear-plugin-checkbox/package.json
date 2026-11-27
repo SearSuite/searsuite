@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-plugin-checkbox",
   "description": "Adds a portable checkbox cell type and typed Sheet commands.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

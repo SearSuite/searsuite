@@ -8,9 +8,7 @@ SearSuite's underlying architecture supports AI-assisted editing, allowing peopl
 
 ## Get started with SearSuite
 
-SearSuite provides TypeScript modules for building spreadsheet experiences that people and AI agents can edit together. Use matching package releases to run a Sheet, a multi-Sheet Workbook or a Node.js Headless editor. The browser examples share one application adapter file.
-
-This Quickstart follows the current source API. The independent state and Workbook kernel packages require an updated npm release; the previously published 0.0.1 set does not provide this API.
+SearSuite provides TypeScript modules for building spreadsheet experiences that people and AI agents can edit together. Use the published 0.0.2 packages to run a Sheet, a multi-Sheet Workbook or a Node.js Headless editor. The browser examples share one application adapter file.
 
 <a id="choose-editor"></a>
 
@@ -33,20 +31,20 @@ npm create vite@6 my-searsuite-app -- --template vanilla-ts
 cd my-searsuite-app
 npm install
 npm install \
-  @searsuite/sear-assembly-setup \
-  @searsuite/sear-assembly-workbook \
-  @searsuite/sear-assembly-workbook-kernel \
-  @searsuite/sear-assembly-sheet-state \
-  @searsuite/sear-assembly-sheet-kernel \
-  @searsuite/sear-domain-workbook \
-  @searsuite/sear-browser-adapters \
-  @searsuite/sear-plugin-web-toolbar \
-  @searsuite/sear-plugin-web-sheet-tabbar \
-  @searsuite/sear-assembly-sheet-doc \
-  @searsuite/sear-render-scroll
+  @searsuite/sear-assembly-setup@0.0.2 \
+  @searsuite/sear-assembly-workbook@0.0.2 \
+  @searsuite/sear-assembly-workbook-kernel@0.0.2 \
+  @searsuite/sear-assembly-sheet-state@0.0.2 \
+  @searsuite/sear-assembly-sheet-kernel@0.0.2 \
+  @searsuite/sear-domain-workbook@0.0.2 \
+  @searsuite/sear-browser-adapters@0.0.2 \
+  @searsuite/sear-plugin-web-toolbar@0.0.2 \
+  @searsuite/sear-plugin-web-sheet-tabbar@0.0.2 \
+  @searsuite/sear-assembly-sheet-doc@0.0.2 \
+  @searsuite/sear-render-scroll@0.0.2
 ```
 
-For an existing application, run only the package install command in its project directory. Keep all example dependencies pinned to the tested `0.0.1` release set. A newer source checkout does not change packages already installed from npm.
+For an existing application, run only the package install command in its project directory. Keep all example dependencies pinned to the tested `0.0.2` release set. A newer source checkout does not change packages already installed from npm.
 
 <a id="create-page"></a>
 
@@ -338,7 +336,7 @@ Headless can run independently of the browser application. In a new directory, i
 mkdir searsuite-headless
 cd searsuite-headless
 npm init -y
-npm install @searsuite/sear-assembly-headless @searsuite/sear-assembly-sheet-state @searsuite/sear-assembly-sheet-kernel @searsuite/sear-plugin-formula
+npm install @searsuite/sear-assembly-headless@0.0.2 @searsuite/sear-assembly-sheet-state@0.0.2 @searsuite/sear-assembly-sheet-kernel@0.0.2 @searsuite/sear-plugin-formula@0.0.2
 ```
 
 Create `headless.mjs`, then run `node headless.mjs`:
@@ -378,7 +376,7 @@ The browser entries define `destroy()` and register it with Vite hot updates. In
 
 Browser edits remain in memory and a page reload restores the seed data. `ExportSheetStateCommand` and `ExportWorkbookStateCommand` return runtime snapshots, not a durable file format. Use `serializeSheetDocumentState()` or `serializeWorkbookDocumentState()` before JSON encoding, then the matching `deserialize*DocumentState()` before creating a new editor. Your application owns storage. Additional state-owning plugins must supply their document codecs; CSV/XLSX import, server persistence and collaboration are not configured here.
 
-The published `0.0.1` default assembly can emit duplicate plugin-depth and startup command-boundary warnings. The examples retain those diagnostics. They do not require adding a second history plugin or suppressing warnings. See the [example README](https://github.com/SearSuite/searsuite-browser/tree/main/examples/npm#plugins-and-lifecycle) for default plugins, cleanup and the scope of the npm checks.
+The default assembly installs its own feature bundle and Workbook history. Do not add a second history plugin or suppress runtime diagnostics. See the [example README](https://github.com/SearSuite/searsuite-browser/tree/main/examples/npm#plugins-and-lifecycle) for default plugins, cleanup and the scope of the npm checks.
 
 ## Repository
 

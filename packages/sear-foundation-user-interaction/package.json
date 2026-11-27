@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-foundation-user-interaction",
   "description": "Defines portable interaction state for host input and editor behavior.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

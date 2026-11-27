@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-foundation-utils",
   "description": "Provides general-purpose algorithms and guards.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

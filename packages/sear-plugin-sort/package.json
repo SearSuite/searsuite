@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-plugin-sort",
   "description": "Provides Sheet range sorting and stable sparse row permutation helpers.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

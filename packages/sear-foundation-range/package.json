@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-foundation-range",
   "description": "Provides range primitives and normalization helpers for Sheet and Doc.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

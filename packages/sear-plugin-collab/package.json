@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-plugin-collab",
   "description": "Connects committed editor transactions to host collaboration transports.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

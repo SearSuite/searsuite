@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-plugin-resize",
   "description": "Adds Sheet row and column sizing, resize interaction, rendering, and persistence.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

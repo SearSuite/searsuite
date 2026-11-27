@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-render-scroll",
   "description": "Provides logical scrolling, axis locking, boundary feedback, and host scroller adapters.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

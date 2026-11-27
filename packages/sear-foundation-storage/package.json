@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-foundation-storage",
   "description": "Defines key-value storage contracts and in-memory adapters.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [
