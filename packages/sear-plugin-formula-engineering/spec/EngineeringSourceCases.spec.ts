@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import type { EvalContext, FormulaValue } from '@searsuite/sear-domain-formula-engine';
+import type { EvalContext } from '@searsuite/sear-domain-formula-engine';
 import {
   AggregationCache,
   FormulaEvaluator,

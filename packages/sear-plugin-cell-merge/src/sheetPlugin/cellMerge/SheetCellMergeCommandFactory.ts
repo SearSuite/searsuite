@@ -3,7 +3,7 @@ import {
   PipelineExecutionCommand,
   TransactionPipelineCommand,
 } from '@searsuite/sear-assembly-commands';
-import { Pipeline } from '@searsuite/sear-assembly-core';
+import { Pipeline } from '@searsuite/sear-assembly-plugin';
 import { createUpdateCellOTOperation, type UpdateCellOTOperation } from '@searsuite/sear-domain-ot';
 import { deepEqual } from '@searsuite/sear-foundation-utils';
 import {

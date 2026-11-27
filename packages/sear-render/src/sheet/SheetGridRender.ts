@@ -1,11 +1,12 @@
+import { ViewExtensionBase } from '@searsuite/sear-render-event-engine';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { Injectable, Inject } from '@searsuite/sear-foundation-di';
 import { SearCoreSheet } from '@searsuite/sear-assembly-core';
-import { Operation } from '@searsuite/sear-domain-ot';
-import { PluginKey, Plugin } from '@searsuite/sear-assembly-plugin';
+
+import { PluginKey } from '@searsuite/sear-assembly-plugin';
 import { ConfigUnit } from '@searsuite/sear-assembly-config';
 import { CellProperties, CellRegion, EmptyCell, SheetCellVisualReaderRegistry } from '@searsuite/sear-render-registry';
-import { readSheetDataMatrix } from '@searsuite/sear-render-engine';
+import { readSheetDataMatrix } from '@searsuite/sear-domain-sheet';
 import { readSheetCellMerges } from '@searsuite/sear-plugin-cell-merge';
 import { PositionRect } from '@searsuite/sear-foundation-rect';
 import { CellVisualLayerNode, Node } from '@searsuite/sear-render-node';
@@ -27,36 +28,21 @@ const sheetGridRenderPluginRenderConfig = {
 
 /** Renders visible sheet body cells. */
 @Injectable()
-export class SheetGridRender extends Plugin<SearCoreSheet, CellProperties, ISheetGridRender> {
+export class SheetGridRender extends ViewExtensionBase<SearCoreSheet, CellProperties> {
   readonly #cellVisualReaders: SheetCellVisualReaderRegistry;
 
-  /** Registers the stateless body grid renderer with PluginManager. */
-  public registerState(): { key: PluginKey; state: ISheetGridRender } {
-    return { key: this.key, state: this.getState() };
-  }
-
   /** Reads the body grid render configuration from ConfigEngine. */
-  public getPluginConfig(searCore: SearCoreSheet): typeof sheetGridRenderPluginRenderConfig {
-    return searCore.configEngine.getPluginConfig(this.key) as typeof sheetGridRenderPluginRenderConfig;
+  public getConfig(searCore: SearCoreSheet): typeof sheetGridRenderPluginRenderConfig {
+    return searCore.configEngine.getConfig(this.key) as typeof sheetGridRenderPluginRenderConfig;
   }
 
   /** DI token for resolving the body grid renderer. */
   public static readonly symbol: symbol = Symbol.for('SheetGridRender');
 
   /** Constructs the body grid renderer. */
-  constructor(
-    @Inject(SheetCellVisualReaderRegistry.symbol) cellVisualReaders: SheetCellVisualReaderRegistry,
-  ) {
-    super({
-      key: new PluginKey(),
-      state: {},
-    });
+  constructor(@Inject(SheetCellVisualReaderRegistry.symbol) cellVisualReaders: SheetCellVisualReaderRegistry) {
+    super(new PluginKey());
     this.#cellVisualReaders = cellVisualReaders;
-  }
-
-  /** Returns unchanged renderer state for every operation list. */
-  public apply(operations: Operation[]) {
-    return this.getState();
   }
 
   /** Handles double-click interactions on grid cells. */
@@ -90,7 +76,7 @@ export class SheetGridRender extends Plugin<SearCoreSheet, CellProperties, IShee
     }
     const freeze = readSheetFreeze(dataEngine);
 
-    const pluginConfig = searCore.configEngine.getPluginConfig(this.key) as typeof sheetGridRenderPluginRenderConfig;
+    const pluginConfig = searCore.configEngine.getConfig(this.key) as typeof sheetGridRenderPluginRenderConfig;
     const { renderCoordinatorManager } = searCore.renderEngine;
     const rects = [];
 

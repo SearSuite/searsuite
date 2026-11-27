@@ -7,7 +7,6 @@ import {
   type EvalContext,
   type FormulaValue,
   FormulaErrorCode,
-  FormulaNodeKind,
   createFormulaError,
 } from '@searsuite/sear-domain-formula-engine';
 

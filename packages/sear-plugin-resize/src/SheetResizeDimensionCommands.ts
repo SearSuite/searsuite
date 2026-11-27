@@ -6,13 +6,7 @@ import {
   TransactionPipelineCommand,
 } from '@searsuite/sear-assembly-commands';
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
-import {
-  createResizeColOTOperation,
-  createResizeRowOTOperation,
-  type Operation,
-  type ResizeColOTOperation,
-  type ResizeRowOTOperation,
-} from '@searsuite/sear-domain-ot';
+import { createResizeColOTOperation, createResizeRowOTOperation, type Operation } from '@searsuite/sear-domain-ot';
 
 /** One explicit dimension change used by batch resize commands. */
 export interface SheetDimensionResizeInput {

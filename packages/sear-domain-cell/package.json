@@ -23,14 +23,12 @@
   },
   "dependencies": {
     "@searsuite/sear-domain-cell-types": "workspace:*",
+    "@searsuite/sear-domain-doc": "workspace:*",
+    "@searsuite/sear-domain-doc-schema": "workspace:*",
     "@searsuite/sear-domain-formula-engine": "workspace:*",
     "@searsuite/sear-domain-formula-engine-ts": "workspace:*",
     "@searsuite/sear-foundation-di": "workspace:*",
-    "@searsuite/sear-foundation-platform": "workspace:*",
-    "@searsuite/sear-foundation-rect": "workspace:*",
-    "@searsuite/sear-render-registry": "workspace:*",
-    "@searsuite/sear-domain-doc": "workspace:*",
-    "@searsuite/sear-domain-doc-schema": "workspace:*"
+    "@searsuite/sear-foundation-platform": "workspace:*"
   },
   "exports": {
     ".": {

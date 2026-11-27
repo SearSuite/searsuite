@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@searsuite/sear-foundation-di';
-import { runOutsideCommandExecution } from '@searsuite/sear-assembly-core';
+import { runOutsideCommandExecution } from '@searsuite/sear-assembly-plugin';
 import { Platform } from '@searsuite/sear-foundation-platform';
 import { SearError } from '@searsuite/sear-foundation-error';
 import {

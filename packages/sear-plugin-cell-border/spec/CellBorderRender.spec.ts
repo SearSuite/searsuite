@@ -1,10 +1,10 @@
 import { HeadlessRenderContext } from '@searsuite/sear-render-context';
 import { RowShapeDimensionsCSRMatrix, ColumnShapeDimensionsCSRMatrix } from '@searsuite/sear-domain-matrix';
-import { SheetRowSizesFieldKey, SheetColumnSizesFieldKey } from '@searsuite/sear-render-engine';
+import { SheetRowSizesFieldKey, SheetColumnSizesFieldKey } from '@searsuite/sear-domain-sheet';
 import { CellMergeMatrix, SheetCellMergeFieldKey } from '@searsuite/sear-plugin-cell-merge';
 import { CellBorderMatrix, SheetBorderLineStyle, BorderLinePaint } from '../src';
-import { CellBorderLineNode } from '../src/CellBorderLineNode';
-import { renderCellBorders } from '../src/renderCellBorders';
+import { CellBorderLineNode } from '@searsuite/sear-render';
+import { renderCellBorders } from '@searsuite/sear-render';
 import { planCellBorders } from '../src/CellBorderPlanning';
 import { SheetBorderPreset } from '../src';
 import { MatrixOT } from '@searsuite/sear-domain-ot';
@@ -39,11 +39,23 @@ describe('Border rendering', () => {
       const lineTo = jest.spyOn(context, 'lineTo');
       new CellBorderLineNode(line, { color: '#ff0000', style: SheetBorderLineStyle.Double }).drawScene(context);
       if (line.y1 === line.y2) {
-        expect(moveTo.mock.calls).toEqual([[50, 22], [50, 26]]);
-        expect(lineTo.mock.calls).toEqual([[150, 22], [150, 26]]);
+        expect(moveTo.mock.calls).toEqual([
+          [50, 22],
+          [50, 26],
+        ]);
+        expect(lineTo.mock.calls).toEqual([
+          [150, 22],
+          [150, 26],
+        ]);
       } else {
-        expect(moveTo.mock.calls).toEqual([[48, 24], [52, 24]]);
-        expect(lineTo.mock.calls).toEqual([[48, 48], [52, 48]]);
+        expect(moveTo.mock.calls).toEqual([
+          [48, 24],
+          [52, 24],
+        ]);
+        expect(lineTo.mock.calls).toEqual([
+          [48, 48],
+          [52, 48],
+        ]);
       }
     }
   });

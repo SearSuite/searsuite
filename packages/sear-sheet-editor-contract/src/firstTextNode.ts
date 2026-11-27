@@ -1,5 +1,5 @@
 import type { Schema } from '@searsuite/sear-domain-doc-schema';
-import type { SheetTextPosition } from './SheetEditorTypes';
+import type { SheetTextPosition } from '@searsuite/sear-assembly-doc';
 
 /** Finds the first text leaf used by the deterministic Fake editor. */
 export function firstTextNode(document: Schema[]): { node: Schema; path: SheetTextPosition['path'] } | null {

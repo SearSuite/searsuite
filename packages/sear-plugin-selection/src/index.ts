@@ -26,7 +26,7 @@
 /**
  * @referenceChapter 1 selection-session Distinguish selection state from its visual highlight
  * @referenceBody
- * Selection has document-facing operations, local navigation state, and a render projection. `SheetHighlightPlugin`
+ * Selection has document-facing operations, local navigation state, and a render projection. `SheetHighlightView`
  * draws the current range and can combine additional highlight providers; it does not become the owner of the
  * selected range. `EnsureSelectionVisibleCommand` asks the viewport to reveal the selection after navigation.
  *
@@ -42,7 +42,6 @@ export {
 export {
   EnsureSelectionVisibleCommand,
   SelectRangeCommand,
-  RestartSheetSelectionNavigationCommand,
   SheetAdditionalSelectionMode,
   type SheetEnsureSelectionVisibleInput,
   type SheetSelectRangeInput,
@@ -52,7 +51,6 @@ export {
   ClearSelectedContentsCommand,
   registerSelectionQueries,
 } from './SheetSelectionCommands';
-export { SheetHighlightPlugin } from './sheetHighlight/SheetHighlightPlugin';
 export { GetActiveCell } from './GetActiveCell';
 export {
   SheetSelectionInteractionName,
@@ -64,24 +62,11 @@ export {
   registerSheetSelectionInteractionReducers,
   type SelectionChangedInteractionSignal,
 } from './SheetSelectionInteractionReducer';
-export { SheetHighlightPipelineStepName } from './SheetHighlightPipelineNames';
-export { SheetSelectionRenderSemantics } from './SheetSelectionRenderSemantics';
-export {
-  SheetHighlightRegistry,
-  SheetHighlightEdge,
-  type SheetHighlightContext,
-  type SheetHighlightProvider,
-  type SheetRangeHighlight,
-} from './SheetHighlightRegistry';
 export { MoveSheetRangeCommand, GetSheetRangeMoveConflict, type MoveSheetRangeInput } from './SheetRangeMoveCommands';
 export { AnalyzeSheetRangeMove } from './AnalyzeSheetRangeMove';
 export { SheetRangeMoveError, SheetRangeMoveErrorCode } from './SheetRangeMoveError';
-export { SheetRangeDrag } from './SheetRangeDrag';
 export { FillSheetRangeCommand, type SheetFillRangeInput } from './SheetFillRangeCommand';
 export { SheetDragAxis } from './SheetDragAxis';
-export { HandleSheetRangeDragCommand, SheetRangeDragAction, type SheetRangeDragInput } from './SheetRangeDragCommand';
-export {
-  HandleSheetSelectionPointerCommand,
-  SheetSelectionPointerAction,
-  type SheetSelectionPointerInput,
-} from './SheetSelectionPointerCommand';
+
+export { type SheetSelectionOptions } from './SheetSelectionOptions';
+export { type SheetAxisDragDestination, commitAxisDrag } from './SheetAxisDrag';

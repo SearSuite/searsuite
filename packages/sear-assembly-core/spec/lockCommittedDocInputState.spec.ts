@@ -1,6 +1,6 @@
 import { RichDocNode } from '@searsuite/sear-domain-doc';
-import { adoptCommittedDocInputState, lockCommittedDocInputState } from '../src/lockCommittedDocInputState';
-import { type DocInputState } from '../src/DocInputPlugin';
+import { adoptCommittedDocInputState, lockCommittedDocInputState } from '@searsuite/sear-assembly-doc';
+import { type DocInputState } from '@searsuite/sear-assembly-doc';
 
 it('revalidates a document after a rejected lock attempt', () => {
   const attrs: Record<string, unknown> = { invalid: () => void 0 };
@@ -18,15 +18,23 @@ it('revalidates a document after a rejected lock attempt', () => {
   lockCommittedDocInputState(state);
 
   expect(Object.isFrozen(state)).toBe(true);
-  expect(() => { attrs['changed'] = true; }).toThrow();
+  expect(() => {
+    attrs['changed'] = true;
+  }).toThrow();
 });
 
 it('detaches retained node-private data and reuses the document for selection changes', () => {
   class OpaqueNode extends RichDocNode {
     #hidden = 1;
-    public constructor() { super('paragraph'); }
-    public readHidden(): number { return this.#hidden; }
-    public changeHidden(value: number): void { this.#hidden = value; }
+    public constructor() {
+      super('paragraph');
+    }
+    public readHidden(): number {
+      return this.#hidden;
+    }
+    public changeHidden(value: number): void {
+      this.#hidden = value;
+    }
   }
   const node = new OpaqueNode();
   const state: DocInputState = {
@@ -45,7 +53,9 @@ it('detaches retained node-private data and reuses the document for selection ch
   expect(adopted.pendingDoc).not.toBe(state.pendingDoc);
   expect(next.pendingDoc).toBe(adopted.pendingDoc);
   expect(() => (adopted.pendingDoc[0] as OpaqueNode).readHidden()).toThrow();
-  expect(() => { adopted.pendingDoc[0].type = 'changed'; }).toThrow();
+  expect(() => {
+    adopted.pendingDoc[0].type = 'changed';
+  }).toThrow();
 });
 
 it('rejects opaque mutable values in document attributes', () => {
@@ -60,15 +70,20 @@ it('rejects opaque mutable values in document attributes', () => {
 
 it('does not retain virtual attributes backed by plugin-owned mutable data', () => {
   class ParagraphNode extends RichDocNode {
-    public constructor() { super('paragraph'); }
+    public constructor() {
+      super('paragraph');
+    }
   }
   const external = { value: 1 };
   const node = new ParagraphNode();
-  node.attrs = new Proxy<{ stored: number; virtual?: number }>({ stored: 1 }, {
-    get(target, key, receiver) {
-      return key === 'virtual' ? external.value : Reflect.get(target, key, receiver);
+  node.attrs = new Proxy<{ stored: number; virtual?: number }>(
+    { stored: 1 },
+    {
+      get(target, key, receiver) {
+        return key === 'virtual' ? external.value : Reflect.get(target, key, receiver);
+      },
     },
-  });
+  );
   const state: DocInputState = {
     pendingDoc: [node],
     docSelection: { anchor: { path: [0, 0], offset: 0 }, head: { path: [0, 0], offset: 0 } },

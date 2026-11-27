@@ -1,7 +1,7 @@
 import { defineSheetCommand, type SheetCommandResult } from '@searsuite/sear-assembly-commands';
 import { type DocCursorDirection } from '@searsuite/sear-domain-commands';
 import { type Point } from '@searsuite/sear-foundation-rect';
-import { type TextInputEvent } from '@searsuite/sear-render-input';
+import { type TextInputEvent } from '@searsuite/sear-domain-commands';
 import { type FormulaEditDraft } from './formulaAssist/FormulaReferencePick';
 import { type PickedReferenceKind } from './formulaAssist/formatPickedReference';
 import {
@@ -36,6 +36,8 @@ export interface SheetCommitCellEditInput {
   readonly historyGroup?: SheetCommandResult['historyGroup'];
   /** Applies the entered value to every cell in the current selected rectangle. */
   readonly fillSelection?: boolean;
+  /** Measured minimum row height supplied by a view that expands multiline content. */
+  readonly minimumRowHeight?: number | undefined;
   readonly nextSelection?: SheetCellEditSelectionInput;
   readonly pipelineName?: SheetCellEditorPipelineName;
 }
@@ -86,13 +88,6 @@ export interface SheetInlineStyleCommandInput {
   readonly attrs: Readonly<Record<string, unknown>>;
 }
 
-/** Pointer selection update inside an active embedded editor. */
-export interface SheetCellEditorPointerInput {
-  readonly type: 'pointerDown' | 'pointerMove';
-  readonly point: { readonly x: number; readonly y: number };
-  readonly clickCount?: number;
-}
-
 /** Formula reference replacement while an edit session is active. */
 export interface SheetFormulaReferenceReplacementInput {
   readonly reference: string;
@@ -118,22 +113,8 @@ export const InsertCurrentDateTimeCommand = defineSheetCommand<'date' | 'time'>(
 /** Command that cancels the active cell edit session. */
 export const CancelCellEditCommand = defineSheetCommand<SheetCancelCellEditInput | void>('cell.cancelEdit');
 
-/** Command that requests a render pass for the cell editor overlay. */
-export const RequestCellEditorRenderCommand = defineSheetCommand('cellEditor.requestRender');
-
 /** Command that executes local document input while editing a cell. */
 export const HandleDocumentInputCommand = defineSheetCommand<SheetDocumentInputCommandInput>('document.input');
-
-/** Updates the embedded editor's cursor or drag selection. */
-export const HandleCellEditorPointerCommand = defineSheetCommand<SheetCellEditorPointerInput>('cellEditor.pointer');
-
-/** Starts the local text-selection drag after the pointer command succeeds. */
-export const BeginCellEditorDragSelectionCommand = defineSheetCommand('cellEditor.beginDragSelection');
-
-/** Ends the local text-selection drag and optionally releases pointer capture. */
-export const EndCellEditorDragSelectionCommand = defineSheetCommand<{ readonly disposeCapture: boolean }>(
-  'cellEditor.endDragSelection',
-);
 
 /** Replaces the picked formula reference in the active edit session. */
 export const ReplaceFormulaReferenceCommand = defineSheetCommand<SheetFormulaReferenceReplacementInput>(
@@ -159,9 +140,7 @@ export type FormulaSuggestionMove =
   | { readonly direction: -1 | 1; readonly step?: 'item' | 'page' }
   | { readonly boundary: 'start' | 'end' };
 
-export const MoveFormulaSuggestionCommand = defineSheetCommand<FormulaSuggestionMove>(
-  'formula.moveSuggestion',
-);
+export const MoveFormulaSuggestionCommand = defineSheetCommand<FormulaSuggestionMove>('formula.moveSuggestion');
 
 /** Updates the formula-assist anchor after editor layout changes. */
 export const UpdateFormulaAssistAnchorCommand = defineSheetCommand<{ readonly x: number; readonly y: number }>(
@@ -189,8 +168,28 @@ export const SetFormulaBarDraftCommand = defineSheetCommand<{
 
 /** Routes formula-bar keys through the same edit and navigation behavior as grid input. */
 export type SheetFormulaBarKeyInput =
-  | { readonly action: 'enter'; readonly shiftKey: boolean; readonly primaryModifier: boolean }
-  | { readonly action: 'tab'; readonly shiftKey: boolean }
-  | { readonly action: 'softEnter' | 'suggestionUp' | 'suggestionDown' | 'suggestionPageUp' | 'suggestionPageDown' | 'suggestionHome' | 'suggestionEnd' | 'escape' };
+  | {
+      readonly action: 'enter';
+      readonly shiftKey: boolean;
+      readonly primaryModifier: boolean;
+      readonly minimumRowHeight?: number | undefined;
+    }
+  | { readonly action: 'tab'; readonly shiftKey: boolean; readonly minimumRowHeight?: number | undefined }
+  | {
+      readonly action:
+        | 'softEnter'
+        | 'suggestionUp'
+        | 'suggestionDown'
+        | 'suggestionPageUp'
+        | 'suggestionPageDown'
+        | 'suggestionHome'
+        | 'suggestionEnd'
+        | 'escape';
+    };
 
 export const HandleFormulaBarKeyCommand = defineSheetCommand<SheetFormulaBarKeyInput>('cellEditor.formulaBar.key');
+
+/** Publishes a committed draft projection update. */
+export const PublishCellEditDraftCommand = defineSheetCommand('cellEditor.publishDraft');
+/** Synchronizes the edit model after a command-owned text-selection change. */
+export const SynchronizeCellEditModelCommand = defineSheetCommand('cellEditor.synchronizeModel');

@@ -1,4 +1,8 @@
-import { SheetRangeMoveRegistry, SheetRangeReorderRegistry, isPointInSheetMoveRange } from '@searsuite/sear-assembly-plugin';
+import {
+  SheetRangeMoveRegistry,
+  SheetRangeReorderRegistry,
+  isPointInSheetMoveRange,
+} from '@searsuite/sear-assembly-plugin';
 import { createMatrixRangeMoveOperations, hasMatrixRangeMoveConflict } from '@searsuite/sear-domain-matrix';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { SheetMergeRangeMoveError } from '../../SheetMergeRangeMoveError';
@@ -27,9 +31,8 @@ import {
 import { Transaction } from '@searsuite/sear-domain-transaction';
 import { Injectable } from '@searsuite/sear-foundation-di';
 import { Rect } from '@searsuite/sear-foundation-rect';
-import { Node } from '@searsuite/sear-render-node';
-import { CellProperties } from '@searsuite/sear-render-registry';
-import { SheetDataFieldNamespace } from '@searsuite/sear-render-engine';
+
+import { SheetDataFieldNamespace } from '@searsuite/sear-domain-sheet';
 import { CellMergeMatrix, type SheetCellMerge } from '../../CellMergeMatrix';
 import {
   registerSheetCellMergeCommands,
@@ -46,10 +49,10 @@ const pluginKey = new PluginKey('SheetCellMergePlugin');
 
 /** Owns sparse merged-cell state, commands, structure projection, collaboration, and export. */
 @Injectable()
-export class SheetCellMergePlugin extends Plugin<unknown, CellProperties, SheetCellMergePluginState> {
+export class SheetCellMergePlugin extends Plugin<SheetCellMergePluginState> {
   readonly #cellContent: SheetCellMergeContentSource | undefined;
 
-  public override readonly warnOnDuplicateDepth = false;
+  public readonly warnOnDuplicateDepth = false;
   public override readonly transactionOT = {
     ownerId: 'sheet.cellMerge',
     definition: MatrixTransactionOT,
@@ -165,8 +168,12 @@ export class SheetCellMergePlugin extends Plugin<unknown, CellProperties, SheetC
         for (const merge of this.getState().cellMerges.getRanges()) {
           const start = merge.getPoint(0);
           const end = merge.getPoint(1);
-          if (start[0] <= range.end[0] && end[0] >= range.start[0] &&
-              start[1] <= range.end[1] && end[1] >= range.start[1]) {
+          if (
+            start[0] <= range.end[0] &&
+            end[0] >= range.start[0] &&
+            start[1] <= range.end[1] &&
+            end[1] >= range.start[1]
+          ) {
             throw new SearError('Cannot sort a range intersecting merged cells.', { range, merge: [start, end] });
           }
         }
@@ -225,25 +232,25 @@ export class SheetCellMergePlugin extends Plugin<unknown, CellProperties, SheetC
     });
     return changed ? pluginState : null;
   }
-
-  public getPluginConfig(): null {
-    return null;
-  }
-
-  public render(): Node<CellProperties>[] {
-    return [];
-  }
 }
 
 function applyStructureToRanges(ranges: Rect[], operation: MatrixStructureOTOperation<unknown>): void {
   ranges.forEach((range) => {
     const start = range.getPoint(0);
     const end = range.getPoint(1);
-    if (MatrixOTActionName.RowInsert in operation && operation.ri !== void 0 &&
-      operation.p[0] === end[0] && start[0] < end[0]) {
+    if (
+      MatrixOTActionName.RowInsert in operation &&
+      operation.ri !== void 0 &&
+      operation.p[0] === end[0] &&
+      start[0] < end[0]
+    ) {
       end[0] += 1;
-    } else if (MatrixOTActionName.ColInsert in operation && operation.ci !== void 0 &&
-      operation.p[0] === end[1] && start[1] < end[1]) {
+    } else if (
+      MatrixOTActionName.ColInsert in operation &&
+      operation.ci !== void 0 &&
+      operation.p[0] === end[1] &&
+      start[1] < end[1]
+    ) {
       end[1] += 1;
     } else {
       RectOT.apply(range, [operation]);

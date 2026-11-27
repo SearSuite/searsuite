@@ -1,3 +1,4 @@
+import * as ownerApi0 from '@searsuite/sear-render';
 import * as moduleExports from '../src/index';
 
 describe('@searsuite/sear-render-cursor public API', () => {
@@ -8,6 +9,6 @@ describe('@searsuite/sear-render-cursor public API', () => {
     expect(moduleExports.CursorRuleKind).toBeDefined();
     expect(moduleExports.CursorRulePriority).toBeDefined();
     expect(moduleExports.CursorRegistry).toBeDefined();
-    expect(moduleExports.SheetCursorPlugin).toBeDefined();
+    expect(ownerApi0.SheetCursorView).toBeDefined();
   });
 });

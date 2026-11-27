@@ -1,6 +1,7 @@
 import { SearError } from '@searsuite/sear-foundation-error';
 import { Input } from './Input';
-import { TextInputKind, type TextInputEvent, type TextInputHandlers } from './TextInputEvent';
+import { type TextInputHandlers } from './TextInputEvent';
+import { TextInputKind, type TextInputEvent } from '@searsuite/sear-domain-commands';
 
 /** Routes host text and composition input through portable subscriptions. */
 export class TextInput extends Input {

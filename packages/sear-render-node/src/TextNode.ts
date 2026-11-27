@@ -1,6 +1,6 @@
 import { SearError } from '@searsuite/sear-foundation-error';
 import { RenderContext } from '@searsuite/sear-render-context';
-import { PositionRect } from '@searsuite/sear-foundation-rect';
+
 import { createFontDescriptor, TextShaper } from '@searsuite/sear-render-metrics';
 
 import { type ClipRegion } from './Node';
@@ -11,7 +11,7 @@ import {
   SheetHorizontalAlignment,
   SheetVerticalAlignment,
 } from '@searsuite/sear-domain-cell-types';
-import { HexColor } from '@searsuite/sear-foundation-utils';
+
 import { RichDocNode as RichTextContentNode, computeFirstBaselineY, paraText } from '@searsuite/sear-domain-doc';
 import { Platform } from '@searsuite/sear-foundation-platform';
 import { type Container } from '@searsuite/sear-foundation-di';
@@ -22,7 +22,7 @@ export class TextNode<T extends NodeProperties> extends RenderNode<T> {
   /** Text value rendered by this node. */
   public readonly value: string | RichTextContentNode;
   /** Text draws above the box background by default. */
-  public override depth: number = 1;
+  public depth: number = 1;
   #measuredWidth: number | null = null;
 
   /** Returns measured text width once attached, otherwise the declared width. */
@@ -174,7 +174,10 @@ export class TextNode<T extends NodeProperties> extends RenderNode<T> {
       if (horizontalAlign === SheetHorizontalAlignment.Center) {
         textX = x + cellPadding + contentInsetStart + (availableWidth - metrics.width) / 2;
       } else if (horizontalAlign === SheetHorizontalAlignment.Right) {
-        textX = Math.max(x + cellPadding + contentInsetStart, x + width - cellPadding - contentInsetEnd - metrics.width);
+        textX = Math.max(
+          x + cellPadding + contentInsetStart,
+          x + width - cellPadding - contentInsetEnd - metrics.width,
+        );
       }
 
       const fontAscent = metrics.fontAscent ?? metrics.height;

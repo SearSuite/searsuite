@@ -1,6 +1,11 @@
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
 import { MatrixOTActionName } from '@searsuite/sear-domain-ot';
-import { Pipeline, PipelineStepKind, isInsideCommandExecution, runInsideCommandExecution } from '@searsuite/sear-assembly-core';
+import {
+  Pipeline,
+  PipelineStepKind,
+  isInsideCommandExecution,
+  runInsideCommandExecution,
+} from '@searsuite/sear-assembly-plugin';
 
 import {
   CommandExecutionPhase,
@@ -132,7 +137,9 @@ describe('sheet commands', () => {
   it('passes a history group through a transaction pipeline command', () => {
     const group = { id: 'clear-rules', phase: 'begin' as const };
     const command = new TransactionPipelineCommand(
-      'cellHighlight.clearRules', createSheetTransaction(new PluginKey('highlight'), []), group,
+      'cellHighlight.clearRules',
+      createSheetTransaction(new PluginKey('highlight'), []),
+      group,
     );
     expect(command.execute({ executePipeline: jest.fn(), applyEffect: jest.fn() }).historyGroup).toEqual(group);
   });
@@ -188,7 +195,13 @@ describe('sheet commands', () => {
     const Success = defineSheetCommand('sheet.lifecycle.success');
     const Failure = defineSheetCommand('sheet.lifecycle.failure');
     bus.register(Success, () => new LocalActionCommand(Success.id, () => void 0));
-    bus.register(Failure, () => new LocalActionCommand(Failure.id, () => { throw new Error('failed'); }));
+    bus.register(
+      Failure,
+      () =>
+        new LocalActionCommand(Failure.id, () => {
+          throw new Error('failed');
+        }),
+    );
 
     bus.run(Success, void 0);
     expect(() => bus.run(Failure, void 0)).toThrow('failed');
@@ -207,7 +220,9 @@ describe('sheet commands', () => {
     const Command = defineSheetCommand('sheet.lifecycle.async');
     const phases: CommandExecutionPhase[] = [];
     let resolve!: () => void;
-    const completion = new Promise<void>((finish) => { resolve = finish; });
+    const completion = new Promise<void>((finish) => {
+      resolve = finish;
+    });
     bus.subscribe((event) => phases.push(event.phase));
     bus.register(Command, () => ({
       id: Command.id,
@@ -230,7 +245,9 @@ describe('sheet commands', () => {
     const phases: CommandExecutionPhase[] = [];
     const error = new Error('connection failed');
     let reject!: (reason: Error) => void;
-    const completion = new Promise<void>((_, fail) => { reject = fail; });
+    const completion = new Promise<void>((_, fail) => {
+      reject = fail;
+    });
     bus.subscribe((event) => phases.push(event.phase));
     bus.register(Command, () => ({
       id: Command.id,
@@ -250,12 +267,20 @@ describe('sheet commands', () => {
     const Outer = defineSheetCommand('sheet.lifecycle.outer');
     const Nested = defineSheetCommand('sheet.lifecycle.nested');
     const observed: boolean[] = [];
-    bus.register(Outer, () => new LocalActionCommand(Outer.id, () => {
-      observed.push(bus.isExecuting(), isInsideCommandExecution());
-    }));
-    bus.register(Nested, () => new LocalActionCommand(Nested.id, () => {
-      observed.push(bus.isExecuting(), isInsideCommandExecution());
-    }));
+    bus.register(
+      Outer,
+      () =>
+        new LocalActionCommand(Outer.id, () => {
+          observed.push(bus.isExecuting(), isInsideCommandExecution());
+        }),
+    );
+    bus.register(
+      Nested,
+      () =>
+        new LocalActionCommand(Nested.id, () => {
+          observed.push(bus.isExecuting(), isInsideCommandExecution());
+        }),
+    );
     bus.subscribe((event) => {
       if (event.id !== Outer.id || event.phase !== CommandExecutionPhase.Started) return;
       observed.push(bus.isExecuting(), isInsideCommandExecution());
@@ -399,7 +424,9 @@ describe('sheet commands', () => {
     const bus = new SheetCommandBus();
     const definition = { id: 'feature.retainedDefinition' } as SheetCommandDefinition<void>;
     const disposeFirst = bus.register(definition, () => new LocalActionCommand(definition.id, () => void 0));
-    expect(() => { (definition as { id: string }).id = 'changed'; }).toThrow();
+    expect(() => {
+      (definition as { id: string }).id = 'changed';
+    }).toThrow();
     disposeFirst();
     bus.register(definition, () => new LocalActionCommand(definition.id, () => void 0));
     disposeFirst();
@@ -541,7 +568,9 @@ describe('doc commands', () => {
     const Success = defineDocCommand('doc.lifecycle.success');
     const Failure = defineDocCommand('doc.lifecycle.failure');
     bus.register(Success, () => createDocCommand(Success.id));
-    bus.register(Failure, () => { throw new Error('failed'); });
+    bus.register(Failure, () => {
+      throw new Error('failed');
+    });
 
     bus.run(Success, void 0);
     expect(() => bus.run(Failure, void 0)).toThrow('failed');
@@ -576,7 +605,9 @@ describe('doc commands', () => {
     const bus = new DocCommandBus(platform as never);
     bus.bind({ executePipeline, applyEffect: () => void 0 });
     const observed: CommandExecutionPhase[] = [];
-    bus.subscribe(() => { throw new Error('listener failed'); });
+    bus.subscribe(() => {
+      throw new Error('listener failed');
+    });
     bus.subscribe((event) => observed.push(event.phase));
     const Command = defineDocCommand('doc.feature.listenerIsolation');
     const factory = jest.fn(() => {
@@ -599,7 +630,9 @@ describe('doc commands', () => {
     const Command = defineDocCommand('doc.feature.factoryFailure');
     const events: CommandExecutionPhase[] = [];
     bus.subscribe((event) => events.push(event.phase));
-    bus.register(Command, () => { throw new Error('factory failed'); });
+    bus.register(Command, () => {
+      throw new Error('factory failed');
+    });
 
     expect(() => bus.run(Command, void 0)).toThrow('factory failed');
     expect(bus.isExecuting()).toBe(false);
@@ -613,7 +646,9 @@ describe('doc commands', () => {
     bus.bind({ executePipeline, applyEffect: () => void 0 });
     const Command = defineDocCommand('doc.feature.expectedId');
     const events: CommandExecutionPhase[] = [];
-    bus.subscribe(() => { throw new Error('observer failed'); });
+    bus.subscribe(() => {
+      throw new Error('observer failed');
+    });
     bus.subscribe((event) => events.push(event.phase));
     bus.register(Command, () => createDocCommand('doc.feature.wrongId'));
 
@@ -640,7 +675,9 @@ describe('doc commands', () => {
     const bus = new DocCommandBus();
     const definition = { id: 'doc.feature.retainedDefinition' } as DocCommandDefinition<void>;
     bus.register(definition, () => createDocCommand(definition.id));
-    expect(() => { (definition as { id: string }).id = 'changed'; }).toThrow();
+    expect(() => {
+      (definition as { id: string }).id = 'changed';
+    }).toThrow();
   });
 
   it('does not accept a forged execution depth', () => {

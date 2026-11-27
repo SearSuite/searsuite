@@ -35,6 +35,12 @@ for (const [packageName, packageInfo] of packages) {
 
   packageInfo.manifest.dependencies ??= {};
   let changed = false;
+  for (const targetName of Object.keys(packageInfo.manifest.dependencies)) {
+    if (packages.has(targetName) && !imports.has(targetName)) {
+      delete packageInfo.manifest.dependencies[targetName];
+      changed = true;
+    }
+  }
   for (const targetName of imports) {
     if (!packageInfo.manifest.dependencies[targetName]) {
       packageInfo.manifest.dependencies[targetName] = 'workspace:*';

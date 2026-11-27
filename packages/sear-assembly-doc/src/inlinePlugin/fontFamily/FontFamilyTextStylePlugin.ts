@@ -1,6 +1,6 @@
 import { DocCommandBus, defineDocCommand } from '@searsuite/sear-assembly-commands';
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
-import { ReflowDocTransaction } from '@searsuite/sear-domain-commands';
+import { DocTransaction } from '@searsuite/sear-domain-commands';
 import {
   applyInlineTextStylePropertyMutation,
   readTextStyleAttrs,
@@ -8,9 +8,8 @@ import {
   type RichTextInlineStyleContribution,
 } from '@searsuite/sear-domain-doc';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { type RichTextRunRenderContribution } from '@searsuite/sear-render-node';
 import { InlineTextStylePluginBase } from '../InlineTextStylePluginBase';
-import { DocContentRenderPluginKey } from '../../plugin/DocFeaturePluginKeys';
+
 import { createDocCommand } from '../../plugin/DocPluginCommandUtils';
 
 /** Persisted style key owned by the font-family text-style plugin. */
@@ -33,11 +32,7 @@ export class FontFamilyTextStylePlugin extends InlineTextStylePluginBase {
   public static readonly symbol = Symbol.for('FontFamilyTextStylePlugin');
 
   public constructor() {
-    super(
-      new PluginKey('DocFontFamilyTextStyle'),
-      createFontFamilyContribution(),
-      createFontFamilyRenderContribution(),
-    );
+    super(new PluginKey('DocFontFamilyTextStyle'), createFontFamilyContribution());
   }
 
   public override registerCommands(commands: DocCommandBus): void {
@@ -46,7 +41,7 @@ export class FontFamilyTextStylePlugin extends InlineTextStylePluginBase {
 
   #createSetFontFamilyCommand(input: SetDocFontFamilyInput) {
     const fontFamily = normalizeFontFamily(input?.fontFamily);
-    return createDocCommand(SetDocFontFamilyCommand.id, DocContentRenderPluginKey, () => {
+    return createDocCommand(SetDocFontFamilyCommand.id, () => {
       const runtime = this.requireRuntime();
       const mutation = runtime.document.inlineStyles.requireMutation(FontFamilyTextStyleKey.FontFamily);
       return runtime.document.input.createTransaction(
@@ -58,7 +53,7 @@ export class FontFamilyTextStylePlugin extends InlineTextStylePluginBase {
             fontFamily,
             (attrs) => mutation.apply({ attrs, value: fontFamily }),
           ),
-        new ReflowDocTransaction(),
+        new DocTransaction(),
       );
     });
   }
@@ -73,29 +68,11 @@ export function createFontFamilyContribution(): RichTextInlineStyleContribution 
   };
 }
 
-/** Creates the render-layer font-family contribution. */
-export function createFontFamilyRenderContribution(): RichTextRunRenderContribution {
-  return {
-    key: `text.${FontFamilyTextStyleKey.FontFamily}`,
-    resolveFont: ({ font, style }) => resolveFontFamily(font, style),
-  };
-}
-
 function readFontFamily(input: { readonly attrs: Record<string, unknown> }): RichTextInlineStyle | undefined {
   const fontFamily = readTextStyleAttrs(input.attrs)[FontFamilyTextStyleKey.FontFamily];
   return typeof fontFamily === 'string' && fontFamily.trim()
     ? { [FontFamilyTextStyleKey.FontFamily]: fontFamily.trim() }
     : void 0;
-}
-
-function resolveFontFamily(font: string, style: Readonly<Record<string, unknown>> | undefined): string {
-  const family =
-    typeof style?.[FontFamilyTextStyleKey.FontFamily] === 'string'
-      ? style[FontFamilyTextStyleKey.FontFamily].trim()
-      : '';
-  if (!family) return font;
-  const separator = font.search(/\s/);
-  return separator < 0 ? font : `${font.slice(0, separator + 1)}${family}`;
 }
 
 function normalizeFontFamily(value: string | null | undefined): string | null {

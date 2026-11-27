@@ -2,7 +2,6 @@ import { SearError } from '@searsuite/sear-foundation-error';
 import { Injectable } from '@searsuite/sear-foundation-di';
 import { assertCellExtensionWrite } from '@searsuite/sear-domain-cell-types';
 import { PositionRectProps } from '@searsuite/sear-foundation-rect';
-import { Node, NodeProperties } from '@searsuite/sear-render-node';
 
 import { NodeFactory } from './NodeFactory';
 import { CellProperties, Cell, CellContext } from './Cell';

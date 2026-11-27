@@ -63,3 +63,12 @@ export { TextCellCommitStrategy, DefaultStringCellCommitStrategy } from './text/
 
 export { CellFormatTransferRegistry } from './CellFormatTransferRegistry';
 export { type CellFormatTransferCodec } from './CellFormatTransferCodec';
+
+export { extractRichText, formatFormulaValue } from './CellDisplayValues';
+
+export { SheetRulePriorityRegistry } from './SheetRulePriorityRegistry';
+
+export * from './SheetCellStyle';
+export { SheetCellStyleRegistry } from './SheetCellStyleRegistry';
+
+export * from './CellIconShape';

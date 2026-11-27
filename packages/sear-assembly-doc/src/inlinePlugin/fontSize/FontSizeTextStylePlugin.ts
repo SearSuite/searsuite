@@ -1,6 +1,6 @@
 import { DocCommandBus, defineDocCommand } from '@searsuite/sear-assembly-commands';
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
-import { ReflowDocTransaction } from '@searsuite/sear-domain-commands';
+import { DocTransaction } from '@searsuite/sear-domain-commands';
 import {
   applyInlineTextStylePropertyMutation,
   readTextStyleAttrs,
@@ -8,9 +8,8 @@ import {
   type RichTextInlineStyleContribution,
 } from '@searsuite/sear-domain-doc';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { type RichTextRunRenderContribution } from '@searsuite/sear-render-node';
 import { InlineTextStylePluginBase } from '../InlineTextStylePluginBase';
-import { DocContentRenderPluginKey } from '../../plugin/DocFeaturePluginKeys';
+
 import { createDocCommand } from '../../plugin/DocPluginCommandUtils';
 
 /** Persisted style key owned by the font-size text-style plugin. */
@@ -33,7 +32,7 @@ export class FontSizeTextStylePlugin extends InlineTextStylePluginBase {
   public static readonly symbol = Symbol.for('FontSizeTextStylePlugin');
 
   public constructor() {
-    super(new PluginKey('DocFontSizeTextStyle'), createFontSizeContribution(), createFontSizeRenderContribution());
+    super(new PluginKey('DocFontSizeTextStyle'), createFontSizeContribution());
   }
 
   public override registerCommands(commands: DocCommandBus): void {
@@ -42,7 +41,7 @@ export class FontSizeTextStylePlugin extends InlineTextStylePluginBase {
 
   #createSetFontSizeCommand(input: SetDocFontSizeInput) {
     const fontSize = normalizeFontSize(input?.fontSize);
-    return createDocCommand(SetDocFontSizeCommand.id, DocContentRenderPluginKey, () => {
+    return createDocCommand(SetDocFontSizeCommand.id, () => {
       const runtime = this.requireRuntime();
       const mutation = runtime.document.inlineStyles.requireMutation(FontSizeTextStyleKey.FontSize);
       return runtime.document.input.createTransaction(
@@ -54,7 +53,7 @@ export class FontSizeTextStylePlugin extends InlineTextStylePluginBase {
             fontSize,
             (attrs) => mutation.apply({ attrs, value: fontSize }),
           ),
-        new ReflowDocTransaction(),
+        new DocTransaction(),
       );
     });
   }
@@ -69,27 +68,11 @@ export function createFontSizeContribution(): RichTextInlineStyleContribution {
   };
 }
 
-/** Creates the render-layer font-size contribution. */
-export function createFontSizeRenderContribution(): RichTextRunRenderContribution {
-  return {
-    key: `text.${FontSizeTextStyleKey.FontSize}`,
-    resolveFont: ({ font, style }) => resolveFontSize(font, style),
-  };
-}
-
 function readFontSize(input: { readonly attrs: Record<string, unknown> }): RichTextInlineStyle | undefined {
   const fontSize = readTextStyleAttrs(input.attrs)[FontSizeTextStyleKey.FontSize];
   return typeof fontSize === 'number' && Number.isFinite(fontSize) && fontSize > 0
     ? { [FontSizeTextStyleKey.FontSize]: fontSize }
     : void 0;
-}
-
-function resolveFontSize(font: string, style: Readonly<Record<string, unknown>> | undefined): string {
-  const fontSize = style?.[FontSizeTextStyleKey.FontSize];
-  if (typeof fontSize !== 'number' || !Number.isFinite(fontSize) || fontSize <= 0) return font;
-  const size = `${fontSize}px`;
-  const sizePattern = /^\s*\d*\.?\d+(?:px|pt|pc|in|cm|mm|em|rem|ex|ch|vh|vw|vmin|vmax|%)\b/i;
-  return sizePattern.test(font) ? font.replace(sizePattern, size) : `${size} ${font}`;
 }
 
 function normalizeFontSize(value: unknown): number | null {

@@ -1,4 +1,5 @@
-import { DocInputPlugin, SearCoreDoc } from '@searsuite/sear-assembly-core';
+import { SearCoreDoc } from '@searsuite/sear-assembly-core';
+import { DocInputPlugin } from '@searsuite/sear-assembly-doc';
 import { type DocCursorPos } from '@searsuite/sear-domain-doc';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { Platform } from '@searsuite/sear-foundation-platform';

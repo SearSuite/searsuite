@@ -1,7 +1,8 @@
 import { SearError } from '@searsuite/sear-foundation-error';
 import type { Schema } from '@searsuite/sear-domain-doc-schema';
 import type { SheetEditSession, SheetEmbeddedEditor, SheetRenderSession } from './SheetEmbeddedEditor';
-import type { SheetDocument, SheetEditInput, SheetEmbeddedEditorContext } from './SheetEditorTypes';
+import type { SheetEmbeddedEditorContext } from './SheetEditorTypes';
+import type { SheetEditInput } from '@searsuite/sear-assembly-doc';
 import { FakeEditSession } from './FakeEditSession';
 import { FakeRenderSession } from './FakeRenderSession';
 import { cloneDocument } from './cloneDocument';
@@ -30,7 +31,11 @@ export class FakeSheetEmbeddedEditor implements SheetEmbeddedEditor {
 
   public initialize(context: SheetEmbeddedEditorContext): void {
     this.#assertLive();
-    if (this.#isCommandExecuting && context.isCommandExecuting && context.isCommandExecuting !== this.#isCommandExecuting) {
+    if (
+      this.#isCommandExecuting &&
+      context.isCommandExecuting &&
+      context.isCommandExecuting !== this.#isCommandExecuting
+    ) {
       throw new SearError('Sheet edit command boundary is already bound to an editor.');
     }
     this.#isCommandExecuting = context.isCommandExecuting ?? this.#isCommandExecuting;

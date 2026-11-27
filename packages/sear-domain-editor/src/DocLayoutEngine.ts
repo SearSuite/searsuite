@@ -8,14 +8,7 @@ import {
   type RichTextLine,
 } from '@searsuite/sear-domain-doc';
 import { type DocBlockLayout } from './DocLayoutCache';
-import {
-  DocCursorPos,
-  paraTextLength,
-  DocSelection,
-  isCollapsed,
-  normalizeSelection,
-  compareCursor,
-} from '@searsuite/sear-domain-doc';
+import { DocCursorPos, DocSelection, isCollapsed, normalizeSelection, compareCursor } from '@searsuite/sear-domain-doc';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 
 // ---------------------------------------------------------------------------

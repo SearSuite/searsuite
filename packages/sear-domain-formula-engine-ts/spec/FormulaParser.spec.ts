@@ -2,7 +2,6 @@ import { FormulaParser } from '../src/FormulaParser';
 import {
   FormulaErrorCode,
   FormulaNodeKind,
-  StructureChangeAxis,
   type FormulaAST,
   type StructureChange,
 } from '@searsuite/sear-domain-formula-engine';
@@ -24,7 +23,9 @@ describe('FormulaParser', () => {
       expect(parser.parse('=1234567890123456')).toEqual({ kind: 'number', value: 1234567890123450 });
       expect(parser.parse('=1.234567890123456')).toEqual({ kind: 'number', value: 1.23456789012345 });
       expect(parser.parse('=9007199254740992')).toEqual({
-        kind: 'number', value: 9007199254740990, rawLiteral: '9007199254740992',
+        kind: 'number',
+        value: 9007199254740990,
+        rawLiteral: '9007199254740992',
       });
     });
 
@@ -119,14 +120,20 @@ describe('FormulaParser', () => {
       expect(ast.kind).toBe(FormulaNodeKind.Call);
       if (ast.kind !== FormulaNodeKind.Call) return;
       expect(ast.args[0]).toEqual({
-        kind: FormulaNodeKind.Range, start: [24, 4], end: [25, 5],
-        absStartRow: false, absStartCol: true, absEndRow: true, absEndCol: false,
+        kind: FormulaNodeKind.Range,
+        start: [24, 4],
+        end: [25, 5],
+        absStartRow: false,
+        absStartCol: true,
+        absEndRow: true,
+        absEndCol: false,
       });
-      expect(parser.extractDependencies(ast)).toEqual([
-        { kind: FormulaNodeKind.Range, start: [24, 4], end: [25, 5] },
-      ]);
+      expect(parser.extractDependencies(ast)).toEqual([{ kind: FormulaNodeKind.Range, start: [24, 4], end: [25, 5] }]);
       expect(parser.parse('=Sheet2!F26:E25')).toMatchObject({
-        kind: FormulaNodeKind.WorkbookRange, sheetName: 'Sheet2', start: [24, 4], end: [25, 5],
+        kind: FormulaNodeKind.WorkbookRange,
+        sheetName: 'Sheet2',
+        start: [24, 4],
+        end: [25, 5],
       });
     });
 
@@ -213,17 +220,20 @@ describe('FormulaParser', () => {
     it('parses addition before comparison and concatenation', () => {
       const comparison = parser.parse('=1+2=3');
       expect(comparison).toMatchObject({
-        kind: FormulaNodeKind.Binary, op: '=',
+        kind: FormulaNodeKind.Binary,
+        op: '=',
         left: { kind: FormulaNodeKind.Binary, op: '+' },
       });
       const concat = parser.parse('=1+2&3');
       expect(concat).toMatchObject({
-        kind: FormulaNodeKind.Binary, op: '&',
+        kind: FormulaNodeKind.Binary,
+        op: '&',
         left: { kind: FormulaNodeKind.Binary, op: '+' },
       });
       const concatFirst = parser.parse('="a"&1+2');
       expect(concatFirst).toMatchObject({
-        kind: FormulaNodeKind.Binary, op: '&',
+        kind: FormulaNodeKind.Binary,
+        op: '&',
         right: { kind: FormulaNodeKind.Binary, op: '+' },
       });
     });
@@ -261,8 +271,12 @@ describe('FormulaParser', () => {
 
     it('parses consecutive postfix percentages', () => {
       expect(parser.parse('=100%%')).toEqual({
-        kind: FormulaNodeKind.Unary, op: '%', operand: {
-          kind: FormulaNodeKind.Unary, op: '%', operand: { kind: FormulaNodeKind.Number, value: 100 },
+        kind: FormulaNodeKind.Unary,
+        op: '%',
+        operand: {
+          kind: FormulaNodeKind.Unary,
+          op: '%',
+          operand: { kind: FormulaNodeKind.Number, value: 100 },
         },
       });
     });
@@ -271,13 +285,18 @@ describe('FormulaParser', () => {
       const ast = parser.parse('=EXACT("，",",")');
       expect(ast).toMatchObject({
         kind: FormulaNodeKind.Call,
-        args: [{ kind: FormulaNodeKind.String, value: '，' }, { kind: FormulaNodeKind.String, value: ',' }],
+        args: [
+          { kind: FormulaNodeKind.String, value: '，' },
+          { kind: FormulaNodeKind.String, value: ',' },
+        ],
       });
       expect(parser.parse('=LEN("“好”")')).toMatchObject({
-        kind: FormulaNodeKind.Call, args: [{ kind: FormulaNodeKind.String, value: '“好”' }],
+        kind: FormulaNodeKind.Call,
+        args: [{ kind: FormulaNodeKind.String, value: '“好”' }],
       });
       expect(parser.parse('=LEN(“好”)')).toMatchObject({
-        kind: FormulaNodeKind.Call, args: [{ kind: FormulaNodeKind.String, value: '好' }],
+        kind: FormulaNodeKind.Call,
+        args: [{ kind: FormulaNodeKind.String, value: '好' }],
       });
     });
 
@@ -297,9 +316,15 @@ describe('FormulaParser', () => {
     it('supports chained postfix percentages on unary expressions', () => {
       const ast = parser.parse('=-5%%');
       expect(ast).toMatchObject({
-        kind: FormulaNodeKind.Unary, op: '-', operand: {
-          kind: FormulaNodeKind.Unary, op: '%', operand: {
-            kind: FormulaNodeKind.Unary, op: '%', operand: { kind: FormulaNodeKind.Number, value: 5 },
+        kind: FormulaNodeKind.Unary,
+        op: '-',
+        operand: {
+          kind: FormulaNodeKind.Unary,
+          op: '%',
+          operand: {
+            kind: FormulaNodeKind.Unary,
+            op: '%',
+            operand: { kind: FormulaNodeKind.Number, value: 5 },
           },
         },
       });
@@ -358,7 +383,8 @@ describe('FormulaParser', () => {
 
     it('parses consecutive comparisons from left to right', () => {
       expect(parser.parse('=1<2<3')).toMatchObject({
-        kind: FormulaNodeKind.Binary, op: '<',
+        kind: FormulaNodeKind.Binary,
+        op: '<',
         left: { kind: FormulaNodeKind.Binary, op: '<' },
       });
     });
@@ -801,10 +827,12 @@ describe('FormulaParser', () => {
 
     it('rebases range endpoints after moving a row or deleting earlier columns', () => {
       const range = parser.parse('=F5:F5') as FormulaAST;
-      expect(parser.shiftReferences(range, [{ type: MatrixOTActionName.RowMove, fromIndex: 4, toIndex: 7 }]))
-        .toMatchObject({ start: [7, 5], end: [7, 5] });
-      expect(parser.shiftReferences(range, [{ type: MatrixOTActionName.ColDelete, index: 2, count: 2 }]))
-        .toMatchObject({ start: [4, 3], end: [4, 3] });
+      expect(
+        parser.shiftReferences(range, [{ type: MatrixOTActionName.RowMove, fromIndex: 4, toIndex: 7 }]),
+      ).toMatchObject({ start: [7, 5], end: [7, 5] });
+      expect(parser.shiftReferences(range, [{ type: MatrixOTActionName.ColDelete, index: 2, count: 2 }])).toMatchObject(
+        { start: [4, 3], end: [4, 3] },
+      );
     });
   });
 });

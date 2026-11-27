@@ -1,8 +1,8 @@
 import { DocNodeRegistry, resolveDocNodeId } from '@searsuite/sear-domain-doc';
-import { DocTransactionRenderOperationType } from '@searsuite/sear-domain-commands';
+import { DocRenderOperationType } from '@searsuite/sear-assembly-core';
 import { RichDocOTActionName, type Operation } from '@searsuite/sear-domain-ot';
 import { createTransaction, Transaction } from '@searsuite/sear-domain-transaction';
-import { DocInputTransactionMeta } from '../src/DocInputPlugin';
+import { DocInputTransactionMeta } from '@searsuite/sear-assembly-doc';
 import {
   collectDocReflowBlockIds,
   collectDocRepaintBlockIds,
@@ -20,11 +20,12 @@ function createParagraph(text: string) {
 
 function createDocRenderTransaction(
   operation: Operation,
-  renderOperation: DocTransactionRenderOperationType = DocTransactionRenderOperationType.Reflow,
+  renderOperation: DocRenderOperationType = DocRenderOperationType.Reflow,
 ): Transaction {
   const transaction = createTransaction(pluginKey);
   transaction.addOperation([operation]);
-  transaction.setMeta(DocInputTransactionMeta.RenderOperation, renderOperation);
+  if (renderOperation === DocRenderOperationType.Repaint)
+    transaction.setMeta(DocInputTransactionMeta.ChangedInlineStyles, ['color']);
   return transaction;
 }
 
@@ -38,7 +39,7 @@ describe('Doc render operations', () => {
 
     const renderOperations = collectDocRenderOperations([transaction]);
 
-    expect(renderOperations).toEqual([{ type: DocTransactionRenderOperationType.Reflow, ot: transaction.operations[0] }]);
+    expect(renderOperations).toEqual([{ type: DocRenderOperationType.Reflow, ot: transaction.operations[0] }]);
     expect(collectDocReflowBlockIds(renderOperations, document)).toEqual(new Set([resolveDocNodeId(document[1], [1])]));
     expect(collectDocRepaintBlockIds(renderOperations, document)).toEqual(new Set());
   });
@@ -57,27 +58,31 @@ describe('Doc render operations', () => {
         p: [0, 0, 'textStyle'],
         [RichDocOTActionName.UpdateAttrs]: { prev: {}, value: { color: '#f00' } },
       },
-      DocTransactionRenderOperationType.Repaint,
+      DocRenderOperationType.Repaint,
     );
 
     const renderOperations = collectDocRenderOperations([transaction]);
 
-    expect(renderOperations).toEqual([{ type: DocTransactionRenderOperationType.Repaint, ot: transaction.operations[0] }]);
+    expect(renderOperations).toEqual([{ type: DocRenderOperationType.Repaint, ot: transaction.operations[0] }]);
     expect(collectDocReflowBlockIds(renderOperations, document)).toEqual(new Set());
-    expect(collectDocRepaintBlockIds(renderOperations, document)).toEqual(new Set([resolveDocNodeId(document[0], [0])]));
+    expect(collectDocRepaintBlockIds(renderOperations, document)).toEqual(
+      new Set([resolveDocNodeId(document[0], [0])]),
+    );
   });
 
   it('keeps transactions without render operation metadata conservative as reflow operations', () => {
     const document = [createParagraph('one')];
     const transaction = createTransaction(pluginKey);
-    transaction.addOperation([{
-      p: [0, 0, 'textStyle'],
-      [RichDocOTActionName.UpdateAttrs]: { prev: {}, value: { fontSize: 24 } },
-    }]);
+    transaction.addOperation([
+      {
+        p: [0, 0, 'textStyle'],
+        [RichDocOTActionName.UpdateAttrs]: { prev: {}, value: { fontSize: 24 } },
+      },
+    ]);
 
     const renderOperations = collectDocRenderOperations([transaction]);
 
-    expect(renderOperations).toEqual([{ type: DocTransactionRenderOperationType.Reflow, ot: transaction.operations[0] }]);
+    expect(renderOperations).toEqual([{ type: DocRenderOperationType.Reflow, ot: transaction.operations[0] }]);
     expect(collectDocReflowBlockIds(renderOperations, document)).toEqual(new Set([resolveDocNodeId(document[0], [0])]));
   });
 

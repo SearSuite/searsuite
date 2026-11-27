@@ -1,10 +1,14 @@
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
 import { createTransaction } from '@searsuite/sear-domain-transaction';
 import { MatrixOTActionName } from '@searsuite/sear-domain-ot';
-import { SheetDataEngine } from '@searsuite/sear-render-engine';
+import { SheetDataEngine } from '@searsuite/sear-domain-sheet';
 import {
-  createSetSheetFreezeOperations, readSheetFreeze, SetSheetFreezeCommand,
-  SheetFreezeBoundaryError, SheetFreezeMatrix, SheetFreezePlugin,
+  createSetSheetFreezeOperations,
+  readSheetFreeze,
+  SetSheetFreezeCommand,
+  SheetFreezeBoundaryError,
+  SheetFreezeMatrix,
+  SheetFreezePlugin,
 } from '../src';
 
 describe('@searsuite/sear-plugin-freeze', () => {
@@ -18,25 +22,32 @@ describe('@searsuite/sear-plugin-freeze', () => {
       { p: [0, 0], uc: { value: 3, prev: 2 } },
       { p: [0, 1], uc: { value: null, prev: 1 } },
     ]);
-    expect(() => createSetSheetFreezeOperations({ rows: 21, columns: 0 }, source))
-      .toThrow(SheetFreezeBoundaryError);
-    expect(() => createSetSheetFreezeOperations({ rows: 20, columns: 0 }, source))
-      .toThrow(SheetFreezeBoundaryError);
-    expect(() => createSetSheetFreezeOperations({ rows: 0, columns: 10 }, source))
-      .toThrow(SheetFreezeBoundaryError);
+    expect(() => createSetSheetFreezeOperations({ rows: 21, columns: 0 }, source)).toThrow(SheetFreezeBoundaryError);
+    expect(() => createSetSheetFreezeOperations({ rows: 20, columns: 0 }, source)).toThrow(SheetFreezeBoundaryError);
+    expect(() => createSetSheetFreezeOperations({ rows: 0, columns: 10 }, source)).toThrow(SheetFreezeBoundaryError);
     expect(createSetSheetFreezeOperations({ rows: 19, columns: 9 }, source)).toHaveLength(2);
     for (const input of [
-      { rows: -1, columns: 0 }, { rows: 1.5, columns: 0 },
-      { rows: 0, columns: -1 }, { rows: 0, columns: 11 }, { rows: 0, columns: 1.5 },
-    ]) expect(() => createSetSheetFreezeOperations(input, source)).toThrow(SheetFreezeBoundaryError);
+      { rows: -1, columns: 0 },
+      { rows: 1.5, columns: 0 },
+      { rows: 0, columns: -1 },
+      { rows: 0, columns: 11 },
+      { rows: 0, columns: 1.5 },
+    ])
+      expect(() => createSetSheetFreezeOperations(input, source)).toThrow(SheetFreezeBoundaryError);
     expect(createSetSheetFreezeOperations({ rows: 2, columns: 1 }, source)).toEqual([]);
     expect(createSetSheetFreezeOperations({ rows: 0, columns: 3 }, source)).toEqual([
       { p: [0, 0], uc: { value: null, prev: 2 } },
       { p: [0, 1], uc: { value: 3, prev: 1 } },
     ]);
-    expect(createSetSheetFreezeOperations({ rows: 1, columns: 1 }, {
-      ...source, read: () => ({ rows: 0, columns: 0 }),
-    })).toEqual([
+    expect(
+      createSetSheetFreezeOperations(
+        { rows: 1, columns: 1 },
+        {
+          ...source,
+          read: () => ({ rows: 0, columns: 0 }),
+        },
+      ),
+    ).toEqual([
       { p: [0, 0], uc: { value: 1, prev: null } },
       { p: [0, 1], uc: { value: 1, prev: null } },
     ]);

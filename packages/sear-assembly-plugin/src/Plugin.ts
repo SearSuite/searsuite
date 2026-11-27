@@ -1,9 +1,6 @@
-import { Node, NodeProperties } from '@searsuite/sear-render-node';
-import { EventWithOffsetAndTarget } from '@searsuite/sear-render-event-engine';
-import { ScrollManagerState } from '@searsuite/sear-render-scroll';
+import { StatePlugin } from '@searsuite/sear-domain-state';
 import { PluginKey } from './PluginKey';
 import { Transaction } from '@searsuite/sear-domain-transaction';
-import { PositionRect } from '@searsuite/sear-foundation-rect';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { type OTOperation, type OTTransformRelation, type TransactionOTDefinition } from '@searsuite/sear-domain-ot';
 import { type SessionStateRegistry } from './SessionStateRegistry';
@@ -11,7 +8,7 @@ import { SessionStateError, SessionStateErrorCode } from './SessionStateError';
 
 /** Immutable identity and initial state used to construct a plugin instance. */
 export interface PluginSpec<T> {
-  /** Stable key under which the plugin registers state, config and scene nodes. */
+  /** Stable key under which the plugin registers state and configuration. */
   key: PluginKey;
   /** Initial state owned by the plugin. */
   state: T;
@@ -37,7 +34,7 @@ export interface PluginDataViewFieldRegistration<PluginStateType = unknown> {
 
 /** Controls whether a plugin state registration is exposed through DataEngine and data views. */
 export interface PluginDataEngineRegistrationOptions<PluginStateType = unknown> {
-  /** When false, Core keeps the plugin private to PluginManager and skips DataEngine registration. */
+  /** When false, the manager owns the plugin without registering its state in DataEngine. */
   readonly enabled?: boolean;
   /** Field selectors contributed by this state to named read-only data views. */
   readonly dataView?: ReadonlyArray<PluginDataViewFieldRegistration<PluginStateType>>;
@@ -101,23 +98,14 @@ export interface PluginConfigRegistration<ConfigType extends object = Record<str
 /**
  * Base contract implemented by sheet and document plugins.
  *
- * Plugins own their state, declare lifecycle hooks, transform transactions into
- * state, and render scene nodes for their host core. Runtime packages should
- * extend this contract rather than reaching into Core internals.
+ * Plugins own state, transaction algebra, persistence and neutral data projections.
+ * Presentation and native input are contributed by independent view extensions.
  */
-export abstract class Plugin<SearCoreType, NodeTypeProperties extends NodeProperties, PluginStateType> {
-  /** Stable plugin key used by PluginManager and SceneGraph ownership maps. */
+export abstract class Plugin<PluginStateType> extends StatePlugin<PluginStateType, Transaction> {
+  /** Stable identity for state ownership and neutral data projections. */
   public pluginKey: PluginKey;
-  #state: PluginStateType;
-  #stateCommitToken: object | undefined;
   #runtimeWriteCheck: (() => void) | undefined;
   #sessionStateRegistry: SessionStateRegistry | undefined;
-
-  /** Draw and event ordering hint; lower values run earlier. */
-  public readonly depth: number = 0;
-
-  /** Whether PluginManager should warn when another ordered plugin shares this depth. */
-  public readonly warnOnDuplicateDepth: boolean = true;
 
   /**
    * Declares which Sheet OT action names this plugin is interested in.
@@ -144,18 +132,13 @@ export abstract class Plugin<SearCoreType, NodeTypeProperties extends NodeProper
 
   /** Creates a plugin with its stable identity and initial state. */
   constructor({ key, state }: PluginSpec<PluginStateType>) {
+    super(state);
     this.pluginKey = key;
-    this.#state = state;
   }
 
   /** Returns the stable key that identifies this plugin instance. */
   public get key() {
     return this.pluginKey;
-  }
-
-  /** Returns the plugin-owned state currently registered with the manager. */
-  public getState() {
-    return this.#state;
   }
 
   /** Binds one plugin instance's session adapters to one editor-local registry. */
@@ -169,17 +152,6 @@ export abstract class Plugin<SearCoreType, NodeTypeProperties extends NodeProper
     }
     register();
     this.#sessionStateRegistry = registry;
-  }
-
-  /** Restricts state replacement to the owning editor's commit phase. */
-  public enforceStateWriteBoundary(commitToken: object): void {
-    if (this.#stateCommitToken) throw new SearError('Plugin state write boundary is already installed.');
-    this.#stateCommitToken = commitToken;
-  }
-
-  /** Reports whether the owning runtime has taken control of state replacement. */
-  public hasStateWriteBoundary(): boolean {
-    return this.#stateCommitToken !== void 0;
   }
 
   /** Installs the editor's command check for plugin-owned runtime sessions. */
@@ -224,8 +196,6 @@ export abstract class Plugin<SearCoreType, NodeTypeProperties extends NodeProper
       if (Array.isArray(documentState)) Object.freeze(documentState);
     }
     Object.defineProperties(this, {
-      depth: { value: this.depth, writable: false, configurable: false },
-      warnOnDuplicateDepth: { value: this.warnOnDuplicateDepth, writable: false, configurable: false },
       interestedIn: { value: interestedIn, writable: false, configurable: false },
       transactionOT: { value: transactionOT, writable: false, configurable: false },
       transactionHistory: { value: transactionHistory, writable: false, configurable: false },
@@ -233,14 +203,19 @@ export abstract class Plugin<SearCoreType, NodeTypeProperties extends NodeProper
     });
   }
 
-  /** Pins transaction and render hooks after plugin startup. */
+  /** Pins transaction and data-initialization hooks after plugin startup. */
   public sealRuntimeMethods(): void {
     for (const name of [
-      'apply', 'render', 'projectTransaction', 'onTransactionCommitted',
-      'dirtyRect', 'onResize', 'onScroll', 'getPluginConfig',
+      'apply',
+      'projectTransaction',
+      'onTransactionCommitted',
+      'onInitialDataCell',
+      'onInitialDataComplete',
     ]) {
       Object.defineProperty(this, name, {
-        value: Reflect.get(this, name), writable: false, configurable: false,
+        value: Reflect.get(this, name),
+        writable: false,
+        configurable: false,
       });
     }
   }
@@ -250,14 +225,6 @@ export abstract class Plugin<SearCoreType, NodeTypeProperties extends NodeProper
 
   /** Closes runtime-owned extension writes after every plugin has initialized and started. */
   public sealRuntimeWrites?(): void;
-
-  /** Replaces the plugin-owned state after an apply or runtime transition. */
-  public setState(state: PluginStateType, commitToken?: object) {
-    if (this.#stateCommitToken && commitToken !== this.#stateCommitToken) {
-      throw new SearError('Committed plugin state can only change through a command transaction.');
-    }
-    this.#state = state;
-  }
 
   /**
    * Purely plans owner-targeted prerequisites before another owner's explicit transaction.
@@ -278,63 +245,16 @@ export abstract class Plugin<SearCoreType, NodeTypeProperties extends NodeProper
    */
   public onTransactionCommitted?(transaction: Transaction): void;
 
-  /** Optional hook invoked when the host viewport or sheet dimensions change. */
-  public onResize?(): void;
-
   /**
-   * Receives one non-empty cell during SearCoreSheet's shared startup scan.
+   * Receives one non-empty cell during the shared Sheet state initialization scan.
    * The scan runs once after every plugin state has been registered, so
    * plugins can build derived indexes without independently traversing the
    * whole sheet.
    */
-  public onInitialDataCell?(searCore: SearCoreType, cell: unknown, row: number, col: number): void;
+  public onInitialDataCell?(cell: unknown, row: number, col: number): void;
 
   /** Called after the final cell of the shared startup scan is delivered. */
-  public onInitialDataComplete?(searCore: SearCoreType): void;
-
-  /**
-   * Plugin pointer event handlers.
-   *
-   * Return value contract:
-   * - Return `false` to stop subsequent plugins from handling the same event.
-   * - Return `true` / `undefined` / `void` to continue dispatching.
-   *
-   * This mechanism allows a plugin to explicitly suppress downstream handlers
-   * after it has consumed an event, replacing the old coupled approach where
-   * one plugin directly modified another plugin's state.
-   */
-  public onClick?(earCore: SearCoreType, event: EventWithOffsetAndTarget<NodeTypeProperties>): boolean | void;
-  /** Handles a double-click pointer event. */
-  public onDblClick?(earCore: SearCoreType, event: EventWithOffsetAndTarget<NodeTypeProperties>): boolean | void;
-  /** Handles the start of a pointer press sequence. */
-  public onMouseDown?(searCore: SearCoreType, event: EventWithOffsetAndTarget<NodeTypeProperties>): boolean | void;
-  /** Handles pointer movement over the host surface. */
-  public onMouseMove?(searCore: SearCoreType, event: EventWithOffsetAndTarget<NodeTypeProperties>): boolean | void;
-  /** Handles the end of a pointer press sequence. */
-  public onMouseUp?(searCore: SearCoreType, event: EventWithOffsetAndTarget<NodeTypeProperties>): boolean | void;
-
-  /** Receives scroll state changes from the active scroll manager. */
-  public onScroll?(scrollManagerState: ScrollManagerState): void;
-
-  /** Produces scene nodes owned by this plugin for the current core state. */
-  public abstract render(
-    searCore: SearCoreType,
-    offset?: { x: number; y: number },
-  ): Node<NodeTypeProperties> | Node<NodeTypeProperties>[] | null;
-
-  /**
-   * Optional. Return the pixel-space dirty rectangle that needs to be
-   * redrawn after this plugin processes `transaction`.
-   *
-   * When implemented, `SearCoreSheet.dispatch` will call `markDirty` with
-   * the returned rect and skip a full-canvas re-render for this plugin.
-   * When omitted (or when `null`/`undefined` is returned), dispatch falls
-   * back to a full render pass.
-   */
-  public dirtyRect?(searCore: SearCoreType, transaction: Transaction): PositionRect<unknown> | null | undefined;
-
-  /** Returns this plugin's runtime configuration view for the current core. */
-  public abstract getPluginConfig(searCore: SearCoreType): unknown;
+  public onInitialDataComplete?(): void;
 
   /** Registers default configuration values owned by this plugin. */
   public registerConfig?(): PluginConfigRegistration[];

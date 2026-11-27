@@ -4,14 +4,7 @@ import {
   type FormulaValue,
   type ResolvedFormulaRange,
 } from '@searsuite/sear-domain-formula-engine';
-import {
-  isFormulaErrorValue,
-  matrixDimensions,
-  matrixFromArg,
-  readScalar,
-  sameDimensions,
-  valueError,
-} from '../shared/mathUtils';
+import { isFormulaErrorValue, matrixDimensions, matrixFromArg, sameDimensions, valueError } from '../shared/mathUtils';
 import { matchesCriteria, readArg } from '../../shared/helpers';
 import { resolveConditionalReference } from '../../shared/conditionalReference';
 import { sumIfsRanges } from './sumifsUtils';

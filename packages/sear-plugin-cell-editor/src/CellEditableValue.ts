@@ -1,4 +1,4 @@
-import { type CellMatrixElement } from '@searsuite/sear-assembly-core';
+import { type CellMatrixElement } from '@searsuite/sear-domain-sheet';
 import { CellType } from '@searsuite/sear-domain-cell-types';
 import { type IFormulaSourceProvider } from '@searsuite/sear-domain-formula-engine';
 

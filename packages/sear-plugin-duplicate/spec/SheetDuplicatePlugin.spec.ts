@@ -1,4 +1,4 @@
-import { SheetMatrix } from '@searsuite/sear-render-engine';
+import { SheetMatrix } from '@searsuite/sear-domain-sheet';
 import { DuplicateMatrix } from '../src/DuplicateMatrix';
 import {
   createClearDuplicateHighlightOperations,
@@ -8,9 +8,10 @@ import {
   type SheetDuplicateCommandDataSource,
 } from '../src/sheetPlugin/duplicate/SheetDuplicateCommands';
 import { SheetDuplicatePlugin } from '../src/sheetPlugin/duplicate/SheetDuplicatePlugin';
-import { SheetDataPlugin } from '@searsuite/sear-render-engine';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
 import { CellClipboardCodecRegistry, CellType } from '@searsuite/sear-domain-cell-types';
-import { extractRichText, SheetCellVisualReaderRegistry } from '@searsuite/sear-render-registry';
+import { SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
+import { extractRichText } from '@searsuite/sear-domain-cell-types';
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
 import { HighlightDuplicateRowsCommand } from '../src';
 
@@ -52,17 +53,21 @@ describe('SheetDuplicatePlugin commands', () => {
     plugin.registerCommands(commands);
 
     const result = commands.run(HighlightDuplicateRowsCommand, {
-      anchor: [0, 0], focus: [0, 1], highlight: '#ffe8e6',
+      anchor: [0, 0],
+      focus: [0, 1],
+      highlight: '#ffe8e6',
     });
     const step = result.pipeline.steps.find((item) => 'transaction' in item);
-    expect(step && 'transaction' in step ? step.transaction.operations.map((operation) => operation.p) : [])
-      .toEqual([[0, 0], [0, 1]]);
+    expect(step && 'transaction' in step ? step.transaction.operations.map((operation) => operation.p) : []).toEqual([
+      [0, 0],
+      [0, 1],
+    ]);
 
     duplicates.addItem(0, 0, '#ffe8e6');
     duplicates.addItem(0, 1, '#ffe8e6');
-    const visuals = new SheetCellVisualReaderRegistry();
-    plugin.registerCellVisualReaders(visuals);
-    expect(visuals.read({ rowIndex: 0, columnIndex: 1 })).toEqual({ fill: '#ffe8e6' });
+    const visuals = new SheetCellStyleRegistry();
+    plugin.registerCellStyles(visuals);
+    expect(visuals.read(0, 1)).toEqual({ fill: '#ffe8e6' });
   });
 
   it('overrides the visual fill without modifying the base fill and restores it when highlights clear', () => {
@@ -73,13 +78,13 @@ describe('SheetDuplicatePlugin commands', () => {
     owner.getState().sheetData.addItem(0, 0, { type: CellType.String, value: 'same' });
     owner.getState().sheetData.addItem(1, 1, { type: CellType.String, value: 'same' });
     const plugin = new SheetDuplicatePlugin({ duplicates }, owner, new CellClipboardCodecRegistry());
-    const registry = new SheetCellVisualReaderRegistry();
-    plugin.registerCellVisualReaders(registry);
+    const registry = new SheetCellStyleRegistry();
+    plugin.registerCellStyles(registry);
     registry.register({ id: 'base-fill', properties: ['fill'], read: () => ({ fill: '#ffcc00' }) });
-    expect(registry.read({ rowIndex: 0, columnIndex: 0 })).toEqual({ fill: '#ffe8e6' });
-    expect(registry.read({ rowIndex: 1, columnIndex: 0 })).toEqual({ fill: '#ffcc00' });
+    expect(registry.read(0, 0)).toEqual({ fill: '#ffe8e6' });
+    expect(registry.read(1, 0)).toEqual({ fill: '#ffcc00' });
     plugin.setState({ duplicates: new DuplicateMatrix(void 0, [2, 2]) });
-    expect(registry.read({ rowIndex: 0, columnIndex: 0 })).toEqual({ fill: '#ffcc00' });
+    expect(registry.read(0, 0)).toEqual({ fill: '#ffcc00' });
   });
 
   it('hides stale duplicate fills after values diverge while keeping another duplicate group', () => {
@@ -91,20 +96,20 @@ describe('SheetDuplicatePlugin commands', () => {
     const duplicates = new DuplicateMatrix(void 0, [4, 1]);
     for (let row = 0; row < 4; row += 1) duplicates.addItem(row, 0, '#ffe8e6');
     const plugin = new SheetDuplicatePlugin({ duplicates }, owner, new CellClipboardCodecRegistry());
-    const registry = new SheetCellVisualReaderRegistry();
-    plugin.registerCellVisualReaders(registry);
-    expect(registry.read({ rowIndex: 0, columnIndex: 0 })).toEqual({ fill: '#ffe8e6' });
+    const registry = new SheetCellStyleRegistry();
+    plugin.registerCellStyles(registry);
+    expect(registry.read(0, 0)).toEqual({ fill: '#ffe8e6' });
     const changed = sheetData.clone();
     changed.addItem(1, 0, { type: CellType.String, value: 'different' });
     owner.setState({ sheetData: changed });
-    expect(registry.read({ rowIndex: 0, columnIndex: 0 })).toEqual({});
-    expect(registry.read({ rowIndex: 1, columnIndex: 0 })).toEqual({});
-    expect(registry.read({ rowIndex: 2, columnIndex: 0 })).toEqual({ fill: '#ffe8e6' });
+    expect(registry.read(0, 0)).toEqual({});
+    expect(registry.read(1, 0)).toEqual({});
+    expect(registry.read(2, 0)).toEqual({ fill: '#ffe8e6' });
     const restored = changed.clone();
     restored.addItem(1, 0, { type: CellType.String, value: 'same' });
     owner.setState({ sheetData: restored });
-    expect(registry.read({ rowIndex: 0, columnIndex: 0 })).toEqual({ fill: '#ffe8e6' });
-    expect(registry.read({ rowIndex: 1, columnIndex: 0 })).toEqual({ fill: '#ffe8e6' });
+    expect(registry.read(0, 0)).toEqual({ fill: '#ffe8e6' });
+    expect(registry.read(1, 0)).toEqual({ fill: '#ffe8e6' });
   });
 
   it('reads the latest committed matrix after the sheet data owner replaces its state', () => {
@@ -208,12 +213,29 @@ describe('SheetDuplicatePlugin commands', () => {
     sheetData.addItem(1, 0, { type: CellType.String, value: 'foo' });
     sheetData.addItem(2, 0, { type: CellType.String, value: 'Foo' });
     const dataSource = createDataSource(sheetData);
-    expect(createHighlightDuplicateOperations({
-      anchor: [0, 0], focus: [2, 0], highlight: '#ffe8e6',
-    }, dataSource).map((operation) => operation.p)).toEqual([[0, 0], [1, 0], [2, 0]]);
-    expect(createDeleteDuplicateRowsOperations({
-      anchor: [0, 0], focus: [2, 0],
-    }, dataSource).map((operation) => operation.p)).toEqual([[2], [1]]);
+    expect(
+      createHighlightDuplicateOperations(
+        {
+          anchor: [0, 0],
+          focus: [2, 0],
+          highlight: '#ffe8e6',
+        },
+        dataSource,
+      ).map((operation) => operation.p),
+    ).toEqual([
+      [0, 0],
+      [1, 0],
+      [2, 0],
+    ]);
+    expect(
+      createDeleteDuplicateRowsOperations(
+        {
+          anchor: [0, 0],
+          focus: [2, 0],
+        },
+        dataSource,
+      ).map((operation) => operation.p),
+    ).toEqual([[2], [1]]);
   });
 
   it('clears only existing duplicate highlights in the requested range', () => {

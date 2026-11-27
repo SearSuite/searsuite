@@ -1,14 +1,9 @@
-import {
-  SearCoreDoc,
-  type DocRenderLayoutState,
-  type DocRenderOperation,
-  type DocRenderRequest,
-  type DocRenderOperations,
-  warnIfOutsideCommandExecution,
-} from '@searsuite/sear-assembly-core';
+import { type ViewExtension } from '@searsuite/sear-render-event-engine';
+import { SearCoreDoc, type DocRenderLayoutState, type DocRenderOperation, type DocRenderRequest, type DocRenderOperations } from '@searsuite/sear-assembly-core';
+import { warnIfOutsideCommandExecution } from '@searsuite/sear-assembly-plugin';
 import { DocCommandBus } from '@searsuite/sear-assembly-commands';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
-import { type Plugin } from '@searsuite/sear-assembly-plugin';
+
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { Platform } from '@searsuite/sear-foundation-platform';
 import { SearError } from '@searsuite/sear-foundation-error';
@@ -18,25 +13,15 @@ import { DocRenderEngine } from '@searsuite/sear-render-engine';
 import { TextInput } from '@searsuite/sear-render-input';
 import { SceneGraph, type RichTextRenderNodeProperties } from '@searsuite/sear-render-node';
 import { ScrollManager } from '@searsuite/sear-render-scroll';
-import {
-  BlockRasterCopyPlan,
-  IncrementalRenderDecisionReason,
-  IncrementalRenderPolicy,
-  type BlockRasterCopyCandidate,
-  type IncrementalRenderCandidate,
-  type IncrementalRenderDecision,
-} from '@searsuite/sear-render-strategy';
+import { BlockRasterCopyPlan, IncrementalRenderDecisionReason, IncrementalRenderPolicy, type BlockRasterCopyCandidate, type IncrementalRenderCandidate, type IncrementalRenderDecision } from '@searsuite/sear-render-strategy';
 
 import { DocEditorLifecycleState } from './DocEditorLifecycleState';
-import {
-  type DocEditorRuntimeConfiguration,
-  DocEditorRuntimeConfigurationSymbol,
-} from './DocEditorRuntimeConfiguration';
+import { type DocEditorRuntimeConfiguration, DocEditorRuntimeConfigurationSymbol } from './DocEditorRuntimeConfiguration';
 import { type DocEditorContentRect, type DocEditorViewport } from './createDocEditor';
 import { DocRenderLayoutService, type DocRenderLayout } from './DocRenderLayoutService';
 import { type DocBlockRenderDebugSnapshot } from './DocVirtualLayoutStore';
 import { DocViewportEnvironment } from './DocViewportEnvironment';
-import { DocContentRenderPluginKey } from '@searsuite/sear-assembly-doc';
+import { DocContentViewKey } from './DocViewKeys';
 import { RenderDocViewportCommand } from './DocViewportCommands';
 import { createDocFontDescriptor } from './createDocFontDescriptor';
 
@@ -145,7 +130,8 @@ export class DocRenderCoordinator {
 
   /** Invalidates cached layout state owned by the render coordinator. */
   public resetLayoutCache(): void {
-    if (!this.#commands.isExecuting()) throw new SearError('Doc layout changes must run through editor.commands.run(...).');
+    if (!this.#commands.isExecuting())
+      throw new SearError('Doc layout changes must run through editor.commands.run(...).');
     this.#renderLayouts.reset();
   }
 
@@ -244,19 +230,19 @@ export class DocRenderCoordinator {
 
   #refreshAllPluginNodes(markDirty: boolean, useBlockRasterCopy: boolean): void {
     const coordinator = this;
-    function refreshDocPluginNodes(plugin: Plugin<SearCoreDoc, RichTextRenderNodeProperties, unknown>): void {
+    function refreshDocPluginNodes(plugin: ViewExtension<SearCoreDoc, RichTextRenderNodeProperties>): void {
       coordinator.#refreshPluginNodes(plugin, markDirty, useBlockRasterCopy);
     }
-    this.#searCoreDoc.pluginManager.forEach(refreshDocPluginNodes);
+    this.#searCoreDoc.getViewExtensions().forEach(refreshDocPluginNodes);
   }
 
   #refreshPluginNodes(
-    plugin: Plugin<SearCoreDoc, RichTextRenderNodeProperties, unknown>,
+    plugin: ViewExtension<SearCoreDoc, RichTextRenderNodeProperties>,
     markDirty: boolean,
     useBlockRasterCopy: boolean = false,
   ): void {
     const shapes = plugin.render?.(this.#searCoreDoc) || [];
-    if (plugin.key.key === DocContentRenderPluginKey.key && (!markDirty || useBlockRasterCopy)) {
+    if (plugin.key.key === DocContentViewKey.key && (!markDirty || useBlockRasterCopy)) {
       const layout = this.#searCoreDoc.getDocRenderLayoutState();
       const changedBlockKeys = useBlockRasterCopy
         ? new Set(layout?.blockLayoutDiff.getChangedEntries().map((entry) => entry.id) ?? [])
@@ -276,18 +262,24 @@ export class DocRenderCoordinator {
 
   #refreshRequestedPluginNodes(requestedPluginKeys: ReadonlySet<string>, markDirty: boolean): void {
     const coordinator = this;
-    function refreshRequestedDocPluginNodes(plugin: Plugin<SearCoreDoc, RichTextRenderNodeProperties, unknown>): void {
+    function refreshRequestedDocPluginNodes(plugin: ViewExtension<SearCoreDoc, RichTextRenderNodeProperties>): void {
       if (requestedPluginKeys.has(plugin.key.key)) coordinator.#refreshPluginNodes(plugin, markDirty);
     }
-    this.#searCoreDoc.pluginManager.forEach(refreshRequestedDocPluginNodes);
+    this.#searCoreDoc.getViewExtensions().forEach(refreshRequestedDocPluginNodes);
   }
 
   #createInteractionPluginKeySet(requests: readonly DocRenderRequest[]): ReadonlySet<string> | null {
     if (requests.length === 0) return null;
     const requestedPluginKeys = new Set<string>();
     for (const request of requests) {
-      const pluginKey = request.renderPluginKey;
-      if (!pluginKey || pluginKey.key === DocContentRenderPluginKey.key) return null;
+      const pluginKey = request.projectionKey;
+      if (!pluginKey && request.renderOperations?.length === 0) {
+        for (const view of this.#searCoreDoc.getViewExtensions().getAll()) {
+          if (view.key.key !== DocContentViewKey.key) requestedPluginKeys.add(view.key.key);
+        }
+        continue;
+      }
+      if (!pluginKey || pluginKey.key === DocContentViewKey.key) return null;
       requestedPluginKeys.add(pluginKey.key);
     }
     return requestedPluginKeys;
@@ -311,10 +303,7 @@ export class DocRenderCoordinator {
     };
   }
 
-  #resolveBlockRasterCopyPlan(
-    layout: DocRenderLayout,
-    viewport: DocEditorViewport,
-  ): ResolvedBlockRasterCopyPlan {
+  #resolveBlockRasterCopyPlan(layout: DocRenderLayout, viewport: DocEditorViewport): ResolvedBlockRasterCopyPlan {
     const plan = this.#createBlockRasterCopyPlan(layout, viewport);
     if (!plan) return NO_INCREMENTAL_RENDER_PLAN;
     const candidate = createIncrementalRenderCandidate(plan);
@@ -342,10 +331,12 @@ export class DocRenderCoordinator {
     });
     const copies: BlockRasterCopyCandidate[] = shiftedEntries.flatMap((entry) => {
       if (!entry.previous || !entry.current) return [];
-      return [{
-        source: toWorldBlockRenderRect(entry.previous, layout.documentRect),
-        destination: toWorldBlockRenderRect(entry.current, layout.documentRect),
-      }];
+      return [
+        {
+          source: toWorldBlockRenderRect(entry.previous, layout.documentRect),
+          destination: toWorldBlockRenderRect(entry.current, layout.documentRect),
+        },
+      ];
     });
     return BlockRasterCopyPlan.fromLayoutShift({
       viewport: { x: 0, y: 0, width: viewport.width, height: viewport.height },
@@ -439,12 +430,14 @@ function createAffectedTailClearRects(
   if (!Number.isFinite(startY)) return [];
   const viewportBottom = scrollState.y + viewport.height;
   if (viewportBottom <= startY) return [];
-  return [{
-    x: layout.documentRect.x,
-    y: startY,
-    width: layout.documentRect.width,
-    height: viewportBottom - startY,
-  }];
+  return [
+    {
+      x: layout.documentRect.x,
+      y: startY,
+      width: layout.documentRect.width,
+      height: viewportBottom - startY,
+    },
+  ];
 }
 
 function createBlockRenderDebugSnapshot(

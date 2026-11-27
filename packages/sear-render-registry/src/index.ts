@@ -40,4 +40,5 @@ export {
   type CellContext,
   IFormulaResultProvider,
 } from './Cell';
-export { extractRichText, formatFormulaValue } from './cell/DisplayTextUtils';
+
+export { defineCellRenderer, type CellRendererDefinition } from './CellRendererDefinition';

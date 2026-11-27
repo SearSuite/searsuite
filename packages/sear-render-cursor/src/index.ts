@@ -18,4 +18,3 @@ export {
   type PositionCursorRule,
 } from './CursorRule';
 export { CursorRegistry } from './CursorRegistry';
-export { SheetCursorPlugin } from './sheetCursor/SheetCursorPlugin';

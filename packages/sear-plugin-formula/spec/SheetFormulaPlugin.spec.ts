@@ -2,7 +2,7 @@ import { CellType } from '@searsuite/sear-domain-cell-types';
 import { MatrixOTActionName } from '@searsuite/sear-domain-ot';
 import { cellKey } from '@searsuite/sear-domain-formula-engine-ts';
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import { SheetDataPlugin } from '@searsuite/sear-render-engine';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
 import { ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 import {
   type Dependency,
@@ -90,13 +90,15 @@ describe('SheetFormulaPlugin', () => {
     parser.parse.mockReturnValue(next);
     const transaction = {
       pluginKey: SheetDataPlugin.pluginKey,
-      operations: [{
-        p: [0, 1],
-        [MatrixOTActionName.UpdateCell]: {
-          value: { type: CellType.Formula, formula: '=B1' },
-          prev: { type: CellType.Formula, formula: '=A1' },
+      operations: [
+        {
+          p: [0, 1],
+          [MatrixOTActionName.UpdateCell]: {
+            value: { type: CellType.Formula, formula: '=B1' },
+            prev: { type: CellType.Formula, formula: '=A1' },
+          },
         },
-      }],
+      ],
     } as never;
 
     expect(plugin.getState()).toBeNull();
@@ -128,16 +130,14 @@ describe('SheetFormulaPlugin', () => {
     const { plugin, graph, scheduler, trace, dependencies } = createPlugin();
     graph.getDependencies.mockReturnValueOnce([]).mockReturnValue(dependencies);
 
-    plugin.onInitialDataCell({} as never, { type: CellType.Formula, formula: '=A1' }, 2, 3);
-    plugin.onInitialDataCell({} as never, { type: CellType.Number, value: 1 }, 2, 4);
-    plugin.onInitialDataComplete({} as never);
+    plugin.onInitialDataCell({ type: CellType.Formula, formula: '=A1' }, 2, 3);
+    plugin.onInitialDataCell({ type: CellType.Number, value: 1 }, 2, 4);
+    plugin.onInitialDataComplete();
 
     expect(graph.updateCell).toHaveBeenCalledWith(131075, dependencies);
     expect(scheduler.markDirty).toHaveBeenCalledWith([131075]);
     expect(plugin.registerState().state).toBe(plugin.getState());
-    expect(plugin.registerConfig()).toHaveLength(1);
-    expect(plugin.getPluginConfig()).toEqual({});
-    expect(plugin.render()).toEqual([]);
+
     expect(trace.emit).toHaveBeenCalledWith({
       type: FormulaDependenciesChangedEventType,
       key: 131075,
@@ -154,8 +154,8 @@ describe('SheetFormulaPlugin', () => {
       throw new Error('invalid formula');
     });
 
-    plugin.onInitialDataCell({} as never, { type: CellType.Formula, formula: '=?' }, 0, 0);
-    plugin.onInitialDataComplete({} as never);
+    plugin.onInitialDataCell({ type: CellType.Formula, formula: '=?' }, 0, 0);
+    plugin.onInitialDataComplete();
 
     expect(platform.warn).toHaveBeenCalledWith(
       expect.stringContaining('[Formula] Failed to parse initial formula at (0,0):'),
@@ -661,7 +661,7 @@ describe('SheetFormulaPlugin', () => {
 
   it('ignores empty initial-dirty queue and applies row and column move operations', () => {
     const { astCache, plugin, scheduler, refShifter } = createPlugin();
-    plugin.onInitialDataComplete({} as never);
+    plugin.onInitialDataComplete();
     expect(scheduler.markDirty).not.toHaveBeenCalled();
 
     const transaction = {

@@ -1,9 +1,12 @@
-import { createDefaultSheetDocumentStateExportRegistry, type SheetDocumentState } from '@searsuite/sear-assembly-setup';
+import {
+  createDefaultSheetDocumentStateExportRegistry,
+  type SheetDocumentState,
+} from '@searsuite/sear-assembly-sheet-state';
 import { CellType } from '@searsuite/sear-domain-cell-types';
 import { CSRMatrix, ColumnShapeDimensionsCSRMatrix, RowShapeDimensionsCSRMatrix } from '@searsuite/sear-domain-matrix';
 import { createWorkbookDocumentState } from '@searsuite/sear-domain-workbook';
 import { DocumentStateCodecRegistry, ExportError, ExportErrorCode } from '@searsuite/sear-plugin-export';
-import { SheetMatrix } from '@searsuite/sear-render-engine';
+import { SheetMatrix } from '@searsuite/sear-domain-sheet';
 import { AlignmentMatrix, VerticalAlignmentMatrix } from '@searsuite/sear-plugin-alignment';
 import { CellFillMatrix } from '@searsuite/sear-plugin-cell-fill';
 import { CellHighlightKind, CellHighlightMatrix, CellHighlightStyle } from '@searsuite/sear-plugin-cell-highlight';
@@ -12,7 +15,11 @@ import { DuplicateMatrix } from '@searsuite/sear-plugin-duplicate';
 import { CellFormatMatrix } from '@searsuite/sear-plugin-cell-format';
 import { CellMergeMatrix } from '@searsuite/sear-plugin-cell-merge';
 import { FixedRowMatrix } from '@searsuite/sear-plugin-fixed-row';
-import { deserializeWorkbookDocumentState, serializeWorkbookDocumentState, WorkbookFormulaEvaluationRuntime } from '../src';
+import {
+  deserializeWorkbookDocumentState,
+  serializeWorkbookDocumentState,
+} from '@searsuite/sear-assembly-workbook-kernel';
+import { WorkbookFormulaEvaluationRuntime } from '@searsuite/sear-assembly-workbook-kernel';
 
 interface ExtendedSheetDocumentState extends SheetDocumentState {
   readonly backgroundColors: CSRMatrix<string>;
@@ -24,20 +31,36 @@ describe('Workbook export JSON', () => {
     main.sheetData.addItem(0, 0, { type: CellType.Formula, formula: '=Data!A1' });
     const workbook = createWorkbookDocumentState({
       id: 'book',
-      sheets: [{ id: 'main', name: 'Main' }, { id: 'data', name: 'Data' }],
+      sheets: [
+        { id: 'main', name: 'Main' },
+        { id: 'data', name: 'Data' },
+      ],
       sheetStates: { main, data: createSheetState([2, 2]) },
     });
     const file = serializeWorkbookDocumentState(workbook);
-    expect(file.workbook.formulaBindings).toEqual([{
-      sheetId: 'main', row: 0, col: 0, formula: '=Data!A1',
-      references: [{ sheetName: 'Data', sheetId: 'data' }],
-    }]);
+    expect(file.workbook.formulaBindings).toEqual([
+      {
+        sheetId: 'main',
+        row: 0,
+        col: 0,
+        formula: '=Data!A1',
+        references: [{ sheetName: 'Data', sheetId: 'data' }],
+      },
+    ]);
     const restored = deserializeWorkbookDocumentState({
       ...file,
-      workbook: { ...file.workbook, sheets: [{ id: 'main', name: 'Main' }, { id: 'data', name: 'Renamed' }] },
+      workbook: {
+        ...file.workbook,
+        sheets: [
+          { id: 'main', name: 'Main' },
+          { id: 'data', name: 'Renamed' },
+        ],
+      },
     });
     const compiled = new WorkbookFormulaEvaluationRuntime().compileFormula(
-      { sheetId: 'main', row: 0, col: 0 }, '=Data!A1', restored,
+      { sheetId: 'main', row: 0, col: 0 },
+      '=Data!A1',
+      restored,
     );
     expect(compiled.dependencies).toEqual([{ sheetId: 'data', row: 0, col: 0 }]);
   });
@@ -63,10 +86,16 @@ describe('Workbook export JSON', () => {
     sheetOne.cellAlignments.addItem(1, 1, 'right');
     sheetOne.cellVerticalAlignments.addItem(1, 1, 'bottom');
     sheetOne.cellFills.addItem(1, 1, '#e6f0ff');
-    sheetOne.cellHighlights.setItem(1, 1, [{
-      id: 'highlight-1', priority: 1, endRow: 2, endColumn: 2,
-      condition: { kind: CellHighlightKind.Duplicate }, style: CellHighlightStyle.RedFill,
-    }]);
+    sheetOne.cellHighlights.setItem(1, 1, [
+      {
+        id: 'highlight-1',
+        priority: 1,
+        endRow: 2,
+        endColumn: 2,
+        condition: { kind: CellHighlightKind.Duplicate },
+        style: CellHighlightStyle.RedFill,
+      },
+    ]);
     sheetOne.fixedRows?.addItem(0, 2, true);
     sheetOne.rowHiddenOriginalSizes?.addItem(0, 3, 24);
     sheetOne.columnHiddenOriginalSizes?.addItem(0, 4, 100);
@@ -132,10 +161,16 @@ describe('Workbook export JSON', () => {
     expect(restoredOne.cellAlignments.getItem(0, 0)).toBe('left');
     expect(restoredOne.cellAlignments.getItem(1, 1)).toBe('right');
     expect(restoredOne.cellFills.getItem(1, 1)).toBe('#e6f0ff');
-    expect(restoredOne.cellHighlights.getItem(1, 1)).toEqual([{
-      id: 'highlight-1', priority: 1, endRow: 2, endColumn: 2,
-      condition: { kind: CellHighlightKind.Duplicate }, style: CellHighlightStyle.RedFill,
-    }]);
+    expect(restoredOne.cellHighlights.getItem(1, 1)).toEqual([
+      {
+        id: 'highlight-1',
+        priority: 1,
+        endRow: 2,
+        endColumn: 2,
+        condition: { kind: CellHighlightKind.Duplicate },
+        style: CellHighlightStyle.RedFill,
+      },
+    ]);
     expect(restoredOne.cellBorders?.getItem(1, 1)).toEqual({
       top: { color: '#256cfb', style: SheetBorderLineStyle.Double },
     });

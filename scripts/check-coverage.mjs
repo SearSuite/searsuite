@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const coverageFinalPath = join(process.cwd(), 'coverage', 'coverage-final.json');
-// Shared Sheet runtime tests run separately in searsuite-test.
+// Integration workloads supplement these package-level coverage thresholds.
 const thresholds = {
   branches: 79,
   functions: 80,

@@ -1,6 +1,6 @@
 import { DocCommandBus, defineDocCommand } from '@searsuite/sear-assembly-commands';
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
-import { RepaintDocTransaction } from '@searsuite/sear-domain-commands';
+import { DocTransaction } from '@searsuite/sear-domain-commands';
 import {
   applyInlineTextStylePropertyMutation,
   readTextStyleAttrs,
@@ -8,9 +8,8 @@ import {
   type RichTextInlineStyleContribution,
 } from '@searsuite/sear-domain-doc';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { type RichTextRunRenderContribution } from '@searsuite/sear-render-node';
 import { InlineTextStylePluginBase } from '../InlineTextStylePluginBase';
-import { DocContentRenderPluginKey } from '../../plugin/DocFeaturePluginKeys';
+
 import { createDocCommand } from '../../plugin/DocPluginCommandUtils';
 
 /** Persisted style key owned by the text-color style plugin. */
@@ -34,7 +33,7 @@ export class TextColorStylePlugin extends InlineTextStylePluginBase {
 
   /** Creates a TextColorStylePlugin instance. */
   public constructor() {
-    super(new PluginKey('DocTextColorStyle'), createTextColorContribution(), createTextColorRenderContribution());
+    super(new PluginKey('DocTextColorStyle'), createTextColorContribution());
   }
 
   public override registerCommands(commands: DocCommandBus): void {
@@ -43,7 +42,7 @@ export class TextColorStylePlugin extends InlineTextStylePluginBase {
 
   #createSetTextColorCommand(input: SetDocTextColorInput) {
     const color = normalizeTextColor(input?.color);
-    return createDocCommand(SetDocTextColorCommand.id, DocContentRenderPluginKey, () => {
+    return createDocCommand(SetDocTextColorCommand.id, () => {
       const runtime = this.requireRuntime();
       const mutation = runtime.document.inlineStyles.requireMutation(TextColorStyleKey.Color);
       return runtime.document.input.createTransaction(
@@ -55,7 +54,7 @@ export class TextColorStylePlugin extends InlineTextStylePluginBase {
             color,
             (attrs) => mutation.apply({ attrs, value: color }),
           ),
-        new RepaintDocTransaction(),
+        new DocTransaction().setMeta('doc.changedInlineStyles', ['color']),
       );
     });
   }
@@ -70,30 +69,11 @@ export function createTextColorContribution(): RichTextInlineStyleContribution {
   };
 }
 
-/** Creates the render-layer text-color contribution. */
-export function createTextColorRenderContribution(): RichTextRunRenderContribution {
-  return {
-    key: `text.${TextColorStyleKey.Color}`,
-    applyRenderState: applyTextColor,
-  };
-}
-
 function readTextColor(input: { readonly attrs: Record<string, unknown> }): RichTextInlineStyle | undefined {
   const style = readTextStyleAttrs(input.attrs);
   return typeof style[TextColorStyleKey.Color] === 'string'
     ? { [TextColorStyleKey.Color]: style[TextColorStyleKey.Color] }
     : void 0;
-}
-
-function applyTextColor(input: {
-  readonly context: { setFillStyle(fillStyle: string): void; setStrokeStyle?(strokeStyle: string): void };
-  readonly style: RichTextInlineStyle | undefined;
-}): void {
-  const color = input.style?.[TextColorStyleKey.Color];
-  if (typeof color === 'string') {
-    input.context.setFillStyle(color);
-    input.context.setStrokeStyle?.(color);
-  }
 }
 
 function applyTextColorMutation(input: {

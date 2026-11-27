@@ -1,78 +1,20 @@
-import {
-  type SheetDocumentState,
-  type SheetEditor,
-  type SheetEditorAdapters,
-  type SheetEditorConfiguration,
-  type SheetPlugin,
-  type SheetPluginImplementation,
-  type SheetSessionState,
-} from '@searsuite/sear-assembly-setup';
-import { type WorkbookDocumentState, type WorkbookSheetId } from '@searsuite/sear-domain-workbook';
-import { type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
-import { type WorkbookCommandBus } from './WorkbookCommandBus';
-import { type WorkbookDocumentApi } from './WorkbookDocumentApi';
-import { type WorkbookRuntimeCapabilityReader } from './WorkbookRuntimeExtensionRegistry';
-import { type WorkbookSessionState } from './WorkbookSessionState';
-import { type WorkbookSheetsApi } from './WorkbookSheetsApi';
-import { type WorkbookPluginImplementation } from './WorkbookPluginContracts';
+import { type SheetEditor } from '@searsuite/sear-assembly-commands';
+import { type SheetEditorAdapters, type SheetEditorConfiguration } from '@searsuite/sear-assembly-setup';
+import { type WorkbookRuntimeConfiguration } from '@searsuite/sear-assembly-workbook-kernel';
+import { type WorkbookSheetId } from '@searsuite/sear-domain-workbook';
 
-/** Input passed when the workbook assembly creates one active SheetEditor. */
+/** Visual Sheet configuration supplied by Workbook browser and desktop hosts. */
 export interface WorkbookSheetEditorFactoryInput {
   readonly sheetId: WorkbookSheetId;
   readonly configuration: SheetEditorConfiguration;
 }
-
+/** Creates the selected visual Sheet facade. */
 export type WorkbookSheetEditorFactory = (input: WorkbookSheetEditorFactoryInput) => SheetEditor;
-
-/** Read-only active SheetEditor capture hook used by custom hosts and focused tests. */
-export interface WorkbookSheetStateCaptureInput {
-  readonly sheetId: WorkbookSheetId;
-  readonly editor: SheetEditor;
-  readonly sheetState: SheetDocumentState;
-  readonly documentState: WorkbookDocumentState<SheetDocumentState>;
-}
-
-export type WorkbookSheetStateCapture = (input: WorkbookSheetStateCaptureInput) => SheetDocumentState;
-
-/** Read-only active SheetEditor session capture hook. */
-export interface WorkbookSheetSessionStateCaptureInput {
-  readonly sheetId: WorkbookSheetId;
-  readonly editor: SheetEditor;
-  readonly sessionState: SheetSessionState | undefined;
-}
-
-export type WorkbookSheetSessionStateCapture = (
-  input: WorkbookSheetSessionStateCaptureInput,
-) => SheetSessionState | undefined;
-
-/** Public configuration accepted by createWorkbookEditor(). */
-export interface WorkbookEditorConfiguration {
-  readonly documentState: WorkbookDocumentState<SheetDocumentState>;
-  readonly sessionState?: WorkbookSessionState;
-  readonly viewport?: { readonly width: number; readonly height: number };
+/** Visual Workbook composition layered on the neutral Workbook runtime. */
+export interface WorkbookEditorConfiguration
+  extends Omit<WorkbookRuntimeConfiguration, 'adapters' | 'sheetClientFactory'> {
   readonly adapters: SheetEditorAdapters;
-  readonly plugins?: readonly WorkbookPluginImplementation[];
-  readonly sheetPlugins?: readonly SheetPluginImplementation<SheetPlugin<unknown>>[];
+  readonly viewport?: { readonly width: number; readonly height: number };
+  readonly sheetViews?: SheetEditorConfiguration['viewExtensions'];
   readonly sheetEditorFactory?: WorkbookSheetEditorFactory;
-  readonly captureSheetState?: WorkbookSheetStateCapture;
-  readonly captureSheetSessionState?: WorkbookSheetSessionStateCapture;
-  readonly warn?: (message: string, ...details: unknown[]) => void;
-  /** One-time assembly callback for registering host-owned commands. */
-  readonly onCreated?: (editor: WorkbookEditor) => void;
-}
-
-/** Public workbook facade returned by createWorkbookEditor(). */
-export interface WorkbookEditor {
-  /** The supported command entry point for workbook user and program actions. */
-  readonly commands: WorkbookCommandBus;
-  /** Typed editor-local state and event observations exposed to the host. */
-  readonly observations: ObservationRegistry;
-  /** Read-only access to typed services owned by this editor's isolated runtime. */
-  readonly services: WorkbookRuntimeCapabilityReader;
-  /** Read-only access to document-owned workbook state. */
-  readonly document: WorkbookDocumentApi;
-  /** Read-only access to the active and mounted SheetEditor. */
-  readonly sheets: WorkbookSheetsApi;
-  /** Releases the active SheetEditor, plugins, observations, commands, and editor-local services. */
-  destroy(): void;
 }

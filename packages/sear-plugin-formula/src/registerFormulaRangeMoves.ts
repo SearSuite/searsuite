@@ -3,7 +3,9 @@ import { FormulaFormatter } from '@searsuite/sear-domain-formula-engine-ts';
 import { SheetRangeMoveRegistry, isPointInSheetMoveRange } from '@searsuite/sear-assembly-plugin';
 import { CellType, type CellMatrixElement } from '@searsuite/sear-domain-cell-types';
 import { createUpdateCellOTOperation, isUpdateCellOperation, MatrixCellUpdateIntent } from '@searsuite/sear-domain-ot';
-import { readSheetDataMatrix, SheetDataPlugin, type DataEngine } from '@searsuite/sear-render-engine';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
+import { readSheetDataMatrix } from '@searsuite/sear-domain-sheet';
+import { type DataEngine } from '@searsuite/sear-domain-state';
 
 /** Rewrites the value owner's plan and surviving formulas against one original reference space. */
 export function registerFormulaRangeMoves(

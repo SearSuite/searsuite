@@ -16,10 +16,10 @@ export interface KeyboardRouterHandlers {
   onEnter?: (shiftKey: boolean, primaryModifier?: boolean) => void;
   /** Enters editing while retaining the selected cell's content. */
   onEdit?: () => void;
-  /** Escape key – cancel the current edit. */
-  onEscape?: () => void;
-  /** Escape not handled by a focused host control. */
-  onUnhandledEscape?: () => void;
+  /** Escape key – cancel the current edit; return false to leave the key to the host. */
+  onEscape?: () => boolean | void;
+  /** Escape not handled by a focused host control; return true only when consumed. */
+  onUnhandledEscape?: () => boolean;
   /** Cycles the reference at the formula caret through relative and absolute modes. */
   onToggleReference?: () => void;
   onArrowLeft?: (shiftKey: boolean, metaKey: boolean, altKey?: boolean) => void;

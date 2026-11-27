@@ -33,8 +33,7 @@ export {
   type DocRuntimeCapabilityReader,
 } from './plugin/DocRuntimeExtensionRegistry';
 export * from './plugin/DocPluginContracts';
-export * from './plugin/DocPluginRuntimeCapability';
-export * from './plugin/DocFeaturePluginKeys';
+export * from './plugin/DocStatePluginKeys';
 export * from './plugin/DocPluginCommandUtils';
 export * from './inlinePlugin/InlineTextStylePluginBase';
 export * from './inlinePlugin/fontFamily/FontFamilyTextStylePlugin';
@@ -48,3 +47,21 @@ export * from './layoutPlugin/lineBox/RichTextLineBoxPlugin';
 export * from './blockPlugin/paragraph/ParagraphPlugin';
 export * from './blockPlugin/paragraph/ParagraphCommands';
 export * from './blockPlugin/table/TablePlugin';
+
+export * from './input/DocInputPlugin';
+export * from './input/lockCommittedDocInputState';
+
+export * from './selection/DocSelectionPlugin';
+export * from './input/DocTextPlugin';
+export * from './input/DocNavigationPlugin';
+export * from './history/HistoryPlugin';
+
+export * from './input/DocEditInput';
+
+export * from './input/DocEditModel';
+
+export * from './embeddedPlugin/SheetEmbeddedEditorPlugin';
+export * from './embeddedPlugin/SheetEmbeddedEditorPluginRegistry';
+export * from './embeddedPlugin/clipboard/SheetClipboardPlugin';
+export * from './embeddedPlugin/formulaReference/SheetFormulaReferencePlugin';
+export * from './embeddedPlugin/shortcut/SheetShortcutPlugin';

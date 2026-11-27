@@ -1,11 +1,7 @@
 /**
- * Cell catalogs that compose commit, display, render, and clipboard behavior.
- *
+ * Platform-neutral cell semantics and extension catalogs.
  * @packageDocumentation
  */
-
-export { defineCellRenderer, type CellRendererDefinition } from './CellRendererDefinition';
-export { CellRenderDefinition } from './CellRenderDefinition';
 export { CellTypeDefinition } from './CellTypeDefinition';
 export { createFormulaCellClipboardCodec } from './FormulaCellClipboardCodec';
 export { CellTypeCatalog } from './CellTypeCatalog';

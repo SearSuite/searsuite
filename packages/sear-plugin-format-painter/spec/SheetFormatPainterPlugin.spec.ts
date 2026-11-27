@@ -1,5 +1,5 @@
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import { type Pipeline } from '@searsuite/sear-assembly-core';
+import { type Pipeline } from '@searsuite/sear-assembly-plugin';
 import { PluginKey, SheetFormatTransferRegistry, createMatrixFormatTransfer } from '@searsuite/sear-assembly-plugin';
 import { NodePlatform as HeadlessPlatform } from '@searsuite/sear-node-adapters';
 import { ObservationRegistry } from '@searsuite/sear-foundation-subscription';
@@ -43,7 +43,7 @@ function harness() {
     executePipeline: (pipeline) => {
       last = pipeline;
       pipeline.steps.forEach((step) => step.localAction?.());
-      pipeline.emitComplete(false);
+      pipeline.emitComplete();
     },
     applyEffect: () => undefined,
   });
@@ -75,9 +75,7 @@ describe('Sheet format painter', () => {
 
     h.commands.run(ApplyFormatPainterCommand, { destination: range(19, 3) });
 
-    expect(h.last()!.steps[0].transaction!.operations).toEqual([
-      { p: [19, 3], uc: { value: '#ff0000', prev: null } },
-    ]);
+    expect(h.last()!.steps[0].transaction!.operations).toEqual([{ p: [19, 3], uc: { value: '#ff0000', prev: null } }]);
     expect(h.observations.getSnapshot(FormatPainterObservation).mode).toBeNull();
   });
 
@@ -102,7 +100,8 @@ describe('Sheet format painter', () => {
     h.commands.run(StartFormatPainterCommand, { source: range(0, 0) });
     (h.plugin as unknown as { snapshot: null; status: { mode: null; source: null } }).snapshot = null;
     (h.plugin as unknown as { snapshot: null; status: { mode: null; source: null } }).status = {
-      mode: null, source: null,
+      mode: null,
+      source: null,
     };
     expect(h.observations.getSnapshot(FormatPainterObservation).mode).toBe(FormatPainterMode.Once);
   });

@@ -1,4 +1,4 @@
-import { DocDebugOverlayPlugin } from '../src/doc/runtimePlugin/debugOverlay/DocDebugOverlayPlugin';
+import { DocDebugOverlayView } from '../src/doc/runtimePlugin/debugOverlay/DocDebugOverlayView';
 import { createDocEditor } from '../src/doc/createDocEditor';
 import { defaultDocConfig } from '@searsuite/sear-assembly-config';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
@@ -69,7 +69,7 @@ function registerSpecTextDocNodes(): void {
   registerTextDocNode(registry);
 }
 
-describe('DocDebugOverlayPlugin', () => {
+describe('DocDebugOverlayView', () => {
   beforeEach(() => {
     container = new Container();
   });
@@ -79,31 +79,18 @@ describe('DocDebugOverlayPlugin', () => {
   });
 
   it('instantiates and registers with proper symbol', () => {
-    const plugin = new DocDebugOverlayPlugin();
-    expect(DocDebugOverlayPlugin.symbol).toBeDefined();
-  });
-
-  it('registers state as null (stateless debug plugin)', () => {
-    const plugin = new DocDebugOverlayPlugin();
-    const stateRegistration = plugin.registerState();
-    expect(stateRegistration.state).toBeNull();
-    expect(stateRegistration.key).toBeDefined();
-  });
-
-  it('applies transactions without changing state', () => {
-    const plugin = new DocDebugOverlayPlugin();
-    const result = plugin.apply(null, { kind: 'dummy' });
-    expect(result).toBeNull();
+    const plugin = new DocDebugOverlayView();
+    expect(DocDebugOverlayView.symbol).toBeDefined();
   });
 
   it('returns null for render (no scene nodes)', () => {
-    const plugin = new DocDebugOverlayPlugin();
+    const plugin = new DocDebugOverlayView();
     const nodes = plugin.render();
     expect(nodes).toBeNull();
   });
 
   it('returns an overlay node when document frame state is available', () => {
-    const plugin = new DocDebugOverlayPlugin();
+    const plugin = new DocDebugOverlayView();
     const block = {
       id: 'p-16',
       index: 16,
@@ -112,7 +99,7 @@ describe('DocDebugOverlayPlugin', () => {
       rect: { x: 0, y: 384, width: 240, height: 24 },
       flowHeight: 24,
     };
-  container.registerInstance(ConfigEngine.symbol, new ConfigEngine(defaultDocConfig));
+    container.registerInstance(ConfigEngine.symbol, new ConfigEngine(defaultDocConfig));
     container.registerInstance(Tree.symbol, {
       getBoundary: () => new PositionRect(0, 0, 400, 300),
       updateBoundary: jest.fn(),
@@ -147,7 +134,7 @@ describe('DocDebugOverlayPlugin', () => {
   });
 
   it('draws block render debug snapshot rectangles', () => {
-    const plugin = new DocDebugOverlayPlugin();
+    const plugin = new DocDebugOverlayView();
     const block = {
       id: 'p-0',
       index: 0,
@@ -156,7 +143,7 @@ describe('DocDebugOverlayPlugin', () => {
       rect: { x: 0, y: 0, width: 240, height: 24 },
       flowHeight: 24,
     };
-  container.registerInstance(ConfigEngine.symbol, new ConfigEngine(defaultDocConfig));
+    container.registerInstance(ConfigEngine.symbol, new ConfigEngine(defaultDocConfig));
     container.registerInstance(Tree.symbol, {
       getBoundary: () => new PositionRect(0, 0, 400, 300),
       updateBoundary: jest.fn(),
@@ -226,7 +213,7 @@ describe('DocDebugOverlayPlugin', () => {
           editorContainer.registerInstance(WebKeyboardRouter.eventTargetSymbol, new EventTarget());
         },
       },
-      plugins: [DocDebugOverlayPlugin],
+      viewExtensions: [DocDebugOverlayView],
     });
 
     expect(editor).toBeDefined();
@@ -251,7 +238,7 @@ describe('DocDebugOverlayPlugin', () => {
           editorContainer.registerInstance(WebKeyboardRouter.eventTargetSymbol, new EventTarget());
         },
       },
-      plugins: [DocDebugOverlayPlugin],
+      viewExtensions: [DocDebugOverlayView],
     });
 
     // Trigger a render without errors
@@ -263,7 +250,7 @@ describe('DocDebugOverlayPlugin', () => {
   });
 
   it('plugin lifecycle methods work correctly', () => {
-    const plugin = new DocDebugOverlayPlugin();
+    const plugin = new DocDebugOverlayView();
 
     // Should not throw during configure (requires runtime context)
     const mockContext = {
@@ -282,7 +269,7 @@ describe('DocDebugOverlayPlugin', () => {
 
     // Should not throw during destroy
     expect(() => {
-      plugin.onEditorDestroy();
+      plugin.destroyView();
     }).not.toThrow();
   });
 });

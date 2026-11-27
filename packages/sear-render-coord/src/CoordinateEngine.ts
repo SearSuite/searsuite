@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
-import { Plugin, PluginKey } from '@searsuite/sear-assembly-plugin';
+import { PluginKey } from '@searsuite/sear-assembly-plugin';
+import { ViewExtensionBase } from '@searsuite/sear-render-event-engine';
 import { SearCoreSheet } from '@searsuite/sear-assembly-core';
 import { ScrollManager } from '@searsuite/sear-render-scroll';
 import { CellProperties } from '@searsuite/sear-render-registry';
 import type { EventWithOffsetAndTarget } from '@searsuite/sear-render-event-engine';
-import { Transaction } from '@searsuite/sear-domain-transaction';
-import { Node } from '@searsuite/sear-render-node';
+
 import { PositionRect } from '@searsuite/sear-foundation-rect';
 import { CoordinateTransformer } from '@searsuite/sear-render-context';
 
@@ -32,7 +32,7 @@ export interface CoordinateState {
 }
 
 /**
- * Creates the default coordinate plugin state.
+ * Creates default local coordinate values.
  * @returns Initial pointer and scroll coordinates.
  */
 export function createDefaultCoordinateState(): CoordinateState {
@@ -45,24 +45,24 @@ export function createDefaultCoordinateState(): CoordinateState {
 }
 
 /**
- * Sheet plugin that tracks pointer and scroll coordinates.
+ * Sheet view service that tracks pointer and scroll coordinates.
  *
- * CoordinateEngine is the plugin-facing facade over CoordinateTransformer:
+ * CoordinateEngine is the view-facing facade over CoordinateTransformer:
  * it caches the latest host pointer position, reads ScrollManager state, and
  * exposes conversions between view and world coordinates.
  */
 @Injectable()
-export class CoordinateEngine extends Plugin<SearCoreSheet, CellProperties, CoordinateState> {
+export class CoordinateEngine extends ViewExtensionBase<SearCoreSheet, CellProperties> {
   readonly #scrollManager: ScrollManager;
   readonly #coordinates: CoordinateTransformer;
 
   /** DI token for resolving the coordinate engine. */
   public static readonly symbol: symbol = Symbol.for('CoordinateEngine');
-  /** Stable plugin key for coordinate state registration. */
-  public static readonly pluginKey: PluginKey = key;
+  /** Stable identity for pointer event ordering. */
+  public static readonly viewKey = key;
 
-  /** Coordinate state is metadata and should render before visible plugins if queried. */
-  public override depth: number = -Infinity;
+  /** Tracks pointer events before visible views consume them. */
+  public depth: number = -Infinity;
   #mouseScreenX = 0;
   #mouseScreenY = 0;
 
@@ -77,7 +77,7 @@ export class CoordinateEngine extends Plugin<SearCoreSheet, CellProperties, Coor
     @Inject(CoordinateTransformer.symbol)
     coordinates: CoordinateTransformer,
   ) {
-    super({ key, state: createDefaultCoordinateState() });
+    super(key);
     this.#scrollManager = scrollManager;
     this.#coordinates = coordinates;
   }
@@ -97,7 +97,7 @@ export class CoordinateEngine extends Plugin<SearCoreSheet, CellProperties, Coor
    * Tracks the latest pointer position from sheet mouse-move events.
    * @param event - Pointer event carrying host-view offsets.
    */
-  public override onMouseMove(_searCore: SearCoreSheet, event: EventWithOffsetAndTarget<CellProperties>): void {
+  public onMouseMove(_searCore: SearCoreSheet, event: EventWithOffsetAndTarget<CellProperties>): void {
     this.#mouseScreenX = event.origin.offsetX;
     this.#mouseScreenY = event.origin.offsetY;
   }
@@ -166,29 +166,5 @@ export class CoordinateEngine extends Plugin<SearCoreSheet, CellProperties, Coor
   public getVisibleScreenRect(): PositionRect<unknown> {
     const [width, height] = this.#scrollManager.getShape();
     return new PositionRect(0, 0, width, height);
-  }
-
-  /**
-   * Keeps coordinate state unchanged for data transactions.
-   * @param state - Current coordinate state.
-   * @returns The unchanged coordinate state.
-   */
-  public apply(state: CoordinateState, _transaction: Transaction): CoordinateState | null {
-    return null;
-  }
-
-  /** CoordinateEngine does not render scene nodes directly. */
-  public render(): Node<CellProperties>[] | null {
-    return null;
-  }
-
-  /** CoordinateEngine has no plugin-specific configuration. */
-  public getPluginConfig(): unknown {
-    return {};
-  }
-
-  /** Registers coordinate state under the plugin key. */
-  public registerState() {
-    return { key: this.key, state: this.getState(), dataEngine: { enabled: false } };
   }
 }

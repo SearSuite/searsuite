@@ -3,16 +3,18 @@ import { segmentTextGraphemes } from '@searsuite/sear-domain-doc';
 import type { Schema } from '@searsuite/sear-domain-doc-schema';
 import type { SheetEditRenderOptions, SheetEditSession } from './SheetEmbeddedEditor';
 import type {
-  SheetCompositionInput,
   SheetCompositionState,
   SheetCursorState,
-  SheetEditInput,
   SheetEmbeddedEditorContext,
-  SheetInlineStyleUpdate,
   SheetPointerInput,
   SheetRenderUpdate,
-  SheetTextSelection,
 } from './SheetEditorTypes';
+import type {
+  SheetCompositionInput,
+  SheetEditInput,
+  SheetInlineStyleUpdate,
+  SheetTextSelection,
+} from '@searsuite/sear-assembly-doc';
 import { cloneDocument } from './cloneDocument';
 import { createUpdate } from './createUpdate';
 import { firstTextNode } from './firstTextNode';
@@ -125,9 +127,10 @@ export class FakeEditSession implements SheetEditSession {
         };
       } else if (input.key === 'ArrowLeft' || input.key === 'ArrowRight') {
         const ranges = segmentTextGraphemes(currentText);
-        const nextOffset = input.key === 'ArrowLeft'
-          ? ranges.find(({ start, end }) => start < offset && offset <= end)?.start ?? 0
-          : ranges.find(({ start, end }) => start <= offset && offset < end)?.end ?? currentText.length;
+        const nextOffset =
+          input.key === 'ArrowLeft'
+            ? ranges.find(({ start, end }) => start < offset && offset <= end)?.start ?? 0
+            : ranges.find(({ start, end }) => start <= offset && offset < end)?.end ?? currentText.length;
         if (input.shiftKey) {
           this.#selection = { ...this.#selection, head: { path: textNode.path, offset: nextOffset } };
         } else {

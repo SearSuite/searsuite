@@ -48,8 +48,8 @@
  *
  * Assemblies construct editor runtimes from selected packages. The current visual editor renders in Web browsers
  * through host-provided rendering and input adapters. The headless assembly runs on Node.js and does not require visual
- * adapters. The host remains responsible for application UI, persistence, credentials, and product policy. A
- * cross-platform Rust core is under development.
+ * adapters. The host remains responsible for application UI, persistence, credentials, and product policy.
+ * State plugins remain independent of the optional view extensions.
  *
  * The Guide describes the package boundaries and runtime model. The [Reference Manual](/docs/ref/) documents public
  * types, functions, and commands.
@@ -67,14 +67,19 @@
  * `createSheetEditor()` assembles a single Sheet from document state, selected plugins, a viewport session, and
  * rendering and input adapters. Its facade exposes commands, queries, observations, and runtime services.
  *
+ * `createSheetKernelEditor()` from `sear-assembly-sheet-kernel` composes the same business contracts without a scene
+ * or native input adapters. The Headless assembly uses that independent runtime directly. Visual assembly adds
+ * view extensions and subscribes to committed state; local painting does not create a document transaction.
+ *
  * `createWorkbookEditor()` owns Workbook structure and mounts a Sheet editor for the active Sheet. Its facade exposes
  * commands, observations, and services. Structural reads use `document`; access to the mounted Sheet uses
  * `sheets`. Each editor facade provides `destroy()` for runtime teardown.
  *
  * ```ts
  * import {
- *   createEmptySheetDocumentState, createSheetEditor, type SheetEditorAdapters,
- * } from '@searsuite/sear-assembly-setup';
+ *   createSheetEditor, type SheetEditorAdapters,
+ * } from './index';
+ * import { createEmptySheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
  * import { SelectRangeCommand } from '@searsuite/sear-plugin-selection';
  *
  * function openSheet(adapters: SheetEditorAdapters) {
@@ -157,107 +162,7 @@
  */
 
 export { registerDefaultDependencies } from './registerDefaultDependencies';
-export { createEmptySheetDocumentState } from './sheet/createEmptySheetDocumentState';
-export { cloneSheetDocumentState } from './sheet/cloneSheetDocumentState';
-export {
-  SheetRuntimeExtensionRegistry,
-  defineSheetRuntimeCapability,
-  type SheetRuntimeCapability as SheetRuntimeCapabilityToken,
-  type SheetRuntimeCapabilityReader,
-} from './sheet/SheetRuntimeExtensionRegistry';
-export {
-  ClearDocCompositionCommand,
-  DeleteDocBackwardCommand,
-  DocCaretPluginKey,
-  DocCompositionPluginKey,
-  DocContentRenderPluginKey,
-  DocPlugin,
-  DocPluginRuntimeCapability,
-  DocRuntimeExtensionRegistry,
-  DocRuntimeCapability,
-  RichTextLineBoxPlugin,
-  FocusDocCommand,
-  FontFamilyTextStylePlugin,
-  FontSizeTextStylePlugin,
-  BoldTextStylePlugin,
-  BoldTextStyleKey,
-  ItalicTextStylePlugin,
-  ItalicTextStyleKey,
-  UnderlineTextStylePlugin,
-  UnderlineTextStyleKey,
-  StrikethroughTextStylePlugin,
-  StrikethroughTextStyleKey,
-  FontFamilyTextStyleKey,
-  FontSizeTextStyleKey,
-  InsertDocTableCommand,
-  InsertDocTextCommand,
-  LoadDocumentCommand,
-  MoveDocCursorCommand,
-  ParagraphPlugin,
-  RenderDocCommand,
-  SelectAllDocCommand,
-  SetDocCompositionCommand,
-  SetDocFontFamilyCommand,
-  SetDocFontSizeCommand,
-  SetDocBoldCommand,
-  ToggleDocBoldCommand,
-  SetDocItalicCommand,
-  ToggleDocItalicCommand,
-  SetDocUnderlineCommand,
-  ToggleDocUnderlineCommand,
-  SetDocStrikethroughCommand,
-  ToggleDocStrikethroughCommand,
-  SetDocSelectionCommand,
-  SplitDocParagraphCommand,
-  TablePlugin,
-  TextColorStylePlugin,
-  TextColorStyleKey,
-  SetDocTextColorCommand,
-  defineDocRuntimeCapability,
-  registerDocPluginCapabilities,
-  registerDocPluginCommands,
-  registerDocPluginInlineStyles,
-  registerDocPluginLineBoxes,
-  registerDocPluginObservations,
-  registerDocPluginSessionStates,
-  type DocInteractionRuntime,
-  type DocPluginImplementation,
-  type DocPluginRuntime,
-  type DocPluginRuntimeContext,
-  type DocPluginServiceContext,
-  type DocPluginSetupContext,
-  type DocRuntimeCapability as DocRuntimeCapabilityToken,
-  type DocRuntimeCapabilityReader,
-  type InsertDocTableInput,
-  type InsertDocTextInput,
-  type LoadDocumentInput,
-  type MoveDocCursorInput,
-  type SetDocCompositionInput,
-  type SetDocFontFamilyInput,
-  type SetDocFontSizeInput,
-  type SetDocTextColorInput,
-  type SetDocBoldInput,
-  type SetDocItalicInput,
-  type SetDocUnderlineInput,
-  type SetDocStrikethroughInput,
-  type SetDocSelectionInput,
-} from '@searsuite/sear-assembly-doc';
-export {
-  SheetPlugin,
-  SheetRuntimeCapability,
-  registerSheetPluginCellVisualReaders,
-  registerSheetPluginCapabilities,
-  registerSheetPluginCommands,
-  registerSheetPluginQueries,
-  registerSheetPluginObservations,
-  registerSheetPluginSessionStates,
-  type SheetPluginImplementation,
-  type SheetPluginRuntime,
-  type SheetPluginRuntimeContext,
-  type SheetPluginServiceContext,
-  type SheetPluginSetupContext,
-  type SheetPluginSetupRuntime,
-} from './sheet/SheetPluginContracts';
+
 export {
   SessionStateError,
   SessionStateErrorCode,
@@ -269,35 +174,10 @@ export {
   type SessionStateDefinition,
   type SessionStateSnapshot,
 } from '@searsuite/sear-assembly-plugin';
-export {
-  CaretPlugin,
-  DefaultDocFeaturePlugins,
-  DocContentRenderPlugin,
-  DocDebugOverlayPlugin,
-  DocHistorySessionStateDefinition,
-  DocHistoryStatusObservation,
-  DocSelectionObservation,
-  DocSelectionSessionStateDefinition,
-  HistoryPlugin,
-  RedoDocCommand,
-  SelectionPlugin,
-  TextInputPlugin,
-  UndoDocCommand,
-  type DocHistoryEntry,
-  type DocHistorySessionState,
-  type DocHistoryStatus,
-} from './doc/DefaultDocFeaturePlugins';
+export { DefaultDocFeaturePlugins } from './doc/DefaultDocFeaturePlugins';
 export { DocInputBindingRegistry } from './doc/DocInputBindingRegistry';
 export { DocCaretState } from './doc/DocCaretState';
-export {
-  createSheetEditor,
-  type SheetEditor,
-  type SheetEditorAdapters,
-  type SheetEditorConfiguration,
-  type SheetDocumentState,
-  type SheetSessionState,
-} from './sheet/createSheetEditor';
-export { SheetDebugOverlayPlugin } from './sheet/runtimePlugin/debugOverlay/SheetDebugOverlayPlugin';
+export { createSheetEditor, type SheetEditorAdapters, type SheetEditorConfiguration } from './sheet/createSheetEditor';
 export {
   createDocEditor,
   type DocEditor,
@@ -312,8 +192,6 @@ export {
 export { registerDocBaseServices, type DocBaseServices } from './doc/registerDocBaseServices';
 export { registerDocRuntime, type DocRuntime } from './doc/registerDocRuntime';
 export { registerDefaultDocFeatures, registerDocFeaturePlugins } from './doc/registerDefaultDocFeatures';
-export { DefaultSheetClipboardDataSource } from './sheet/DefaultSheetClipboardDataSource';
-export { SheetClipboardWorkbookBridgeSymbol, type SheetClipboardWorkbookBridge } from './sheet/SheetClipboardWorkbookBridge';
 export {
   DocRenderLayoutService,
   type DocRenderLayout,
@@ -340,25 +218,8 @@ export {
   type SheetScrollToInput,
   type SheetViewportSessionState,
 } from './sheet/SheetViewportCommands';
-export { UpdateSheetDefaultConfigCommand, registerSheetConfigCommands } from './sheet/SheetConfigCommands';
-export { UnregisterSheetInputValidatorCommand } from './sheet/SheetInputValidationCommands';
-export { PublishSheetDisplayedValueChangesCommand } from './sheet/SheetDisplayedValueCommands';
+export { PublishSheetDisplayedValueChangesCommand } from '@searsuite/sear-assembly-commands';
 export { UpdateDocDefaultConfigCommand, registerDocConfigCommands } from './doc/DocConfigCommands';
-export {
-  ExportSheetStateCommand,
-  registerSheetStateSnapshotCommands,
-  type ExportSheetStateCommandResult,
-} from './sheet/SheetStateSnapshotCommands';
-export {
-  createDefaultSheetDocumentStateExportRegistry,
-  deserializeSheetDocumentState,
-  serializeSheetDocumentState,
-} from './sheet/SheetDocumentStateExportCodecs';
-export {
-  CaptureSheetSessionStateCommand,
-  registerSheetSessionStateCommands,
-  type CaptureSheetSessionStateCommandResult,
-} from './sheet/SheetSessionStateCommands';
 export {
   ApplyDocViewportScrollCommand,
   DocViewportObservation,
@@ -388,3 +249,25 @@ export {
   registerDocStateSnapshotCommands,
   type ExportDocStateCommandResult,
 } from './doc/DocStateSnapshotCommands';
+
+export {
+  SheetViewCapability,
+  type SheetViewSetupRuntime,
+  type SheetViewRuntime,
+  type SheetViewRuntimeContext,
+} from './sheet/SheetViewContracts';
+
+export * from './doc/DocViewContracts';
+export * from './doc/DocViewCapabilities';
+
+export * from './doc/DefaultDocViews';
+
+export {
+  SheetView,
+  type SheetViewImplementation,
+  type SheetViewServiceContext,
+  type SheetViewSetupContext,
+} from './sheet/SheetViewContracts';
+
+export * from './doc/DocViewKeys';
+export * from './doc/DocViewCommands';

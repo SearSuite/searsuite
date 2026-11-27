@@ -1,4 +1,5 @@
-import { DocCursorManager, DocInputPlugin } from '@searsuite/sear-assembly-core';
+import { DocCursorManager } from '@searsuite/sear-assembly-core';
+import { DocInputPlugin } from '@searsuite/sear-assembly-doc';
 import { cloneRichDocument, RichDocNode, TextNode, normalizeDocForEdit } from '@searsuite/sear-domain-doc';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 

@@ -1,52 +1,28 @@
-import {
-  SheetRangeMoveRegistry,
-  SheetRangeReorderRegistry,
-  SheetStructureMoveRegistry,
-} from '@searsuite/sear-assembly-plugin';
+import { registerSheetRuntimeServices } from '@searsuite/sear-assembly-sheet-kernel';
+import { bindSheetFormulaPriority } from './bindSheetFormulaPriority';
+
+import { ViewExtensionRegistry } from '@searsuite/sear-render-event-engine';
+
 import { type SearCoreSheet } from '@searsuite/sear-assembly-core';
-import { SheetCommandBus, SheetQueryRegistry } from '@searsuite/sear-assembly-commands';
-import { createDefaultCellFormatLocaleProvider, ICellFormatLocaleProvider } from '@searsuite/sear-domain-cell-types';
+import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
+
 import { type Container, Scope } from '@searsuite/sear-foundation-di';
-import { FileDownload, UnavailableFileDownload, Platform } from '@searsuite/sear-foundation-platform';
-import { ObservationRegistry } from '@searsuite/sear-foundation-subscription';
-import {
-  type CellProperties,
-  NodeFactory,
-  RenderCoordinatorManager,
-  RendererRegistry,
-  SheetCellVisualReaderRegistry,
-  SheetNodeFactory,
-  SheetRenderCoordinatorManager,
-  SheetRendererRegistry,
-} from '@searsuite/sear-render-registry';
+
+import { type CellProperties, NodeFactory, RenderCoordinatorManager, RendererRegistry, SheetCellVisualReaderRegistry, SheetNodeFactory, SheetRenderCoordinatorManager, SheetRendererRegistry } from '@searsuite/sear-render-registry';
 import { CoordinateTransformer, RenderContext } from '@searsuite/sear-render-context';
 import { CoordinateEngine } from '@searsuite/sear-render-coord';
 import { EventEngine, EventRegistrar } from '@searsuite/sear-render-event-engine';
 import { SheetRenderEngine } from '@searsuite/sear-render-engine';
-import { SceneGraph } from '@searsuite/sear-render-node';
+
 import { RenderContextTextShaper, TextShaper } from '@searsuite/sear-render-metrics';
 import { ScrollManager, Scroller, type ScrollPublisher } from '@searsuite/sear-render-scroll';
-import {
-  DirtyRenderStrategy,
-  EventRenderStrategy,
-  HitRenderStrategy,
-  OverlayRenderStrategy,
-  RasterCopyExecutor,
-  RenderStrategyManager,
-  ScreenRenderStrategy,
-  StickyRenderStrategy,
-} from '@searsuite/sear-render-strategy';
+import { DirtyRenderStrategy, EventRenderStrategy, HitRenderStrategy, OverlayRenderStrategy, RasterCopyExecutor, RenderStrategyManager, ScreenRenderStrategy, StickyRenderStrategy } from '@searsuite/sear-render-strategy';
 import { PluginManager } from '@searsuite/sear-assembly-plugin';
 import { SearFormulaBar, SearToolbar } from '@searsuite/sear-assembly-plugin';
-import { UserInteractionService } from '@searsuite/sear-foundation-user-interaction';
+
 import { type SheetEditorAdapters } from './SheetEditorContracts';
-import { InMemorySheetClipboard, SheetClipboard, SheetClipboardCutSession, SheetClipboardSheetIdentity } from '@searsuite/sear-plugin-clipboard';
-import { NoopSheetExternalHistory, SheetExternalHistory } from '@searsuite/sear-plugin-history';
-import {
-  SheetEmbeddedEditor,
-  type SheetDocument,
-  type SheetEmbeddedEditorContext,
-} from '@searsuite/sear-sheet-editor-contract';
+
+import { SheetEmbeddedEditor, type SheetDocument, type SheetEmbeddedEditorContext } from '@searsuite/sear-sheet-editor-contract';
 
 /** Runtime services assembled after base services and host adapters are available. */
 export interface EditorRuntime {
@@ -65,7 +41,7 @@ export interface EditorRuntime {
   /** Optional host-provided editor for rich text embedded in Sheet cells. */
   readonly embeddedEditor?: SheetEmbeddedEditor | undefined;
   /** Sheet plugin manager populated by feature registration. */
-  readonly pluginManager: PluginManager<SearCoreSheet, CellProperties>;
+  readonly pluginManager: PluginManager;
 }
 
 /**
@@ -82,6 +58,7 @@ export function registerEditorRuntime(
   viewport: { width: number; height: number },
   devicePixelRatio: number,
 ): EditorRuntime {
+  const { pluginManager } = registerSheetRuntimeServices(container, adapters);
   const { renderContext, offScreenRenderContext, hitRenderContext } = adapters.createRenderContexts();
   renderContext.initialize(devicePixelRatio);
   offScreenRenderContext.initialize(devicePixelRatio);
@@ -89,18 +66,12 @@ export function registerEditorRuntime(
   container.registerInstance(RenderContext.symbol, renderContext);
   container.registerInstance(RenderContext.offScreenSymbol, offScreenRenderContext);
   container.registerInstance(RenderContext.hitSymbol, hitRenderContext);
-  if (!container.hasBinding(ICellFormatLocaleProvider.symbol)) {
-    container.registerInstance(ICellFormatLocaleProvider.symbol, createDefaultCellFormatLocaleProvider());
-  }
   const textShaper = adapters.createTextShaper?.(renderContext) ?? new RenderContextTextShaper(renderContext);
   container.registerInstance(TextShaper.symbol, textShaper);
   container.registerInstance(NodeFactory.symbol, new SheetNodeFactory());
   const rendererRegistry = new SheetRendererRegistry<CellProperties>();
   container.registerInstance(RendererRegistry.symbol, rendererRegistry);
   container.register(SheetCellVisualReaderRegistry.symbol, SheetCellVisualReaderRegistry, Scope.Singleton);
-  container.register(SheetRangeMoveRegistry.symbol, SheetRangeMoveRegistry, Scope.Singleton);
-  container.register(SheetRangeReorderRegistry.symbol, SheetRangeReorderRegistry, Scope.Singleton);
-  container.register(SheetStructureMoveRegistry.symbol, SheetStructureMoveRegistry, Scope.Singleton);
   container.register(SheetRenderCoordinatorManager.symbol, SheetRenderCoordinatorManager, Scope.Singleton);
   container.registerFactory(
     RenderCoordinatorManager.symbol,
@@ -114,7 +85,6 @@ export function registerEditorRuntime(
   container.registerInstance(ScrollManager.symbol, scrollManager);
   container.register(CoordinateTransformer.symbol, CoordinateTransformer, Scope.Singleton);
   container.register(CoordinateEngine.symbol, CoordinateEngine, Scope.Singleton);
-  container.register(SheetCommandBus.symbol, SheetCommandBus, Scope.Singleton);
   const embeddedEditor = container.hasBinding(SheetEmbeddedEditor.symbol)
     ? container.resolve<SheetEmbeddedEditor>(SheetEmbeddedEditor.symbol)
     : undefined;
@@ -132,30 +102,11 @@ export function registerEditorRuntime(
   container.register(EventRenderStrategy.symbol, EventRenderStrategy, Scope.Singleton);
   container.register(HitRenderStrategy.symbol, HitRenderStrategy, Scope.Singleton);
   container.register(EventRegistrar.symbol, adapters.eventRegistrar, Scope.Singleton);
-  if (!container.hasBinding(FileDownload.symbol)) {
-    container.register(FileDownload.symbol, adapters.fileDownload ?? UnavailableFileDownload, Scope.Singleton);
-  }
   container.register(SearToolbar.symbol, adapters.toolbar, Scope.Singleton);
   if (adapters.formulaBar) container.register(SearFormulaBar.symbol, adapters.formulaBar, Scope.Singleton);
-  if (adapters.userInteraction)
-    container.register(UserInteractionService.symbol, adapters.userInteraction, Scope.Singleton);
-  container.register(SheetClipboard.symbol, adapters.clipboard ?? InMemorySheetClipboard, Scope.Singleton);
-  if (!container.hasBinding(SheetClipboardCutSession.symbol))
-    container.registerInstance(SheetClipboardCutSession.symbol, new SheetClipboardCutSession());
-  if (!container.hasBinding(SheetClipboardSheetIdentity.symbol))
-    container.registerInstance(SheetClipboardSheetIdentity.symbol,
-      new SheetClipboardSheetIdentity(container.resolve<Platform>(Platform.symbol).createId('sheet-clipboard-source')));
-  if (!container.hasBinding(SheetExternalHistory.symbol))
-    container.registerInstance(SheetExternalHistory.symbol, new NoopSheetExternalHistory());
   container.register(EventEngine.symbol, EventEngine, Scope.Singleton);
-  container.register(SheetQueryRegistry.symbol, SheetQueryRegistry, Scope.Singleton);
-  container.register(ObservationRegistry.symbol, ObservationRegistry, Scope.Singleton);
-  container.registerFactory(
-    PluginManager.symbol,
-    () => new PluginManager<SearCoreSheet, CellProperties>(container.resolve<Platform>(Platform.symbol)),
-    Scope.Singleton,
-  );
-  const pluginManager = container.resolve<PluginManager<SearCoreSheet, CellProperties>>(PluginManager.symbol);
+  container.registerInstance(ViewExtensionRegistry.symbol, new ViewExtensionRegistry<SearCoreSheet, CellProperties>());
+  bindSheetFormulaPriority(container, scrollManager);
   return {
     renderContexts: { main: renderContext, offScreen: offScreenRenderContext, hit: hitRenderContext },
     rendererRegistry,

@@ -1,9 +1,9 @@
 import { CellType } from '@searsuite/sear-domain-cell-types';
 import { FormulaNodeKind } from '@searsuite/sear-domain-formula-engine';
 import { cellKey } from '@searsuite/sear-domain-formula-engine-ts';
-import { SheetDataFieldNamespace, SheetDataMatrixFieldKey } from '@searsuite/sear-render-engine';
+import { SheetDataFieldNamespace, SheetDataMatrixFieldKey } from '@searsuite/sear-domain-sheet';
 import { SheetColumnSizesFieldKey, SheetRowSizesFieldKey } from '@searsuite/sear-plugin-resize';
-import { SheetFormulaReferenceHighlightPlugin } from '../src/formulaReferenceHighlight/SheetFormulaReferenceHighlightPlugin';
+import { SheetFormulaReferenceHighlightView } from '@searsuite/sear-render';
 
 function createCore(cell: unknown, rowCount = 5, colCount = 6) {
   const fields = {
@@ -25,10 +25,10 @@ function createCore(cell: unknown, rowCount = 5, colCount = 6) {
   };
 }
 
-describe('SheetFormulaReferenceHighlightPlugin', () => {
+describe('SheetFormulaReferenceHighlightView', () => {
   it('registers highlight provider and returns no highlights when interaction state suppresses selection', () => {
     const statusProvider = { getFormulaCellStatus: jest.fn(() => ({ dependencies: [], dependents: [] })) };
-    const configEngine = { getPluginConfig: jest.fn(() => void 0) };
+    const configEngine = { getConfig: jest.fn(() => void 0) };
     const register = jest.fn();
     const interactionStore = {
       getState: jest
@@ -37,7 +37,7 @@ describe('SheetFormulaReferenceHighlightPlugin', () => {
         .mockReturnValueOnce({ editSession: null, suppressedSelectionRevision: 2, selectionRevision: 1 })
         .mockReturnValueOnce({ editSession: null, suppressedSelectionRevision: null, selectionRevision: 3 }),
     };
-    const plugin = new SheetFormulaReferenceHighlightPlugin(
+    const plugin = new SheetFormulaReferenceHighlightView(
       statusProvider as never,
       configEngine as never,
       { register } as never,
@@ -45,17 +45,13 @@ describe('SheetFormulaReferenceHighlightPlugin', () => {
     );
 
     expect(register).toHaveBeenCalledWith(
-      expect.objectContaining({ key: SheetFormulaReferenceHighlightPlugin.highlightProviderKey }),
+      expect.objectContaining({ key: SheetFormulaReferenceHighlightView.highlightProviderKey }),
     );
     expect(plugin.getHighlights({ searCore: createCore(null) } as never)).toEqual([]);
     expect(plugin.getHighlights({ searCore: createCore(null) } as never)).toEqual([]);
     expect(plugin.getHighlights({ searCore: { getDataEngine: () => ({ getDataType: () => null }) } } as never)).toEqual(
       [],
     );
-    expect(plugin.registerState().key).toBe(plugin.key);
-    expect(plugin.getPluginConfig()).toEqual({});
-    expect(plugin.apply({} as never, {} as never)).toBeNull();
-    expect(plugin.render({} as never)).toEqual([]);
   });
 
   it('resolves dependencies and dependents into range highlights', () => {
@@ -71,7 +67,7 @@ describe('SheetFormulaReferenceHighlightPlugin', () => {
       })),
     };
     const configEngine = {
-      getPluginConfig: jest.fn(() => ({
+      getConfig: jest.fn(() => ({
         referenceColors: ['#ff0000', '#00ff00', '#0000ff', '#112233'],
         referenceFillOpacity: 0.2,
       })),
@@ -84,7 +80,7 @@ describe('SheetFormulaReferenceHighlightPlugin', () => {
         selection: { focus: [4, 2] },
       })),
     };
-    const plugin = new SheetFormulaReferenceHighlightPlugin(
+    const plugin = new SheetFormulaReferenceHighlightView(
       statusProvider as never,
       configEngine as never,
       { register: jest.fn() } as never,
@@ -134,9 +130,9 @@ describe('SheetFormulaReferenceHighlightPlugin', () => {
           selection: { focus: [0, 0] },
         }),
     };
-    const plugin = new SheetFormulaReferenceHighlightPlugin(
+    const plugin = new SheetFormulaReferenceHighlightView(
       statusProvider as never,
-      { getPluginConfig: jest.fn(() => void 0) } as never,
+      { getConfig: jest.fn(() => void 0) } as never,
       { register: jest.fn() } as never,
       interactionStore as never,
     );
@@ -148,8 +144,6 @@ describe('SheetFormulaReferenceHighlightPlugin', () => {
     expect(plugin.getHighlights({ searCore: createCore({ type: CellType.Formula, formula: '=A1' }) } as never)).toEqual(
       [],
     );
-
-
   });
 
   it.each([
@@ -170,9 +164,9 @@ describe('SheetFormulaReferenceHighlightPlugin', () => {
         selection: { focus: [0, 0] },
       })),
     };
-    const plugin = new SheetFormulaReferenceHighlightPlugin(
+    const plugin = new SheetFormulaReferenceHighlightView(
       statusProvider as never,
-      { getPluginConfig: jest.fn(() => void 0) } as never,
+      { getConfig: jest.fn(() => void 0) } as never,
       { register: jest.fn() } as never,
       interactionStore as never,
     );
@@ -185,9 +179,9 @@ describe('SheetFormulaReferenceHighlightPlugin', () => {
   });
 
   it('renders qualified references supplied by the workbook on the active sheet', () => {
-    const plugin = new SheetFormulaReferenceHighlightPlugin(
+    const plugin = new SheetFormulaReferenceHighlightView(
       { getFormulaCellStatus: () => ({ dependencies: [], dependents: [] }) } as never,
-      { getPluginConfig: () => void 0 } as never,
+      { getConfig: () => void 0 } as never,
       { register: jest.fn() } as never,
       {
         getState: () => ({
@@ -204,7 +198,9 @@ describe('SheetFormulaReferenceHighlightPlugin', () => {
     expect(plugin.getHighlights({ searCore: createCore(null) } as never)).toEqual([
       expect.objectContaining({ start: [1, 2], end: [3, 4], type: 'formula-reference-highlight' }),
     ]);
-    plugin.enforceStateWriteBoundary({});
+    plugin.enforceRuntimeWriteBoundary(() => {
+      throw new Error('cannot change after editor assembly');
+    });
     expect(() => plugin.bindCrossSheetSource({ getReferences: () => [] } as never)).toThrow(
       'cannot change after editor assembly',
     );
@@ -215,9 +211,9 @@ describe('SheetFormulaReferenceHighlightPlugin', () => {
   });
 
   it('keeps in-bounds workbook references visible before the target sheet has a selection', () => {
-    const plugin = new SheetFormulaReferenceHighlightPlugin(
+    const plugin = new SheetFormulaReferenceHighlightView(
       { getFormulaCellStatus: jest.fn() } as never,
-      { getPluginConfig: () => void 0 } as never,
+      { getConfig: () => void 0 } as never,
       { register: jest.fn() } as never,
       {
         getState: () => ({

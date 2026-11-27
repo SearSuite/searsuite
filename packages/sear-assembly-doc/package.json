@@ -23,25 +23,17 @@
   },
   "dependencies": {
     "@searsuite/sear-assembly-commands": "workspace:*",
-    "@searsuite/sear-assembly-config": "workspace:*",
-    "@searsuite/sear-assembly-core": "workspace:*",
     "@searsuite/sear-assembly-plugin": "workspace:*",
     "@searsuite/sear-domain-commands": "workspace:*",
     "@searsuite/sear-domain-doc": "workspace:*",
+    "@searsuite/sear-domain-doc-schema": "workspace:*",
     "@searsuite/sear-domain-editor": "workspace:*",
     "@searsuite/sear-domain-ot": "workspace:*",
     "@searsuite/sear-domain-transaction": "workspace:*",
     "@searsuite/sear-foundation-di": "workspace:*",
     "@searsuite/sear-foundation-error": "workspace:*",
     "@searsuite/sear-foundation-platform": "workspace:*",
-    "@searsuite/sear-foundation-subscription": "workspace:*",
-    "@searsuite/sear-foundation-utils": "workspace:*",
-    "@searsuite/sear-render-context": "workspace:*",
-    "@searsuite/sear-render-event-engine": "workspace:*",
-    "@searsuite/sear-render-input": "workspace:*",
-    "@searsuite/sear-render-metrics": "workspace:*",
-    "@searsuite/sear-render-node": "workspace:*",
-    "@searsuite/sear-render-scroll": "workspace:*"
+    "@searsuite/sear-foundation-subscription": "workspace:*"
   },
   "exports": {
     ".": {

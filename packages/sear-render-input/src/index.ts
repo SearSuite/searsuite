@@ -8,7 +8,8 @@ export { InputManager } from './InputManager';
 export { Input } from './Input';
 
 export { TextInput } from './TextInput';
-export { TextInputKind, type TextInputEvent, type TextInputHandlers } from './TextInputEvent';
+export { type TextInputHandlers } from './TextInputEvent';
+
 export { HeadlessTextInput } from './HeadlessTextInput';
 
 export { KeyboardRouter, type KeyboardRouterHandlers } from './KeyboardRouter';

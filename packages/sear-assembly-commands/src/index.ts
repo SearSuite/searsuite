@@ -53,7 +53,7 @@
  * ```
  *
  * `SelectRangeCommand` requires an anchor and a focus. `SheetSelectionPlugin` handles the command and prepares the
- * selection change. The Sheet core commits the prepared operations together; rendering and observations then receive
+ * selection change. The Sheet kernel commits the prepared operations together; rendering and observations then receive
  * the committed result. `GetSelection` reads the current selection through a separate query.
  *
  * ### One owner per state
@@ -195,3 +195,17 @@ export {
 export { extendSelection, type ExtendSelectionCommandInput } from './selection/ExtendSelectionCommand';
 export { CommandExecutionPhase } from '@searsuite/sear-foundation-common';
 export { SheetAxisMoveBoundsError } from './sheetOperationCommands/SheetAxisMoveBoundsError';
+
+export * from './SheetPluginContracts';
+export * from './SheetRuntimeExtensionRegistry';
+
+export * from './SheetStyleQueries';
+export { registerSheetPluginCellStyles, type SheetCellStyleRegistrar } from './SheetCellStyleRegistrar';
+
+export { SheetCommandEffectRegistry } from './SheetCommandEffectRegistry';
+
+export * from './SheetDisplayedValueCommands';
+
+export * from './SheetCommandClient';
+
+export { type SheetEditor } from './SheetEditor';

@@ -1,13 +1,11 @@
 import { SearError } from '@searsuite/sear-foundation-error';
+
 import {
   Pipeline,
   PipelineStepKind,
   runOutsideCommandExecution,
   SheetInteractionStore,
-  type SheetLifecycleContext,
-  type SheetLifecycleController,
-  type SearCoreSheet,
-} from '@searsuite/sear-assembly-core';
+} from '@searsuite/sear-assembly-plugin';
 import {
   CommandExecutionPhase,
   createSheetTransaction,
@@ -31,8 +29,6 @@ import { TRANSACTION_ORIGIN_META_KEY, Transaction, TransactionOrigin } from '@se
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { Platform } from '@searsuite/sear-foundation-platform';
 import { type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
-import { KeyboardRouter } from '@searsuite/sear-render-input';
-import { type CellProperties } from '@searsuite/sear-render-registry';
 
 import { RedoSheetCommand, UndoSheetCommand } from '../SheetHistoryCommands';
 import { SheetHistoryStatusObservation } from '../SheetHistoryObservation';
@@ -63,13 +59,9 @@ const RecordCompletedSheetHistoryCommand = defineSheetCommand<void>('sheet.histo
 
 /** Editor-local command history for plugin-owned Sheet state with registered transaction algebra. */
 @Injectable()
-export class SheetHistoryPlugin
-  extends Plugin<SearCoreSheet, CellProperties, null>
-  implements SheetLifecycleController, SheetHistoryStatusProvider
-{
-  readonly #plugins: PluginManager<SearCoreSheet, CellProperties>;
+export class SheetHistoryPlugin extends Plugin<null> implements SheetHistoryStatusProvider {
+  readonly #plugins: PluginManager;
   readonly #interaction: SheetInteractionStore;
-  readonly #keyboard: KeyboardRouter;
   readonly #platform: Platform;
   readonly #externalHistory: SheetExternalHistory;
 
@@ -78,7 +70,7 @@ export class SheetHistoryPlugin
   /** Stable owner key for the private history state. */
   public static readonly pluginKey = pluginKey;
 
-  public override readonly warnOnDuplicateDepth = false;
+  public readonly warnOnDuplicateDepth = false;
 
   readonly #listeners = new Set<(status: SheetHistoryStatus) => void>();
   #disposeCommandListener: (() => void) | null = null;
@@ -91,11 +83,9 @@ export class SheetHistoryPlugin
 
   public constructor(
     @Inject(PluginManager.symbol)
-    plugins: PluginManager<SearCoreSheet, CellProperties>,
+    plugins: PluginManager,
     @Inject(SheetInteractionStore.symbol)
     interaction: SheetInteractionStore,
-    @Inject(KeyboardRouter.symbol)
-    keyboard: KeyboardRouter,
     @Inject(Platform.symbol)
     platform: Platform,
     @Inject(SheetCommandBus.symbol)
@@ -106,7 +96,6 @@ export class SheetHistoryPlugin
     super({ key: pluginKey, state: null });
     this.#plugins = plugins;
     this.#interaction = interaction;
-    this.#keyboard = keyboard;
     this.#platform = platform;
     this.#externalHistory = externalHistory;
     this.#commands = commands;
@@ -124,12 +113,15 @@ export class SheetHistoryPlugin
       if (history.#useExternalRedo()) return history.#createExternalCommand('redo');
       return new PipelineExecutionCommand(RedoSheetCommand.id, history.#createHistoryPipeline('redo'));
     });
-    commands.register(RecordCompletedSheetHistoryCommand, () =>
-      new LocalActionCommand(RecordCompletedSheetHistoryCommand.id, () => {
-        const event = this.#pendingCompletedEvents.at(-1);
-        if (!event) throw new SearError('No completed Sheet command is pending for history.');
-        this.#processCompletedCommandEvent(event);
-      }));
+    commands.register(
+      RecordCompletedSheetHistoryCommand,
+      () =>
+        new LocalActionCommand(RecordCompletedSheetHistoryCommand.id, () => {
+          const event = this.#pendingCompletedEvents.at(-1);
+          if (!event) throw new SearError('No completed Sheet command is pending for history.');
+          this.#processCompletedCommandEvent(event);
+        }),
+    );
   }
 
   /** Registers the host-facing history status observation for this editor. */
@@ -154,16 +146,12 @@ export class SheetHistoryPlugin
     });
   }
 
-  /** Starts command observation and semantic keyboard shortcuts after Core is ready. */
-  public start(_context: SheetLifecycleContext): void {
+  /** Starts observation of committed commands and local history status. */
+  public start(): void {
     if (this.#disposeCommandListener) return;
     this.#disposeCommandListener = this.#commands.subscribe(this.#handleCommandEvent.bind(this));
     this.#disposeInteractionListener = this.#interaction.subscribe(() => this.#emitStatus());
     this.#disposeExternalHistory = this.#externalHistory.subscribe(() => this.#emitStatus());
-    this.#keyboard.subscribe({
-      onUndo: () => this.#commands.run(UndoSheetCommand, void 0),
-      onRedo: () => this.#commands.run(RedoSheetCommand, void 0),
-    });
   }
 
   /** Releases command/status subscriptions owned by this editor instance. */
@@ -192,16 +180,18 @@ export class SheetHistoryPlugin
     const external = this.#externalHistory.getStatus();
     if (!external.canUndo) return false;
     const local = this.#historyState.undoStack.at(-1);
-    return !local || (local.undoOrder !== void 0 && external.undoOrder !== void 0 &&
-      external.undoOrder > local.undoOrder);
+    return (
+      !local || (local.undoOrder !== void 0 && external.undoOrder !== void 0 && external.undoOrder > local.undoOrder)
+    );
   }
 
   #useExternalRedo(): boolean {
     const external = this.#externalHistory.getStatus();
     if (!external.canRedo) return false;
     const local = this.#historyState.redoStack.at(-1);
-    return !local || (local.redoOrder !== void 0 && external.redoOrder !== void 0 &&
-      external.redoOrder > local.redoOrder);
+    return (
+      !local || (local.redoOrder !== void 0 && external.redoOrder !== void 0 && external.redoOrder > local.redoOrder)
+    );
   }
 
   #nextOrder(): number {
@@ -233,8 +223,13 @@ export class SheetHistoryPlugin
       undoStack: cloneHistoryStack(state.undoStack).slice(-MAX_HISTORY_ENTRIES),
       redoStack: cloneHistoryStack(state.redoStack).slice(-MAX_HISTORY_ENTRIES),
     };
-    this.#localSequence = Math.max(0, ...[...this.#historyState.undoStack, ...this.#historyState.redoStack]
-      .flatMap((entry) => [entry.undoOrder ?? 0, entry.redoOrder ?? 0]));
+    this.#localSequence = Math.max(
+      0,
+      ...[...this.#historyState.undoStack, ...this.#historyState.redoStack].flatMap((entry) => [
+        entry.undoOrder ?? 0,
+        entry.redoOrder ?? 0,
+      ]),
+    );
     this.#emitStatus();
   }
 
@@ -251,16 +246,6 @@ export class SheetHistoryPlugin
 
   /** History observes committed commands and owns no transactional sheet projection. */
   public apply(_state: null, _transaction: Transaction): null {
-    return null;
-  }
-
-  /** History has no render-time configuration. */
-  public getPluginConfig(): null {
-    return null;
-  }
-
-  /** History contributes no scene nodes. */
-  public render(): null {
     return null;
   }
 

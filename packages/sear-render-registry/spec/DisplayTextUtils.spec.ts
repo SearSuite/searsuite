@@ -1,4 +1,4 @@
-import { extractRichText, formatFormulaValue } from '../src';
+import { extractRichText, formatFormulaValue } from '@searsuite/sear-domain-cell-types';
 
 describe('display text utilities', () => {
   it('extracts nested rich text and ignores malformed nodes', () => {

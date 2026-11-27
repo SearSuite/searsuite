@@ -26,12 +26,11 @@
     "@searsuite/sear-assembly-plugin": "workspace:*",
     "@searsuite/sear-domain-matrix": "workspace:*",
     "@searsuite/sear-domain-ot": "workspace:*",
+    "@searsuite/sear-domain-sheet": "workspace:*",
+    "@searsuite/sear-domain-state": "workspace:*",
     "@searsuite/sear-domain-transaction": "workspace:*",
     "@searsuite/sear-foundation-di": "workspace:*",
-    "@searsuite/sear-foundation-error": "workspace:*",
-    "@searsuite/sear-render-engine": "workspace:*",
-    "@searsuite/sear-render-node": "workspace:*",
-    "@searsuite/sear-render-registry": "workspace:*"
+    "@searsuite/sear-foundation-error": "workspace:*"
   },
   "exports": {
     ".": {

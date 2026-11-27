@@ -1,17 +1,14 @@
 import { DocCommandBus, defineDocCommand } from '@searsuite/sear-assembly-commands';
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
-import { ReflowDocTransaction } from '@searsuite/sear-domain-commands';
+import { DocTransaction } from '@searsuite/sear-domain-commands';
 import {
   buildInlineTextRangePatchPlan,
   applyInlineTextStylePropertyMutation,
   readTextStyleAttrs,
-  type RichTextInlineStyle,
   type RichTextInlineStyleContribution,
 } from '@searsuite/sear-domain-doc';
-import { type RichTextRunRenderContribution } from '@searsuite/sear-render-node';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { type DocKeyboardHandlerRegistrationContext } from '../../plugin/DocPluginContracts';
-import { DocContentRenderPluginKey } from '../../plugin/DocFeaturePluginKeys';
+
 import { createDocCommand } from '../../plugin/DocPluginCommandUtils';
 import { InlineTextStylePluginBase } from '../InlineTextStylePluginBase';
 
@@ -31,11 +28,7 @@ export const ToggleDocStrikethroughCommand = defineDocCommand<void>('doc.toggleS
 export class StrikethroughTextStylePlugin extends InlineTextStylePluginBase {
   public static readonly symbol = Symbol.for('StrikethroughTextStylePlugin');
   public constructor() {
-    super(
-      new PluginKey('DocStrikethroughTextStyle'),
-      createStrikethroughContribution(),
-      createStrikethroughRenderContribution(),
-    );
+    super(new PluginKey('DocStrikethroughTextStyle'), createStrikethroughContribution());
   }
 
   public override registerCommands(commands: DocCommandBus): void {
@@ -43,21 +36,13 @@ export class StrikethroughTextStylePlugin extends InlineTextStylePluginBase {
     commands.register(ToggleDocStrikethroughCommand, this.#createToggleStrikethroughCommand.bind(this));
   }
 
-  public override registerKeyboardHandlers({ bindings, commands }: DocKeyboardHandlerRegistrationContext): void {
-    bindings.registerKeyboardHandlers({
-      onToggleStrikethrough: () => void commands.run(ToggleDocStrikethroughCommand, void 0),
-    });
-  }
-
   #createSetStrikethroughCommand(input: SetDocStrikethroughInput) {
     const strikethrough = normalizeBoolean(input?.strikethrough, 'SetDocStrikethroughCommand.strikethrough');
-    return createDocCommand(SetDocStrikethroughCommand.id, DocContentRenderPluginKey, () =>
-      this.#createStrikethroughTransaction(strikethrough),
-    );
+    return createDocCommand(SetDocStrikethroughCommand.id, () => this.#createStrikethroughTransaction(strikethrough));
   }
 
   #createToggleStrikethroughCommand() {
-    return createDocCommand(ToggleDocStrikethroughCommand.id, DocContentRenderPluginKey, () => {
+    return createDocCommand(ToggleDocStrikethroughCommand.id, () => {
       const runtime = this.requireRuntime();
       const state = runtime.document.input.getState();
       const patches = buildInlineTextRangePatchPlan(state.pendingDoc, state.docSelection, () => ({}));
@@ -79,7 +64,7 @@ export class StrikethroughTextStylePlugin extends InlineTextStylePluginBase {
           strikethrough,
           (attrs) => mutation.apply({ attrs, value: strikethrough }),
         ),
-      new ReflowDocTransaction(),
+      new DocTransaction(),
     );
   }
 }
@@ -90,22 +75,6 @@ export function createStrikethroughContribution(): RichTextInlineStyleContributi
     read: (input) =>
       isStrikethrough(readTextStyleAttrs(input.attrs)) ? { [StrikethroughTextStyleKey.Strikethrough]: true } : void 0,
     mutations: [{ styleKey: StrikethroughTextStyleKey.Strikethrough, apply: applyStrikethroughMutation }],
-  };
-}
-
-/** Creates the render-layer strikethrough contribution. */
-export function createStrikethroughRenderContribution(): RichTextRunRenderContribution {
-  return {
-    key: `text.${StrikethroughTextStyleKey.Strikethrough}`,
-    paintRun: ({ context, style, x, baselineY, width, height, fontAscent }) => {
-      if (style?.[StrikethroughTextStyleKey.Strikethrough] !== true) return;
-      context.setLineWidth(Math.max(1, height / 16));
-      const strikeY = baselineY - Math.max(1, fontAscent * 0.35);
-      context.beginPath();
-      context.moveTo(x, strikeY);
-      context.lineTo(x + width, strikeY);
-      context.stroke();
-    },
   };
 }
 

@@ -13,12 +13,8 @@ export {
   CommitCellEditCommand,
   InsertCurrentDateTimeCommand,
   HandleDocumentInputCommand,
-  HandleCellEditorPointerCommand,
-  BeginCellEditorDragSelectionCommand,
-  EndCellEditorDragSelectionCommand,
   ReplaceFormulaReferenceCommand,
   EndFormulaReferencePickCommand,
-  RequestCellEditorRenderCommand,
   UpdateCellEditorDocumentSelectionCommand,
   SetCellInlineStyleCommand,
   AcceptFormulaSuggestionCommand,
@@ -36,15 +32,12 @@ export {
   type SheetCommitCellEditInput,
   type SheetDocumentCursorPositionInput,
   type SheetDocumentInputCommandInput,
-  type SheetCellEditorPointerInput,
   type SheetFormulaReferenceReplacementInput,
   type SheetDocumentSelectionCommandInput,
   type SheetInlineStyleCommandInput,
   type SheetFormulaBarKeyInput,
 } from './SheetCellEditorCommands';
 export { getCellEditableValue } from './CellEditableValue';
-export { Highlighter, type Highlighting, type HighlightContext, type CellRangeHighlight } from './Highlighter';
-export { FormulaReferenceHighlighter } from './FormulaReferenceHighlighter';
 export {
   SheetCellEditorExitReason,
   SheetCellEditorInteractionName,
@@ -68,3 +61,9 @@ export {
 
 export { IsCellEditingQuery } from './IsCellEditingQuery';
 export { ReadSelectedCellEditTextQuery } from './ReadSelectedCellEditTextQuery';
+
+export { PublishCellEditDraftCommand, SynchronizeCellEditModelCommand } from './SheetCellEditorCommands';
+export * from './SheetCellEditorOptions';
+export { type EditorState } from './EditorTypes';
+
+export { canStartFormulaReferencePick, type PickedReferenceKind } from './formulaAssist/formatPickedReference';

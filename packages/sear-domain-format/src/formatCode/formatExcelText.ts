@@ -1,7 +1,6 @@
 import {
   DefaultSpreadsheetFormatLocale,
   type SpreadsheetErrorValue,
-  type SpreadsheetFormatLocale,
   type SpreadsheetFormatValue,
 } from '../types/SpreadsheetFormatTypes';
 import { formatExcelDisplay } from './formatExcelDisplay';

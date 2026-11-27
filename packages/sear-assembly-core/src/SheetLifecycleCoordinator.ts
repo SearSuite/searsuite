@@ -1,5 +1,5 @@
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { SearContractViolationError, SearLifecycleError } from './errors/SearAssemblyError';
+import { SearContractViolationError, SearLifecycleError } from '@searsuite/sear-assembly-plugin';
 import { type SheetLifecycleContext, type SheetLifecycleController } from './SheetLifecycleController';
 
 /** Starts and disposes the runtime controllers owned by one sheet instance. */
@@ -17,7 +17,8 @@ export class SheetLifecycleCoordinator {
 
   /** Closes runtime registration after editor assembly. */
   enforceCommandBoundary(assertCommandWrite: () => void, teardownToken: object): void {
-    if (this.#assertCommandWrite) throw new SearContractViolationError('Sheet lifecycle boundary is already installed.');
+    if (this.#assertCommandWrite)
+      throw new SearContractViolationError('Sheet lifecycle boundary is already installed.');
     this.#assertCommandWrite = assertCommandWrite;
     this.#teardownToken = teardownToken;
   }

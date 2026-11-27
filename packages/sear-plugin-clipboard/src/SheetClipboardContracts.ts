@@ -1,7 +1,11 @@
 import { type SheetRangeBounds } from '@searsuite/sear-assembly-commands';
 import {
-  type PluginKey, type SheetClipboardTransferPlan, type SheetFormatTransferPlan,
-  type SheetClipboardTransferRequest, type SheetPortableClipboardTransfer, type SheetPortableFormatTransfer,
+  type PluginKey,
+  type SheetClipboardTransferPlan,
+  type SheetFormatTransferPlan,
+  type SheetClipboardTransferRequest,
+  type SheetPortableClipboardTransfer,
+  type SheetPortableFormatTransfer,
 } from '@searsuite/sear-assembly-plugin';
 import { type Operation } from '@searsuite/sear-domain-ot';
 import {
@@ -13,7 +17,7 @@ import {
 import type { SheetRangeMovePlan } from '@searsuite/sear-assembly-plugin';
 import type { SheetClipboardRangeInput } from './SheetClipboardCommands';
 import type { SheetClipboardCutSession } from './SheetClipboardCutSession';
-import type { Pipeline } from '@searsuite/sear-assembly-core';
+import type { Pipeline } from '@searsuite/sear-assembly-plugin';
 
 /** Current version of the transient structured sheet clipboard payload. */
 export const SHEET_CLIPBOARD_PAYLOAD_VERSION = 3 as const;
@@ -111,7 +115,10 @@ export interface SheetClipboardDataSource {
   readonly formatTarget: PluginKey;
   readonly cutSourceId?: string;
   readonly cutSession?: SheetClipboardCutSession;
-  planRangeMove?(source: SheetClipboardRangeInput, destination: SheetClipboardRangeInput): readonly SheetRangeMovePlan[];
+  planRangeMove?(
+    source: SheetClipboardRangeInput,
+    destination: SheetClipboardRangeInput,
+  ): readonly SheetRangeMovePlan[];
   prepareCrossSheetCut?(cutId: string, clearPipeline: Pipeline): void;
   scheduleCrossSheetMove?(cutId: string, sourceId: string, pastePipeline: Pipeline): Promise<void>;
   getSelection(): SheetRangeBounds | null;
@@ -130,13 +137,19 @@ export interface SheetClipboardDataSource {
   isRowVisible?(row: number): boolean;
   createClipboardCutId?(): string;
   captureOwnerFormats?(range: SheetRangeBounds): readonly SheetPortableFormatTransfer[];
-  planOwnerFormats?(captured: readonly SheetPortableFormatTransfer[], target: SheetRangeBounds): readonly SheetFormatTransferPlan[];
+  planOwnerFormats?(
+    captured: readonly SheetPortableFormatTransfer[],
+    target: SheetRangeBounds,
+  ): readonly SheetFormatTransferPlan[];
   clearOwnerFormats?(range: SheetRangeBounds): readonly SheetFormatTransferPlan[];
   captureOwnerData?(range: SheetRangeBounds): readonly SheetPortableClipboardTransfer[];
   planOwnerData?(requests: readonly SheetClipboardTransferRequest[]): readonly SheetClipboardTransferPlan[];
   clearOwnerData?(range: SheetRangeBounds): readonly SheetClipboardTransferPlan[];
   captureMergedRanges?(range: SheetRangeBounds): readonly SheetClipboardMergedRange[];
-  planPasteMergedRanges?(merges: readonly SheetClipboardMergedRange[], target: SheetClipboardCellPoint): SheetClipboardMergePlan;
+  planPasteMergedRanges?(
+    merges: readonly SheetClipboardMergedRange[],
+    target: SheetClipboardCellPoint,
+  ): SheetClipboardMergePlan;
   planClearMergedRanges?(range: SheetRangeBounds): SheetClipboardMergePlan;
   /** Optional host projection for rejecting writes hidden by merged cells. */
   getMergedRange?(row: number, column: number): SheetRangeBounds | null;

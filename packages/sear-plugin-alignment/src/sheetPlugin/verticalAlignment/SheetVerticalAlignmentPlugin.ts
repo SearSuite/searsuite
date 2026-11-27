@@ -1,3 +1,4 @@
+import { type SheetCellStyleRegistry, type SheetCellStyleDefaults } from '@searsuite/sear-domain-cell-types';
 import { createMatrixFormatTransfer, type SheetFormatTransferRegistry } from '@searsuite/sear-assembly-plugin';
 import { SheetRangeMoveRegistry, SheetRangeReorderRegistry } from '@searsuite/sear-assembly-plugin';
 import {
@@ -25,14 +26,10 @@ import {
 import { Plugin, PluginKey, type PluginDocumentStateContribution } from '@searsuite/sear-assembly-plugin';
 import { deserializeSparseMatrix, serializeSparseMatrix } from '@searsuite/sear-domain-matrix';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { Node } from '@searsuite/sear-render-node';
+
 import { Transaction } from '@searsuite/sear-domain-transaction';
-import {
-  CellProperties,
-  type SheetCellVisualReaderRegistrationContext,
-  SheetCellVisualReaderRegistry,
-} from '@searsuite/sear-render-registry';
-import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-render-engine';
+
+import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-domain-sheet';
 import { VerticalAlignmentMatrix } from '../../VerticalAlignmentMatrix';
 import { SheetVerticalAlignment } from '@searsuite/sear-domain-cell-types';
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
@@ -57,9 +54,20 @@ const pluginKey = new PluginKey('SheetVerticalAlignmentPlugin');
  * Plugin that owns vertical cell alignment data, commands, and structural projections.
  */
 @Injectable()
-export class SheetVerticalAlignmentPlugin extends Plugin<unknown, CellProperties, SheetVerticalAlignmentPluginState> {
-  /** Alignment state is data-only and does not use render-depth diagnostics. */
-  public override readonly warnOnDuplicateDepth = false;
+export class SheetVerticalAlignmentPlugin extends Plugin<SheetVerticalAlignmentPluginState> {
+  public registerCellStyles(registry: SheetCellStyleRegistry, defaults: SheetCellStyleDefaults): void {
+    registry.register({
+      id: 'sheet.alignment.vertical',
+      properties: ['verticalAlign'],
+      read: (row, column) => ({
+        verticalAlign:
+          (this.getState().cellVerticalAlignments.getItem(row, column) as SheetVerticalAlignment | null) ??
+          defaults.read().verticalAlign ??
+          SheetVerticalAlignment.Center,
+      }),
+    });
+  }
+
   /** Vertical alignment transactions share the registered MatrixOT algebra. */
   public override readonly transactionOT = {
     ownerId: 'sheet.verticalAlignment',
@@ -120,33 +128,6 @@ export class SheetVerticalAlignmentPlugin extends Plugin<unknown, CellProperties
       getColumnCount: () => plugin.getState().cellVerticalAlignments.shape[1],
       readCellVerticalAlignment: (row, column) =>
         plugin.getState().cellVerticalAlignments.getItem(row, column) as SheetVerticalAlignment | null,
-    });
-  }
-
-  /** Contributes vertical alignment to the shared Sheet cell visual pipeline. */
-  public registerCellVisualReaders(
-    registry: SheetCellVisualReaderRegistry,
-    context: SheetCellVisualReaderRegistrationContext,
-  ): void {
-    const plugin = this;
-    registry.register({
-      id: 'sheet.alignment.vertical',
-      properties: ['verticalAlign'],
-      read({ rowIndex, columnIndex }) {
-        const configuredDefault = (
-          context.readDefaultConfig() as Partial<{
-            defaultCellVerticalAlign: SheetVerticalAlignment;
-          }>
-        ).defaultCellVerticalAlign;
-        return {
-          verticalAlign:
-            (plugin
-              .getState()
-              .cellVerticalAlignments.getItem(rowIndex, columnIndex) as SheetVerticalAlignment | null) ??
-            configuredDefault ??
-            SheetVerticalAlignment.Center,
-        };
-      },
     });
   }
 
@@ -216,16 +197,6 @@ export class SheetVerticalAlignmentPlugin extends Plugin<unknown, CellProperties
     if (operations.length === 0) return null;
     MatrixOT.apply(pluginState.cellVerticalAlignments, operations);
     return pluginState;
-  }
-
-  /** Vertical alignment data has no render-time configuration. */
-  public getPluginConfig(): null {
-    return null;
-  }
-
-  /** Vertical alignment data does not render scene nodes directly. */
-  public render(): Node<CellProperties>[] {
-    return [];
   }
 }
 

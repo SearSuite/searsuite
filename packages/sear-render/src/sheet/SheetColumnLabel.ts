@@ -1,7 +1,8 @@
+import { ViewExtensionBase } from '@searsuite/sear-render-event-engine';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { SearCoreSheet } from '@searsuite/sear-assembly-core';
-import { Operation } from '@searsuite/sear-domain-ot';
-import { PluginKey, Plugin } from '@searsuite/sear-assembly-plugin';
+
+import { PluginKey } from '@searsuite/sear-assembly-plugin';
 import { ScrollManagerState } from '@searsuite/sear-render-scroll';
 import { Injectable } from '@searsuite/sear-foundation-di';
 import { ConfigUnit } from '@searsuite/sear-assembly-config';
@@ -19,19 +20,14 @@ interface ISheetColumnLabel {}
 
 /** Renders sticky column header cells for the visible viewport range. */
 @Injectable()
-export class SheetColumnLabelPlugin extends Plugin<SearCoreSheet, CellProperties, ISheetColumnLabel> {
-  /** Registers the stateless column header plugin with PluginManager. */
-  public registerState(): { key: PluginKey; state: ISheetColumnLabel } {
-    return { key: this.key, state: this.getState() };
-  }
-
+export class SheetColumnLabelView extends ViewExtensionBase<SearCoreSheet, CellProperties> {
   /** Reads the column header render configuration from ConfigEngine. */
-  public getPluginConfig(searCore: SearCoreSheet): typeof SheetColumnLabelPlugin.defaultConfig {
-    return searCore.configEngine.getPluginConfig(this.key) as typeof SheetColumnLabelPlugin.defaultConfig;
+  public getConfig(searCore: SearCoreSheet): typeof SheetColumnLabelView.defaultConfig {
+    return searCore.configEngine.getConfig(this.key) as typeof SheetColumnLabelView.defaultConfig;
   }
 
   /** DI token for resolving the column header plugin. */
-  public static readonly symbol: symbol = Symbol.for('SheetColumnLabelPlugin');
+  public static readonly symbol: symbol = Symbol.for('SheetColumnLabelView');
 
   /** Default visual configuration for column headers. */
   public static readonly defaultConfig = {
@@ -42,19 +38,11 @@ export class SheetColumnLabelPlugin extends Plugin<SearCoreSheet, CellProperties
 
   /** Constructs the column header plugin. */
   constructor() {
-    super({
-      key: new PluginKey(),
-      state: {},
-    });
+    super(new PluginKey());
   }
 
   /** Initializes column header runtime state. */
   public initialize(): void {}
-
-  /** Returns unchanged plugin state for every transaction. */
-  public apply(operations: Operation[]) {
-    return this.getState();
-  }
 
   /** Column header positions are recomputed during render from scroll state. */
   public onScroll(_scrollManagerState: ScrollManagerState): void {}
@@ -67,7 +55,7 @@ export class SheetColumnLabelPlugin extends Plugin<SearCoreSheet, CellProperties
     return [
       {
         key: this.key,
-        config: new ConfigUnit(SheetColumnLabelPlugin.defaultConfig),
+        config: new ConfigUnit(SheetColumnLabelView.defaultConfig),
       },
     ];
   }
@@ -83,11 +71,11 @@ export class SheetColumnLabelPlugin extends Plugin<SearCoreSheet, CellProperties
     const rowSizes = readSheetRowSizes(dataEngine);
     const columnSizes = readSheetColumnSizes(dataEngine);
     if (!rowSizes || !columnSizes) {
-      throw new SearError('Sheet dimension fields are not found in SheetColumnLabelPlugin render.');
+      throw new SearError('Sheet dimension fields are not found in SheetColumnLabelView render.');
     }
     const freeze = readSheetFreeze(dataEngine);
 
-    const pluginConfig = searCore.configEngine.getPluginConfig(this.key) as typeof SheetColumnLabelPlugin.defaultConfig;
+    const pluginConfig = searCore.configEngine.getConfig(this.key) as typeof SheetColumnLabelView.defaultConfig;
     const { defaultHeight } = pluginConfig;
     const { renderCoordinatorManager } = searCore.renderEngine;
 
@@ -104,8 +92,9 @@ export class SheetColumnLabelPlugin extends Plugin<SearCoreSheet, CellProperties
     const [viewportWidth] = searCore.renderEngine.scrollManager.getShape();
     const columns = new Set<number>();
     for (let column = startCol; column <= endCol; column++) columns.add(column);
-    visibleFrozenIndices(freeze.columns, columnSizes, viewportWidth - offset.x)
-      .forEach((column) => columns.add(column));
+    visibleFrozenIndices(freeze.columns, columnSizes, viewportWidth - offset.x).forEach((column) =>
+      columns.add(column),
+    );
     for (const i of [...columns].sort((left, right) => left - right)) {
       const width = columnSizes.getItem(0, i) || 0;
       if (width === 0) continue;

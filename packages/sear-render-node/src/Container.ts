@@ -1,10 +1,8 @@
 import { SearError } from '@searsuite/sear-foundation-error';
-import { PositionRect } from '@searsuite/sear-foundation-rect';
-import { DataStorage, MapDataStorageFactory } from '@searsuite/sear-foundation-storage';
+
 import { HexColor, getRandomColor } from '@searsuite/sear-foundation-utils';
 
 import { EventListener } from './EventListener';
-import { Tree, TreeFactory } from './Tree';
 
 /** Scene node that owns, queries, and serializes an ordered child collection. */
 export class Container extends EventListener<string> {

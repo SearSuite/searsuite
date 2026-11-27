@@ -1,12 +1,12 @@
 /** @jest-environment node */
 
 import { createHeadlessEditor } from '../src';
+import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
 import {
   createEmptySheetDocumentState,
-  ExportSheetStateCommand,
   serializeSheetDocumentState,
   deserializeSheetDocumentState,
-} from '@searsuite/sear-assembly-setup';
+} from '@searsuite/sear-assembly-sheet-state';
 import {
   InsertCheckboxesCommand,
   SetCheckboxesCommand,
@@ -17,7 +17,7 @@ import {
   CheckboxRemovalMode,
   CheckboxError,
 } from '@searsuite/sear-plugin-checkbox';
-import { ReadSheetCellDataQuery } from '@searsuite/sear-render-engine';
+import { ReadSheetCellDataQuery } from '@searsuite/sear-domain-sheet';
 import { UndoSheetCommand, RedoSheetCommand } from '@searsuite/sear-plugin-history';
 import { GetFormulaCellStatusCommand, waitForFormulaIdle } from '@searsuite/sear-plugin-formula';
 import {

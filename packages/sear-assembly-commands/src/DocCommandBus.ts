@@ -2,7 +2,13 @@ import { SearError } from '@searsuite/sear-foundation-error';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { Platform } from '@searsuite/sear-foundation-platform';
 import { CommandExecutionPhase } from '@searsuite/sear-foundation-common';
-import { getCommandObserverEpoch, isInsideCommandExecution, runInsideCommandExecution, runOutsideCommandExecution, warnIfSyntheticCommandDefinition } from '@searsuite/sear-assembly-core';
+import {
+  getCommandObserverEpoch,
+  isInsideCommandExecution,
+  runInsideCommandExecution,
+  runOutsideCommandExecution,
+  warnIfSyntheticCommandDefinition,
+} from '@searsuite/sear-assembly-plugin';
 
 import {
   type DocCommandContext,
@@ -48,7 +54,9 @@ export class DocCommandBus {
   constructor(@Inject(Platform.symbol) platform?: Platform) {
     this.#platform = platform;
     Object.defineProperty(this, 'isExecuting', {
-      value: (): boolean => this.#executionDepth > 0 && isInsideCommandExecution() &&
+      value: (): boolean =>
+        this.#executionDepth > 0 &&
+        isInsideCommandExecution() &&
         this.#activeObserverEpoch === getCommandObserverEpoch(),
       configurable: false,
       writable: false,
@@ -82,10 +90,7 @@ export class DocCommandBus {
     Object.preventExtensions(this);
   }
 
-  #executeCommand<Result extends DocCommandResult>(
-    id: string,
-    createCommand: () => DocEditorCommand<Result>,
-  ): Result {
+  #executeCommand<Result extends DocCommandResult>(id: string, createCommand: () => DocEditorCommand<Result>): Result {
     const context = this.#context;
     if (!context) throw new SearError(`DocCommandBus cannot run ${id} before it is bound to an editor.`);
     const boundContext = context;
@@ -116,8 +121,9 @@ export class DocCommandBus {
 
   /** Whether this editor's command bus is currently dispatching a command. */
   public isExecuting(): boolean {
-    return this.#executionDepth > 0 && isInsideCommandExecution() &&
-      this.#activeObserverEpoch === getCommandObserverEpoch();
+    return (
+      this.#executionDepth > 0 && isInsideCommandExecution() && this.#activeObserverEpoch === getCommandObserverEpoch()
+    );
   }
 
   /** Invokes external observers without inheriting this editor's command write authority. */

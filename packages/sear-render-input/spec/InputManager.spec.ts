@@ -1,3 +1,4 @@
+import { TextInputKind, type TextInputEvent } from '@searsuite/sear-domain-commands';
 import {
   HeadlessKeyboardRouter,
   HeadlessPointerCapture,
@@ -5,8 +6,6 @@ import {
   Input,
   InputManager,
   TextInput,
-  TextInputKind,
-  type TextInputEvent,
 } from '../src';
 
 class TestInput extends Input {

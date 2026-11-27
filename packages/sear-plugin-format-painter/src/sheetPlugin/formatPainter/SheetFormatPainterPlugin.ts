@@ -1,12 +1,12 @@
 import { type SheetFormatPainterOptions } from '../../SheetFormatPainterOptions';
 import { createSheetTransaction, LocalActionCommand, type SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import { Pipeline, runOutsideCommandExecution } from '@searsuite/sear-assembly-core';
+import { Pipeline, runOutsideCommandExecution } from '@searsuite/sear-assembly-plugin';
 import { Plugin, PluginKey } from '@searsuite/sear-assembly-plugin';
 import { type Transaction } from '@searsuite/sear-domain-transaction';
 import { Injectable } from '@searsuite/sear-foundation-di';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
-import { type CellProperties } from '@searsuite/sear-render-registry';
+
 import {
   ApplyFormatPainterCommand,
   CancelFormatPainterCommand,
@@ -20,11 +20,11 @@ import { SheetFormatPainterSession } from '../../SheetFormatPainterSession';
 
 /** Owns only a local captured-format session; document formats remain with their owners. */
 @Injectable()
-export class SheetFormatPainterPlugin extends Plugin<unknown, CellProperties, null> {
+export class SheetFormatPainterPlugin extends Plugin<null> {
   readonly #options: SheetFormatPainterOptions;
 
   public static readonly symbol = Symbol.for('SheetFormatPainterPlugin');
-  public override readonly warnOnDuplicateDepth = false;
+  public readonly warnOnDuplicateDepth = false;
   readonly #session: SheetFormatPainterSession;
   #commands: SheetCommandBus | null = null;
   readonly #listeners = new Set<(state: FormatPainterState) => void>();
@@ -65,8 +65,14 @@ export class SheetFormatPainterPlugin extends Plugin<unknown, CellProperties, nu
             {
               start: destination.start,
               end: [
-                Math.min(shape[0] - 1, destination.start[0] + this.#session.state.source.end[0] - this.#session.state.source.start[0]),
-                Math.min(shape[1] - 1, destination.start[1] + this.#session.state.source.end[1] - this.#session.state.source.start[1]),
+                Math.min(
+                  shape[0] - 1,
+                  destination.start[0] + this.#session.state.source.end[0] - this.#session.state.source.start[0],
+                ),
+                Math.min(
+                  shape[1] - 1,
+                  destination.start[1] + this.#session.state.source.end[1] - this.#session.state.source.start[1],
+                ),
               ],
             },
             shape,
@@ -102,13 +108,7 @@ export class SheetFormatPainterPlugin extends Plugin<unknown, CellProperties, nu
   public registerState() {
     return { key: this.key, state: null, dataEngine: { enabled: false } };
   }
-  public getPluginConfig(): null {
-    return null;
-  }
   public apply(_state: null, _transaction: Transaction): null {
-    return null;
-  }
-  public render(): null {
     return null;
   }
   public destroy(): void {

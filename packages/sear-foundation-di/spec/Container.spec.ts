@@ -1,4 +1,3 @@
-import 'reflect-metadata';
 import { Container, Scope, Injectable, Inject, Singleton } from '../src';
 
 let container: Container;

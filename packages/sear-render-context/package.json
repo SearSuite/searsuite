@@ -23,11 +23,8 @@
   },
   "dependencies": {
     "@searsuite/sear-foundation-di": "workspace:*",
-    "@searsuite/sear-foundation-platform": "workspace:*",
-    "@searsuite/sear-foundation-utils": "workspace:*",
     "@searsuite/sear-foundation-rect": "workspace:*",
-    "@searsuite/sear-render-scroll": "workspace:*",
-    "@searsuite/sear-foundation-error": "workspace:*"
+    "@searsuite/sear-render-scroll": "workspace:*"
   },
   "exports": {
     ".": {

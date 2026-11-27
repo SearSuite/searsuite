@@ -1,3 +1,5 @@
+import { LocalActionCommand } from '@searsuite/sear-assembly-commands';
+import { ActivateFormulaHyperlinkCommand } from '../ActivateFormulaHyperlinkCommand';
 /**
  * Formula plugin main entry.
  *
@@ -18,16 +20,15 @@
 import { Injectable, Inject } from '@searsuite/sear-foundation-di';
 import { Platform } from '@searsuite/sear-foundation-platform';
 import { CellType, SheetCellInputValidationRegistry } from '@searsuite/sear-domain-cell-types';
-import { SearCoreSheet, CellMatrixElement } from '@searsuite/sear-assembly-core';
+
+import { CellMatrixElement } from '@searsuite/sear-domain-sheet';
 import { type SheetCommandBus } from '@searsuite/sear-assembly-commands';
 import { type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
-import { Plugin, PluginKey } from '@searsuite/sear-assembly-plugin';
-import { ConfigUnit } from '@searsuite/sear-assembly-config';
+import { Plugin } from '@searsuite/sear-assembly-plugin';
+
 import { type OTOperation, MatrixOTActionName, type UpdateCellOTOperation } from '@searsuite/sear-domain-ot';
 import { Transaction } from '@searsuite/sear-domain-transaction';
-import { CellProperties, CellRegion } from '@searsuite/sear-render-registry';
-import { type EventWithOffsetAndTarget } from '@searsuite/sear-render-event-engine';
-import { Node } from '@searsuite/sear-render-node';
+
 import {
   type CellKey,
   type Dependency,
@@ -61,16 +62,24 @@ import {
   shiftStructureCoordinate,
 } from '@searsuite/sear-domain-formula-engine';
 import {
-  AggregationCache, DependencyGraph, FormulaExternalServiceRegistry,
-  FormulaTextServiceRegistry, FunctionRegistry, cellKey, fromCellKey,
+  AggregationCache,
+  DependencyGraph,
+  FormulaExternalServiceRegistry,
+  FormulaTextServiceRegistry,
+  FunctionRegistry,
+  cellKey,
+  fromCellKey,
 } from '@searsuite/sear-domain-formula-engine-ts';
-import { DataEngine, readSheetDataMatrix, SheetDataPlugin } from '@searsuite/sear-render-engine';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
+import { readSheetDataMatrix } from '@searsuite/sear-domain-sheet';
+import { DataEngine } from '@searsuite/sear-domain-state';
 import { RecalcScheduler } from '../RecalcScheduler';
 import { FormulaRefShifter } from '../FormulaRefShifter';
 import { FormulaResultStore } from '../FormulaResultStore';
 import { FormulaSchedulerDataSource } from '../FormulaSchedulerDataSource';
 import { FormulaCalculationTraceBus } from '../FormulaCalculationTraceBus';
-import { formulaReferenceHighlightConfig, sheetFormulaPluginKey } from '../FormulaHighlightConfig';
+import { sheetFormulaPluginKey } from '../SheetFormulaPluginKey';
+
 import { registerFormulaStatusCommands } from '../FormulaStatusCommands';
 import { FormulaCalculationTraceObservation } from '../FormulaObservations';
 import { FormulaResultProviderRegistry } from '../FormulaResultProviderRegistry';
@@ -78,7 +87,10 @@ import { FormulaRichResultProviderRegistry } from '../FormulaRichResultProviderR
 import { FormulaSourceProviderRegistry } from '../FormulaSourceProviderRegistry';
 import { registerFormulaProviderCommands, sealFormulaProviderRegistries } from '../FormulaProviderCommands';
 import { registerFormulaRecalculationCommands } from '../FormulaRecalculationCommands';
-import { registerSheetFormulaFunctionCommands, UnregisterSheetFormulaFunctionCommand } from '../FormulaFunctionRegistrationCommands';
+import {
+  registerSheetFormulaFunctionCommands,
+  UnregisterSheetFormulaFunctionCommand,
+} from '../FormulaFunctionRegistrationCommands';
 import {
   registerSheetFormulaServiceCommands,
   UnregisterSheetFormulaExternalServiceCommand,
@@ -102,7 +114,7 @@ const pluginKey = sheetFormulaPluginKey;
  */
 @Injectable()
 export class SheetFormulaPlugin
-  extends Plugin<SearCoreSheet, CellProperties, FormulaPluginState>
+  extends Plugin<FormulaPluginState>
   implements IFormulaResultProvider, IFormulaRichResultProvider, IFormulaSourceProvider, IFormulaStatusProvider
 {
   #parser: IFormulaParser;
@@ -193,12 +205,26 @@ export class SheetFormulaPlugin
     this.#schedulerDataSource = schedulerDataSource;
 
     for (const name of [
-      'parser', 'graph', 'aggCache', 'resultStore', 'scheduler', 'refShifter', 'trace',
-      'dataEngine', 'platform', 'results', 'resultProviders', 'richResultProviders',
-      'sourceProviders', 'functions', 'externalServices', 'textServices',
+      'parser',
+      'graph',
+      'aggCache',
+      'resultStore',
+      'scheduler',
+      'refShifter',
+      'trace',
+      'dataEngine',
+      'platform',
+      'results',
+      'resultProviders',
+      'richResultProviders',
+      'sourceProviders',
+      'functions',
+      'externalServices',
+      'textServices',
       'inputValidation',
       'schedulerDataSource',
-    ]) Object.defineProperty(this, name, { writable: false, configurable: false });
+    ])
+      Object.defineProperty(this, name, { writable: false, configurable: false });
 
     this.#scheduler.bindAstCache(this.#astCache);
   }
@@ -212,13 +238,30 @@ export class SheetFormulaPlugin
       throw new SearError('Sheet formula commands are already bound to an editor.');
     }
     this.#commands = commands;
+    commands.register(
+      ActivateFormulaHyperlinkCommand,
+      ({ row, column }) =>
+        new LocalActionCommand(ActivateFormulaHyperlinkCommand.id, () => {
+          const rich = this.#richResultProviders?.getFormulaRichResult(row, column);
+          if (rich?.kind === 'hyperlink')
+            this.#externalServices?.get(FormulaHyperlinkServiceDefinition)?.openTarget?.(rich.target);
+        }),
+    );
     if (this.#inputValidation && !this.#spillValidatorRegistered) {
-      this.#inputValidation.register('sheet.formula.spill', (row, col) => {
-        const reject = this.#resultStore.isSpillCell(row, col);
-        return reject
-          ? { valid: false, reject: true, message: 'Spilled array cells cannot be edited directly. Edit or clear the anchor formula first.' }
-          : { valid: true, reject: false };
-      }, { protectClear: true });
+      this.#inputValidation.register(
+        'sheet.formula.spill',
+        (row, col) => {
+          const reject = this.#resultStore.isSpillCell(row, col);
+          return reject
+            ? {
+                valid: false,
+                reject: true,
+                message: 'Spilled array cells cannot be edited directly. Edit or clear the anchor formula first.',
+              }
+            : { valid: true, reject: false };
+        },
+        { protectClear: true },
+      );
       this.#spillValidatorRegistered = true;
     }
     registerFormulaStatusCommands(commands, this, this.#scheduler);
@@ -226,7 +269,8 @@ export class SheetFormulaPlugin
     if (this.#externalServices && this.#textServices) {
       registerSheetFormulaServiceCommands(commands, this.#externalServices, this.#textServices);
     }
-    if (typeof this.#scheduler.bindCommandBus === 'function') registerFormulaRecalculationCommands(commands, this.#scheduler);
+    if (typeof this.#scheduler.bindCommandBus === 'function')
+      registerFormulaRecalculationCommands(commands, this.#scheduler);
     if (this.#resultProviders && this.#richResultProviders && this.#sourceProviders) {
       registerFormulaProviderCommands(commands, {
         results: this.#resultProviders,
@@ -237,10 +281,7 @@ export class SheetFormulaPlugin
   }
 
   /** Seals provider registration once every configured Sheet plugin has started. */
-  public enforceProviderCommandBoundary(
-    commands: SheetCommandBus,
-    workbookOwnership?: FormulaRegistryOwnership,
-  ): void {
+  public enforceProviderCommandBoundary(commands: SheetCommandBus, workbookOwnership?: FormulaRegistryOwnership): void {
     this.#initialDataComplete = true;
     const isExecuting = commands.isExecuting.bind(commands);
     FormulaCalculationTraceBus.prototype.enforceCommandBoundary.call(this.#trace, isExecuting);
@@ -260,12 +301,18 @@ export class SheetFormulaPlugin
     if (this.#externalServices && !workbookOwnership?.externalServices) {
       const remove = (id: number) => commands.run(UnregisterSheetFormulaExternalServiceCommand, id);
       if (this.#externalServices instanceof FormulaExternalServiceRegistry) {
-        FormulaExternalServiceRegistry.prototype.enforceCommandBoundary.call(this.#externalServices, isExecuting, remove);
+        FormulaExternalServiceRegistry.prototype.enforceCommandBoundary.call(
+          this.#externalServices,
+          isExecuting,
+          remove,
+        );
       } else this.#externalServices.enforceCommandBoundary(isExecuting, remove);
     }
     if (this.#textServices && !workbookOwnership?.textServices) {
-      if ((this.#textServices.registerLanguageService || this.#textServices.registerPhoneticReader) &&
-          (!this.#textServices.enforceCommandBoundary || !this.#textServices.unregisterRegistration)) {
+      if (
+        (this.#textServices.registerLanguageService || this.#textServices.registerPhoneticReader) &&
+        (!this.#textServices.enforceCommandBoundary || !this.#textServices.unregisterRegistration)
+      ) {
         throw new SearError('Mutable formula text providers must enforce the editor command boundary.');
       }
       const remove = (id: number) => commands.run(UnregisterSheetFormulaTextServiceCommand, id);
@@ -302,16 +349,6 @@ export class SheetFormulaPlugin
     });
   }
 
-  /** @inheritdoc */
-  public override registerConfig() {
-    return [
-      {
-        key: pluginKey,
-        config: new ConfigUnit(formulaReferenceHighlightConfig),
-      },
-    ];
-  }
-
   /**
    * Receives cells from shared startup scanning and builds AST/dependency
    * indexes for existing formula cells.
@@ -320,7 +357,7 @@ export class SheetFormulaPlugin
    * and does not pass through the command pipeline -> apply, so formula-derived
    * indexes must be built here.
    */
-  public onInitialDataCell(_searCore: SearCoreSheet, value: unknown, row: number, col: number): void {
+  public onInitialDataCell(value: unknown, row: number, col: number): void {
     if (this.#initialDataComplete) {
       throw new SearError('Sheet formula initial data scanning has completed.');
     }
@@ -343,7 +380,7 @@ export class SheetFormulaPlugin
   }
 
   /** Starts one recalculation after dependencies for all initial formulas have been registered. */
-  public onInitialDataComplete(_searCore: SearCoreSheet): void {
+  public onInitialDataComplete(): void {
     if (this.#initialDataComplete) {
       throw new SearError('Sheet formula initial data scanning has completed.');
     }
@@ -357,11 +394,6 @@ export class SheetFormulaPlugin
   /** Formula indexes are editor-local and do not enter Sheet document views. */
   public registerState() {
     return { key: this.key, state: null, dataEngine: { enabled: false } };
-  }
-
-  /** Returns the plugin config. */
-  public getPluginConfig(): unknown {
-    return {};
   }
 
   /**
@@ -417,7 +449,6 @@ export class SheetFormulaPlugin
         }
       }
     }
-
   }
 
   /**
@@ -457,16 +488,6 @@ export class SheetFormulaPlugin
     sheetData.forEachStored((cell, row, col) => this.#indexFormulaCell(cell, row, col, this.#astCache));
   }
 
-  /**
-   * Render method; the formula plugin does not render nodes directly.
-   *
-   * Formula cells are rendered by FormulaCell through render-registry
-   * registration. This plugin owns data updates, not visual presentation.
-   */
-  public render(): Node<CellProperties>[] {
-    return [];
-  }
-
   // ─── Internal Methods ───────────────────────────────────
 
   /**
@@ -487,11 +508,7 @@ export class SheetFormulaPlugin
     }
   }
 
-  #indexInsertedFormulas(
-    operation: OTOperation,
-    change: StructureChange,
-    astCache: Map<CellKey, FormulaAST>,
-  ): void {
+  #indexInsertedFormulas(operation: OTOperation, change: StructureChange, astCache: Map<CellKey, FormulaAST>): void {
     if (getStructureChangeKind(change) !== StructureChangeKind.Insert) return;
     if (!('index' in change)) return;
     const insertedCells = Reflect.get(operation, change.type) as Array<CellMatrixElement | null> | undefined;
@@ -555,11 +572,7 @@ export class SheetFormulaPlugin
     return shifted ? cellKey(shifted.row, shifted.col) : null;
   }
 
-  #shiftFormulaCoordinate(
-    row: number,
-    col: number,
-    change: StructureChange,
-  ): { row: number; col: number } | null {
+  #shiftFormulaCoordinate(row: number, col: number, change: StructureChange): { row: number; col: number } | null {
     const shiftedRow = shiftStructureCoordinate({ coordinate: row, axis: StructureChangeAxis.Row, changes: [change] });
     const shiftedCol = shiftStructureCoordinate({ coordinate: col, axis: StructureChangeAxis.Col, changes: [change] });
     if (shiftedRow.deleted || shiftedCol.deleted) return null;
@@ -592,23 +605,6 @@ export class SheetFormulaPlugin
     return this.#resultStore.getRichAt(row, col);
   }
 
-  /** Activates a host-backed hyperlink after a primary-button cell click. */
-  public onMouseUp(_searCore: SearCoreSheet, event: EventWithOffsetAndTarget<CellProperties>): boolean | void {
-    if ((event.origin.button ?? 0) !== 0 || (event.clickCount ?? 1) > 1) return;
-    const properties = event.target?.properties;
-    if (properties?.region !== CellRegion.Grid) return;
-    const row = properties.startRowIndex;
-    const col = properties.startColIndex;
-    if (row === undefined || col === undefined) return;
-    const rich = this.#richResultProviders?.getFormulaRichResult(row, col);
-    if (rich?.kind !== 'hyperlink') return;
-    const opener = this.#externalServices?.get(FormulaHyperlinkServiceDefinition);
-    if (!opener?.openTarget) return;
-    opener.openTarget(rich.target);
-    event.origin.preventDefault();
-    return false;
-  }
-
   public getFormulaResultFormat(row: number, col: number) {
     if (typeof this.getFormulaResult(row, col) !== 'number') return void 0;
     const ast = this.#astCache.get(cellKey(row, col));
@@ -617,7 +613,10 @@ export class SheetFormulaPlugin
 
   /** Exposes derived spill coordinates to sparse range consumers. */
   public forEachFormulaResultInRange(
-    startRow: number, startColumn: number, endRow: number, endColumn: number,
+    startRow: number,
+    startColumn: number,
+    endRow: number,
+    endColumn: number,
     visit: (row: number, column: number) => void,
   ): void {
     this.#resultStore.forEachSpillInRange(startRow, startColumn, endRow, endColumn, visit);

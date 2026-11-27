@@ -1,11 +1,18 @@
 import { SheetCommandBus, SheetQueryRegistry } from '@searsuite/sear-assembly-commands';
-import { PipelineStepKind } from '@searsuite/sear-assembly-core';
+import { PipelineStepKind } from '@searsuite/sear-assembly-plugin';
 import { CSRMatrix } from '@searsuite/sear-domain-matrix';
 import {
-  ClearSheetFilterCommand, CreateSheetFilterCommand, CreateSheetFilterViewCommand,
-  ReadSheetFilterQuery, ReadSheetFilterValuesQuery, ReapplySheetFilterCommand, SetSheetColumnFilterCommand,
+  ClearSheetFilterCommand,
+  CreateSheetFilterCommand,
+  CreateSheetFilterViewCommand,
+  ReadSheetFilterQuery,
+  ReadSheetFilterValuesQuery,
+  ReapplySheetFilterCommand,
+  SetSheetColumnFilterCommand,
   SetSheetColumnFiltersCommand,
-  SheetFilterKind, SheetFilterMatrix, SheetFilterPlugin,
+  SheetFilterKind,
+  SheetFilterMatrix,
+  SheetFilterPlugin,
 } from '../src';
 
 const range = { start: [0, 0] as const, end: [3, 1] as const };
@@ -16,16 +23,18 @@ function createFixture(readDisplayValue?: (row: number, column: number, value: u
   cells.addItem(0, 0, 'Name');
   cells.addItem(1, 0, 'Ada');
   cells.addItem(2, 0, 'Bob');
-  const plugin = new SheetFilterPlugin({ filters: new SheetFilterMatrix() }, {
-    readShape: () => [4, 2],
-    readValue: (row, column) => cells.getItem(row, column),
-    ...(readDisplayValue ? { readDisplayValue } : {}),
-    forEachStoredInRange: (first, column, last, visit) =>
-      cells.forEachStoredInRange(first, column, last, column, (_value, row) => visit(row)),
-    readColor: () => null,
-    platform,
-    renderKeys: () => [SheetFilterPlugin.pluginKey],
-  });
+  const plugin = new SheetFilterPlugin(
+    { filters: new SheetFilterMatrix() },
+    {
+      readShape: () => [4, 2],
+      readValue: (row, column) => cells.getItem(row, column),
+      ...(readDisplayValue ? { readDisplayValue } : {}),
+      forEachStoredInRange: (first, column, last, visit) =>
+        cells.forEachStoredInRange(first, column, last, column, (_value, row) => visit(row)),
+      readColor: () => null,
+      platform,
+    },
+  );
   const commands = new SheetCommandBus();
   const queries = new SheetQueryRegistry();
   commands.bind({
@@ -57,18 +66,22 @@ describe('Sheet filter commands', () => {
     cells.addItem(2, 1, '2');
     commands.run(CreateSheetFilterCommand, { range });
     commands.run(SetSheetColumnFilterCommand, {
-      column: 0, predicate: { kind: SheetFilterKind.Values, values: ['Ada'] },
+      column: 0,
+      predicate: { kind: SheetFilterKind.Values, values: ['Ada'] },
     });
-    expect(queries.run(ReadSheetFilterValuesQuery, { column: 1 }).items)
-      .toEqual([{ value: '1', count: 1 }]);
+    expect(queries.run(ReadSheetFilterValuesQuery, { column: 1 }).items).toEqual([{ value: '1', count: 1 }]);
     commands.run(SetSheetColumnFilterCommand, {
-      column: 0, predicate: { kind: SheetFilterKind.Values, values: ['Ada', ''] },
+      column: 0,
+      predicate: { kind: SheetFilterKind.Values, values: ['Ada', ''] },
     });
     commands.run(SetSheetColumnFilterCommand, {
-      column: 1, predicate: { kind: SheetFilterKind.Values, values: ['2'] },
+      column: 1,
+      predicate: { kind: SheetFilterKind.Values, values: ['2'] },
     });
-    expect(queries.run(ReadSheetFilterValuesQuery, { column: 1 }).items)
-      .toEqual([{ value: '1', count: 1 }, { value: '', count: 1 }]);
+    expect(queries.run(ReadSheetFilterValuesQuery, { column: 1 }).items).toEqual([
+      { value: '1', count: 1 },
+      { value: '', count: 1 },
+    ]);
   });
 
   it('updates several columns together and rejects an invalid batch without changing rules', () => {
@@ -81,9 +94,12 @@ describe('Sheet filter commands', () => {
       { column: 1, predicate: { kind: SheetFilterKind.Values, values: ['1'] } },
     ] as const;
     commands.run(SetSheetColumnFiltersCommand, { updates });
-    expect(queries.run(ReadSheetFilterQuery, void 0)?.rules).toEqual(updates.map(({ column, predicate }) => ({
-      column, predicate,
-    })));
+    expect(queries.run(ReadSheetFilterQuery, void 0)?.rules).toEqual(
+      updates.map(({ column, predicate }) => ({
+        column,
+        predicate,
+      })),
+    );
     expect(plugin.isRowFiltered(1)).toBe(false);
     expect(plugin.isRowFiltered(2)).toBe(true);
     expect(() => commands.run(SetSheetColumnFiltersCommand, { updates: [updates[0], updates[0]] })).toThrow();
@@ -91,12 +107,15 @@ describe('Sheet filter commands', () => {
   });
   it('searches formatted labels while keeping the underlying value as the filter key', () => {
     const { commands, queries, plugin } = createFixture((_row, _column, value) =>
-      value === 'Ada' ? '2026-1-2' : String(value ?? ''));
+      value === 'Ada' ? '2026-1-2' : String(value ?? ''),
+    );
     commands.run(CreateSheetFilterCommand, { range });
-    expect(queries.run(ReadSheetFilterValuesQuery, { column: 0, search: '2026-1-2' }).items)
-      .toEqual([{ value: 'Ada', label: '2026-1-2', count: 1 }]);
+    expect(queries.run(ReadSheetFilterValuesQuery, { column: 0, search: '2026-1-2' }).items).toEqual([
+      { value: 'Ada', label: '2026-1-2', count: 1 },
+    ]);
     commands.run(SetSheetColumnFilterCommand, {
-      column: 0, predicate: { kind: SheetFilterKind.Values, values: ['Ada'] },
+      column: 0,
+      predicate: { kind: SheetFilterKind.Values, values: ['Ada'] },
     });
     expect(plugin.isRowFiltered(1)).toBe(false);
     expect(plugin.isRowFiltered(2)).toBe(true);
@@ -106,10 +125,14 @@ describe('Sheet filter commands', () => {
     const { commands, queries, plugin } = createFixture();
     commands.run(CreateSheetFilterCommand, { range });
     expect(queries.run(ReadSheetFilterQuery, void 0)).toMatchObject({
-      range, rules: [], firstRowIsHeader: true, privateView: false,
+      range,
+      rules: [],
+      firstRowIsHeader: true,
+      privateView: false,
     });
     commands.run(SetSheetColumnFilterCommand, {
-      column: 0, predicate: { kind: SheetFilterKind.Values, values: ['Ada'] },
+      column: 0,
+      predicate: { kind: SheetFilterKind.Values, values: ['Ada'] },
     });
     expect(plugin.isRowFiltered(1)).toBe(false);
     expect(plugin.isRowFiltered(2)).toBe(true);
@@ -124,12 +147,14 @@ describe('Sheet filter commands', () => {
     const { commands, queries, plugin } = createFixture();
     commands.run(CreateSheetFilterCommand, { range, firstRowIsHeader: false });
     commands.run(SetSheetColumnFilterCommand, {
-      column: 0, predicate: { kind: SheetFilterKind.Values, values: ['Ada'] },
+      column: 0,
+      predicate: { kind: SheetFilterKind.Values, values: ['Ada'] },
     });
     commands.run(CreateSheetFilterViewCommand, { range });
     expect(queries.run(ReadSheetFilterQuery, void 0)?.privateView).toBe(true);
     commands.run(SetSheetColumnFilterCommand, {
-      column: 0, predicate: { kind: SheetFilterKind.Values, values: ['Bob'] },
+      column: 0,
+      predicate: { kind: SheetFilterKind.Values, values: ['Bob'] },
     });
     expect(plugin.isRowFiltered(1)).toBe(true);
     expect(plugin.isRowFiltered(2)).toBe(false);
@@ -147,17 +172,27 @@ describe('Sheet filter commands', () => {
       { start: [-1, 0] as const, end: [2, 1] as const },
       { start: [2, 1] as const, end: [1, 1] as const },
       { start: [0, 0] as const, end: [4, 1] as const },
-    ]) expect(() => commands.run(CreateSheetFilterCommand, { range: invalid })).toThrow();
-    expect(() => commands.run(SetSheetColumnFilterCommand, {
-      column: 0, predicate: { kind: SheetFilterKind.Values, values: ['Ada'] },
-    })).toThrow();
+    ])
+      expect(() => commands.run(CreateSheetFilterCommand, { range: invalid })).toThrow();
+    expect(() =>
+      commands.run(SetSheetColumnFilterCommand, {
+        column: 0,
+        predicate: { kind: SheetFilterKind.Values, values: ['Ada'] },
+      }),
+    ).toThrow();
     commands.run(CreateSheetFilterCommand, { range });
-    expect(() => commands.run(SetSheetColumnFilterCommand, {
-      column: 2, predicate: { kind: SheetFilterKind.Values, values: ['Ada'] },
-    })).toThrow();
-    expect(() => commands.run(SetSheetColumnFilterCommand, {
-      column: 0, predicate: { kind: SheetFilterKind.Values, values: [1] } as never,
-    })).toThrow();
+    expect(() =>
+      commands.run(SetSheetColumnFilterCommand, {
+        column: 2,
+        predicate: { kind: SheetFilterKind.Values, values: ['Ada'] },
+      }),
+    ).toThrow();
+    expect(() =>
+      commands.run(SetSheetColumnFilterCommand, {
+        column: 0,
+        predicate: { kind: SheetFilterKind.Values, values: [1] } as never,
+      }),
+    ).toThrow();
     expect(queries.run(ReadSheetFilterQuery, void 0)?.rules).toEqual([]);
   });
 });

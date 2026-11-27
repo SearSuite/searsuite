@@ -1,33 +1,37 @@
+import * as docApi from '@searsuite/sear-assembly-doc';
+import * as ownerApi0 from '@searsuite/sear-assembly-commands';
 import * as moduleExports from '../src/index';
 
 describe('@searsuite/sear-assembly-setup public API', () => {
   it('exports DI registration, plugin base types, and editor factory', () => {
+    expect('DocPlugin' in moduleExports).toBe(false);
+    expect('SheetEditorPlugin' in moduleExports).toBe(false);
     expect(moduleExports.registerDefaultDependencies).toBeDefined();
-    expect(moduleExports.SheetPlugin).toBeDefined();
-    expect(moduleExports.registerSheetPluginCommands).toBeDefined();
-    expect(moduleExports.registerSheetPluginObservations).toBeDefined();
-    expect(moduleExports.registerSheetPluginSessionStates).toBeDefined();
+    expect(ownerApi0.SheetPlugin).toBeDefined();
+    expect(ownerApi0.registerSheetPluginCommands).toBeDefined();
+    expect(ownerApi0.registerSheetPluginObservations).toBeDefined();
+    expect(ownerApi0.registerSheetPluginSessionStates).toBeDefined();
     expect(moduleExports.SessionStateRegistry).toBeDefined();
     expect(moduleExports.SessionStateRestorePhase).toBeDefined();
     expect(moduleExports.defineSessionState).toBeDefined();
     expect(moduleExports.readSessionState).toBeDefined();
-    expect(moduleExports.defineSheetRuntimeCapability).toBeDefined();
-    expect(moduleExports.SheetRuntimeCapability).toBeDefined();
-    expect(moduleExports.SheetRuntimeExtensionRegistry).toBeDefined();
-    expect(moduleExports.DocPlugin).toBeDefined();
-    expect(moduleExports.registerDocPluginCommands).toBeDefined();
-    expect(moduleExports.registerDocPluginObservations).toBeDefined();
-    expect(moduleExports.registerDocPluginSessionStates).toBeDefined();
+    expect(ownerApi0.defineSheetRuntimeCapability).toBeDefined();
+    expect(ownerApi0.SheetRuntimeCapability).toBeDefined();
+    expect(ownerApi0.SheetRuntimeExtensionRegistry).toBeDefined();
+    expect(docApi.DocPlugin).toBeDefined();
+    expect(docApi.registerDocPluginCommands).toBeDefined();
+    expect(docApi.registerDocPluginObservations).toBeDefined();
+    expect(docApi.registerDocPluginSessionStates).toBeDefined();
     expect(moduleExports.CaptureDocSessionStateCommand).toBeDefined();
     expect(moduleExports.ExportDocStateCommand).toBeDefined();
     expect(moduleExports.DocDocumentObservation).toBeDefined();
     expect(moduleExports.DocInlineStyleObservation).toBeDefined();
-    expect(moduleExports.DocSelectionObservation).toBeDefined();
+    expect(docApi.DocSelectionObservation).toBeDefined();
     expect(moduleExports.DocViewportObservation).toBeDefined();
-    expect(moduleExports.DocHistoryStatusObservation).toBeDefined();
-    expect(moduleExports.DocSelectionSessionStateDefinition).toBeDefined();
+    expect(docApi.DocHistoryStatusObservation).toBeDefined();
+    expect(docApi.DocSelectionSessionStateDefinition).toBeDefined();
     expect(moduleExports.DocViewportSessionStateDefinition).toBeDefined();
-    expect(moduleExports.DocHistorySessionStateDefinition).toBeDefined();
+    expect(docApi.DocHistorySessionStateDefinition).toBeDefined();
     expect(moduleExports.RichTextBlockNode).toBeDefined();
     expect(moduleExports.ViewportOverlayNode).toBeDefined();
     expect(moduleExports.createSheetEditor).toBeDefined();
@@ -38,9 +42,9 @@ describe('@searsuite/sear-assembly-setup public API', () => {
   });
 
   it('manages typed runtime extension capabilities', () => {
-    const registry = new moduleExports.SheetRuntimeExtensionRegistry();
-    const capability = moduleExports.defineSheetRuntimeCapability<{ readonly value: number }>('test.runtime.value');
-    const missingCapability = moduleExports.defineSheetRuntimeCapability('test.runtime.missing');
+    const registry = new ownerApi0.SheetRuntimeExtensionRegistry();
+    const capability = ownerApi0.defineSheetRuntimeCapability<{ readonly value: number }>('test.runtime.value');
+    const missingCapability = ownerApi0.defineSheetRuntimeCapability('test.runtime.missing');
 
     expect(registry.has(capability)).toBe(false);
     expect(registry.get(capability)).toBeUndefined();

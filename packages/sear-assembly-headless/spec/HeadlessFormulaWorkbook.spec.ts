@@ -5,12 +5,12 @@ import {
   ActivateWorkbookSheetCommand,
   WorkbookStructureMoveError,
   WorkbookFormulaPlugin,
-} from '@searsuite/sear-assembly-workbook';
+} from '@searsuite/sear-assembly-workbook-kernel';
 import { MoveRowsCommand } from '@searsuite/sear-assembly-commands';
 import { UndoSheetCommand, RedoSheetCommand } from '@searsuite/sear-plugin-history';
 import { createWorkbookDocumentState } from '@searsuite/sear-domain-workbook';
 import { GetFormulaCellStatusCommand, waitForFormulaIdle } from '@searsuite/sear-plugin-formula';
-import { SheetMatrix } from '@searsuite/sear-assembly-core';
+import { SheetMatrix } from '@searsuite/sear-domain-sheet';
 import { AlignmentMatrix, VerticalAlignmentMatrix } from '@searsuite/sear-plugin-alignment';
 import { CellFillMatrix } from '@searsuite/sear-plugin-cell-fill';
 import { CellHighlightMatrix } from '@searsuite/sear-plugin-cell-highlight';
@@ -20,7 +20,7 @@ import { CellMergeMatrix } from '@searsuite/sear-plugin-cell-merge';
 import { CellType } from '@searsuite/sear-domain-cell-types';
 import { FormulaDateSystem } from '@searsuite/sear-domain-formula-engine';
 import { ColumnShapeDimensionsCSRMatrix, CSRMatrix, RowShapeDimensionsCSRMatrix } from '@searsuite/sear-domain-matrix';
-import type { SheetDocumentState } from '@searsuite/sear-assembly-setup';
+import type { SheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
 
 function createSheetState(
   cells: Array<[number, number, unknown]>,
@@ -56,16 +56,15 @@ function formulaStatus(editor: { commands: { run: Function } }, row: number, col
 
 describe('headless formula and workbook runtime', () => {
   it('uses per-workbook iteration settings for circular formulas', async () => {
-    const makeWorkbook = (id: string, enabled: boolean) => createHeadlessWorkbookEditor({
-      documentState: createWorkbookDocumentState<SheetDocumentState>({
-        id,
-        sheets: [{ id: 'main', name: 'Main' }],
-        sheetStates: { main: createSheetState([
-          [0, 0, { type: CellType.Formula, formula: '=A1/2+1' }],
-        ], [2, 2]) },
-      }),
-      iteration: { enabled, maxIterations: 100, maxChange: 1e-9 },
-    });
+    const makeWorkbook = (id: string, enabled: boolean) =>
+      createHeadlessWorkbookEditor({
+        documentState: createWorkbookDocumentState<SheetDocumentState>({
+          id,
+          sheets: [{ id: 'main', name: 'Main' }],
+          sheetStates: { main: createSheetState([[0, 0, { type: CellType.Formula, formula: '=A1/2+1' }]], [2, 2]) },
+        }),
+        iteration: { enabled, maxIterations: 100, maxChange: 1e-9 },
+      });
     const iterative = makeWorkbook('iterative', true);
     const ordinary = makeWorkbook('ordinary', false);
     try {
@@ -81,14 +80,15 @@ describe('headless formula and workbook runtime', () => {
   });
 
   it('keeps workbook date systems isolated', async () => {
-    const createBook = (id: string, dateSystem?: FormulaDateSystem) => createHeadlessWorkbookEditor({
-      documentState: createWorkbookDocumentState<SheetDocumentState>({
-        id,
-        sheets: [{ id: 'main', name: 'Main' }],
-        sheetStates: { main: createSheetState([[0, 0, { type: CellType.Formula, formula: '=DATE(1904,2,29)' }]]) },
-      }),
-      ...(dateSystem === undefined ? {} : { dateSystem }),
-    });
+    const createBook = (id: string, dateSystem?: FormulaDateSystem) =>
+      createHeadlessWorkbookEditor({
+        documentState: createWorkbookDocumentState<SheetDocumentState>({
+          id,
+          sheets: [{ id: 'main', name: 'Main' }],
+          sheetStates: { main: createSheetState([[0, 0, { type: CellType.Formula, formula: '=DATE(1904,2,29)' }]]) },
+        }),
+        ...(dateSystem === undefined ? {} : { dateSystem }),
+      });
     const ordinary = createBook('date-1900');
     const alternate = createBook('date-1904', FormulaDateSystem.Excel1904);
     try {
@@ -106,7 +106,10 @@ describe('headless formula and workbook runtime', () => {
   it('reports the workbook result for a cross-sheet formula', async () => {
     const documentState = createWorkbookDocumentState<SheetDocumentState>({
       id: 'cross-sheet-status',
-      sheets: [{ id: 'north', name: 'North' }, { id: 'summary', name: 'Summary' }],
+      sheets: [
+        { id: 'north', name: 'North' },
+        { id: 'summary', name: 'Summary' },
+      ],
       sheetStates: {
         north: createSheetState([[0, 0, { type: CellType.Number, value: 19 }]], [2, 2]),
         summary: createSheetState([[0, 0, { type: CellType.Formula, formula: '=North!A1+23' }]], [2, 2]),
@@ -410,7 +413,7 @@ describe('headless formula and workbook runtime', () => {
       sheets: [{ id: 'sheet-1', name: 'Only sheet' }],
       sheetStates: { 'sheet-1': createSheetState([], [1, 1]) },
     });
-    const editor = createHeadlessEditor({ documentState }) as HeadlessWorkbookEditor;
+    const editor = createHeadlessWorkbookEditor({ documentState }) as HeadlessWorkbookEditor;
     expect(editor.sheets.getActiveId()).toBe('sheet-1');
     editor.destroy();
   });

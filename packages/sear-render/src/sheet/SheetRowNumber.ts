@@ -1,7 +1,8 @@
+import { ViewExtensionBase } from '@searsuite/sear-render-event-engine';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { SearCoreSheet } from '@searsuite/sear-assembly-core';
-import { Operation } from '@searsuite/sear-domain-ot';
-import { PluginKey, Plugin } from '@searsuite/sear-assembly-plugin';
+
+import { PluginKey } from '@searsuite/sear-assembly-plugin';
 import { ScrollManagerState } from '@searsuite/sear-render-scroll';
 import { ConfigUnit } from '@searsuite/sear-assembly-config';
 import { Injectable } from '@searsuite/sear-foundation-di';
@@ -19,19 +20,14 @@ interface ISheetRowNumber {}
 
 /** Renders sticky row header cells for the visible viewport range. */
 @Injectable()
-export class SheetRowNumberPlugin extends Plugin<SearCoreSheet, CellProperties, ISheetRowNumber> {
-  /** Registers the stateless row header plugin with PluginManager. */
-  public registerState(): { key: PluginKey; state: ISheetRowNumber } {
-    return { key: this.key, state: this.getState() };
-  }
-
+export class SheetRowNumberView extends ViewExtensionBase<SearCoreSheet, CellProperties> {
   /** Reads the row header render configuration from ConfigEngine. */
-  public getPluginConfig(searCore: SearCoreSheet): typeof SheetRowNumberPlugin.defaultConfig {
-    return searCore.configEngine.getPluginConfig(this.key) as typeof SheetRowNumberPlugin.defaultConfig;
+  public getConfig(searCore: SearCoreSheet): typeof SheetRowNumberView.defaultConfig {
+    return searCore.configEngine.getConfig(this.key) as typeof SheetRowNumberView.defaultConfig;
   }
 
   /** DI token for resolving the row header plugin. */
-  public static readonly symbol: symbol = Symbol.for('SheetRowNumberPlugin');
+  public static readonly symbol: symbol = Symbol.for('SheetRowNumberView');
 
   /** Default visual configuration for row headers. */
   public static readonly defaultConfig = {
@@ -42,19 +38,11 @@ export class SheetRowNumberPlugin extends Plugin<SearCoreSheet, CellProperties, 
 
   /** Constructs the row header plugin. */
   constructor() {
-    super({
-      key: new PluginKey(),
-      state: {},
-    });
+    super(new PluginKey());
   }
 
   /** Initializes row header runtime state. */
   public initialize(): void {}
-
-  /** Returns unchanged plugin state for every transaction. */
-  public apply(operations: Operation[]) {
-    return this.getState();
-  }
 
   // public onClick(event: EventWithOffsetAndTarget): void { }
   /** Row header positions are recomputed during render from scroll state. */
@@ -68,7 +56,7 @@ export class SheetRowNumberPlugin extends Plugin<SearCoreSheet, CellProperties, 
     return [
       {
         key: this.key,
-        config: new ConfigUnit(SheetRowNumberPlugin.defaultConfig),
+        config: new ConfigUnit(SheetRowNumberView.defaultConfig),
       },
     ];
   }
@@ -85,11 +73,11 @@ export class SheetRowNumberPlugin extends Plugin<SearCoreSheet, CellProperties, 
     const columnSizes = readSheetColumnSizes(dataEngine);
     const fixedRows = readSheetFixedRows(dataEngine);
     if (!rowSizes || !columnSizes) {
-      throw new SearError('Sheet dimension fields are not found in SheetRowNumberPlugin render.');
+      throw new SearError('Sheet dimension fields are not found in SheetRowNumberView render.');
     }
     const freeze = readSheetFreeze(dataEngine);
 
-    const pluginConfig = searCore.configEngine.getPluginConfig(this.key) as typeof SheetRowNumberPlugin.defaultConfig;
+    const pluginConfig = searCore.configEngine.getConfig(this.key) as typeof SheetRowNumberView.defaultConfig;
     const { defaultWidth } = pluginConfig;
     const { renderCoordinatorManager } = searCore.renderEngine;
 

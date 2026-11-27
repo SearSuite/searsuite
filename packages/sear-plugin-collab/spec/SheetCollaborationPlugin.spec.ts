@@ -7,7 +7,6 @@ import {
   type CollaborationServerMessage,
 } from '@searsuite/sear-domain-collaboration';
 import { createTransaction, Transaction } from '@searsuite/sear-domain-transaction';
-import { type NodeProperties } from '@searsuite/sear-render-node';
 
 import {
   CollabTransport,
@@ -18,7 +17,7 @@ import {
   type CollaborationTransportConnectOptions,
 } from '../src';
 
-class CollaborativeStatePlugin extends Plugin<object, NodeProperties, null> {
+class CollaborativeStatePlugin extends Plugin<null> {
   public override readonly transactionOT = {
     ownerId: 'third-party.cells',
     definition: MatrixTransactionOT,
@@ -30,14 +29,6 @@ class CollaborativeStatePlugin extends Plugin<object, NodeProperties, null> {
   }
 
   public apply(): null {
-    return null;
-  }
-
-  public render(): null {
-    return null;
-  }
-
-  public getPluginConfig(): null {
     return null;
   }
 
@@ -103,7 +94,7 @@ function createCollaborativeTransaction(owner: CollaborativeStatePlugin, value: 
 
 function createRuntime() {
   const owner = new CollaborativeStatePlugin();
-  const plugins = new PluginManager<object, NodeProperties>();
+  const plugins = new PluginManager();
   plugins.registerPlugin(owner);
   const commands = new SheetCommandBus();
   const executePipeline = jest.fn();
@@ -113,7 +104,7 @@ function createRuntime() {
   const channel = new CollaborationChannel(transport, platform);
   const collaboration = new SheetCollaborationPlugin({ channel, owner: 'editor' }, plugins as never, commands);
   collaboration.registerCommands(commands);
-  collaboration.start({} as never);
+  collaboration.start();
   return { channel, collaboration, commands, executePipeline, owner, platform, transport };
 }
 
@@ -143,12 +134,14 @@ describe('SheetCollaborationPlugin', () => {
     transport.attempts[1]?.reject(new Error('stale connection failed'));
     await expect(stale).rejects.toThrow('stale connection failed');
     expect(channel.getStatus()).toMatchObject({
-      state: CollaborationConnectionState.Connecting, resourceId: 'current',
+      state: CollaborationConnectionState.Connecting,
+      resourceId: 'current',
     });
     transport.attempts[2]?.resolve();
     await current;
     expect(channel.getStatus()).toMatchObject({
-      state: CollaborationConnectionState.Online, resourceId: 'current',
+      state: CollaborationConnectionState.Online,
+      resourceId: 'current',
     });
     channel.destroy();
   });
@@ -180,7 +173,8 @@ describe('SheetCollaborationPlugin', () => {
     transport.attempts[0]?.resolve();
     await nested;
     expect(channel.getStatus()).toMatchObject({
-      state: CollaborationConnectionState.Online, resourceId: 'newer',
+      state: CollaborationConnectionState.Online,
+      resourceId: 'newer',
     });
     channel.destroy();
   });

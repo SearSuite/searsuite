@@ -1,7 +1,7 @@
 /** HEX2OCT converts hexadecimal to octal. Example: =HEX2OCT("F") returns 17. */
 import { engineeringFunction } from '../shared/functionFactory';
 import { numeric, text } from '../shared/arguments';
-import { isFormulaError, numberError } from '../shared/errors';
+import { isFormulaError } from '../shared/errors';
 import { formatSignedRadix, parseSignedRadix } from '../shared/radix';
 export const HEX2OCT = engineeringFunction({
   name: 'HEX2OCT',

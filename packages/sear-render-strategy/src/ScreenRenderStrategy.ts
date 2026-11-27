@@ -1,12 +1,6 @@
 import { SearError } from '@searsuite/sear-foundation-error';
 import { RenderContext } from '@searsuite/sear-render-context';
-import {
-  GenerationalDirtyTracker,
-  NodeProperties,
-  Node,
-  SceneGraph,
-  Tree,
-} from '@searsuite/sear-render-node';
+import { FrameDirtyTracker, NodeProperties, Node, SceneGraph, Tree } from '@searsuite/sear-render-node';
 import { PositionRect } from '@searsuite/sear-foundation-rect';
 
 import { RenderStrategy } from './RenderStrategy';
@@ -90,8 +84,8 @@ export class ScreenRenderStrategy<
     renderCoordinatorManager: RenderCoordinatorManager,
     @Inject(SceneGraph.symbol) stage: SceneGraph<NodeTypeProperties>,
     @Inject(Tree.symbol) tree: Tree<PositionRect<HexColor>>,
-    @Inject(GenerationalDirtyTracker.symbol)
-    dirtyTree: GenerationalDirtyTracker,
+    @Inject(FrameDirtyTracker.symbol)
+    dirtyTree: FrameDirtyTracker,
     @Inject(RasterCopyExecutor.symbol)
     rasterCopyExecutor: RasterCopyExecutor,
   ) {
@@ -245,13 +239,9 @@ export class ScreenRenderStrategy<
     }
   }
 
-  #resolveWorldRect(
-    viewportRect: PositionRect<HexColor>,
-    scrollState: ScrollManagerState,
-  ): PositionRect<HexColor> {
+  #resolveWorldRect(viewportRect: PositionRect<HexColor>, scrollState: ScrollManagerState): PositionRect<HexColor> {
     return (
-      this.#runtime.toWorldRect?.(viewportRect, scrollState) ??
-      createWorldRectFromViewport(viewportRect, scrollState)
+      this.#runtime.toWorldRect?.(viewportRect, scrollState) ?? createWorldRectFromViewport(viewportRect, scrollState)
     );
   }
 
@@ -302,7 +292,9 @@ export class ScreenRenderStrategy<
    * @throws Error
    */
   getNodeByCoordinates(node: Node<NodeTypeProperties>, x: number, y: number): Node<NodeTypeProperties>[] {
-    throw new SearError('ScreenRenderStrategy.getNodeByCoordinates is not supported; use HitRenderStrategy for coordinate lookup.');
+    throw new SearError(
+      'ScreenRenderStrategy.getNodeByCoordinates is not supported; use HitRenderStrategy for coordinate lookup.',
+    );
   }
 }
 

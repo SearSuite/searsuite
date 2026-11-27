@@ -2,6 +2,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile, copyFile } from 'node
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { collectWorkspaceImports } from './collect-workspace-imports.mjs';
 import { spawnSync } from 'node:child_process';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -40,24 +41,11 @@ try {
   }
 
   const directDependencies = [
-    '@searsuite/sear-assembly-headless',
-    '@searsuite/sear-assembly-plugin',
-    '@searsuite/sear-assembly-setup',
-    '@searsuite/sear-assembly-workbook',
-    '@searsuite/sear-domain-collaboration',
-    '@searsuite/sear-domain-formula-engine',
-    '@searsuite/sear-domain-formula-engine-ts',
-    '@searsuite/sear-domain-ot',
-    '@searsuite/sear-domain-transaction',
-    '@searsuite/sear-foundation-di',
-    '@searsuite/sear-foundation-subscription',
-    '@searsuite/sear-node-adapters',
-    '@searsuite/sear-plugin-checkbox',
-    '@searsuite/sear-plugin-dropdown',
-    '@searsuite/sear-plugin-collab',
-    '@searsuite/sear-plugin-export',
-    '@searsuite/sear-render-registry',
-  ];
+    ...new Set([
+      ...collectWorkspaceImports(join(fixtureRoot, 'consumer.ts')),
+      ...collectWorkspaceImports(join(fixtureRoot, 'headless.mjs')),
+    ]),
+  ].sort();
   const manifest = {
     name: 'searsuite-external-consumer-contract',
     version: '0.0.0',
@@ -74,9 +62,11 @@ try {
   await writeFile(join(temporaryRoot, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   await copyFile(join(fixtureRoot, 'consumer.ts'), join(temporaryRoot, 'consumer.ts'));
   await copyFile(join(fixtureRoot, 'tsconfig.json'), join(temporaryRoot, 'tsconfig.json'));
+  await copyFile(join(fixtureRoot, 'headless.mjs'), join(temporaryRoot, 'headless.mjs'));
 
   run('pnpm', ['install', '--prefer-offline', '--ignore-scripts', '--no-frozen-lockfile'], temporaryRoot);
   run('pnpm', ['exec', 'tsc', '-p', join(temporaryRoot, 'tsconfig.json'), '--noEmit'], temporaryRoot);
+  run(process.execPath, [join(temporaryRoot, 'headless.mjs')], temporaryRoot);
   console.log(`External consumer contract passed for ${packageEntries.length} packed packages.`);
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });

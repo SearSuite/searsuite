@@ -44,13 +44,87 @@
  */
 
 export { SheetGridRender } from './sheet/SheetGridRender';
-export { SheetGridPlugin } from './sheet/SheetGrid';
+export { SheetGridView } from './sheet/SheetGrid';
 export { activeFixedRowOffsets } from './sheet/SheetFreezeLayout';
 
-export { SheetRowNumberPlugin } from './sheet/SheetRowNumber';
-export { SheetColumnLabelPlugin } from './sheet/SheetColumnLabel';
-export { SheetCornerPlugin } from './sheet/corner/SheetCornerPlugin';
+export { SheetRowNumberView } from './sheet/SheetRowNumber';
+export { SheetColumnLabelView } from './sheet/SheetColumnLabel';
+export { SheetCornerView } from './sheet/corner/SheetCornerView';
 export { SheetCellMergeRender } from './sheet/SheetCellMergeRender';
 export { getSheetRangePositionRect, type SheetRangePositionContext } from './sheet/getSheetRangePositionRect';
 
 export { computeViewportRange, type ViewportRange } from './ViewportRange';
+
+export { SheetCursorView } from './sheet/cursor/SheetCursorView';
+export {
+  type SheetHeaderHighlightMode,
+  sheetHeaderHighlightPluginConfig,
+  SheetHeaderHighlightView,
+} from './sheet/headerHighlight/SheetHeaderHighlightView';
+export { SheetZoomSessionStateDefinition, sheetZoomPluginConfig, SheetZoomView } from './sheet/zoom/SheetZoomView';
+export { SheetHighlightView } from './sheet/highlight/SheetHighlightView';
+export { SheetFormulaReferenceHighlightView } from './sheet/formulaHighlight/SheetFormulaReferenceHighlightView';
+export { SetSheetZoomCommand, ReadSheetZoomQuery, SheetZoomObservation } from './sheet/zoom/SheetZoomCommands';
+
+export { SheetFormulaHyperlinkView } from './sheet/formulaHighlight/SheetFormulaHyperlinkView';
+
+export {
+  formulaHighlightViewKey,
+  type FormulaReferenceColorPalette,
+  type FormulaReferenceHighlightConfig,
+  formulaReferenceHighlightConfig,
+  getFormulaReferenceColor,
+} from './sheet/formulaHighlight/FormulaHighlightConfig';
+
+export { createBuiltinSheetCellView } from './sheet/registerBuiltinSheetRenderers';
+
+export { SheetResizeView, type SheetResizeProjectedCells } from './sheet/resize/SheetResizeView';
+export {
+  registerSheetResizeDragCommands,
+  type SheetResizeDragCommandController,
+} from './sheet/resize/SheetResizeCommandRegistration';
+export * from './sheet/resize/SheetResizeCommands';
+export { SheetHistoryKeyboardView } from './sheet/history/SheetHistoryKeyboardView';
+
+export * from './sheet/border/CellBorderLineNode';
+export * from './sheet/border/renderCellBorders';
+export * from './sheet/checkbox/CheckboxCell';
+export * from './sheet/checkbox/CheckboxGlyphNode';
+export * from './sheet/checkbox/CheckboxRenderContract';
+export { SheetCellBorderView } from './sheet/border/SheetCellBorderView';
+export { SheetCheckboxView, type SheetCheckboxViewOptions } from './sheet/checkbox/SheetCheckboxView';
+
+export { registerSheetCellStyleView } from './sheet/visuals/registerSheetCellStyleView';
+
+export { registerSheetFilterVisuals } from './sheet/visuals/registerSheetFilterVisuals';
+
+export {
+  SheetDataValidationView,
+  type SheetDataValidationViewOptions,
+} from './sheet/dataValidation/SheetDataValidationView';
+export {
+  numericValidationControlLayers,
+  numericValidationControlValueAt,
+} from './sheet/dataValidation/NumericValidationControlView';
+
+export { SheetDropdownView, type SheetDropdownViewOptions } from './sheet/dropdown/SheetDropdownView';
+
+export * from './sheet/selection/SheetRangeDrag';
+export * from './sheet/selection/SheetRangeDragCommand';
+export * from './sheet/selection/SheetSelectionPointerCommand';
+export * from './sheet/selection/SheetSelectionRenderSemantics';
+export * from './sheet/highlight/SheetHighlightRegistry';
+export * from './sheet/highlight/SheetHighlightPipelineNames';
+export * from './sheet/selection/createRangeMovePreview';
+export * from './sheet/selection/SheetAxisDragView';
+export * from './sheet/selection/SelectionViewCommands';
+export * from './sheet/selection/SheetSelectionView';
+export { resolveAxisInsertionBoundary } from './sheet/selection/resolveAxisInsertionBoundary';
+
+export * from './sheet/cellEditor/Highlighter';
+export * from './sheet/cellEditor/FormulaReferenceHighlighter';
+export * from './sheet/cellEditor/EditorCursorBlinker';
+export * from './sheet/cellEditor/computeCellEditorOverflowLeftX';
+export * from './sheet/cellEditor/SheetCellEditorGeometry';
+export * from './sheet/cellEditor/SheetCellEditorView';
+export * from './sheet/cellEditor/SheetCellEditorViewCommands';

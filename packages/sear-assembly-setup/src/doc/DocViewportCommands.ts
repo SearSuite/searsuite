@@ -1,20 +1,10 @@
-import {
-  defineDocCommand,
-  type DocCommandBus,
-  type DocCommandContext,
-  type DocCommandResult,
-  type DocEditorCommand,
-} from '@searsuite/sear-assembly-commands';
-import { Pipeline } from '@searsuite/sear-assembly-core';
-import {
-  SessionStateRestorePhase,
-  defineSessionState,
-  type SessionStateRegistry,
-} from '@searsuite/sear-assembly-plugin';
+import { defineDocCommand, type DocCommandBus, type DocCommandContext, type DocCommandResult, type DocEditorCommand } from '@searsuite/sear-assembly-commands';
+import { Pipeline } from '@searsuite/sear-assembly-plugin';
+import { SessionStateRestorePhase, defineSessionState, type SessionStateRegistry } from '@searsuite/sear-assembly-plugin';
 import { defineStateObservation, type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 import { type ScrollManager, type ScrollManagerState } from '@searsuite/sear-render-scroll';
 
-import { DocContentRenderPluginKey } from '@searsuite/sear-assembly-doc';
+import { DocContentViewKey } from './DocViewKeys';
 import { type DocEditorViewport } from './createDocEditor';
 import { type DocRenderCoordinator } from './DocRenderCoordinator';
 import { type DocViewportEnvironment } from './DocViewportEnvironment';
@@ -58,9 +48,8 @@ export function registerDocViewportCommands(input: {
       id: ScrollDocViewportToCommand.id,
       execute(): DocCommandResult {
         return {
-          pipeline: new Pipeline(ScrollDocViewportToCommand.id).addLocalAction(
-            ScrollDocViewportToCommand.id,
-            () => input.scrollManager.scrollTo(x, y),
+          pipeline: new Pipeline(ScrollDocViewportToCommand.id).addLocalAction(ScrollDocViewportToCommand.id, () =>
+            input.scrollManager.scrollTo(x, y),
           ),
         };
       },
@@ -112,20 +101,22 @@ function createResizeDocViewportCommand(
       pipeline.addLocalAction(ResizeDocViewportCommand.id, function applyDocViewportResize(): void {
         viewportEnvironment.applyViewportResize(size);
       });
-      pipeline.addRender(`${ResizeDocViewportCommand.id}:render`, DocContentRenderPluginKey);
+      pipeline.invalidate(`${ResizeDocViewportCommand.id}:render`, DocContentViewKey);
       return { pipeline };
     },
   };
 }
 
-function createApplyDocViewportScrollCommand(update: DocViewportScrollInput, scrollManager: ScrollManager): DocEditorCommand {
+function createApplyDocViewportScrollCommand(
+  update: DocViewportScrollInput,
+  scrollManager: ScrollManager,
+): DocEditorCommand {
   return {
     id: ApplyDocViewportScrollCommand.id,
     execute(_context: DocCommandContext): DocCommandResult {
       return {
-        pipeline: new Pipeline(ApplyDocViewportScrollCommand.id).addLocalAction(
-          ApplyDocViewportScrollCommand.id,
-          () => scrollManager.applyInputScroll(update),
+        pipeline: new Pipeline(ApplyDocViewportScrollCommand.id).addLocalAction(ApplyDocViewportScrollCommand.id, () =>
+          scrollManager.applyInputScroll(update),
         ),
       };
     },

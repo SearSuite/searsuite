@@ -1,5 +1,5 @@
 import { SearError } from '@searsuite/sear-foundation-error';
-import { type Pipeline } from '@searsuite/sear-assembly-core';
+import { type Pipeline } from '@searsuite/sear-assembly-plugin';
 
 /**
  * The active Sheet editor's execution boundary for a command result.
@@ -8,7 +8,7 @@ import { type Pipeline } from '@searsuite/sear-assembly-core';
  * passes them to this context after the command has returned.
  */
 export interface SheetCommandContext {
-  /** Applies the command-produced pipeline through the core transaction boundary. */
+  /** Applies the command-produced pipeline through the owning kernel transaction boundary. */
   executePipeline(pipeline: Pipeline): void;
   /** Applies a local UI/runtime effect after pipeline execution. */
   applyEffect(effect: SheetCommandEffect): void;

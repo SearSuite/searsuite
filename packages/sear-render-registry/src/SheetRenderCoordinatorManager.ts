@@ -4,14 +4,17 @@ import { PositionRectProps } from '@searsuite/sear-foundation-rect';
 import { NodeFactory } from './NodeFactory';
 import { SheetNodeFactory } from './SheetNodeFactory';
 
-import { RenderCoordinatorManager } from './RenderCoordinatorManager';
 import { RendererRegistry } from './RendererRegistry';
 import { SheetRendererRegistry } from './SheetRendererRegistry';
 import { CellProperties, Cell, CellContext, IFormulaResultProvider } from './Cell';
 import { IFormulaRichResultProvider } from '@searsuite/sear-domain-formula-engine';
 import { FixBoxNode, Node } from '@searsuite/sear-render-node';
 import { Platform } from '@searsuite/sear-foundation-platform';
-import { assertCellExtensionWrite, createDefaultCellFormatLocaleProvider, ICellFormatLocaleProvider } from '@searsuite/sear-domain-cell-types';
+import {
+  assertCellExtensionWrite,
+  createDefaultCellFormatLocaleProvider,
+  ICellFormatLocaleProvider,
+} from '@searsuite/sear-domain-cell-types';
 
 /** Coordinates cell projection and rendering for a Sheet frame. */
 @Injectable()

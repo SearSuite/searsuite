@@ -6,7 +6,7 @@ import {
   type CollaborationServerMessage,
 } from '@searsuite/sear-domain-collaboration';
 import { TransactionOTRegistry, type OTOperation } from '@searsuite/sear-domain-ot';
-import { runOutsideCommandExecution } from '@searsuite/sear-assembly-core';
+import { runOutsideCommandExecution } from '@searsuite/sear-assembly-plugin';
 import { type Platform } from '@searsuite/sear-foundation-platform';
 import { type CollabTransport } from './CollabTransport';
 import { CollaborationChannelError, CollaborationChannelErrorCode } from './CollaborationChannelError';
@@ -75,8 +75,10 @@ export class CollaborationChannel implements CollaborationSession {
     dispatchExternalEvent: (event: CollaborationExternalEvent) => void,
   ): void {
     if (this.#assertWrite) {
-      throw new CollaborationChannelError(CollaborationChannelErrorCode.BoundaryInstalled,
-        'Collaboration channel command boundary is already installed.');
+      throw new CollaborationChannelError(
+        CollaborationChannelErrorCode.BoundaryInstalled,
+        'Collaboration channel command boundary is already installed.',
+      );
     }
     this.#assertWrite = assertWrite;
     this.#runWithoutMutationAuthority = runWithoutMutationAuthority;

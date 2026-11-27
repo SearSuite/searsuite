@@ -29,7 +29,7 @@ describe('render-strategy test setup helpers', () => {
     };
     const nodeModule = jest.requireMock('@searsuite/sear-render-node') as {
       Tree: new () => { getBoundary(): unknown };
-      GenerationalDirtyTracker: new (tree: unknown) => {
+      FrameDirtyTracker: new (tree: unknown) => {
         query(range: unknown): unknown;
         getBoundary(): unknown;
         clear(): void;
@@ -59,7 +59,7 @@ describe('render-strategy test setup helpers', () => {
     const tree = new nodeModule.Tree();
     expect(tree.getBoundary()).toEqual({ width: 1000, height: 800 });
 
-    const dirtyTracker = new nodeModule.GenerationalDirtyTracker({});
+    const dirtyTracker = new nodeModule.FrameDirtyTracker({});
     expect(dirtyTracker.query({})).toEqual([]);
     expect(dirtyTracker.getBoundary()).toEqual({ x: 0, y: 0, width: 1000, height: 800 });
     expect(() => dirtyTracker.clear()).not.toThrow();

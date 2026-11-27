@@ -1,12 +1,14 @@
+import { sealSheetContributionWrites } from '@searsuite/sear-assembly-plugin';
+import { ViewExtensionBase } from '@searsuite/sear-render-event-engine';
+
+import { DefaultDocViews } from './DefaultDocViews';
+import { type DocView, type DocViewRuntime, type DocViewSetupContext, type DocViewRuntimeContext, DocViewCapability } from './DocViewContracts';
 import { ConfigEngine, type DocConfig, type EditorDefaultConfigOverrides } from '@searsuite/sear-assembly-config';
-import { DocCompositionManager, DocCursorManager, DocInputPlugin, SearContractViolationError, SearCoreDoc } from '@searsuite/sear-assembly-core';
+import { DocCompositionManager, DocCursorManager, SearCoreDoc } from '@searsuite/sear-assembly-core';
+import { DocInputPlugin } from '@searsuite/sear-assembly-doc';
+import { SearContractViolationError } from '@searsuite/sear-assembly-plugin';
 import { DocCommandBus } from '@searsuite/sear-assembly-commands';
-import {
-  DocNodeRegistry,
-  RichTextInlineStyleRegistry,
-  RichTextLineBoxRegistry,
-  RichTextBlockFlowRegistry,
-} from '@searsuite/sear-domain-doc';
+import { DocNodeRegistry, RichTextInlineStyleRegistry, RichTextLineBoxRegistry, RichTextBlockFlowRegistry } from '@searsuite/sear-domain-doc';
 import { DocLayoutEngine } from '@searsuite/sear-domain-editor';
 import { Container, Scope } from '@searsuite/sear-foundation-di';
 import { cloneSessionStateValue, createRuntimeCapabilityReader, EditorLifecycleStack, SessionStateRegistry, SessionStateRestorePhase } from '@searsuite/sear-assembly-plugin';
@@ -15,31 +17,15 @@ import { Platform } from '@searsuite/sear-foundation-platform';
 import { TextShaper } from '@searsuite/sear-render-metrics';
 import { KeyboardRouter, PointerCapture, TextInput } from '@searsuite/sear-render-input';
 import { RichTextRunRenderRegistry } from '@searsuite/sear-render-node';
-import {
-  DocRuntimeCapability,
-  registerDocPluginCommands,
-  registerDocPluginKeyboardHandlers,
-  registerDocPluginCapabilities,
-  registerDocPluginInlineStyles,
-  registerDocPluginInlineStyleRenderers,
-  registerDocPluginLineBoxes,
-  registerDocPluginBlockFlows,
-  registerDocPluginObservations,
-  registerDocPluginSessionStates,
-  type DocPlugin,
-  type DocPluginImplementation,
-  type DocPluginRuntime,
-  type DocPluginRuntimeContext,
-  type DocPluginServiceContext,
-  type DocPluginSetupContext,
-} from '@searsuite/sear-assembly-doc';
+import { DocRuntimeCapability, registerDocPluginCommands, registerDocPluginCapabilities, registerDocPluginInlineStyles, registerDocPluginLineBoxes, registerDocPluginBlockFlows, registerDocPluginObservations, registerDocPluginSessionStates, type DocPlugin, type DocPluginImplementation, type DocPluginRuntime, type DocPluginRuntimeContext, type DocPluginServiceContext, type DocPluginSetupContext } from '@searsuite/sear-assembly-doc';
+import { registerDocPluginKeyboardHandlers, registerDocPluginInlineStyleRenderers } from '../index';
 import { DocRuntimeExtensionRegistry } from '@searsuite/sear-assembly-doc';
 import { registerDocBaseServices } from './registerDocBaseServices';
 import { registerDocRuntime } from './registerDocRuntime';
 import { registerDefaultDocFeatures, registerDocFeaturePlugins } from './registerDefaultDocFeatures';
 import { DefaultDocFeaturePlugins } from './DefaultDocFeaturePlugins';
 import { DocInputBindingRegistry } from './DocInputBindingRegistry';
-import { DocPluginRuntimeCapability } from '@searsuite/sear-assembly-doc';
+import { DocViewRuntimeCapability } from './DocViewCapabilities';
 import { createDocEditorApi } from './DocEditorApi';
 import { bindDocEditorCommandHost } from './DocEditorCommandHost';
 import { DocDocumentSessionCoordinator } from './DocDocumentSessionCoordinator';
@@ -58,21 +44,9 @@ import { registerDocDocumentObservation } from './DocStateObservations';
 import { registerDocInlineStyleObservation } from './DocInlineStyleObservations';
 import { registerDocSessionStateCommands } from './DocSessionStateCommands';
 import { registerDocStateSnapshotCommands } from './DocStateSnapshotCommands';
-import { RenderDocCommand } from '@searsuite/sear-assembly-doc';
-import {
-  type DocEditorRuntimeConfiguration,
-  DocEditorRuntimeConfigurationSymbol,
-} from './DocEditorRuntimeConfiguration';
-import {
-  type DocEditor,
-  type DocEditorAdapters,
-  type DocEditorChange,
-  type DocEditorConfiguration,
-  type DocEditorContentRect,
-  type DocDocumentState,
-  type DocSessionState,
-  type DocEditorViewport,
-} from './DocEditorContracts';
+import { RenderDocCommand } from './DocViewCommands';
+import { type DocEditorRuntimeConfiguration, DocEditorRuntimeConfigurationSymbol } from './DocEditorRuntimeConfiguration';
+import { type DocEditor, type DocEditorAdapters, type DocEditorChange, type DocEditorConfiguration, type DocEditorContentRect, type DocDocumentState, type DocSessionState, type DocEditorViewport } from './DocEditorContracts';
 
 export type {
   DocEditor,
@@ -128,6 +102,10 @@ function assembleDocEditor(
   const defaultPluginImplementations: DocPluginImplementation<DocPlugin<unknown>>[] =
     options.defaultPlugins === false ? [] : [...(options.defaultPlugins ?? DefaultDocFeaturePlugins)];
   const customPlugins = options.plugins ?? [];
+  const viewImplementations = [
+    ...(options.defaultViews === false ? [] : options.defaultViews ?? DefaultDocViews),
+    ...(options.viewExtensions ?? []),
+  ];
   const docPluginImplementations = [...defaultPluginImplementations, ...customPlugins];
   registerDocBaseServices(editorDIContainer, options.adapters, viewport, createDocDefaultConfigOverrides(options));
   options.adapters.registerEnvironment?.(editorDIContainer);
@@ -136,6 +114,10 @@ function assembleDocEditor(
     editorDIContainer.register(implementation.symbol, implementation, Scope.Singleton);
     implementation.registerServices?.(pluginServiceContext);
   });
+  for (const implementation of viewImplementations) {
+    editorDIContainer.register(implementation.symbol, implementation, Scope.Singleton);
+    implementation.registerServices?.(pluginServiceContext);
+  }
   const runtime = registerDocRuntime(editorDIContainer, options.adapters, viewport);
 
   const renderContext = runtime.renderContexts.main;
@@ -156,7 +138,8 @@ function assembleDocEditor(
   const renderEngine = runtime.renderEngine;
   const commands = editorDIContainer.resolve<DocCommandBus>(DocCommandBus.symbol);
   searCoreDoc.enforceCommandBoundary(
-    commands.isExecuting.bind(commands), commands.runWithoutMutationAuthority.bind(commands),
+    commands.isExecuting.bind(commands),
+    commands.runWithoutMutationAuthority.bind(commands),
   );
   const inputBindings = editorDIContainer.resolve<DocInputBindingRegistry>(DocInputBindingRegistry.symbol);
   let inputBindingsTearingDown = false;
@@ -182,7 +165,7 @@ function assembleDocEditor(
   const pointerMapper = editorDIContainer.resolve<DocPointerCoordinateMapper>(DocPointerCoordinateMapper.symbol);
 
   const extensions = editorDIContainer.resolve<DocRuntimeExtensionRegistry>(DocRuntimeExtensionRegistry.symbol);
-  const pluginRuntime: DocPluginRuntime = {
+  const viewRuntime: DocViewRuntime = {
     extensions,
     platform,
     commands,
@@ -217,28 +200,51 @@ function assembleDocEditor(
       input: inputPlugin,
     },
   };
+  const pluginRuntime: DocPluginRuntime = {
+    extensions,
+    platform,
+    commands,
+    observations,
+    session,
+    plugins: runtime.pluginManager,
+    document: {
+      input: inputPlugin,
+      nodes: viewRuntime.document.nodes,
+      layout: viewRuntime.document.layout,
+      inlineStyles: inlineStyleRegistry,
+      lineBoxes: lineBoxRegistry,
+      blockFlows: blockFlowRegistry,
+    },
+  };
+  const docViews = viewImplementations.map((implementation) =>
+    editorDIContainer.resolve<DocView>(implementation.symbol),
+  );
+  const viewRegistry = searCoreDoc.getViewExtensions();
+  for (const view of docViews) viewRegistry.register(view);
+  const viewSetupContext: DocViewSetupContext = { container: editorDIContainer, runtime: viewRuntime };
   extensions.register(DocRuntimeCapability.Platform, platform);
-  extensions.register(DocRuntimeCapability.Config, editorDIContainer.resolve<ConfigEngine>(ConfigEngine.symbol));
+  extensions.register(DocViewCapability.Config, editorDIContainer.resolve<ConfigEngine>(ConfigEngine.symbol));
   extensions.register(DocRuntimeCapability.Commands, commands);
   extensions.register(DocRuntimeCapability.Observations, observations);
   extensions.register(DocRuntimeCapability.Session, session);
   extensions.register(DocRuntimeCapability.Plugins, runtime.pluginManager);
-  extensions.register(DocRuntimeCapability.TextShaper, pluginRuntime.textShaper);
-  extensions.register(DocRuntimeCapability.Render, pluginRuntime.render);
-  extensions.register(DocRuntimeCapability.Events, pluginRuntime.events);
-  extensions.register(DocRuntimeCapability.Input, pluginRuntime.input);
-  extensions.register(DocRuntimeCapability.Scroll, pluginRuntime.scroll);
+  extensions.register(DocViewCapability.TextShaper, viewRuntime.textShaper);
+  extensions.register(DocViewCapability.Render, viewRuntime.render);
+  extensions.register(DocViewCapability.Events, viewRuntime.events);
+  extensions.register(DocViewCapability.Input, viewRuntime.input);
+  extensions.register(DocViewCapability.Scroll, viewRuntime.scroll);
   extensions.register(DocRuntimeCapability.Document, pluginRuntime.document);
   extensions.register(DocRuntimeCapability.InlineStyles, inlineStyleRegistry);
   extensions.register(DocRuntimeCapability.LineBoxes, lineBoxRegistry);
   extensions.register(DocRuntimeCapability.BlockFlows, blockFlowRegistry);
   extensions.register(
-    DocRuntimeCapability.LayoutService,
+    DocViewCapability.LayoutService,
     editorDIContainer.resolve<DocRenderLayoutService>(DocRenderLayoutService.symbol),
   );
-  extensions.register(DocPluginRuntimeCapability.Composition, compositionManager);
-  extensions.register(DocPluginRuntimeCapability.InputBindings, inputBindings);
-  extensions.register(DocPluginRuntimeCapability.Interaction, pointerMapper);
+  extensions.register(DocViewRuntimeCapability.Composition, compositionManager);
+  extensions.register(DocViewRuntimeCapability.InputBindings, inputBindings);
+  extensions.register(DocViewRuntimeCapability.Interaction, pointerMapper);
+  for (const view of docViews) view.configure?.(viewSetupContext);
 
   const defaultDocPlugins = registerDefaultDocFeatures(
     editorDIContainer,
@@ -249,7 +255,7 @@ function assembleDocEditor(
   const docPlugins = [...defaultDocPlugins, ...customDocPlugins];
   const unregisterDocPluginInlineStyles = registerDocPluginInlineStyles(docPlugins, inlineStyleRegistry);
   resourceLifecycle.add(unregisterDocPluginInlineStyles);
-  const disposeDocPluginInlineStyleRenderers = registerDocPluginInlineStyleRenderers(docPlugins, runRenderRegistry);
+  const disposeDocPluginInlineStyleRenderers = registerDocPluginInlineStyleRenderers(docViews, runRenderRegistry);
   resourceLifecycle.add(disposeDocPluginInlineStyleRenderers);
   const unregisterDocPluginLineBoxes = registerDocPluginLineBoxes(docPlugins, lineBoxRegistry);
   resourceLifecycle.add(unregisterDocPluginLineBoxes);
@@ -263,8 +269,8 @@ function assembleDocEditor(
     plugin.configure?.(pluginSetupContext);
   });
   const registeredPlugins = runtime.pluginManager.getAllPlugins();
-  const unregisterDocPluginCommands = registerDocPluginCommands(registeredPlugins, commands);
-  const unregisterDocPluginKeyboardHandlers = registerDocPluginKeyboardHandlers(registeredPlugins, {
+  const unregisterDocPluginCommands = registerDocPluginCommands([...registeredPlugins, ...docViews], commands);
+  const unregisterDocPluginKeyboardHandlers = registerDocPluginKeyboardHandlers(docViews, {
     bindings: inputBindings,
     commands,
   });
@@ -294,9 +300,12 @@ function assembleDocEditor(
   viewportEnvironment.start();
   inputLifecycle.start();
 
+  const viewRuntimeContext: DocViewRuntimeContext = { ...viewSetupContext, core: searCoreDoc };
+  resourceLifecycle.add(() => {
+    for (const view of [...docViews].reverse()) view.destroyView?.();
+  });
   const pluginRuntimeContext: DocPluginRuntimeContext = {
     ...pluginSetupContext,
-    core: searCoreDoc,
   };
   resourceLifecycle.add(() => extensions.destroy());
   const coreTeardownToken = {};
@@ -342,25 +351,36 @@ function assembleDocEditor(
     markDestroyed: markDocEditorDestroyed,
   });
 
+  for (const view of docViews) view.initialize?.(viewRuntimeContext);
   searCoreDoc.start();
+  for (const view of docViews) view.start?.(viewRuntimeContext);
   docPlugins.forEach(function startDocPlugin(plugin) {
     plugin.start?.(pluginRuntimeContext);
   });
   let extensionsTearingDown = false;
-  resourceLifecycle.add(() => { extensionsTearingDown = true; });
-  resourceLifecycle.add(() => { inputBindingsTearingDown = true; });
+  resourceLifecycle.add(() => {
+    extensionsTearingDown = true;
+  });
+  resourceLifecycle.add(() => {
+    inputBindingsTearingDown = true;
+  });
   const assertExtensionCommand = (): void => {
     if (!extensionsTearingDown && !commands.isExecuting()) {
       throw new SearContractViolationError('Doc extensions must change through editor.commands.run(...).');
     }
   };
   sealDocPluginTeardownWrites(docPlugins, assertExtensionCommand);
+  for (const view of docViews)
+    ViewExtensionBase.prototype.enforceRuntimeWriteBoundary.call(view, assertExtensionCommand);
+  sealSheetContributionWrites(viewRegistry, assertExtensionCommand);
   inlineStyleRegistry.enforceWriteBoundary(assertExtensionCommand);
   runRenderRegistry.enforceWriteBoundary(assertExtensionCommand);
   lineBoxRegistry.enforceWriteBoundary(assertExtensionCommand);
   blockFlowRegistry.enforceWriteBoundary(assertExtensionCommand);
   observations.enforceWriteBoundary(
-    assertExtensionCommand, commands.runWithoutMutationAuthority.bind(commands), cloneSessionStateValue,
+    assertExtensionCommand,
+    commands.runWithoutMutationAuthority.bind(commands),
+    cloneSessionStateValue,
   );
   extensions.enforceWriteBoundary(assertExtensionCommand);
   inputBindings.enforceCommandBoundary(commands.isExecuting.bind(commands), () => inputBindingsTearingDown);
@@ -372,13 +392,16 @@ function assembleDocEditor(
   viewportEnvironment.enforceTeardownBoundary(viewportTeardownToken);
   renderCoordinator.enforceTeardownBoundary(renderTeardownToken);
   if (editorDIContainer.hasBinding(DocCaretState.symbol)) {
-    editorDIContainer.resolve<DocCaretState>(DocCaretState.symbol)
+    editorDIContainer
+      .resolve<DocCaretState>(DocCaretState.symbol)
       .enforceCommandBoundary(commands.isExecuting.bind(commands));
   }
   compositionManager.enforceCommandBoundary(commands.isExecuting.bind(commands));
   cursorManager.enforceCommandBoundary(commands.isExecuting.bind(commands), cursorTeardownToken);
   scrollManager.enforceCommandBoundary(commands.isExecuting.bind(commands));
-  editorDIContainer.resolve<ConfigEngine>(ConfigEngine.symbol).enforceCommandBoundary(commands.isExecuting.bind(commands));
+  editorDIContainer
+    .resolve<ConfigEngine>(ConfigEngine.symbol)
+    .enforceCommandBoundary(commands.isExecuting.bind(commands));
   options.onCreated?.(editor);
   commands.enforceRegistrationBoundary(assertExtensionCommand);
   return editor;

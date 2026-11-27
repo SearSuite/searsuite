@@ -2,8 +2,10 @@
 
 import { createUpdateCellOTOperation } from '@searsuite/sear-domain-ot';
 import { createHeadlessEditor } from '../src';
-import { createEmptySheetDocumentState, ExportSheetStateCommand, SheetPlugin } from '@searsuite/sear-assembly-setup';
-import { createSheetEmbeddedSearCoreEditor } from '@searsuite/sear-plugin-sheet-doc-adapter';
+import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
+import { createEmptySheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
+import { SheetPlugin } from '@searsuite/sear-assembly-commands';
+
 import { ClearRangeStylesCommand } from '@searsuite/sear-plugin-clear-style';
 import { CellFormats } from '@searsuite/sear-domain-cell-types';
 import { SheetHorizontalAlignment, SheetVerticalAlignment } from '@searsuite/sear-plugin-alignment';
@@ -53,7 +55,7 @@ it('clears all contributed formats in one undo step and retains text, formulas, 
   state.cellFormats.setItem(1, 1, CellFormats.percent);
   state.cellBorders = new CellBorderMatrix(undefined, [5, 5]);
   state.cellBorders.setItem(0, 0, { bottom: { color: '#ff0000', style: SheetBorderLineStyle.Thin } });
-  const editor = createHeadlessEditor({ sheetState: state, embeddedEditor: createSheetEmbeddedSearCoreEditor() });
+  const editor = createHeadlessEditor({ sheetState: state });
   const read = () => editor.commands.run(ExportSheetStateCommand, undefined).sheetState;
   try {
     const before = read();
@@ -104,12 +106,6 @@ class RejectClearPlugin extends SheetPlugin<null> {
   }
   public apply(_state: null, transaction: Transaction): null {
     if (transaction.pluginKey === this.key) throw new SearError('clear rejected');
-    return null;
-  }
-  public getPluginConfig(): null {
-    return null;
-  }
-  public render(): null {
     return null;
   }
 }

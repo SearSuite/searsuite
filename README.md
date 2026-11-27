@@ -8,7 +8,9 @@ SearSuite's underlying architecture supports AI-assisted editing, allowing peopl
 
 ## Get started with SearSuite
 
-SearSuite provides TypeScript modules for building spreadsheet experiences that people and AI agents can edit together. Use the published 0.0.1 packages to run a Sheet, a multi-Sheet Workbook or a Node.js Headless editor. The browser examples share one application adapter file.
+SearSuite provides TypeScript modules for building spreadsheet experiences that people and AI agents can edit together. Use matching package releases to run a Sheet, a multi-Sheet Workbook or a Node.js Headless editor. The browser examples share one application adapter file.
+
+This Quickstart follows the current source API. The independent state and Workbook kernel packages require an updated npm release; the previously published 0.0.1 set does not provide this API.
 
 <a id="choose-editor"></a>
 
@@ -18,7 +20,7 @@ SearSuite provides TypeScript modules for building spreadsheet experiences that 
 - [Sheet](#single-sheet): use the same browser setup for one spreadsheet.
 - [Headless](#headless): calculate and serialize Sheet data on Node.js, without a browser.
 
-Prefer a ready-to-run project? Copy the [standalone npm examples](https://github.com/SearSuite/searsuite-browser/tree/main/examples/npm) into your application directory and run `npm ci`, then `npm run dev`. Open `/` or `/sheet.html` on the printed URL. Run `npm run headless` for Node and `npm test` for its calculation and JSON checks. The project installs registry packages and does not link source workspaces.
+Prefer a ready-to-run project? Copy the [standalone npm examples](https://github.com/SearSuite/searsuite-browser/tree/main/examples/npm) into your application directory and run `npm install`, then `npm run dev`. Open `/` or `/sheet.html` on the printed URL. Run `npm run headless` for Node and `npm test` for its calculation and JSON checks. The project installs registry packages and does not link source workspaces.
 
 <a id="install"></a>
 
@@ -31,14 +33,17 @@ npm create vite@6 my-searsuite-app -- --template vanilla-ts
 cd my-searsuite-app
 npm install
 npm install \
-  @searsuite/sear-assembly-setup@0.0.1 \
-  @searsuite/sear-assembly-workbook@0.0.1 \
-  @searsuite/sear-domain-workbook@0.0.1 \
-  @searsuite/sear-browser-adapters@0.0.1 \
-  @searsuite/sear-plugin-web-toolbar@0.0.1 \
-  @searsuite/sear-plugin-web-sheet-tabbar@0.0.1 \
-  @searsuite/sear-plugin-sheet-doc-adapter@0.0.1 \
-  @searsuite/sear-render-scroll@0.0.1
+  @searsuite/sear-assembly-setup \
+  @searsuite/sear-assembly-workbook \
+  @searsuite/sear-assembly-workbook-kernel \
+  @searsuite/sear-assembly-sheet-state \
+  @searsuite/sear-assembly-sheet-kernel \
+  @searsuite/sear-domain-workbook \
+  @searsuite/sear-browser-adapters \
+  @searsuite/sear-plugin-web-toolbar \
+  @searsuite/sear-plugin-web-sheet-tabbar \
+  @searsuite/sear-assembly-sheet-doc \
+  @searsuite/sear-render-scroll
 ```
 
 For an existing application, run only the package install command in its project directory. Keep all example dependencies pinned to the tested `0.0.1` release set. A newer source checkout does not change packages already installed from npm.
@@ -81,7 +86,7 @@ Replace `index.html` with this page. The workbook has separate containers for th
 Create `src/browser-host.ts`. This application helper supplies Web rendering, scrolling, keyboard and pointer input, clipboard, and toolbar adapters to each mounted Sheet editor. The helper is defined in your application; it is not an export of an npm package.
 
 ```typescript
-import type { SheetEditorAdapters } from '@searsuite/sear-assembly-setup';
+import type { SheetEditorAdapters } from "@searsuite/sear-assembly-setup";
 import {
   BrowserPlatform,
   WebCanvasRenderContext,
@@ -92,21 +97,27 @@ import {
   WebScroller,
   WebSocketTransport,
   WebTextInput,
-} from '@searsuite/sear-browser-adapters';
+} from "@searsuite/sear-browser-adapters";
 import {
   SearWebToolbar,
   WebFormulaBar,
   WebSheetAdapterDefaults,
-} from '@searsuite/sear-plugin-web-toolbar';
-import { Scroller } from '@searsuite/sear-render-scroll';
+} from "@searsuite/sear-plugin-web-toolbar";
+import { Scroller } from "@searsuite/sear-render-scroll";
 
-// This helper belongs to the application. All imported APIs exist in npm 0.0.1.
-export function createBrowserAdapters(canvas: HTMLCanvasElement): SheetEditorAdapters {
+// This helper belongs to the application and supplies its selected browser adapters.
+export function createBrowserAdapters(
+  canvas: HTMLCanvasElement
+): SheetEditorAdapters {
   return {
     ...WebSheetAdapterDefaults,
     platform: BrowserPlatform,
     createRenderContexts() {
-      const context = new WebCanvasRenderContext(canvas, false, new BrowserPlatform());
+      const context = new WebCanvasRenderContext(
+        canvas,
+        false,
+        new BrowserPlatform()
+      );
       return {
         renderContext: context,
         offScreenRenderContext: context.cloneNode(),
@@ -124,8 +135,14 @@ export function createBrowserAdapters(canvas: HTMLCanvasElement): SheetEditorAda
     formulaBar: WebFormulaBar,
     registerEnvironment(container) {
       container.registerInstance(Scroller.ContainerSymbol, canvas);
-      container.registerInstance(WebKeyboardRouter.eventTargetSymbol, canvas.ownerDocument);
-      container.registerInstance(WebPointerCapture.eventTargetSymbol, canvas.ownerDocument);
+      container.registerInstance(
+        WebKeyboardRouter.eventTargetSymbol,
+        canvas.ownerDocument
+      );
+      container.registerInstance(
+        WebPointerCapture.eventTargetSymbol,
+        canvas.ownerDocument
+      );
     },
   };
 }
@@ -142,64 +159,64 @@ The `canvas` parameter is supplied by each entry below: `document.querySelector<
 Create `src/workbook.ts`. It creates two Sheets, enables cross-Sheet formulas, and mounts the toolbar, formula bar, and bottom Sheet tabs.
 
 ```typescript
-import {
-  createEmptySheetDocumentState,
-  createSheetEditor,
-  SheetRuntimeCapability,
-} from '@searsuite/sear-assembly-setup';
-import {
-  createWorkbookEditor,
-  WorkbookActiveSheetEditorObservation,
-  WorkbookFormulaPlugin,
-} from '@searsuite/sear-assembly-workbook';
-import { createWorkbookDocumentState } from '@searsuite/sear-domain-workbook';
-import { BrowserPlatform } from '@searsuite/sear-browser-adapters';
-import { createSheetEmbeddedSearCoreEditor } from '@searsuite/sear-plugin-sheet-doc-adapter';
-import { SearWebBottomBar } from '@searsuite/sear-plugin-web-sheet-tabbar';
-import { createBrowserAdapters } from './browser-host';
+import { SheetViewCapability } from "@searsuite/sear-assembly-setup";
+import { createSheetEditor } from "@searsuite/sear-assembly-setup";
+import { createEmptySheetDocumentState } from "@searsuite/sear-assembly-sheet-state";
 
-const canvas = document.querySelector<HTMLCanvasElement>('#canvas')!;
-const toolbarElement = document.querySelector<HTMLElement>('#toolbar')!;
-const formulaBarElement = document.querySelector<HTMLElement>('#formula-bar')!;
-const bottomBarElement = document.querySelector<HTMLElement>('#bottom-bar')!;
+import { createWorkbookEditor } from '@searsuite/sear-assembly-workbook';
+import { WorkbookActiveSheetEditorObservation } from '@searsuite/sear-assembly-workbook-kernel';
+import { WorkbookFormulaPlugin } from "@searsuite/sear-assembly-workbook-kernel";
+import { createWorkbookDocumentState } from "@searsuite/sear-domain-workbook";
+import { BrowserPlatform } from "@searsuite/sear-browser-adapters";
+import { createSheetEmbeddedSearCoreEditor } from "@searsuite/sear-assembly-sheet-doc";
+import { SearWebBottomBar } from "@searsuite/sear-plugin-web-sheet-tabbar";
+import { createBrowserAdapters } from "./browser-host";
+
+const canvas = document.querySelector<HTMLCanvasElement>("#canvas")!;
+const toolbarElement = document.querySelector<HTMLElement>("#toolbar")!;
+const formulaBarElement = document.querySelector<HTMLElement>("#formula-bar")!;
+const bottomBarElement = document.querySelector<HTMLElement>("#bottom-bar")!;
 
 const first = createEmptySheetDocumentState(1000, 26);
-first.sheetData.addItem(0, 0, { type: 'string', value: 'Hello SearSuite' });
-first.sheetData.addItem(1, 0, { type: 'number', value: 21 });
-first.sheetData.addItem(2, 0, { type: 'formula', formula: '=A2*2' });
+first.sheetData.addItem(0, 0, { type: "string", value: "Hello SearSuite" });
+first.sheetData.addItem(1, 0, { type: "number", value: 21 });
+first.sheetData.addItem(2, 0, { type: "formula", formula: "=A2*2" });
 
 const second = createEmptySheetDocumentState(1000, 26);
-second.sheetData.addItem(0, 0, { type: 'string', value: 'Second Sheet' });
-second.sheetData.addItem(1, 0, { type: 'formula', formula: '=Sheet1!A2*3' });
+second.sheetData.addItem(0, 0, { type: "string", value: "Second Sheet" });
+second.sheetData.addItem(1, 0, { type: "formula", formula: "=Sheet1!A2*3" });
 
 const workbook = createWorkbookEditor({
   plugins: [WorkbookFormulaPlugin],
   documentState: createWorkbookDocumentState({
-    id: 'my-workbook',
+    id: "my-workbook",
     sheets: [
-      { id: 'sheet-1', name: 'Sheet1' },
-      { id: 'sheet-2', name: 'Sheet2' },
+      { id: "sheet-1", name: "Sheet1" },
+      { id: "sheet-2", name: "Sheet2" },
     ],
-    sheetStates: { 'sheet-1': first, 'sheet-2': second },
+    sheetStates: { "sheet-1": first, "sheet-2": second },
   }),
   viewport: { width: canvas.clientWidth, height: canvas.clientHeight },
   adapters: createBrowserAdapters(canvas),
-  sheetEditorFactory: ({ configuration }) => createSheetEditor({
-    ...configuration,
-    embeddedEditor: createSheetEmbeddedSearCoreEditor(),
-  }),
+  sheetEditorFactory: ({ configuration }) =>
+    createSheetEditor({
+      ...configuration,
+      embeddedEditor: createSheetEmbeddedSearCoreEditor(),
+    }),
 });
 
 function mountSheetChrome() {
   const editor = workbook.sheets.getActiveEditor();
-  editor.services.require(SheetRuntimeCapability.Toolbar).mount(toolbarElement);
-  editor.services.require(SheetRuntimeCapability.FormulaBar).mount(formulaBarElement);
+  editor.services.require(SheetViewCapability.Toolbar).mount(toolbarElement);
+  editor.services
+    .require(SheetViewCapability.FormulaBar)
+    .mount(formulaBarElement);
 }
 
 mountSheetChrome();
 const unsubscribe = workbook.observations.subscribe(
   WorkbookActiveSheetEditorObservation,
-  mountSheetChrome,
+  mountSheetChrome
 );
 
 const bottomBar = new SearWebBottomBar(new BrowserPlatform());
@@ -270,19 +287,21 @@ Reuse the browser installation and `src/browser-host.ts` above. Add `sheet.html`
 ```
 
 ```typescript
-import {
-  createEmptySheetDocumentState,
-  createSheetEditor,
-  SheetRuntimeCapability,
-} from '@searsuite/sear-assembly-setup';
-import { createSheetEmbeddedSearCoreEditor } from '@searsuite/sear-plugin-sheet-doc-adapter';
-import { createBrowserAdapters } from './browser-host';
+import { SheetViewCapability } from "@searsuite/sear-assembly-setup";
+import { createSheetEditor } from "@searsuite/sear-assembly-setup";
+import { createEmptySheetDocumentState } from "@searsuite/sear-assembly-sheet-state";
 
-const canvas = document.querySelector<HTMLCanvasElement>('#canvas')!;
+import { createSheetEmbeddedSearCoreEditor } from "@searsuite/sear-assembly-sheet-doc";
+import { createBrowserAdapters } from "./browser-host";
+
+const canvas = document.querySelector<HTMLCanvasElement>("#canvas")!;
 const sheetState = createEmptySheetDocumentState(1000, 26);
-sheetState.sheetData.addItem(0, 0, { type: 'string', value: 'Hello SearSuite' });
-sheetState.sheetData.addItem(1, 0, { type: 'number', value: 21 });
-sheetState.sheetData.addItem(2, 0, { type: 'formula', formula: '=A2*2' });
+sheetState.sheetData.addItem(0, 0, {
+  type: "string",
+  value: "Hello SearSuite",
+});
+sheetState.sheetData.addItem(1, 0, { type: "number", value: 21 });
+sheetState.sheetData.addItem(2, 0, { type: "formula", formula: "=A2*2" });
 
 const editor = createSheetEditor({
   sheetState,
@@ -291,8 +310,12 @@ const editor = createSheetEditor({
   embeddedEditor: createSheetEmbeddedSearCoreEditor(),
 });
 
-editor.services.require(SheetRuntimeCapability.Toolbar).mount(document.querySelector('#toolbar'));
-editor.services.require(SheetRuntimeCapability.FormulaBar).mount(document.querySelector('#formula-bar'));
+editor.services
+  .require(SheetViewCapability.Toolbar)
+  .mount(document.querySelector("#toolbar"));
+editor.services
+  .require(SheetViewCapability.FormulaBar)
+  .mount(document.querySelector("#formula-bar"));
 
 function destroy() {
   editor.destroy();
@@ -309,24 +332,21 @@ if (import.meta.hot) {
 
 ### Run on Node.js
 
-Headless can run independently of the browser application. In a new directory, install only these three packages. Use Node.js 22.12 or later; no Canvas, browser adapter, Vite or DOM is required.
+Headless can run independently of the browser application. In a new directory, install only these four packages. Use Node.js 22.12 or later; no Canvas, browser adapter, Vite or DOM is required.
 
 ```bash
 mkdir searsuite-headless
 cd searsuite-headless
 npm init -y
-npm install @searsuite/sear-assembly-headless@0.0.1 @searsuite/sear-assembly-setup@0.0.1 @searsuite/sear-plugin-formula@0.0.1
+npm install @searsuite/sear-assembly-headless @searsuite/sear-assembly-sheet-state @searsuite/sear-assembly-sheet-kernel @searsuite/sear-plugin-formula
 ```
 
 Create `headless.mjs`, then run `node headless.mjs`:
 
 ```javascript
+import { createEmptySheetDocumentState, serializeSheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
 import { createHeadlessEditor } from '@searsuite/sear-assembly-headless';
-import {
-  createEmptySheetDocumentState,
-  ExportSheetStateCommand,
-  serializeSheetDocumentState,
-} from '@searsuite/sear-assembly-setup';
+import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
 import { GetFormulaCellStatusCommand, waitForFormulaIdle } from '@searsuite/sear-plugin-formula';
 
 const sheetState = createEmptySheetDocumentState(10, 10);

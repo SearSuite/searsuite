@@ -22,8 +22,7 @@
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "@searsuite/sear-foundation-di": "workspace:*",
-    "@searsuite/sear-foundation-rect": "workspace:*"
+    "@searsuite/sear-foundation-di": "workspace:*"
   },
   "exports": {
     ".": {

@@ -1,7 +1,7 @@
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
 import { MatrixOTActionName } from '@searsuite/sear-domain-ot';
-import { createTransaction, Transaction } from '@searsuite/sear-domain-transaction';
-import { SheetCellVisualReaderRegistry } from '@searsuite/sear-render-registry';
+import { createTransaction } from '@searsuite/sear-domain-transaction';
+import { SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
 import {
   CellFillMatrix,
   SetRangeCellFillCommand,
@@ -62,15 +62,15 @@ describe('@searsuite/sear-plugin-cell-fill', () => {
     expect(state.cellFills.getItem(2, 1)).toBe('#00a870');
   });
 
-  it('contributes only explicit fills through the visual reader registry', () => {
+  it('contributes only explicit fills through the semantic style registry', () => {
     const fills = new CellFillMatrix(void 0, [2, 2]);
     fills.addItem(1, 0, '#ffcc00' as SheetCellFill);
     const plugin = new SheetCellFillPlugin({ cellFills: fills });
-    const registry = new SheetCellVisualReaderRegistry();
+    const registry = new SheetCellStyleRegistry();
 
-    plugin.registerCellVisualReaders(registry);
+    plugin.registerCellStyles(registry);
 
-    expect(registry.read({ rowIndex: 0, columnIndex: 0 })).toEqual({});
-    expect(registry.read({ rowIndex: 1, columnIndex: 0 })).toEqual({ fill: '#ffcc00' });
+    expect(registry.read(0, 0)).toEqual({});
+    expect(registry.read(1, 0)).toEqual({ fill: '#ffcc00' });
   });
 });

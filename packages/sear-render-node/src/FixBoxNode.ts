@@ -1,7 +1,7 @@
 import { type ClipRegion } from './Node';
 import { RenderNode } from './RenderNode';
 import { RenderContext } from '@searsuite/sear-render-context';
-import { PositionRect } from '@searsuite/sear-foundation-rect';
+
 import { Platform } from '@searsuite/sear-foundation-platform';
 import { NodeProperties } from './types';
 
@@ -76,11 +76,13 @@ export class FixBoxNode<T extends NodeProperties> extends RenderNode<T> {
     // should not paint the Hit Canvas; otherwise they can cover cell hit colors and block click-through.
     if (this.properties.skipHit) return;
     if (!this.randomColorKey) {
-      this.resolveRuntime<Platform>(Platform.symbol)
-        .warn('FixBoxNode drawHit skipped: randomColorKey is missing for a hit-enabled node.', {
+      this.resolveRuntime<Platform>(Platform.symbol).warn(
+        'FixBoxNode drawHit skipped: randomColorKey is missing for a hit-enabled node.',
+        {
           nodeName: this.name,
           positionRect: this.positionRect,
-        });
+        },
+      );
       return;
     }
 

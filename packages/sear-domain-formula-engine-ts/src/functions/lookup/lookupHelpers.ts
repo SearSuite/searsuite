@@ -1,7 +1,6 @@
 import {
   isFormulaArgumentKind,
   FormulaErrorCode,
-  FormulaNodeKind,
   createFormulaError,
   isFormulaError,
   type EvalContext,
@@ -129,18 +128,23 @@ export function matrixArg(
   return rows;
 }
 
-export function selectionIndexes(args: readonly FormulaArg[], context: EvalContext, size: number): number[] | FormulaError {
+export function selectionIndexes(
+  args: readonly FormulaArg[],
+  context: EvalContext,
+  size: number,
+): number[] | FormulaError {
   const indexes: number[] = [];
   for (const arg of args) {
     const values = matrixArg(arg, context, true);
     if (isFormulaError(values)) return values;
-    for (const row of values) for (const value of row) {
-      const numeric = numberArg({ kind: 'value', value }, context);
-      if (isFormulaError(numeric)) return numeric;
-      const index = Math.trunc(numeric);
-      if (index === 0 || Math.abs(index) > size) return lookupValueError();
-      indexes.push(index > 0 ? index - 1 : size + index);
-    }
+    for (const row of values)
+      for (const value of row) {
+        const numeric = numberArg({ kind: 'value', value }, context);
+        if (isFormulaError(numeric)) return numeric;
+        const index = Math.trunc(numeric);
+        if (index === 0 || Math.abs(index) > size) return lookupValueError();
+        indexes.push(index > 0 ? index - 1 : size + index);
+      }
   }
   return indexes;
 }

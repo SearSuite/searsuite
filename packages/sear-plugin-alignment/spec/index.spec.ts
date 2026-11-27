@@ -7,9 +7,9 @@ import {
   SheetVerticalAlignmentPlugin,
   VerticalAlignmentMatrix,
 } from '../src';
-import { SheetCellVisualReaderRegistry } from '@searsuite/sear-render-registry';
+import { SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
 import { SheetFormatTransferRegistry } from '@searsuite/sear-assembly-plugin';
-import { SheetMatrix } from '@searsuite/sear-render-engine';
+import { SheetMatrix } from '@searsuite/sear-domain-sheet';
 
 describe('@searsuite/sear-plugin-alignment public API', () => {
   it('exports canonical alignment enums and matrices', () => {
@@ -64,28 +64,28 @@ describe('@searsuite/sear-plugin-alignment public API', () => {
     );
   });
 
-  it('contributes horizontal and vertical properties through the visual reader registry', () => {
+  it('contributes horizontal and vertical properties through the semantic style registry', () => {
     const horizontal = new AlignmentMatrix(void 0, [2, 2]);
     horizontal.addItem(0, 1, SheetHorizontalAlignment.Right);
     const vertical = new VerticalAlignmentMatrix(void 0, [2, 2]);
     vertical.addItem(1, 0, SheetVerticalAlignment.Bottom);
-    const registry = new SheetCellVisualReaderRegistry();
+    const registry = new SheetCellStyleRegistry();
     const context = {
-      readDefaultConfig: () => ({
-        defaultCellAlign: SheetHorizontalAlignment.Center,
-        defaultCellVerticalAlign: SheetVerticalAlignment.Top,
+      read: () => ({
+        horizontalAlign: SheetHorizontalAlignment.Center,
+        verticalAlign: SheetVerticalAlignment.Top,
       }),
     };
 
-    new SheetAlignmentPlugin({ cellAlignments: horizontal }).registerCellVisualReaders(registry, context);
-    new SheetVerticalAlignmentPlugin({ cellVerticalAlignments: vertical }).registerCellVisualReaders(registry, context);
+    new SheetAlignmentPlugin({ cellAlignments: horizontal }).registerCellStyles(registry, context);
+    new SheetVerticalAlignmentPlugin({ cellVerticalAlignments: vertical }).registerCellStyles(registry, context);
 
-    expect(registry.read({ rowIndex: 0, columnIndex: 0 })).toEqual({
+    expect(registry.read(0, 0)).toEqual({
       horizontalAlign: SheetHorizontalAlignment.Left,
       verticalAlign: SheetVerticalAlignment.Center,
     });
-    expect(registry.read({ rowIndex: 0, columnIndex: 1 }).horizontalAlign).toBe(SheetHorizontalAlignment.Right);
-    expect(registry.read({ rowIndex: 1, columnIndex: 0 }).verticalAlign).toBe(SheetVerticalAlignment.Bottom);
+    expect(registry.read(0, 1).horizontalAlign).toBe(SheetHorizontalAlignment.Right);
+    expect(registry.read(1, 0).verticalAlign).toBe(SheetVerticalAlignment.Bottom);
   });
 
   it('BUG-748 restores cell-type alignment when clearing explicit styles', () => {

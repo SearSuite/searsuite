@@ -1,11 +1,19 @@
 import { type CSRMatrix } from '@searsuite/sear-domain-matrix';
 import {
-  MatrixOTActionName, createDeleteColOTOperation, createDeleteRowOTOperation,
-  createInsertColOTOperation, createInsertRowOTOperation, createMoveColOTOperation,
-  createMoveRowOTOperation, createUpdateCellOTOperation, isMatrixStructureOperation,
-  isUpdateCellOperation, type MatrixOTOperation, type Operation,
+  MatrixOTActionName,
+  createDeleteColOTOperation,
+  createDeleteRowOTOperation,
+  createInsertColOTOperation,
+  createInsertRowOTOperation,
+  createMoveColOTOperation,
+  createMoveRowOTOperation,
+  createUpdateCellOTOperation,
+  isMatrixStructureOperation,
+  isUpdateCellOperation,
+  type MatrixOTOperation,
+  type Operation,
 } from '@searsuite/sear-domain-ot';
-import { readDenseColumn, readDenseRow } from '@searsuite/sear-render-engine';
+import { readDenseColumn, readDenseRow } from '@searsuite/sear-domain-sheet';
 import { type SheetDemoMarker } from './SheetDemoMarker';
 
 /** Project one direct marker edit or one shared row/column structure operation. */
@@ -18,7 +26,8 @@ export function projectMarkerOperation(
     if (!direct) return null;
     const [row, column] = operation.p;
     return createUpdateCellOTOperation(
-      [row, column], operation.uc.value,
+      [row, column],
+      operation.uc.value,
       operation.uc.prev === void 0 ? matrix.getItem(row, column) : operation.uc.prev,
     );
   }

@@ -1,10 +1,17 @@
-import { createSheetTransaction, defineSheetCommand, TransactionPipelineCommand, type SheetCommandBus, type SheetQueryRegistry } from '@searsuite/sear-assembly-commands';
+import {
+  createSheetTransaction,
+  defineSheetCommand,
+  TransactionPipelineCommand,
+  type SheetCommandBus,
+  type SheetQueryRegistry,
+} from '@searsuite/sear-assembly-commands';
 import { CellType, type CellMatrixElement } from '@searsuite/sear-domain-cell-types';
 import { stringToRichDoc } from '@searsuite/sear-domain-doc';
 import { createUpdateCellOTOperation } from '@searsuite/sear-domain-ot';
 import { GetSelections } from '@searsuite/sear-plugin-selection';
-import { ReadSheetCellDataQuery, SheetDataPlugin } from '@searsuite/sear-render-engine';
-import { type SheetEmbeddedEditor } from '@searsuite/sear-sheet-editor-contract';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
+import { ReadSheetCellDataQuery } from '@searsuite/sear-domain-sheet';
+import { type CellDocumentFormatting } from './SheetCellEditorOptions';
 
 export interface SheetRangeTextStyleInput {
   readonly attrs: Readonly<Record<string, unknown>>;
@@ -16,9 +23,8 @@ export const SetRangeCellTextStyleCommand = defineSheetCommand<SheetRangeTextSty
 export function registerSheetRangeTextStyleCommand(
   commands: SheetCommandBus,
   queries: SheetQueryRegistry,
-  embeddedEditor: SheetEmbeddedEditor | null | undefined,
+  formatting: CellDocumentFormatting,
 ): void {
-  if (!embeddedEditor?.formatting) return;
   commands.register(SetRangeCellTextStyleCommand, (input) => {
     const data = queries.run(ReadSheetCellDataQuery, void 0);
     const ranges = queries.run(GetSelections, void 0);
@@ -29,12 +35,15 @@ export function registerSheetRangeTextStyleCommand(
       if (seen.has(key)) return;
       seen.add(key);
       if (previous.type !== CellType.String && previous.type !== CellType.RichText) return;
-      const document = typeof previous.value === 'string'
-        ? stringToRichDoc(previous.value)
-        : Array.isArray(previous.value) ? previous.value : null;
+      const document =
+        typeof previous.value === 'string'
+          ? stringToRichDoc(previous.value)
+          : Array.isArray(previous.value)
+          ? previous.value
+          : null;
       if (!document) return;
-      const current = embeddedEditor.formatting!.capture(document);
-      const next = embeddedEditor.formatting!.apply(document, { ...current, ...input.attrs });
+      const current = formatting.capture(document);
+      const next = formatting.apply(document, { ...current, ...input.attrs });
       const value: CellMatrixElement = { type: CellType.RichText, value: next };
       operations.push(createUpdateCellOTOperation<CellMatrixElement>([row, col], value, previous));
     };
@@ -50,7 +59,9 @@ export function registerSheetRangeTextStyleCommand(
         }
       }
     }
-    return new TransactionPipelineCommand(SetRangeCellTextStyleCommand.id,
-      createSheetTransaction(SheetDataPlugin.pluginKey, operations));
+    return new TransactionPipelineCommand(
+      SetRangeCellTextStyleCommand.id,
+      createSheetTransaction(SheetDataPlugin.pluginKey, operations),
+    );
   });
 }

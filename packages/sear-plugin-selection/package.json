@@ -22,31 +22,20 @@
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "@searsuite/sear-foundation-user-interaction": "workspace:*",
-    "@searsuite/sear-render-coord": "workspace:*",
-    "@searsuite/sear-render-cursor": "workspace:*",
     "@searsuite/sear-assembly-commands": "workspace:*",
-    "@searsuite/sear-assembly-config": "workspace:*",
-    "@searsuite/sear-assembly-core": "workspace:*",
     "@searsuite/sear-assembly-plugin": "workspace:*",
     "@searsuite/sear-domain-cell-types": "workspace:*",
     "@searsuite/sear-domain-matrix": "workspace:*",
     "@searsuite/sear-domain-ot": "workspace:*",
+    "@searsuite/sear-domain-sheet": "workspace:*",
+    "@searsuite/sear-domain-state": "workspace:*",
     "@searsuite/sear-domain-transaction": "workspace:*",
     "@searsuite/sear-foundation-di": "workspace:*",
+    "@searsuite/sear-foundation-error": "workspace:*",
     "@searsuite/sear-foundation-platform": "workspace:*",
     "@searsuite/sear-foundation-rect": "workspace:*",
-    "@searsuite/sear-foundation-utils": "workspace:*",
-    "@searsuite/sear-render": "workspace:*",
     "@searsuite/sear-plugin-cell-merge": "workspace:*",
-    "@searsuite/sear-plugin-freeze": "workspace:*",
-    "@searsuite/sear-plugin-fixed-row": "workspace:*",
-    "@searsuite/sear-render-engine": "workspace:*",
-    "@searsuite/sear-render-event-engine": "workspace:*",
-    "@searsuite/sear-render-input": "workspace:*",
-    "@searsuite/sear-render-node": "workspace:*",
-    "@searsuite/sear-render-registry": "workspace:*",
-    "@searsuite/sear-foundation-error": "workspace:*"
+    "@searsuite/sear-plugin-sheet-data": "workspace:*"
   },
   "exports": {
     ".": {

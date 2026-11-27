@@ -1,17 +1,14 @@
 import { DocCommandBus, defineDocCommand } from '@searsuite/sear-assembly-commands';
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
-import { ReflowDocTransaction } from '@searsuite/sear-domain-commands';
+import { DocTransaction } from '@searsuite/sear-domain-commands';
 import {
   buildInlineTextRangePatchPlan,
   applyInlineTextStylePropertyMutation,
   readTextStyleAttrs,
-  type RichTextInlineStyle,
   type RichTextInlineStyleContribution,
 } from '@searsuite/sear-domain-doc';
-import { type RichTextRunRenderContribution } from '@searsuite/sear-render-node';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { type DocKeyboardHandlerRegistrationContext } from '../../plugin/DocPluginContracts';
-import { DocContentRenderPluginKey } from '../../plugin/DocFeaturePluginKeys';
+
 import { createDocCommand } from '../../plugin/DocPluginCommandUtils';
 import { InlineTextStylePluginBase } from '../InlineTextStylePluginBase';
 
@@ -31,7 +28,7 @@ export const ToggleDocUnderlineCommand = defineDocCommand<void>('doc.toggleUnder
 export class UnderlineTextStylePlugin extends InlineTextStylePluginBase {
   public static readonly symbol = Symbol.for('UnderlineTextStylePlugin');
   public constructor() {
-    super(new PluginKey('DocUnderlineTextStyle'), createUnderlineContribution(), createUnderlineRenderContribution());
+    super(new PluginKey('DocUnderlineTextStyle'), createUnderlineContribution());
   }
 
   public override registerCommands(commands: DocCommandBus): void {
@@ -39,21 +36,13 @@ export class UnderlineTextStylePlugin extends InlineTextStylePluginBase {
     commands.register(ToggleDocUnderlineCommand, this.#createToggleUnderlineCommand.bind(this));
   }
 
-  public override registerKeyboardHandlers({ bindings, commands }: DocKeyboardHandlerRegistrationContext): void {
-    bindings.registerKeyboardHandlers({
-      onToggleUnderline: () => void commands.run(ToggleDocUnderlineCommand, void 0),
-    });
-  }
-
   #createSetUnderlineCommand(input: SetDocUnderlineInput) {
     const underline = normalizeBoolean(input?.underline, 'SetDocUnderlineCommand.underline');
-    return createDocCommand(SetDocUnderlineCommand.id, DocContentRenderPluginKey, () =>
-      this.#createUnderlineTransaction(underline),
-    );
+    return createDocCommand(SetDocUnderlineCommand.id, () => this.#createUnderlineTransaction(underline));
   }
 
   #createToggleUnderlineCommand() {
-    return createDocCommand(ToggleDocUnderlineCommand.id, DocContentRenderPluginKey, () => {
+    return createDocCommand(ToggleDocUnderlineCommand.id, () => {
       const runtime = this.requireRuntime();
       const state = runtime.document.input.getState();
       const patches = buildInlineTextRangePatchPlan(state.pendingDoc, state.docSelection, () => ({}));
@@ -75,7 +64,7 @@ export class UnderlineTextStylePlugin extends InlineTextStylePluginBase {
           underline,
           (attrs) => mutation.apply({ attrs, value: underline }),
         ),
-      new ReflowDocTransaction(),
+      new DocTransaction(),
     );
   }
 }
@@ -86,22 +75,6 @@ export function createUnderlineContribution(): RichTextInlineStyleContribution {
     read: (input) =>
       isUnderline(readTextStyleAttrs(input.attrs)) ? { [UnderlineTextStyleKey.Underline]: true } : void 0,
     mutations: [{ styleKey: UnderlineTextStyleKey.Underline, apply: applyUnderlineMutation }],
-  };
-}
-
-/** Creates the render-layer underline contribution. */
-export function createUnderlineRenderContribution(): RichTextRunRenderContribution {
-  return {
-    key: `text.${UnderlineTextStyleKey.Underline}`,
-    paintRun: ({ context, style, x, baselineY, width, height, fontDescent }) => {
-      if (style?.[UnderlineTextStyleKey.Underline] !== true) return;
-      context.setLineWidth(Math.max(1, height / 16));
-      const y = baselineY + Math.max(1, fontDescent * 0.35);
-      context.beginPath();
-      context.moveTo(x, y);
-      context.lineTo(x + width, y);
-      context.stroke();
-    },
   };
 }
 

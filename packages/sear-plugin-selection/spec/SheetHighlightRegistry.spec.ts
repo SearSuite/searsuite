@@ -1,4 +1,4 @@
-import { SheetHighlightRegistry, SheetHighlightProvider, SheetHighlightContext } from '../src/SheetHighlightRegistry';
+import { SheetHighlightRegistry, SheetHighlightProvider, SheetHighlightContext } from '@searsuite/sear-render';
 
 describe('SheetHighlightRegistry', () => {
   it('throws on duplicate registration', () => {
@@ -37,7 +37,9 @@ describe('SheetHighlightRegistry', () => {
   it('continues notifying after a listener throws', () => {
     const registry = new SheetHighlightRegistry();
     const received = jest.fn();
-    registry.subscribe(() => { throw new Error('observer failed'); });
+    registry.subscribe(() => {
+      throw new Error('observer failed');
+    });
     registry.subscribe(received);
     expect(() => registry.invalidate()).not.toThrow();
     expect(received).toHaveBeenCalledTimes(1);

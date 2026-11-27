@@ -21,15 +21,19 @@
     "compile": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
+    "@searsuite/sear-assembly-config": "workspace:*",
     "@searsuite/sear-assembly-plugin": "workspace:*",
-    "@searsuite/sear-assembly-core": "workspace:*",
-    "@searsuite/sear-domain-ot": "workspace:*",
+    "@searsuite/sear-domain-cell": "workspace:*",
     "@searsuite/sear-domain-cell-types": "workspace:*",
+    "@searsuite/sear-domain-formula-engine": "workspace:*",
+    "@searsuite/sear-domain-ot": "workspace:*",
+    "@searsuite/sear-domain-sheet": "workspace:*",
     "@searsuite/sear-domain-transaction": "workspace:*",
     "@searsuite/sear-foundation-common": "workspace:*",
     "@searsuite/sear-foundation-di": "workspace:*",
     "@searsuite/sear-foundation-error": "workspace:*",
-    "@searsuite/sear-foundation-platform": "workspace:*"
+    "@searsuite/sear-foundation-platform": "workspace:*",
+    "@searsuite/sear-foundation-subscription": "workspace:*"
   },
   "exports": {
     ".": {

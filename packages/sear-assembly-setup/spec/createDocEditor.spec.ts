@@ -1,3 +1,4 @@
+import { DocView, type DocViewSetupContext, type DocViewRuntimeContext } from '../src/doc/DocViewContracts';
 import { createDocEditor } from '../src/doc/createDocEditor';
 import { DocCaretState } from '../src/doc/DocCaretState';
 import { DocInputAdapterLifecycle } from '../src/doc/DocInputAdapterLifecycle';
@@ -5,26 +6,29 @@ import { DocRenderCoordinator } from '../src/doc/DocRenderCoordinator';
 import { DocViewportEnvironment } from '../src/doc/DocViewportEnvironment';
 import {
   DocPlugin,
-  DocRuntimeCapability,
   defineDocRuntimeCapability,
   type DocPluginRuntime,
-  type DocPluginRuntimeContext,
   type DocPluginSetupContext,
 } from '@searsuite/sear-assembly-doc';
 import { type DocInteractionRuntime } from '../src/doc/DocInteractionRuntime';
-import { DocPluginRuntimeCapability, type DocInputBindingRegistryCapability } from '@searsuite/sear-assembly-doc';
+import { DocViewCapability } from '../src/doc/DocViewContracts';
+import { DocViewRuntimeCapability } from '../src/doc/DocViewCapabilities';
+import { DocContentView, DocDebugOverlayView } from '../src/doc/DefaultDocViews';
+import { type DocInputBindingRegistryCapability } from '@searsuite/sear-assembly-setup';
 import {
   DeleteDocBackwardCommand,
   ClearDocCompositionCommand,
   InsertDocTextCommand,
   LoadDocumentCommand,
   MoveDocCursorCommand,
-  RenderDocCommand,
   SelectAllDocCommand,
   SetDocCompositionCommand,
   SetDocSelectionCommand,
 } from '@searsuite/sear-assembly-doc';
-import { DocCompositionManager, DocCursorManager, DocInputPlugin, Pipeline, SearCoreDoc } from '@searsuite/sear-assembly-core';
+import { RenderDocCommand } from '@searsuite/sear-assembly-setup';
+import { DocCompositionManager, DocCursorManager, SearCoreDoc } from '@searsuite/sear-assembly-core';
+import { DocInputPlugin } from '@searsuite/sear-assembly-doc';
+import { Pipeline } from '@searsuite/sear-assembly-plugin';
 import {
   CommandExecutionPhase,
   DocCommandBus,
@@ -43,7 +47,12 @@ import { NodePlatform as HeadlessPlatform } from '@searsuite/sear-node-adapters'
 import { defineStateObservation } from '@searsuite/sear-foundation-subscription';
 import { HeadlessRenderContext } from '@searsuite/sear-render-context';
 import { EventEngine, EventRegistrar, type EventWithOffset } from '@searsuite/sear-render-event-engine';
-import { HeadlessKeyboardRouter, HeadlessPointerCapture, HeadlessTextInput, type KeyboardRouterHandlers } from '@searsuite/sear-render-input';
+import {
+  HeadlessKeyboardRouter,
+  HeadlessPointerCapture,
+  HeadlessTextInput,
+  type KeyboardRouterHandlers,
+} from '@searsuite/sear-render-input';
 import { WebKeyboardRouter } from '@searsuite/sear-browser-adapters';
 import { DocRenderEngine, RenderEngine } from '@searsuite/sear-render-engine';
 import { HitRenderStrategy, IncrementalRenderDecisionReason } from '@searsuite/sear-render-strategy';
@@ -70,11 +79,10 @@ import {
   type RichTextInlineStyleRegistry,
   type RichDocNode,
 } from '@searsuite/sear-domain-doc';
-import { DocTransactionRenderOperationType, RepaintDocTransaction } from '@searsuite/sear-domain-commands';
+import { DocTransaction } from '@searsuite/sear-domain-commands';
+import { DocRenderOperationType } from '@searsuite/sear-assembly-core';
 import { createTransaction, type Transaction } from '@searsuite/sear-domain-transaction';
 import {
-  DocContentRenderPlugin,
-  DocDebugOverlayPlugin,
   SelectionPlugin,
   DocHistoryStatusObservation,
   HistoryPlugin,
@@ -96,8 +104,9 @@ import {
   InsertDocTableCommand,
   RedoDocCommand,
   UndoDocCommand,
-} from '../src/doc/DefaultDocFeaturePlugins';
-import { DocContentRenderPluginKey, DocCaretPluginKey, DocSelectionPluginKey } from '@searsuite/sear-assembly-doc';
+} from '@searsuite/sear-assembly-doc';
+import { DocContentViewKey, DocCaretViewKey } from '@searsuite/sear-assembly-setup';
+
 import {
   ApplyDocViewportScrollCommand,
   DocViewportObservation,
@@ -386,14 +395,18 @@ describe('createDocEditor', () => {
     @Injectable()
     class RetainSelectionPlugin extends DocPlugin<null> {
       public static readonly symbol = Symbol('RetainSelectionPlugin');
-      public constructor() { super({ key: new PluginKey('RetainSelectionPlugin'), state: null }); }
+      public constructor() {
+        super({ key: new PluginKey('RetainSelectionPlugin'), state: null });
+      }
       public configure(context: DocPluginSetupContext): void {
         selection = context.container.resolve<SelectionPlugin>(SelectionPlugin.symbol);
       }
-      public registerState() { return { key: this.key, state: null }; }
-      public apply(): null { return null; }
-      public getPluginConfig(): null { return null; }
-      public render(): null { return null; }
+      public registerState() {
+        return { key: this.key, state: null };
+      }
+      public apply(): null {
+        return null;
+      }
     }
 
     const editor = createDocEditor({
@@ -405,10 +418,8 @@ describe('createDocEditor', () => {
     try {
       expect(() => selection!.onEditorDestroy()).toThrow('editor.commands.run');
       expect(() => SelectionPlugin.prototype.onEditorDestroy.call(selection)).toThrow('editor.commands.run');
-      expect(() => Object.defineProperty(selection, 'onEditorDestroy', { value: () => void 0 }))
-        .toThrow();
-      expect(() => Object.defineProperty(selection, 'assertRuntimeWriteAllowed', { value: () => void 0 }))
-        .toThrow();
+      expect(() => Object.defineProperty(selection, 'onEditorDestroy', { value: () => void 0 })).toThrow();
+      expect(() => Object.defineProperty(selection, 'assertRuntimeWriteAllowed', { value: () => void 0 })).toThrow();
       expect(editor.getText()).toBe('Alpha');
     } finally {
       editor.destroy();
@@ -431,7 +442,7 @@ describe('createDocEditor', () => {
   it('requires a command to change assembled document defaults', () => {
     const { editor } = createRecordingDocEditor({ viewport: { width: 320, height: 200 }, paragraphs: ['one'] });
     try {
-      const config = editor.services.require(DocRuntimeCapability.Config);
+      const config = editor.services.require(DocViewCapability.Config);
       expect(() => config.updateDefaultConfigOverrides({ docFontSize: 20 })).toThrow('editor.commands.run');
       expect(() => {
         (config.getDefaultConfig().incrementalRenderPolicyLimits as { maxCopyCount: number }).maxCopyCount = 1;
@@ -651,7 +662,7 @@ describe('createDocEditor', () => {
     });
 
     const core = container.resolve<SearCoreDoc>(SearCoreDoc.symbol);
-    const manager = container.resolve<PluginManager<SearCoreDoc, RichTextRenderNodeProperties>>(PluginManager.symbol);
+    const manager = container.resolve<PluginManager>(PluginManager.symbol);
     const renderEngine = container.resolve<DocRenderEngine>(DocRenderEngine.symbol);
 
     expect(core.pluginManager).toBe(manager);
@@ -659,7 +670,13 @@ describe('createDocEditor', () => {
     const pluginKeys = manager.getAllPlugins().map((plugin) => plugin.key.key);
     expect(pluginKeys.some((key) => key.startsWith('DocInput'))).toBe(true);
     expect(pluginKeys.some((key) => key.startsWith('DocParagraph'))).toBe(true);
-    expect(pluginKeys.some((key) => key.startsWith('DocContentRender'))).toBe(true);
+    expect(pluginKeys).not.toContain(DocContentViewKey.key);
+    expect(
+      core
+        .getViewExtensions()
+        .getAll()
+        .some((view) => view.key === DocContentViewKey),
+    ).toBe(true);
 
     editor.destroy();
   });
@@ -710,7 +727,9 @@ describe('createDocEditor', () => {
       documentState: { document: createRichDocument('Alpha') },
       adapters: {
         ...createDefaultDocAdapters(),
-        registerEnvironment: (value) => { editorContainer = value; },
+        registerEnvironment: (value) => {
+          editorContainer = value;
+        },
       },
     });
     try {
@@ -720,8 +739,7 @@ describe('createDocEditor', () => {
         commands: { isExecuting: () => true },
         currentViewport: { width: 1, height: 1 },
       });
-      expect(() => viewport.applyViewportResize({ width: 400, height: 240 }))
-        .toThrow('editor.commands.run');
+      expect(() => viewport.applyViewportResize({ width: 400, height: 240 })).toThrow('editor.commands.run');
       expect(viewport.getViewport()).toEqual(before);
       viewport.getViewport().width = 1;
       viewport.getContentRect().width = 1;
@@ -797,32 +815,16 @@ describe('createDocEditor', () => {
     let runtimeEventRegistrar!: EventRegistrar;
 
     @Injectable()
-    class EventProbePlugin extends DocPlugin<null> {
-      public static readonly symbol = Symbol.for('EventProbePlugin');
+    class EventProbeView extends DocView {
+      public static readonly symbol = Symbol.for('EventProbeView');
 
       public constructor() {
-        super({ key: new PluginKey('EventProbePlugin'), state: null });
+        super(new PluginKey('EventProbeView'));
       }
 
-      public registerState() {
-        return { key: this.key, state: null };
-      }
-
-      public apply(_state: null, _transaction: Transaction): null {
-        return null;
-      }
-
-      public getPluginConfig(): null {
-        return null;
-      }
-
-      public render(): null {
-        return null;
-      }
-
-      public initialize(context: DocPluginRuntimeContext): void {
-        runtimeEventEngine = context.runtime.extensions.require(DocRuntimeCapability.Events).engine;
-        runtimeEventRegistrar = context.runtime.extensions.require(DocRuntimeCapability.Events).registrar;
+      public initialize(context: DocViewRuntimeContext): void {
+        runtimeEventEngine = context.runtime.extensions.require(DocViewCapability.Events).engine;
+        runtimeEventRegistrar = context.runtime.extensions.require(DocViewCapability.Events).registrar;
       }
     }
 
@@ -842,7 +844,7 @@ describe('createDocEditor', () => {
           editorContainer.registerInstance(WebKeyboardRouter.eventTargetSymbol, new EventTarget());
         },
       },
-      plugins: [EventProbePlugin],
+      viewExtensions: [EventProbeView],
     });
 
     const core = container.resolve<SearCoreDoc>(SearCoreDoc.symbol);
@@ -863,27 +865,11 @@ describe('createDocEditor', () => {
     const onMouseDown = jest.fn();
 
     @Injectable()
-    class PointerProbePlugin extends DocPlugin<null> {
-      public static readonly symbol = Symbol.for('PointerProbePlugin');
+    class PointerProbeView extends DocView {
+      public static readonly symbol = Symbol.for('PointerProbeView');
 
       public constructor() {
-        super({ key: new PluginKey('PointerProbePlugin'), state: null });
-      }
-
-      public registerState() {
-        return { key: this.key, state: null };
-      }
-
-      public apply(_state: null, _transaction: Transaction): null {
-        return null;
-      }
-
-      public getPluginConfig(): null {
-        return null;
-      }
-
-      public render(): null {
-        return null;
+        super(new PluginKey('PointerProbeView'));
       }
 
       public onMouseDown(core: SearCoreDoc, event: unknown): void {
@@ -908,7 +894,7 @@ describe('createDocEditor', () => {
           editorContainer.registerInstance(WebKeyboardRouter.eventTargetSymbol, new EventTarget());
         },
       },
-      plugins: [PointerProbePlugin],
+      viewExtensions: [PointerProbeView],
     });
 
     eventContext.listeners.get('mousedown')?.(new MouseEvent('mousedown') as EventWithOffset);
@@ -1084,7 +1070,7 @@ describe('createDocEditor', () => {
     expect(visibleClears).toEqual([{ name: 'clearRect', args: [0, 0, 240, 90] }]);
     expect(visibleCopies).toHaveLength(1);
     expect(visibleCopies[0].args.slice(1)).toEqual([0, 0, 240, 90, 0, 48, 240, 90]);
-    expect(reconcilePluginNodesSpy).toHaveBeenCalledWith(DocContentRenderPluginKey.key, expect.any(Array), {
+    expect(reconcilePluginNodesSpy).toHaveBeenCalledWith(DocContentViewKey.key, expect.any(Array), {
       markDirty: false,
       retainExisting: true,
       updateRetainedGeometry: true,
@@ -1194,11 +1180,7 @@ describe('createDocEditor', () => {
     editor.commands.run(SelectAllDocCommand, void 0);
 
     expect(editor.getText()).toBe('!Alpha');
-    expect(core.getDocRenderRequests().map((request) => request.renderPluginKey?.key)).toEqual([
-      DocContentRenderPluginKey.key,
-      DocSelectionPluginKey.key,
-      DocCaretPluginKey.key,
-    ]);
+    expect(core.getDocRenderRequests().map((request) => request.projectionKey?.key)).toEqual([undefined, undefined]);
 
     editor.destroy();
   });
@@ -1265,8 +1247,8 @@ describe('createDocEditor', () => {
       .resolve<SearCoreDoc>(SearCoreDoc.symbol)
       .getDocRenderRequests()
       .slice(-2)
-      .map((request) => request.renderPluginKey?.key);
-    expect(requestKeys).toEqual([DocSelectionPluginKey.key, DocCaretPluginKey.key]);
+      .map((request) => request.projectionKey?.key);
+    expect(requestKeys.at(-1)).toBeUndefined();
 
     editor.destroy();
   });
@@ -1357,14 +1339,6 @@ describe('createDocEditor', () => {
         return null;
       }
 
-      public getPluginConfig(): null {
-        return null;
-      }
-
-      public render(): null {
-        return null;
-      }
-
       #createSetHighlightCommand(input: { readonly color: string | null }) {
         const runtime = this.#runtime;
         if (!runtime) throw new Error('HighlightTextStylePlugin is not configured.');
@@ -1384,10 +1358,9 @@ describe('createDocEditor', () => {
                     input.color,
                     (attrs) => mutation.apply({ attrs, value: input.color }),
                   ),
-                new RepaintDocTransaction(),
+                new DocTransaction().setMeta('doc.changedInlineStyles', ['highlight']),
               ),
             );
-            pipeline.addRender(`${SetHighlightCommand.id}:render`, DocContentRenderPluginKey);
             return { pipeline };
           },
         };
@@ -1422,13 +1395,15 @@ describe('createDocEditor', () => {
     expect(() => virtualLayouts.reset()).toThrow('editor.commands.run');
     expect(() => virtualLayouts.prepare({} as never)).toThrow('editor.commands.run');
     expect((virtualLayouts as unknown as Record<string, unknown>)['records']).toBeUndefined();
-    expect(() => { (latestSummary!.timings as unknown as { renderPrepareMs: number }).renderPrepareMs = 999; }).toThrow();
+    expect(() => {
+      (latestSummary!.timings as unknown as { renderPrepareMs: number }).renderPrepareMs = 999;
+    }).toThrow();
     expect(renderLayouts.getLatestVirtualLayoutSummary()?.timings.renderPrepareMs).not.toBe(999);
     expect(editor.getDocument()[0].content[0].attrs).toEqual({ textStyle: { highlight: '#fde047' } });
     expect(latestRequest?.renderOperations?.map((operation) => operation.type)).toEqual([
-      DocTransactionRenderOperationType.Repaint,
+      DocRenderOperationType.Reflow,
     ]);
-    expect(latestSummary?.cacheMisses).toBe(0);
+    expect(latestSummary?.cacheMisses).toBeGreaterThan(0);
     expect(blockRender?.changedBlocks).toHaveLength(1);
     editor.destroy();
   });
@@ -1464,7 +1439,8 @@ describe('createDocEditor', () => {
     editor.commands.run(InsertDocTextCommand, { text: 'defghijklmnopqrstuvwxyz' });
 
     const request = core.getDocRenderRequests().at(-1);
-    expect(request?.renderPluginKey?.key).toBe(DocContentRenderPluginKey.key);
+    expect(request).toBeDefined();
+    expect(request?.projectionKey).toBeUndefined();
 
     editor.destroy();
   });
@@ -1618,7 +1594,7 @@ describe('createDocEditor', () => {
     const updatedBlock = core.getDocRenderLayoutState()?.layoutCache.getBlockByIndex(0);
     expect(initialBlock).toBeDefined();
     expect(latestRequest?.renderOperations?.map((operation) => operation.type)).toEqual([
-      DocTransactionRenderOperationType.Reflow,
+      DocRenderOperationType.Reflow,
     ]);
     expect(updatedBlock?.flowHeight).toBeGreaterThan(initialBlock?.flowHeight ?? 0);
 
@@ -1818,31 +1794,15 @@ describe('createDocEditor', () => {
     let interaction!: DocInteractionRuntime;
 
     @Injectable()
-    class InteractionProbePlugin extends DocPlugin<null> {
-      public static readonly symbol = Symbol.for('InteractionProbePlugin');
+    class InteractionProbeView extends DocView {
+      public static readonly symbol = Symbol.for('InteractionProbeView');
 
       public constructor() {
-        super({ key: new PluginKey('InteractionProbePlugin'), state: null });
+        super(new PluginKey('InteractionProbeView'));
       }
 
-      public registerState() {
-        return { key: this.key, state: null };
-      }
-
-      public apply(_state: null, _transaction: Transaction): null {
-        return null;
-      }
-
-      public getPluginConfig(): null {
-        return null;
-      }
-
-      public render(): null {
-        return null;
-      }
-
-      public initialize(context: DocPluginRuntimeContext): void {
-        interaction = context.runtime.extensions.require(DocPluginRuntimeCapability.Interaction);
+      public initialize(context: DocViewRuntimeContext): void {
+        interaction = context.runtime.extensions.require(DocViewRuntimeCapability.Interaction);
       }
     }
 
@@ -1862,7 +1822,7 @@ describe('createDocEditor', () => {
           editorContainer.registerInstance(WebKeyboardRouter.eventTargetSymbol, new EventTarget());
         },
       },
-      plugins: [InteractionProbePlugin],
+      viewExtensions: [InteractionProbeView],
     });
     const scrollManager = container.resolve<ScrollManager>(ScrollManager.symbol);
 
@@ -1907,8 +1867,8 @@ describe('createDocEditor', () => {
     const requestKeys = core
       .getDocRenderRequests()
       .slice(-2)
-      .map((request) => request.renderPluginKey?.key);
-    expect(requestKeys).toEqual([DocSelectionPluginKey.key, DocCaretPluginKey.key]);
+      .map((request) => request.projectionKey?.key);
+    expect(requestKeys.at(-1)).toBeUndefined();
     expect(core.getDocRenderLayoutState()?.visibleBlocks.length).toBeGreaterThan(0);
     expect(prepareLayoutSpy).not.toHaveBeenCalled();
 
@@ -1941,7 +1901,7 @@ describe('createDocEditor', () => {
     visibleContext.calls.length = 0;
     hitRender.mockClear();
 
-    expect(() => core.requestDocRender(DocCaretPluginKey)).toThrow('editor.commands.run');
+    expect(() => core.requestDocRender(DocCaretViewKey)).toThrow('editor.commands.run');
     editor.commands.run(SetDocSelectionCommand, {
       selection: {
         anchor: { path: [0, 0], offset: 0 },
@@ -1949,7 +1909,7 @@ describe('createDocEditor', () => {
       },
     });
 
-    expect(core.getDocRenderRequests().at(-1)?.renderPluginKey?.key).toBe(DocCaretPluginKey.key);
+    expect(core.getDocRenderRequests().at(-1)?.projectionKey).toBeUndefined();
     expect(core.getDocRenderLayoutState()?.visibleBlocks.length).toBeGreaterThan(0);
     expect(visibleContext.calls.some((call) => call.name === 'fillText')).toBe(true);
     expect(hitRender).toHaveBeenCalled();
@@ -2009,23 +1969,11 @@ describe('createDocEditor', () => {
     const renderedBlockCounts: number[] = [];
 
     @Injectable()
-    class RenderNodePlugin extends DocPlugin<null> {
-      public static readonly symbol = Symbol.for('RenderNodePlugin');
+    class RenderNodeView extends DocView {
+      public static readonly symbol = Symbol.for('RenderNodeView');
 
       public constructor() {
-        super({ key: new PluginKey('RenderNodePlugin'), state: null });
-      }
-
-      public apply(_state: null, _transaction: Transaction): null {
-        return null;
-      }
-
-      public registerState() {
-        return { key: this.key, state: null };
-      }
-
-      public getPluginConfig(): null {
-        return null;
+        super(new PluginKey('RenderNodeView'));
       }
 
       public render(core: SearCoreDoc): Node<RichTextRenderNodeProperties>[] | null {
@@ -2066,7 +2014,7 @@ describe('createDocEditor', () => {
     const editor = createDocEditor({
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
-      plugins: [RenderNodePlugin],
+      viewExtensions: [RenderNodeView],
       adapters: {
         platform: HeadlessPlatform,
         createRenderContext() {
@@ -2108,14 +2056,6 @@ describe('createDocEditor', () => {
         return { key: this.key, state: null };
       }
 
-      public getPluginConfig(): null {
-        return null;
-      }
-
-      public render(): null {
-        return null;
-      }
-
       public registerCommands(commands: DocCommandBus): void {
         commands.register(PluginEchoCommand, createPluginEchoCommand);
       }
@@ -2135,14 +2075,6 @@ describe('createDocEditor', () => {
 
       public registerState() {
         return { key: this.key, state: null };
-      }
-
-      public getPluginConfig(): null {
-        return null;
-      }
-
-      public render(): null {
-        return null;
       }
 
       public registerCommands(commands: DocCommandBus): void {
@@ -2177,12 +2109,13 @@ describe('createDocEditor', () => {
     );
   });
 
-  it('warns when document plugins share the same priority depth', () => {
+  it('keeps visual priority independent of business registration', () => {
     createDocEditor({
       viewport: { width: 320, height: 180 },
       defaultPlugins: false,
       documentState: { document: createRichDocument('Alpha') },
-      plugins: [DocContentRenderPlugin, DocDebugOverlayPlugin],
+      viewExtensions: [DocContentView, DocDebugOverlayView],
+      defaultViews: false,
       adapters: {
         platform: HeadlessPlatform,
         createRenderContext() {
@@ -2198,12 +2131,12 @@ describe('createDocEditor', () => {
       },
     }).destroy();
 
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('runtime order will follow registration order'));
+    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('runtime order will follow registration order'));
   });
 
   it('unregisters document plugin state, retained nodes, and event handlers', () => {
     const onMouseDown = jest.fn();
-    let pluginKey!: PluginKey;
+    let pluginKey = new PluginKey('RemovablePlugin');
     let core!: SearCoreDoc;
     const RemoveRemovablePluginCommand = defineDocCommand<void>('doc.test.removeRemovablePlugin');
 
@@ -2212,7 +2145,7 @@ describe('createDocEditor', () => {
       public static readonly symbol = Symbol.for('RemovablePlugin');
 
       public constructor() {
-        super({ key: new PluginKey('RemovablePlugin'), state: { value: 0 } });
+        super({ key: pluginKey, state: { value: 0 } });
         pluginKey = this.key;
       }
 
@@ -2223,11 +2156,13 @@ describe('createDocEditor', () => {
       public registerState() {
         return { key: this.key, state: { value: 1 } };
       }
-
-      public getPluginConfig(): null {
-        return null;
+    }
+    @Injectable()
+    class RemovableView extends DocView {
+      public static readonly symbol = Symbol('RemovableView');
+      public constructor() {
+        super(pluginKey);
       }
-
       public render(): Node<RichTextRenderNodeProperties> {
         return new ViewportOverlayNode({
           nodeKey: `${this.key.key}:overlay`,
@@ -2235,11 +2170,9 @@ describe('createDocEditor', () => {
           drawOverlay: noopViewportOverlayDraw,
         });
       }
-
       public onMouseDown(): void {
         onMouseDown();
       }
-
       public registerCommands(commands: DocCommandBus): void {
         commands.register(RemoveRemovablePluginCommand, () => ({
           id: RemoveRemovablePluginCommand.id,
@@ -2247,7 +2180,10 @@ describe('createDocEditor', () => {
             return {
               pipeline: new Pipeline(RemoveRemovablePluginCommand.id).addLocalAction(
                 RemoveRemovablePluginCommand.id,
-                () => core.unregisterPlugin(pluginKey),
+                () => {
+                  core.unregisterPlugin(pluginKey);
+                  core.getViewExtensions().unregister(pluginKey);
+                },
               ),
             };
           },
@@ -2261,6 +2197,7 @@ describe('createDocEditor', () => {
       defaultPlugins: false,
       documentState: { document: createRichDocument('Alpha') },
       plugins: [RemovablePlugin],
+      viewExtensions: [RemovableView],
       adapters: {
         platform: HeadlessPlatform,
         createRenderContext() {
@@ -2442,11 +2379,11 @@ describe('createDocEditor', () => {
     expect(firstContainer!.resolve(SessionStateRegistry.symbol)).not.toBe(
       secondContainer!.resolve(SessionStateRegistry.symbol),
     );
-    expect(first.services.require(DocRuntimeCapability.LayoutService)).toBe(
+    expect(first.services.require(DocViewCapability.LayoutService)).toBe(
       firstContainer!.resolve(DocRenderLayoutService.symbol),
     );
-    expect(first.services.require(DocRuntimeCapability.LayoutService)).not.toBe(
-      second.services.require(DocRuntimeCapability.LayoutService),
+    expect(first.services.require(DocViewCapability.LayoutService)).not.toBe(
+      second.services.require(DocViewCapability.LayoutService),
     );
 
     first.commands.run(InsertDocTextCommand, { text: '1' });
@@ -2454,7 +2391,7 @@ describe('createDocEditor', () => {
     expect(second.getText()).toBe('Second');
 
     first.destroy();
-    expect(() => first.services.require(DocRuntimeCapability.LayoutService)).toThrow(
+    expect(() => first.services.require(DocViewCapability.LayoutService)).toThrow(
       'Runtime capability registry for DocEditor has been destroyed.',
     );
     second.commands.run(InsertDocTextCommand, { text: '2' });
@@ -2565,14 +2502,6 @@ describe('createDocEditor', () => {
       public apply(): null {
         return null;
       }
-
-      public getPluginConfig(): null {
-        return null;
-      }
-
-      public render(): null {
-        return null;
-      }
     }
 
     const editor = createDocEditor({
@@ -2619,14 +2548,6 @@ describe('createDocEditor', () => {
       }
 
       public apply(): null {
-        return null;
-      }
-
-      public getPluginConfig(): null {
-        return null;
-      }
-
-      public render(): null {
         return null;
       }
 
@@ -2683,29 +2604,25 @@ describe('createDocEditor', () => {
     let historyContext: DocPluginSetupContext | null = null;
     const retainedHistorySession = new SessionStateRegistry();
     @Injectable()
-    class RetainedInputPlugin extends DocPlugin<null> {
-      public static readonly symbol = Symbol('RetainedInputPlugin');
+    class RetainedInputView extends DocView {
+      public static readonly symbol = Symbol('RetainedInputView');
       public constructor() {
-        super({ key: new PluginKey('RetainedInputPlugin'), state: null });
+        super(new PluginKey('RetainedInputView'));
       }
-      public configure(context: DocPluginSetupContext): void {
+      public configure(context: DocViewSetupContext): void {
         input = context.runtime.document.input;
-        cursor = context.runtime.document.cursor;
+        cursor = context.container.resolve<DocCursorManager>(DocCursorManager.symbol);
         history = context.container.resolve<HistoryPlugin>(HistoryPlugin.symbol);
         historyContext = context;
         history.registerSessionState(retainedHistorySession);
       }
-      public registerState() { return { key: this.key, state: null }; }
-      public apply(): null { return null; }
-      public getPluginConfig(): null { return null; }
-      public render(): null { return null; }
     }
     const resetBypass = defineDocCommand<void>('test.resetDocSessionBypass');
     let unregisterResetBypass: (() => void) | undefined;
     const editor = createDocEditor({
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
-      plugins: [RetainedInputPlugin],
+      viewExtensions: [RetainedInputView],
       adapters: createDefaultDocAdapters(),
       onCreated: ({ commands }) => {
         unregisterResetBypass = commands.register(resetBypass, () => ({
@@ -2718,27 +2635,37 @@ describe('createDocEditor', () => {
     });
     try {
       const retainedState = input!.session;
-      expect(() => { (retainedState.pendingDoc[0]!.content[0] as TextNode).text = 'changed'; }).toThrow();
-      expect(() => { retainedState.docSelection.anchor.offset = 4; }).toThrow();
+      expect(() => {
+        (retainedState.pendingDoc[0]!.content[0] as TextNode).text = 'changed';
+      }).toThrow();
+      expect(() => {
+        retainedState.docSelection.anchor.offset = 4;
+      }).toThrow();
       expect(() => input!.resetSession([])).toThrow('editor.commands.run');
       expect(() => input!.setLastSnapshot({ lines: [] })).toThrow('editor.commands.run');
       expect(() => input!.restoreSelection(retainedState.docSelection)).toThrow('editor.commands.run');
       expect(() => input!.handleInput('?')).toThrow('command pipeline');
       expect(() => input!.setState(retainedState)).toThrow();
       expect((input as unknown as Record<string, unknown>)['replaceSessionState']).toBeUndefined();
-      expect(() => editor.commands.register(defineDocCommand<void>('test.lateDocCommand'), () => ({
-        id: 'test.lateDocCommand', execute: () => ({ pipeline: new Pipeline('test.lateDocCommand') }),
-      }))).toThrow('editor.commands.run');
+      expect(() =>
+        editor.commands.register(defineDocCommand<void>('test.lateDocCommand'), () => ({
+          id: 'test.lateDocCommand',
+          execute: () => ({ pipeline: new Pipeline('test.lateDocCommand') }),
+        })),
+      ).toThrow('editor.commands.run');
       expect(() => unregisterResetBypass!()).toThrow('editor.commands.run');
       expect(() => editor.commands.destroy()).toThrow('editor.commands.run');
       expect(() => editor.commands.run(resetBypass, void 0)).toThrow('RichDocOT transaction');
       editor.render();
       const retainedLayout = input!.getLastSnapshot();
       expect(retainedLayout?.lines.length).toBeGreaterThan(0);
-      expect(() => { retainedLayout!.lines[0].x = 999; }).toThrow();
-      expect(() => { retainedLayout!.lines[0].textNodePath[0] = 99; }).toThrow();
-      expect(() => cursor!.setCursor({ x: 5, y: 5, height: 10, visible: true }))
-        .toThrow('editor.commands.run');
+      expect(() => {
+        retainedLayout!.lines[0].x = 999;
+      }).toThrow();
+      expect(() => {
+        retainedLayout!.lines[0].textNodePath[0] = 99;
+      }).toThrow();
+      expect(() => cursor!.setCursor({ x: 5, y: 5, height: 10, visible: true })).toThrow('editor.commands.run');
       expect(() => cursor!.getSelectionRects().push({ x: 0, y: 0, width: 1, height: 1 })).toThrow();
       expect(editor.getText()).toBe('Alpha');
 
@@ -2758,17 +2685,21 @@ describe('createDocEditor', () => {
       editor.commands.run(InsertDocTextCommand, { text: '!' });
       expect(editor.getText()).toBe('!Alpha');
       expect(historyListenerAuthority).toContain(false);
-      expect(() => { (input!.session.pendingDoc[0]!.content[0] as TextNode).text = 'changed'; }).toThrow();
+      expect(() => {
+        (input!.session.pendingDoc[0]!.content[0] as TextNode).text = 'changed';
+      }).toThrow();
       expect(history!.getState()).toBeNull();
       expect(history!.getStatus().canUndo).toBe(true);
       expect(() => history!.configure(historyContext!)).toThrow('already configured');
       expect(() => history!.registerSessionState(new SessionStateRegistry())).toThrow('restoration is closed');
       retainedHistorySession.loadSnapshot({ 'doc.history': { undoStack: [], redoStack: [] } });
-      expect(() => retainedHistorySession.restorePhase(SessionStateRestorePhase.BeforeInitialize))
-        .toThrow('restoration is closed');
+      expect(() => retainedHistorySession.restorePhase(SessionStateRestorePhase.BeforeInitialize)).toThrow(
+        'restoration is closed',
+      );
       Object.assign(history!, { runtime: { commands: { isExecuting: () => true } } });
-      expect(() => history!.onTransactionCommitted(createTransaction(DocInputPlugin.pluginKey)))
-        .toThrow('editor.commands.run');
+      expect(() => history!.onTransactionCommitted(createTransaction(DocInputPlugin.pluginKey))).toThrow(
+        'editor.commands.run',
+      );
       expect(history!.getStatus().canUndo).toBe(true);
     } finally {
       editor.destroy();
@@ -2778,53 +2709,64 @@ describe('createDocEditor', () => {
   it('rejects retained Doc Core snapshot loading outside the command bus', () => {
     let core: SearCoreDoc | null = null;
     @Injectable()
-    class RetainedCorePlugin extends DocPlugin<null> {
-      public static readonly symbol = Symbol('RetainedCorePlugin');
+    class RetainedCoreView extends DocView {
+      public static readonly symbol = Symbol('RetainedCoreView');
       public constructor() {
-        super({ key: new PluginKey('RetainedCorePlugin'), state: null });
+        super(new PluginKey('RetainedCoreView'));
       }
-      public configure(context: DocPluginSetupContext): void {
-        core = context.runtime.document.core;
+      public configure(context: DocViewSetupContext): void {
+        core = context.container.resolve<SearCoreDoc>(SearCoreDoc.symbol);
       }
-      public registerState() { return { key: this.key, state: null }; }
-      public apply(): null { return null; }
-      public getPluginConfig(): null { return null; }
-      public render(): null { return null; }
     }
     const bypassCommand = defineDocCommand<void>('test.loadDocSnapshotBypass');
     const editor = createDocEditor({
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
-      plugins: [RetainedCorePlugin],
+      viewExtensions: [RetainedCoreView],
       adapters: createDefaultDocAdapters(),
-      onCreated: ({ commands }) => commands.register(bypassCommand, () => ({
-        id: bypassCommand.id,
-        execute: () => {
-          const pipeline = new Pipeline(bypassCommand.id);
-          pipeline.addLocalAction(bypassCommand.id, () => { core!.loadSnapshot(createRichDocument('Bypass')); });
-          return { pipeline };
-        },
-      })),
+      onCreated: ({ commands }) =>
+        commands.register(bypassCommand, () => ({
+          id: bypassCommand.id,
+          execute: () => {
+            const pipeline = new Pipeline(bypassCommand.id);
+            pipeline.addLocalAction(bypassCommand.id, () => {
+              core!.loadSnapshot(createRichDocument('Bypass'));
+            });
+            return { pipeline };
+          },
+        })),
     });
     try {
       const before = core!.exportSnapshot();
       expect(() => core!.loadSnapshot(createRichDocument('Bypass'))).toThrow('RichDocOT command transaction');
-      expect(() => core!.requestDocRender(DocCaretPluginKey)).toThrow('editor.commands.run');
+      expect(() => core!.requestDocRender(DocCaretViewKey)).toThrow('editor.commands.run');
       expect(() => core!.setDocRenderLayoutState(null)).toThrow('editor.commands.run');
       expect(() => core!.destroy()).toThrow('editor owner');
-      expect(() => { (core as unknown as { blockManager: unknown }).blockManager = {}; }).toThrow();
-      expect(() => { (core as unknown as { eventEngine: unknown }).eventEngine = {}; }).toThrow();
-      const retainedPlugin = core!.getPluginInstance(new PluginKey('RetainedCorePlugin'))!;
-      expect(() => { (retainedPlugin as unknown as { apply: unknown }).apply = () => null; }).toThrow();
+      expect(() => {
+        (core as unknown as { blockManager: unknown }).blockManager = {};
+      }).toThrow();
+      expect(() => {
+        (core as unknown as { eventEngine: unknown }).eventEngine = {};
+      }).toThrow();
+      const retainedPlugin = core!.getPluginInstance(new PluginKey('RetainedCoreView'))!;
+      expect(() => {
+        (retainedPlugin as unknown as { apply: unknown }).apply = () => null;
+      }).toThrow();
       expect(() => core!.blockManager.clear()).toThrow('editor.commands.run');
       expect(() => core!.blockManager.setBaseFont('20px sans-serif')).toThrow('editor.commands.run');
       expect((core as unknown as Record<string, unknown>)['document']).toBeUndefined();
       editor.render();
       const retainedLayout = core!.getDocRenderLayoutState();
       expect(retainedLayout).not.toBeNull();
-      expect(() => { (retainedLayout!.viewport as { width: number }).width = 1; }).toThrow();
-      expect(() => { retainedLayout!.layoutCache.snapshot.lines[0].x = 999; }).toThrow();
-      expect(() => { (retainedLayout!.visibleBlocks as unknown[]).push({}); }).toThrow();
+      expect(() => {
+        (retainedLayout!.viewport as { width: number }).width = 1;
+      }).toThrow();
+      expect(() => {
+        retainedLayout!.layoutCache.snapshot.lines[0].x = 999;
+      }).toThrow();
+      expect(() => {
+        (retainedLayout!.visibleBlocks as unknown[]).push({});
+      }).toThrow();
       expect(() => editor.commands.run(bypassCommand, void 0)).toThrow('RichDocOT command transaction');
       expect(core!.exportSnapshot()).toEqual(before);
       const materialized = core!.materializeSnapshot(createRichDocument('Detached'));
@@ -2839,23 +2781,19 @@ describe('createDocEditor', () => {
   it('rejects retained Doc caret state writes outside the owning command bus', () => {
     let caret: DocCaretState | null = null;
     @Injectable()
-    class RetainedCaretPlugin extends DocPlugin<null> {
-      public static readonly symbol = Symbol('RetainedCaretPlugin');
+    class RetainedCaretView extends DocView {
+      public static readonly symbol = Symbol('RetainedCaretView');
       public constructor() {
-        super({ key: new PluginKey('RetainedCaretPlugin'), state: null });
+        super(new PluginKey('RetainedCaretView'));
       }
-      public configure(context: DocPluginSetupContext): void {
+      public configure(context: DocViewSetupContext): void {
         caret = context.container.resolve<DocCaretState>(DocCaretState.symbol);
       }
-      public registerState() { return { key: this.key, state: null }; }
-      public apply(): null { return null; }
-      public getPluginConfig(): null { return null; }
-      public render(): null { return null; }
     }
     const editor = createDocEditor({
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
-      plugins: [RetainedCaretPlugin],
+      viewExtensions: [RetainedCaretView],
       adapters: createDefaultDocAdapters(),
     });
     try {
@@ -2872,23 +2810,19 @@ describe('createDocEditor', () => {
   it('rejects retained Doc composition writes outside the owning command bus', () => {
     let composition: DocCompositionManager | null = null;
     @Injectable()
-    class RetainedCompositionPlugin extends DocPlugin<null> {
-      public static readonly symbol = Symbol('RetainedCompositionPlugin');
+    class RetainedCompositionView extends DocView {
+      public static readonly symbol = Symbol('RetainedCompositionView');
       public constructor() {
-        super({ key: new PluginKey('RetainedCompositionPlugin'), state: null });
+        super(new PluginKey('RetainedCompositionView'));
       }
-      public configure(context: DocPluginSetupContext): void {
+      public configure(context: DocViewSetupContext): void {
         composition = context.container.resolve<DocCompositionManager>(DocCompositionManager.symbol);
       }
-      public registerState() { return { key: this.key, state: null }; }
-      public apply(): null { return null; }
-      public getPluginConfig(): null { return null; }
-      public render(): null { return null; }
     }
     const editor = createDocEditor({
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
-      plugins: [RetainedCompositionPlugin],
+      viewExtensions: [RetainedCompositionView],
       adapters: createDefaultDocAdapters(),
     });
     try {
@@ -2912,12 +2846,18 @@ describe('createDocEditor', () => {
     @Injectable()
     class RetainedRegistriesPlugin extends DocPlugin<null> {
       public static readonly symbol = Symbol('RetainedRegistriesPlugin');
-      public constructor() { super({ key: new PluginKey('RetainedRegistriesPlugin'), state: null }); }
-      public configure(context: DocPluginSetupContext): void { extensions = context.runtime.extensions; }
-      public registerState() { return { key: this.key, state: null }; }
-      public apply(): null { return null; }
-      public getPluginConfig(): null { return null; }
-      public render(): null { return null; }
+      public constructor() {
+        super({ key: new PluginKey('RetainedRegistriesPlugin'), state: null });
+      }
+      public configure(context: DocPluginSetupContext): void {
+        extensions = context.runtime.extensions;
+      }
+      public registerState() {
+        return { key: this.key, state: null };
+      }
+      public apply(): null {
+        return null;
+      }
     }
     const editor = createDocEditor({
       viewport: { width: 320, height: 180 },
@@ -2926,9 +2866,12 @@ describe('createDocEditor', () => {
       adapters: createDefaultDocAdapters(),
     });
     try {
-      expect(() => editor.observations.register(observation, {
-        getSnapshot: () => 1, subscribe: () => () => void 0,
-      })).toThrow('editor.commands.run');
+      expect(() =>
+        editor.observations.register(observation, {
+          getSnapshot: () => 1,
+          subscribe: () => () => void 0,
+        }),
+      ).toThrow('editor.commands.run');
       expect(() => extensions!.register(capability, 1)).toThrow('editor.commands.run');
       expect(() => editor.observations.destroy()).toThrow('editor.commands.run');
       expect(() => extensions!.destroy()).toThrow('editor.commands.run');
@@ -2942,22 +2885,20 @@ describe('createDocEditor', () => {
     let bindings: DocInputBindingRegistryCapability | undefined;
     let dispose: (() => void) | null = null;
     @Injectable()
-    class RetainedInputBindingsPlugin extends DocPlugin<null> {
-      public static readonly symbol = Symbol('RetainedInputBindingsPlugin');
-      public constructor() { super({ key: new PluginKey('RetainedInputBindingsPlugin'), state: null }); }
-      public configure(context: DocPluginSetupContext): void {
-        bindings = context.runtime.extensions.get(DocPluginRuntimeCapability.InputBindings);
+    class RetainedInputBindingsView extends DocView {
+      public static readonly symbol = Symbol('RetainedInputBindingsView');
+      public constructor() {
+        super(new PluginKey('RetainedInputBindingsView'));
+      }
+      public configure(context: DocViewSetupContext): void {
+        bindings = context.runtime.extensions.get(DocViewRuntimeCapability.InputBindings);
         dispose = bindings!.registerTextHandlers({ onDelete: () => void 0 });
       }
-      public registerState() { return { key: this.key, state: null }; }
-      public apply(): null { return null; }
-      public getPluginConfig(): null { return null; }
-      public render(): null { return null; }
     }
     const editor = createDocEditor({
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
-      plugins: [RetainedInputBindingsPlugin],
+      viewExtensions: [RetainedInputBindingsView],
       adapters: createDefaultDocAdapters(),
     });
     try {
@@ -2977,26 +2918,24 @@ describe('createDocEditor', () => {
     let eventEngine: EventEngine<RichTextRenderNodeProperties> | undefined;
 
     @Injectable()
-    class RetainInputLifecyclePlugin extends DocPlugin<null> {
-      public static readonly symbol = Symbol('RetainInputLifecyclePlugin');
-      public constructor() { super({ key: new PluginKey('RetainInputLifecyclePlugin'), state: null }); }
-      public configure(context: DocPluginSetupContext): void {
+    class RetainInputLifecycleView extends DocView {
+      public static readonly symbol = Symbol('RetainInputLifecycleView');
+      public constructor() {
+        super(new PluginKey('RetainInputLifecycleView'));
+      }
+      public configure(context: DocViewSetupContext): void {
         inputLifecycle = context.container.resolve<DocInputAdapterLifecycle>(DocInputAdapterLifecycle.symbol);
         viewportEnvironment = context.container.resolve<DocViewportEnvironment>(DocViewportEnvironment.symbol);
         renderCoordinator = context.container.resolve<DocRenderCoordinator>(DocRenderCoordinator.symbol);
         scrollManager = context.container.resolve<ScrollManager>(ScrollManager.symbol);
-        eventEngine = context.runtime.events.engine;
+        eventEngine = context.container.resolve<EventEngine<RichTextRenderNodeProperties>>(EventEngine.symbol);
       }
-      public registerState() { return { key: this.key, state: null }; }
-      public apply(): null { return null; }
-      public getPluginConfig(): null { return null; }
-      public render(): null { return null; }
     }
 
     const editor = createDocEditor({
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
-      plugins: [RetainInputLifecyclePlugin],
+      viewExtensions: [RetainInputLifecycleView],
       adapters: createDefaultDocAdapters(),
     });
     expect(() => inputLifecycle!.destroy()).toThrow('editor owner');

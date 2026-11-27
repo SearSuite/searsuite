@@ -1,7 +1,7 @@
 /** OCT2BIN converts octal to binary. Example: =OCT2BIN("3") returns 11. */
 import { engineeringFunction } from '../shared/functionFactory';
 import { numeric, text } from '../shared/arguments';
-import { isFormulaError, numberError } from '../shared/errors';
+import { isFormulaError } from '../shared/errors';
 import { formatSignedRadix, parseSignedRadix } from '../shared/radix';
 export const OCT2BIN = engineeringFunction({
   name: 'OCT2BIN',

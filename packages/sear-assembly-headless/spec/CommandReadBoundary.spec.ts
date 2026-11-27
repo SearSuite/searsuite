@@ -1,17 +1,17 @@
 /** @jest-environment node */
 
+import { SheetKernel } from '@searsuite/sear-assembly-sheet-kernel';
+
+
 import { createHeadlessEditor, createHeadlessWorkbookEditor } from '../src';
+import { ExportSheetStateCommand, UpdateSheetDefaultConfigCommand } from '@searsuite/sear-assembly-sheet-kernel';
+import { createEmptySheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
 import {
-  createEmptySheetDocumentState,
-  ExportSheetStateCommand,
-  ResizeSheetViewportCommand,
-  ScrollViewportToCommand,
-  UpdateSheetDefaultConfigCommand,
   SheetPlugin,
   SheetRuntimeCapability,
   type SheetPluginRuntimeContext,
   type SheetPluginSetupContext,
-} from '@searsuite/sear-assembly-setup';
+} from '@searsuite/sear-assembly-commands';
 import { PluginKey, type PluginManager, type SessionStateRegistry } from '@searsuite/sear-assembly-plugin';
 import {
   createSheetTransaction,
@@ -22,15 +22,23 @@ import {
   type SheetCommandBus,
   type SheetQueryRegistry,
 } from '@searsuite/sear-assembly-commands';
-import { Pipeline, type SheetInteractionStore } from '@searsuite/sear-assembly-core';
+import { Pipeline, type SheetInteractionStore } from '@searsuite/sear-assembly-plugin';
 import { Injectable } from '@searsuite/sear-foundation-di';
 import { createWorkbookDocumentState } from '@searsuite/sear-domain-workbook';
-import { WorkbookDocumentStateObservation, WorkbookRuntimeCapability } from '@searsuite/sear-assembly-workbook';
-import { ReadSheetCellDataQuery, SheetDataPlugin, SheetMatrix, type SheetDataEngine, type SheetDataPluginState } from '@searsuite/sear-render-engine';
+import { WorkbookRuntimeCapability } from '@searsuite/sear-assembly-workbook-kernel';
+import { WorkbookDocumentStateObservation } from '@searsuite/sear-assembly-workbook-kernel';
+import { SheetDataPlugin, type SheetDataPluginState } from '@searsuite/sear-plugin-sheet-data';
+import { ReadSheetCellDataQuery, SheetMatrix } from '@searsuite/sear-domain-sheet';
+import { type SheetDataEngine } from '@searsuite/sear-domain-sheet';
 import { GetSelection, SelectRangeCommand, SheetSelectionPlugin } from '@searsuite/sear-plugin-selection';
 import { ReadSheetCellFormatQuery } from '@searsuite/sear-plugin-cell-format';
 import { FormulaInputAssistObservation } from '@searsuite/sear-plugin-cell-editor';
-import { FormulaResultStore, RunFormulaBatchCommand, UnregisterFormulaProviderCommand, waitForFormulaIdle } from '@searsuite/sear-plugin-formula';
+import {
+  FormulaResultStore,
+  RunFormulaBatchCommand,
+  UnregisterFormulaProviderCommand,
+  waitForFormulaIdle,
+} from '@searsuite/sear-plugin-formula';
 import { CellType } from '@searsuite/sear-domain-cell-types';
 import { cellKey } from '@searsuite/sear-domain-formula-engine-ts';
 
@@ -38,10 +46,10 @@ let retainedDataState: SheetDataPluginState | null = null;
 let retainedDataPlugin: SheetDataPlugin | null = null;
 let retainedInteractionStore: SheetInteractionStore | null = null;
 let retainedDataEngine: SheetDataEngine | null = null;
-let retainedPluginManager: PluginManager<unknown, never> | null = null;
+let retainedPluginManager: PluginManager | null = null;
 let retainedSelectionPlugin: SheetSelectionPlugin | null = null;
 let retainedSessionRegistry: SessionStateRegistry | null = null;
-let retainedCore: SheetPluginRuntimeContext['core'] | null = null;
+let retainedKernel: SheetKernel | null = null;
 let retainedCommands: SheetCommandBus | null = null;
 let retainedCommandDisposer: (() => void) | null = null;
 let startupWriteRejected = false;
@@ -64,8 +72,12 @@ let retainedStagedMatrix: RetainedMatrix | null = null;
 
 class RetainedMatrix extends SheetMatrix {
   #privateValue = 'initial';
-  public setPrivateValue(value: string): void { this.#privateValue = value; }
-  public getPrivateValue(): string { return this.#privateValue; }
+  public setPrivateValue(value: string): void {
+    this.#privateValue = value;
+  }
+  public getPrivateValue(): string {
+    return this.#privateValue;
+  }
 }
 
 @Injectable()
@@ -79,21 +91,23 @@ class RetainedMatrixPlugin extends SheetPlugin<{ matrix: RetainedMatrix }> {
     super({ key: new PluginKey('RetainedMatrixPlugin'), state: { matrix } });
   }
 
-  public registerState() { return { key: this.key, state: this.getState(), dataEngine: { enabled: false } }; }
+  public registerState() {
+    return { key: this.key, state: this.getState(), dataEngine: { enabled: false } };
+  }
   public registerCommands(commands: SheetCommandBus): void {
-    commands.register(CommitRetainedMatrixCommand, () =>
-      new TransactionPipelineCommand(CommitRetainedMatrixCommand.id, createSheetTransaction(this.key, [])));
+    commands.register(
+      CommitRetainedMatrixCommand,
+      () => new TransactionPipelineCommand(CommitRetainedMatrixCommand.id, createSheetTransaction(this.key, [])),
+    );
   }
   public registerQueries(queries: SheetQueryRegistry): void {
     queries.register(ReadRetainedMatrixQuery, () => this.getState().matrix.getItem(0, 0)?.value as string | undefined);
   }
-  public getPluginConfig(): null { return null; }
   public apply(state: { matrix: RetainedMatrix }): { matrix: RetainedMatrix } {
     retainedStagedMatrix = state.matrix;
     state.matrix.addItem(0, 0, { type: 'string', value: 'committed' });
     return state;
   }
-  public render(): null { return null; }
 }
 
 const registeredKey = new PluginKey('PrivateStatePlugin.extra');
@@ -114,20 +128,23 @@ class PrivateStatePlugin extends SheetPlugin<{ nested: { value: number } }> {
     ];
   }
   public registerCommands(commands: SheetCommandBus): void {
-    commands.register(CommitPrivateStateCommand, () =>
-      new TransactionPipelineCommand(CommitPrivateStateCommand.id, createSheetTransaction(this.key, [])));
-    commands.register(DirectPrivateStateWriteCommand, () =>
-      new LocalActionCommand(DirectPrivateStateWriteCommand.id, () => {
-        retainedPrivateState!.nested.value = 99;
-      }));
+    commands.register(
+      CommitPrivateStateCommand,
+      () => new TransactionPipelineCommand(CommitPrivateStateCommand.id, createSheetTransaction(this.key, [])),
+    );
+    commands.register(
+      DirectPrivateStateWriteCommand,
+      () =>
+        new LocalActionCommand(DirectPrivateStateWriteCommand.id, () => {
+          retainedPrivateState!.nested.value = 99;
+        }),
+    );
   }
-  public getPluginConfig(): null { return null; }
   public override lockCommittedState(): void {}
   public override enforceStateWriteBoundary(): void {}
   public apply(state: { nested: { value: number } }): { nested: { value: number } } {
     return { nested: { value: state.nested.value + 1 } };
   }
-  public render(): null { return null; }
   public initialize(): void {
     retainedPrivateState = this.getState();
     retainedPrivatePlugin = this;
@@ -142,51 +159,70 @@ class RetainedSheetStatePlugin extends SheetPlugin<null> {
     super({ key: new PluginKey('RetainedSheetStatePlugin'), state: null });
   }
 
-  public registerState() { return { key: this.key, state: null }; }
+  public registerState() {
+    return { key: this.key, state: null };
+  }
   public configure(context: SheetPluginSetupContext): void {
     retainedFormulaProviderDisposer = context.runtime.formula.results.register({
-      provider: { getFormulaResult: (row, col) => row === 100 && col === 100 ? 'probe' : undefined },
+      provider: { getFormulaResult: (row, col) => (row === 100 && col === 100 ? 'probe' : undefined) },
       priority: 200,
     });
   }
   public registerCommands(commands: SheetCommandBus): void {
-    commands.register(RegisterRuntimeCommand, () => new LocalActionCommand(RegisterRuntimeCommand.id, () => {
-      commands.register(RuntimeCommand, () => new LocalActionCommand(RuntimeCommand.id, () => void 0));
-    }));
-    retainedCommandDisposer = commands.register(DirectStateWriteCommand, () => new LocalActionCommand(DirectStateWriteCommand.id, () => {
-      retainedDataState!.sheetData.addItem(0, 0, { type: 'string', value: 'changed' });
-    }));
-    commands.register(DirectRegistryWriteCommand, () => new LocalActionCommand(DirectRegistryWriteCommand.id, () => {
-      retainedPluginManager!.unregisterPlugin(SheetDataPlugin.pluginKey);
-    }));
-    commands.register(SetProbeFormulaResultCommand, () => new LocalActionCommand(SetProbeFormulaResultCommand.id, () => {
-      retainedFormulaResultStore!.set(cellKey(0, 0), [[1, 2]]);
-    }));
+    commands.register(
+      RegisterRuntimeCommand,
+      () =>
+        new LocalActionCommand(RegisterRuntimeCommand.id, () => {
+          commands.register(RuntimeCommand, () => new LocalActionCommand(RuntimeCommand.id, () => void 0));
+        }),
+    );
+    retainedCommandDisposer = commands.register(
+      DirectStateWriteCommand,
+      () =>
+        new LocalActionCommand(DirectStateWriteCommand.id, () => {
+          retainedDataState!.sheetData.addItem(0, 0, { type: 'string', value: 'changed' });
+        }),
+    );
+    commands.register(
+      DirectRegistryWriteCommand,
+      () =>
+        new LocalActionCommand(DirectRegistryWriteCommand.id, () => {
+          retainedPluginManager!.unregisterPlugin(SheetDataPlugin.pluginKey);
+        }),
+    );
+    commands.register(
+      SetProbeFormulaResultCommand,
+      () =>
+        new LocalActionCommand(SetProbeFormulaResultCommand.id, () => {
+          retainedFormulaResultStore!.set(cellKey(0, 0), [[1, 2]]);
+        }),
+    );
   }
-  public getPluginConfig(): null { return null; }
-  public apply(): null { return null; }
-  public render(): null { return null; }
+  public apply(): null {
+    return null;
+  }
 
-  public onInitialDataCell(core: SheetPluginRuntimeContext['core']): void {
+  public initialize({ runtime, container }: SheetPluginRuntimeContext): void {
+    const kernel = container.resolve<SheetKernel>(SheetKernel.symbol);
     try {
-      (core.getPlugin(SheetDataPlugin.pluginKey) as SheetDataPluginState).sheetData.addItem(
-        0, 0, { type: 'string', value: 'startup bypass' },
-      );
+      runtime.data
+        .getDataType<SheetDataPluginState>(SheetDataPlugin.pluginKey)
+        ?.sheetData.addItem(0, 0, { type: 'string', value: 'startup bypass' });
     } catch {
       startupWriteRejected = true;
     }
-  }
-
-  public initialize({ core, runtime, container }: SheetPluginRuntimeContext): void {
-    retainedDataState = core.getPlugin(SheetDataPlugin.pluginKey) as SheetDataPluginState;
-    retainedDataPlugin = core.pluginManager.getAllPlugins().find((plugin) => plugin.key === SheetDataPlugin.pluginKey) as SheetDataPlugin;
+    retainedDataState = runtime.plugins.getPluginState(SheetDataPlugin.pluginKey) as SheetDataPluginState;
+    retainedDataPlugin = runtime.plugins
+      .getAllPlugins()
+      .find((plugin) => plugin.key === SheetDataPlugin.pluginKey) as SheetDataPlugin;
     retainedInteractionStore = runtime.interaction.store;
-    retainedDataEngine = core.getDataEngine();
-    retainedPluginManager = core.pluginManager as unknown as PluginManager<unknown, never>;
-    retainedSelectionPlugin = core.pluginManager.getAllPlugins()
+    retainedDataEngine = runtime.data;
+    retainedPluginManager = runtime.plugins as unknown as PluginManager;
+    retainedSelectionPlugin = runtime.plugins
+      .getAllPlugins()
       .find((plugin) => plugin.key === SheetSelectionPlugin.pluginKey) as SheetSelectionPlugin;
     retainedSessionRegistry = runtime.session;
-    retainedCore = core;
+    retainedKernel = kernel;
     retainedCommands = runtime.commands;
     retainedFormulaResultStore = container.resolve<FormulaResultStore>(FormulaResultStore.symbol);
   }
@@ -200,7 +236,7 @@ it('rejects writes through a plugin-retained committed document state handle', (
   retainedPluginManager = null;
   retainedSelectionPlugin = null;
   retainedSessionRegistry = null;
-  retainedCore = null;
+  retainedKernel = null;
   retainedCommands = null;
   retainedCommandDisposer = null;
   startupWriteRejected = false;
@@ -216,8 +252,12 @@ it('rejects writes through a plugin-retained committed document state handle', (
     expect(startupWriteRejected).toBe(true);
     const state = retainedDataState!;
     expect(() => state.sheetData.addItem(0, 0, { type: 'string', value: 'changed' })).toThrow();
-    expect(() => { state.sheetData = new SheetMatrix(); }).toThrow();
-    expect(() => { state.sheetData.getItem(0, 0)!.value = 'changed'; }).toThrow();
+    expect(() => {
+      state.sheetData = new SheetMatrix();
+    }).toThrow();
+    expect(() => {
+      state.sheetData.getItem(0, 0)!.value = 'changed';
+    }).toThrow();
     expect(() => {
       (state.sheetData as unknown as { getItem: () => { value: string } }).getItem = () => ({ value: 'forged' });
     }).toThrow();
@@ -228,10 +268,18 @@ it('rejects writes through a plugin-retained committed document state handle', (
     expect(() => {
       retainedDataPlugin!.pluginKey = new PluginKey('forged-plugin');
     }).toThrow();
-    expect(() => { (retainedDataPlugin!.key as { key: string }).key = 'forged-key'; }).toThrow();
-    expect(() => { retainedDataPlugin!.interestedIn = ['*']; }).toThrow();
-    expect(() => { retainedDataPlugin!.interestedIn.push('*'); }).toThrow();
-    expect(() => { (retainedDataPlugin!.transactionOT as { ownerId: string }).ownerId = 'forged'; }).toThrow();
+    expect(() => {
+      (retainedDataPlugin!.key as { key: string }).key = 'forged-key';
+    }).toThrow();
+    expect(() => {
+      retainedDataPlugin!.interestedIn = ['*'];
+    }).toThrow();
+    expect(() => {
+      retainedDataPlugin!.interestedIn.push('*');
+    }).toThrow();
+    expect(() => {
+      (retainedDataPlugin!.transactionOT as { ownerId: string }).ownerId = 'forged';
+    }).toThrow();
     expect(() => {
       (retainedDataPlugin!.transactionOT.definition as { id: string }).id = 'forged';
     }).toThrow();
@@ -242,10 +290,21 @@ it('rejects writes through a plugin-retained committed document state handle', (
       (retainedDataPlugin!.documentState.codec as { key: string }).key = 'forged';
     }).toThrow();
     expect(() => retainedSelectionPlugin!.setState(retainedSelectionPlugin!.getState())).toThrow();
-    expect(() => { retainedSelectionPlugin!.getState()[1].getPoint(0)[0] = 9; }).toThrow();
-    expect(() => { retainedSelectionPlugin!.getState()[1].update([[9, 9], [9, 9]]); }).toThrow();
-    expect(() => retainedDataEngine!.replaceDataType(SheetDataPlugin.pluginKey, { sheetData: new SheetMatrix() })).toThrow();
-    expect(() => retainedDataEngine!.registerDataType(SheetDataPlugin.pluginKey, { sheetData: new SheetMatrix() })).toThrow();
+    expect(() => {
+      retainedSelectionPlugin!.getState()[1].getPoint(0)[0] = 9;
+    }).toThrow();
+    expect(() => {
+      retainedSelectionPlugin!.getState()[1].update([
+        [9, 9],
+        [9, 9],
+      ]);
+    }).toThrow();
+    expect(() =>
+      retainedDataEngine!.replaceDataType(SheetDataPlugin.pluginKey, { sheetData: new SheetMatrix() }),
+    ).toThrow();
+    expect(() =>
+      retainedDataEngine!.registerDataType(SheetDataPlugin.pluginKey, { sheetData: new SheetMatrix() }),
+    ).toThrow();
     expect(() => retainedInteractionStore!.apply({ type: 'sheet.selection.select' })).toThrow();
     expect(() => retainedPluginManager!.unregisterPlugin(SheetDataPlugin.pluginKey)).toThrow();
     expect(() => retainedPluginManager!.clearPlugins()).toThrow();
@@ -253,52 +312,48 @@ it('rejects writes through a plugin-retained committed document state handle', (
     expect(() => retainedSessionRegistry!.loadSnapshot({})).toThrow();
     expect(() => retainedSessionRegistry!.restorePhase('beforeInitialize')).toThrow();
     expect(() => retainedSessionRegistry!.clear()).toThrow();
-    expect(() => retainedCommands!.register(defineSheetCommand<void>('test.lateCommand'), () =>
-      new LocalActionCommand('test.lateCommand', () => void 0))).toThrow('editor.commands.run');
+    expect(() =>
+      retainedCommands!.register(
+        defineSheetCommand<void>('test.lateCommand'),
+        () => new LocalActionCommand('test.lateCommand', () => void 0),
+      ),
+    ).toThrow('editor.commands.run');
     expect(() => retainedCommandDisposer!()).toThrow('editor.commands.run');
     expect(() => retainedCommands!.destroy()).toThrow('editor.commands.run');
-    expect(() => { (retainedCommands as unknown as { executionDepth: number }).executionDepth = 1; }).toThrow();
-    (retainedCore as unknown as { commandBoundaryCheck: () => boolean }).commandBoundaryCheck = () => true;
+    expect(() => {
+      (retainedCommands as unknown as { executionDepth: number }).executionDepth = 1;
+    }).toThrow();
+    (retainedKernel as unknown as { commandBoundaryCheck: () => boolean }).commandBoundaryCheck = () => true;
     expect(retainedCommands!.isExecuting()).toBe(false);
-    expect(() => retainedCore!.executePipeline(new Pipeline('bypass').addLocalAction('change', () => void 0))).toThrow();
-    const scroll = retainedCore!.renderEngine.scrollManager;
-    expect(() => scroll.scrollTo(10, 10)).toThrow('editor.commands.run');
-    expect(() => scroll.resize(10, 10)).toThrow('editor.commands.run');
-    expect(() => scroll.setContentBoundary(10, 10)).toThrow('editor.commands.run');
-    expect(() => scroll.setInputUpdateExecutor(() => void 0)).toThrow();
-    expect(() => scroll.setScrollToExecutor(() => void 0)).toThrow();
-    expect(() => { scroll.getState().x = 10; }).toThrow();
-    expect(() => { (scroll as unknown as { state: object }).state = { x: 10 }; }).toThrow();
+    expect(() =>
+      retainedKernel!.executePipeline(new Pipeline('bypass').addLocalAction('change', () => void 0)),
+    ).toThrow();
     expect(retainedPluginManager!.getPluginState(SheetDataPlugin.pluginKey)).toBe(retainedDataState);
-    expect(() => { (retainedInteractionStore!.getState() as { selectionRevision: number }).selectionRevision = 8; }).toThrow();
+    expect(() => {
+      (retainedInteractionStore!.getState() as { selectionRevision: number }).selectionRevision = 8;
+    }).toThrow();
     (retainedInteractionStore as unknown as { state: object }).state = { selectionRevision: 8 };
     expect(retainedInteractionStore!.getState().selectionRevision).toBe(0);
     expect(editor.queries.run(ReadSheetCellDataQuery, undefined).getItem(0, 0)?.value).toBe('before');
     expect(events).toEqual([]);
     editor.commands.run(RegisterRuntimeCommand, undefined);
     expect(editor.commands.has(RuntimeCommand)).toBe(true);
-    editor.commands.run(ResizeSheetViewportCommand, { width: 120, height: 90 });
-    expect(scroll.getShape()).toEqual([120, 90]);
-    scroll.requestScrollTo(10, 10);
-    expect(scroll.getState()).toMatchObject({ x: 10, y: 10 });
-    expect(events).toContain(ResizeSheetViewportCommand.id);
-    expect(events).toContain(ScrollViewportToCommand.id);
     const formula = editor.services.require(SheetRuntimeCapability.Formula);
     expect(formula.results.getFormulaResult(100, 100)).toBe('probe');
     expect(() => formula.results.register({ provider: { getFormulaResult: () => 1 } })).toThrow('editor.commands.run');
-    expect(() => formula.sources.register({ provider: { getFormulaSource: () => 'direct' } })).toThrow('editor.commands.run');
-    expect(() => formula.richResults.register({ provider: { getFormulaRichResult: () => undefined } })).toThrow('editor.commands.run');
+    expect(() => formula.sources.register({ provider: { getFormulaSource: () => 'direct' } })).toThrow(
+      'editor.commands.run',
+    );
+    expect(() => formula.richResults.register({ provider: { getFormulaRichResult: () => undefined } })).toThrow(
+      'editor.commands.run',
+    );
     retainedFormulaProviderDisposer!();
     expect(formula.results.getFormulaResult(100, 100)).toBeUndefined();
     expect(events).toContain(UnregisterFormulaProviderCommand.id);
     const config = editor.services.require(SheetRuntimeCapability.Config);
     expect(() => config.updateDefaultConfigOverrides({ sheetOffsetX: 88 })).toThrow('editor.commands.run');
-    const selectionConfig = config.getPluginConfig<{ defaultBorderColor: string }>(retainedSelectionPlugin!.key);
-    expect(selectionConfig).toBeDefined();
-    expect(() => { selectionConfig!.defaultBorderColor = 'changed'; }).toThrow();
     editor.commands.run(UpdateSheetDefaultConfigCommand, { sheetOffsetX: 88 });
     expect(config.getDefaultConfig().sheetOffsetX).toBe(88);
-    expect(editor.services.get(SheetRuntimeCapability.Lifecycle)).toBeUndefined();
     expect(editor.services.get(SheetRuntimeCapability.Interaction)).toBeUndefined();
     expect(() => editor.commands.run(DirectStateWriteCommand, undefined)).toThrow();
     expect(() => editor.commands.run(DirectRegistryWriteCommand, undefined)).toThrow();
@@ -314,7 +369,7 @@ it('rejects writes through a plugin-retained committed document state handle', (
     retainedPluginManager = null;
     retainedSelectionPlugin = null;
     retainedSessionRegistry = null;
-    retainedCore = null;
+    retainedKernel = null;
     retainedCommands = null;
   }
 });
@@ -333,7 +388,9 @@ it('runs asynchronous formula result writes inside a batch command', async () =>
     expect(events).toContain(RunFormulaBatchCommand.id);
     editor.commands.run(SetProbeFormulaResultCommand, void 0);
     const retained = retainedFormulaResultStore!.get(cellKey(0, 0)) as number[][];
-    expect(() => { retained[0]![0] = 99; }).toThrow();
+    expect(() => {
+      retained[0]![0] = 99;
+    }).toThrow();
     expect(retainedFormulaResultStore!.get(cellKey(0, 0))).toEqual([[1, 2]]);
   } finally {
     unsubscribe();
@@ -375,15 +432,23 @@ it('locks private plugin state even without a document-state contribution', () =
   });
   try {
     const oldState = retainedPrivateState!;
-    expect(() => { oldState.nested.value = 99; }).toThrow();
-    expect(() => { retainedRegisteredState!.nested.value = 99; }).toThrow();
+    expect(() => {
+      oldState.nested.value = 99;
+    }).toThrow();
+    expect(() => {
+      retainedRegisteredState!.nested.value = 99;
+    }).toThrow();
     expect(() => retainedPrivatePlugin!.setState({ nested: { value: 99 } })).toThrow();
     expect(() => editor.commands.run(DirectPrivateStateWriteCommand, undefined)).toThrow();
     editor.commands.run(CommitPrivateStateCommand, undefined);
-    expect(() => { oldState.nested.value = 99; }).toThrow();
+    expect(() => {
+      oldState.nested.value = 99;
+    }).toThrow();
     expect(oldState.nested.value).toBe(1);
     expect(retainedPrivatePlugin!.getState().nested.value).toBe(2);
-    expect(() => { retainedPrivatePlugin!.getState().nested.value = 99; }).toThrow();
+    expect(() => {
+      retainedPrivatePlugin!.getState().nested.value = 99;
+    }).toThrow();
   } finally {
     editor.destroy();
     retainedPrivateState = null;
@@ -496,8 +561,7 @@ it('keeps Workbook runtime mutations outside the public capability reader', () =
     snapshot.sheetStates['one']!.sheetData.addItem(0, 0, { type: 'string', value: 'outside command' });
     const observed = editor.observations.getSnapshot(WorkbookDocumentStateObservation);
     observed.sheetStates['one']!.sheetData.addItem(0, 0, { type: 'string', value: 'changed observation' });
-    expect(editor.sheets.getActiveEditor().queries.run(ReadSheetCellDataQuery, undefined).getItem(0, 0))
-      .toBeNull();
+    expect(editor.sheets.getActiveEditor().queries.run(ReadSheetCellDataQuery, undefined).getItem(0, 0)).toBeNull();
   } finally {
     editor.destroy();
   }

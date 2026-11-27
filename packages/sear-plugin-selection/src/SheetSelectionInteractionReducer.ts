@@ -3,7 +3,7 @@ import {
   type SheetInteractionSignal,
   type SheetInteractionState,
   SheetInteractionReducerRegistry,
-} from '@searsuite/sear-assembly-core';
+} from '@searsuite/sear-assembly-plugin';
 import { type Point } from '@searsuite/sear-foundation-rect';
 import { SheetSelectionInteractionName, type SheetSelectionSource } from './SheetSelectionPipelineNames';
 

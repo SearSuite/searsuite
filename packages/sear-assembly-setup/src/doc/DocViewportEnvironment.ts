@@ -8,10 +8,7 @@ import { DocRenderEngine } from '@searsuite/sear-render-engine';
 import { ScrollManager } from '@searsuite/sear-render-scroll';
 
 import { type DocEditorContentRect, type DocEditorViewport } from './createDocEditor';
-import {
-  type DocEditorRuntimeConfiguration,
-  DocEditorRuntimeConfigurationSymbol,
-} from './DocEditorRuntimeConfiguration';
+import { type DocEditorRuntimeConfiguration, DocEditorRuntimeConfigurationSymbol } from './DocEditorRuntimeConfiguration';
 import { DocEditorLifecycleState } from './DocEditorLifecycleState';
 import { ResizeDocViewportCommand } from './DocViewportCommands';
 

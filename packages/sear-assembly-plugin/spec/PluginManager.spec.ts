@@ -1,6 +1,5 @@
 import { type Transaction } from '@searsuite/sear-domain-transaction';
 import { MatrixTransactionOT } from '@searsuite/sear-domain-ot';
-import { type NodeProperties } from '@searsuite/sear-render-node';
 
 import { Plugin, PluginKey, PluginManager, type PluginDocumentStateContribution } from '../src';
 
@@ -8,20 +7,12 @@ interface MockState {
   value: number;
 }
 
-class MockPlugin extends Plugin<object, NodeProperties, MockState> {
+class MockPlugin extends Plugin<MockState> {
   public readonly applyMock = jest.fn();
 
   public apply(state: MockState, transaction: Transaction): MockState {
     this.applyMock(state, transaction);
     return state;
-  }
-
-  public render() {
-    return null;
-  }
-
-  public getPluginConfig() {
-    return {};
   }
 
   public registerState() {
@@ -30,7 +21,7 @@ class MockPlugin extends Plugin<object, NodeProperties, MockState> {
 }
 
 class StateOnlyMockPlugin extends MockPlugin {
-  public override readonly warnOnDuplicateDepth = false;
+  public readonly warnOnDuplicateDepth = false;
 }
 
 class CollaborativeMockPlugin extends StateOnlyMockPlugin {
@@ -61,7 +52,7 @@ describe('PluginManager', () => {
   });
 
   it('registers plugins and exposes their state', () => {
-    const manager = new PluginManager<object, NodeProperties>();
+    const manager = new PluginManager();
     const plugin = new MockPlugin({
       key: new PluginKey('state'),
       state: { value: 1 },
@@ -74,7 +65,7 @@ describe('PluginManager', () => {
   });
 
   it('rejects duplicate keys and can clear registered plugins', () => {
-    const manager = new PluginManager<object, NodeProperties>();
+    const manager = new PluginManager();
     const plugin = new MockPlugin({
       key: new PluginKey('duplicate'),
       state: { value: 1 },
@@ -89,7 +80,7 @@ describe('PluginManager', () => {
   });
 
   it('rejects duplicate plugin key strings', () => {
-    const manager = new PluginManager<object, NodeProperties>();
+    const manager = new PluginManager();
     const firstKey = new PluginKey('same');
     const secondKey = Object.assign(Object.create(PluginKey.prototype), { key: firstKey.key }) as PluginKey;
     const first = new MockPlugin({ key: firstKey, state: { value: 1 } });
@@ -101,7 +92,7 @@ describe('PluginManager', () => {
   });
 
   it('unregisters plugins and clears their state', () => {
-    const manager = new PluginManager<object, NodeProperties>();
+    const manager = new PluginManager();
     const plugin = new MockPlugin({
       key: new PluginKey('removable'),
       state: { value: 1 },
@@ -116,14 +107,15 @@ describe('PluginManager', () => {
   });
 
   it('rejects registry changes outside command dispatch after assembly', () => {
-    const manager = new PluginManager<object, NodeProperties>();
+    const manager = new PluginManager();
     const plugin = new MockPlugin({ key: new PluginKey('guarded'), state: { value: 1 } });
     manager.registerPlugin(plugin);
     const token = {};
     manager.enforceWriteBoundary(token);
 
-    expect(() => manager.registerPlugin(new MockPlugin({ key: new PluginKey('later'), state: { value: 2 } })))
-      .toThrow('require the owning runtime');
+    expect(() => manager.registerPlugin(new MockPlugin({ key: new PluginKey('later'), state: { value: 2 } }))).toThrow(
+      'require the owning runtime',
+    );
     expect(() => manager.unregisterPlugin(plugin.key)).toThrow('require the owning runtime');
     expect(() => manager.clearPlugins()).toThrow('require the owning runtime');
     expect(manager.getAllPlugins()).toEqual([plugin]);
@@ -137,23 +129,22 @@ describe('PluginManager', () => {
     plugin.enforceStateWriteBoundary({});
     Object.assign(plugin, { hasStateWriteBoundary: () => false });
 
-    expect(() => new PluginManager<object, NodeProperties>().registerPlugin(plugin))
-      .toThrow('already owned by another editor');
+    expect(() => new PluginManager().registerPlugin(plugin)).toThrow('already owned by another editor');
   });
 
-  it('warns when plugins share the same depth', () => {
-    const manager = new PluginManager<object, NodeProperties>(platform as never);
+  it('does not assign visual depth to business owners', () => {
+    const manager = new PluginManager(platform as never);
     const first = new MockPlugin({ key: new PluginKey('first-depth'), state: { value: 1 } });
     const second = new MockPlugin({ key: new PluginKey('second-depth'), state: { value: 2 } });
 
     manager.registerPlugin(first);
     manager.registerPlugin(second);
 
-    expect(platform.warn).toHaveBeenCalledWith(expect.stringContaining('runtime order will follow registration order'));
+    expect(platform.warn).not.toHaveBeenCalled();
   });
 
   it('does not warn when state-only plugins opt out of duplicate depth diagnostics', () => {
-    const manager = new PluginManager<object, NodeProperties>(platform as never);
+    const manager = new PluginManager(platform as never);
     const ordered = new MockPlugin({ key: new PluginKey('ordered-depth'), state: { value: 1 } });
     const stateOnly = new StateOnlyMockPlugin({ key: new PluginKey('state-depth'), state: { value: 2 } });
 
@@ -164,7 +155,7 @@ describe('PluginManager', () => {
   });
 
   it('warns when a collaborative plugin does not register a document-state export contribution', () => {
-    const manager = new PluginManager<object, NodeProperties>(platform as never);
+    const manager = new PluginManager(platform as never);
     const plugin = new CollaborativeMockPlugin({ key: new PluginKey('collab-without-export'), state: { value: 1 } });
 
     manager.registerPlugin(plugin);
@@ -175,7 +166,7 @@ describe('PluginManager', () => {
   });
 
   it('does not warn for collaboration when the plugin registers a document-state export contribution', () => {
-    const manager = new PluginManager<object, NodeProperties>(platform as never);
+    const manager = new PluginManager(platform as never);
     const plugin = new ExportedCollaborativeMockPlugin({
       key: new PluginKey('collab-with-export'),
       state: { value: 1 },
@@ -187,8 +178,8 @@ describe('PluginManager', () => {
     expect(manager.getDocumentStateContributions()).toHaveLength(1);
   });
 
-  it('iterates in depth order and applies every registered plugin', () => {
-    const manager = new PluginManager<object, NodeProperties>();
+  it('iterates business owners in registration order', () => {
+    const manager = new PluginManager();
     const first = new MockPlugin({
       key: new PluginKey('first'),
       state: { value: 1 },
@@ -207,15 +198,15 @@ describe('PluginManager', () => {
     manager.registerPlugin(first);
     manager.registerPlugin(second);
     manager.registerPlugin(third);
-    const visited: Plugin<object, NodeProperties, unknown>[] = [];
+    const visited: Plugin<unknown>[] = [];
 
     manager.forEach((plugin) => visited.push(plugin));
 
-    expect(visited).toEqual([third, second, first]);
+    expect(visited).toEqual([first, second, third]);
   });
 
   it('covers depth sorting with multiple undefined depths', () => {
-    const manager = new PluginManager<object, NodeProperties>();
+    const manager = new PluginManager();
     const a = new MockPlugin({ key: new PluginKey('a'), state: { value: 1 } });
     const b = new MockPlugin({ key: new PluginKey('b'), state: { value: 2 } });
     Object.defineProperty(a, 'depth', { value: undefined });

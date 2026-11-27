@@ -1,17 +1,14 @@
 import { DocCommandBus, defineDocCommand } from '@searsuite/sear-assembly-commands';
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
-import { ReflowDocTransaction } from '@searsuite/sear-domain-commands';
+import { DocTransaction } from '@searsuite/sear-domain-commands';
 import {
   buildInlineTextRangePatchPlan,
   applyInlineTextStylePropertyMutation,
   readTextStyleAttrs,
-  type RichTextInlineStyle,
   type RichTextInlineStyleContribution,
 } from '@searsuite/sear-domain-doc';
-import { type RichTextRunRenderContribution } from '@searsuite/sear-render-node';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { type DocKeyboardHandlerRegistrationContext } from '../../plugin/DocPluginContracts';
-import { DocContentRenderPluginKey } from '../../plugin/DocFeaturePluginKeys';
+
 import { createDocCommand } from '../../plugin/DocPluginCommandUtils';
 import { InlineTextStylePluginBase } from '../InlineTextStylePluginBase';
 
@@ -31,7 +28,7 @@ export const ToggleDocItalicCommand = defineDocCommand<void>('doc.toggleItalic')
 export class ItalicTextStylePlugin extends InlineTextStylePluginBase {
   public static readonly symbol = Symbol.for('ItalicTextStylePlugin');
   public constructor() {
-    super(new PluginKey('DocItalicTextStyle'), createItalicContribution(), createItalicRenderContribution());
+    super(new PluginKey('DocItalicTextStyle'), createItalicContribution());
   }
 
   public override registerCommands(commands: DocCommandBus): void {
@@ -39,21 +36,13 @@ export class ItalicTextStylePlugin extends InlineTextStylePluginBase {
     commands.register(ToggleDocItalicCommand, this.#createToggleItalicCommand.bind(this));
   }
 
-  public override registerKeyboardHandlers({ bindings, commands }: DocKeyboardHandlerRegistrationContext): void {
-    bindings.registerKeyboardHandlers({
-      onToggleItalic: () => void commands.run(ToggleDocItalicCommand, void 0),
-    });
-  }
-
   #createSetItalicCommand(input: SetDocItalicInput) {
     const italic = normalizeBoolean(input?.italic, 'SetDocItalicCommand.italic');
-    return createDocCommand(SetDocItalicCommand.id, DocContentRenderPluginKey, () =>
-      this.#createItalicTransaction(italic),
-    );
+    return createDocCommand(SetDocItalicCommand.id, () => this.#createItalicTransaction(italic));
   }
 
   #createToggleItalicCommand() {
-    return createDocCommand(ToggleDocItalicCommand.id, DocContentRenderPluginKey, () => {
+    return createDocCommand(ToggleDocItalicCommand.id, () => {
       const runtime = this.requireRuntime();
       const state = runtime.document.input.getState();
       const patches = buildInlineTextRangePatchPlan(state.pendingDoc, state.docSelection, () => ({}));
@@ -75,7 +64,7 @@ export class ItalicTextStylePlugin extends InlineTextStylePluginBase {
           italic,
           (attrs) => mutation.apply({ attrs, value: italic }),
         ),
-      new ReflowDocTransaction(),
+      new DocTransaction(),
     );
   }
 }
@@ -86,20 +75,6 @@ export function createItalicContribution(): RichTextInlineStyleContribution {
     read: (input) => (isItalic(readTextStyleAttrs(input.attrs)) ? { [ItalicTextStyleKey.Italic]: true } : void 0),
     mutations: [{ styleKey: ItalicTextStyleKey.Italic, apply: applyItalicMutation }],
   };
-}
-
-/** Creates the render-layer italic contribution. */
-export function createItalicRenderContribution(): RichTextRunRenderContribution {
-  return {
-    key: `text.${ItalicTextStyleKey.Italic}`,
-    resolveFont: ({ font, style }) => resolveItalicFont(font, style),
-  };
-}
-
-function resolveItalicFont(font: string, style: RichTextInlineStyle | undefined): string {
-  if (style?.[ItalicTextStyleKey.Italic] !== true) return font;
-  const pattern = /^(?:normal|italic|oblique)(\s+)/i;
-  return pattern.test(font) ? font.replace(pattern, 'italic$1') : `italic ${font}`;
 }
 
 function applyItalicMutation(input: {

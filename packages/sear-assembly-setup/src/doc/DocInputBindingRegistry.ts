@@ -1,6 +1,7 @@
 import { Injectable } from '@searsuite/sear-foundation-di';
 import { SearError } from '@searsuite/sear-foundation-error';
-import { type KeyboardRouterHandlers, type TextInputEvent, type TextInputHandlers } from '@searsuite/sear-render-input';
+import { type KeyboardRouterHandlers, type TextInputHandlers } from '@searsuite/sear-render-input';
+import { type TextInputEvent } from '@searsuite/sear-domain-commands';
 
 /** Registry that lets multiple document plugins contribute handlers to single-subscription input adapters. */
 @Injectable()
@@ -24,8 +25,7 @@ export class DocInputBindingRegistry {
 
   #assertWritable(allowTeardown = false): void {
     if (this.#destroyed) throw new SearError('Doc input bindings have been destroyed.');
-    if (this.#isCommandExecuting && !this.#isCommandExecuting() &&
-      !(allowTeardown && this.#isTearingDown?.())) {
+    if (this.#isCommandExecuting && !this.#isCommandExecuting() && !(allowTeardown && this.#isTearingDown?.())) {
       throw new SearError('Doc input bindings must change through editor.commands.run(...).');
     }
   }

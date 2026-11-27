@@ -1,6 +1,6 @@
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
 import { MatrixOTActionName, createUpdateCellOTOperation } from '@searsuite/sear-domain-ot';
-import { SheetMatrix } from '@searsuite/sear-render-engine';
+import { SheetMatrix } from '@searsuite/sear-domain-sheet';
 import { DefaultSheetClipboardCodec } from '../src/DefaultSheetClipboardCodec';
 import {
   CopyRangeCommand,
@@ -13,7 +13,7 @@ import { type SheetClipboardDataSource, type SheetClipboardPayload } from '../sr
 import { SheetClipboardCutSession } from '../src/SheetClipboardCutSession';
 import { SheetClipboardError, SheetClipboardErrorCode } from '../src/SheetClipboardErrors';
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import { Pipeline } from '@searsuite/sear-assembly-core';
+import { Pipeline } from '@searsuite/sear-assembly-plugin';
 import { CellClipboardCodecRegistry, CellFormats, type CellFormat } from '@searsuite/sear-domain-cell-types';
 import { createFormulaCellClipboardCodec } from '@searsuite/sear-domain-cell';
 import { SheetPasteMode } from '../src/SheetPasteMode';
@@ -55,9 +55,18 @@ function createSource(): SheetClipboardDataSource & {
       return 'test-cut-1';
     },
     planRangeMove(source, destination) {
-      return [{ target: this.target, operations: [createUpdateCellOTOperation(
-        destination.start, this.readCell(source.start[0], source.start[1]), this.readCell(destination.start[0], destination.start[1]),
-      )] }];
+      return [
+        {
+          target: this.target,
+          operations: [
+            createUpdateCellOTOperation(
+              destination.start,
+              this.readCell(source.start[0], source.start[1]),
+              this.readCell(destination.start[0], destination.start[1]),
+            ),
+          ],
+        },
+      ];
     },
   };
 }
@@ -97,16 +106,16 @@ describe('SheetClipboardPlugin', () => {
   it('BUG-081 copies a displayed projection without treating it as persisted source data', () => {
     const source = createSource();
     source.selection = { start: [2, 1], end: [2, 1] };
-    source.readCopyCell = (row, column) => row === 2 && column === 1
-      ? { type: 'string', value: 'projected' }
-      : source.readCell(row, column);
+    source.readCopyCell = (row, column) =>
+      row === 2 && column === 1 ? { type: 'string', value: 'projected' } : source.readCell(row, column);
     source.validateCutCell = () => ({ valid: false, reject: true, message: 'Protected spill' });
     const commands = createCommands(source);
 
     const copied = commands.run(CopyRangeCommand, void 0).payload;
     expect(copied.plainText).toBe('projected');
     expect(copied.structured?.rows[0]?.[0]).toMatchObject({
-      type: 'string', data: { type: 'string', value: 'projected' },
+      type: 'string',
+      data: { type: 'string', value: 'projected' },
     });
     expect(source.readCell(2, 1)).toBeNull();
     expect(() => commands.run(CutRangeCommand, void 0)).toThrow('Protected spill');
@@ -121,8 +130,9 @@ describe('SheetClipboardPlugin', () => {
       message: 'Protected result',
     });
     const commands = createCommands(source);
-    expect(() => commands.run(CutRangeCommand, void 0))
-      .toThrow(expect.objectContaining({ code: SheetClipboardErrorCode.InputRejected, message: 'Protected result' }));
+    expect(() => commands.run(CutRangeCommand, void 0)).toThrow(
+      expect.objectContaining({ code: SheetClipboardErrorCode.InputRejected, message: 'Protected result' }),
+    );
     expect(source.cutSession?.getPending()).toBeNull();
     expect(commands.run(CopyRangeCommand, void 0).payload.plainText).toContain('A');
     expect(source.readCell(0, 1)?.value).toBe(2);
@@ -136,9 +146,12 @@ describe('SheetClipboardPlugin', () => {
       message: 'Invalid input',
     });
     const commands = createCommands(source);
-    expect(() => commands.run(PasteRangeCommand, {
-      payload: { plainText: 'ok\t123' }, target: [2, 1],
-    })).toThrow(expect.objectContaining({ code: SheetClipboardErrorCode.InputRejected }));
+    expect(() =>
+      commands.run(PasteRangeCommand, {
+        payload: { plainText: 'ok\t123' },
+        target: [2, 1],
+      }),
+    ).toThrow(expect.objectContaining({ code: SheetClipboardErrorCode.InputRejected }));
     expect(source.readCell(2, 1)).toBeNull();
     expect(source.readCell(2, 2)).toBeNull();
   });
@@ -156,18 +169,16 @@ describe('SheetClipboardPlugin', () => {
     const commands = createCommands(source);
     const { payload } = commands.run(CutRangeCommand, void 0);
 
-    expect(() => commands.run(PasteRangeCommand, { payload, target: [2, 2] }))
-      .toThrow(expect.objectContaining({ code: SheetClipboardErrorCode.InputRejected }));
+    expect(() => commands.run(PasteRangeCommand, { payload, target: [2, 2] })).toThrow(
+      expect.objectContaining({ code: SheetClipboardErrorCode.InputRejected }),
+    );
     expect(source.readCell(0, 0)?.value).toBe('123');
     expect(source.readCell(2, 2)).toBeNull();
     expect(source.planRangeMove).not.toHaveBeenCalled();
     expect(source.cutSession?.getPending()?.range).toEqual({ start: [0, 0], end: [0, 0] });
 
     commands.run(PasteRangeCommand, { payload, target: [2, 1] });
-    expect(source.planRangeMove).toHaveBeenCalledWith(
-      { start: [0, 0], end: [0, 0] },
-      { start: [2, 1], end: [2, 1] },
-    );
+    expect(source.planRangeMove).toHaveBeenCalledWith({ start: [0, 0], end: [0, 0] }, { start: [2, 1], end: [2, 1] });
     expect(source.cutSession?.getPending()).toBeNull();
   });
 
@@ -202,10 +213,12 @@ describe('SheetClipboardPlugin', () => {
     source.isRowVisible = (row) => row !== 1;
     source.captureOwnerFormats = (range) => [{ id: 'fill', portable: { row: range.start[0] } }];
     const fill = new PluginKey('test-fill');
-    source.planOwnerFormats = (captured, target) => [{
-      target: fill,
-      operations: [createUpdateCellOTOperation(target.start, (captured[0]!.portable as { row: number }).row, null)],
-    }];
+    source.planOwnerFormats = (captured, target) => [
+      {
+        target: fill,
+        operations: [createUpdateCellOTOperation(target.start, (captured[0]!.portable as { row: number }).row, null)],
+      },
+    ];
     const commands = createCommands(source);
 
     const copy = commands.run(CopyRangeCommand, void 0);
@@ -277,14 +290,20 @@ describe('SheetClipboardPlugin', () => {
     const fill = new PluginKey('test-fill');
     source.selection = { start: [0, 0], end: [0, 0] };
     source.captureOwnerFormats = () => [{ id: 'fill', portable: { color: '#ffdddd' } }];
-    source.planOwnerFormats = (captured, target) => [{
-      target: fill,
-      operations: [createUpdateCellOTOperation(target.start, (captured[0]!.portable as { color: string }).color, null)],
-    }];
-    source.clearOwnerFormats = (range) => [{
-      target: fill,
-      operations: [createUpdateCellOTOperation(range.start, null, '#ffdddd')],
-    }];
+    source.planOwnerFormats = (captured, target) => [
+      {
+        target: fill,
+        operations: [
+          createUpdateCellOTOperation(target.start, (captured[0]!.portable as { color: string }).color, null),
+        ],
+      },
+    ];
+    source.clearOwnerFormats = (range) => [
+      {
+        target: fill,
+        operations: [createUpdateCellOTOperation(range.start, null, '#ffdddd')],
+      },
+    ];
     const commands = createCommands(source);
 
     const copy = commands.run(CopyRangeCommand, void 0);
@@ -306,7 +325,13 @@ describe('SheetClipboardPlugin', () => {
     source.captureMergedRanges = () => [{ start: [0, 0], end: [0, 1] }];
     source.planPasteMergedRanges = (merges, target) => ({
       target: mergeTarget,
-      operations: [createUpdateCellOTOperation(target, { endRow: target[0] + merges[0]!.end[0], endColumn: target[1] + merges[0]!.end[1] }, null)],
+      operations: [
+        createUpdateCellOTOperation(
+          target,
+          { endRow: target[0] + merges[0]!.end[0], endColumn: target[1] + merges[0]!.end[1] },
+          null,
+        ),
+      ],
     });
     source.planClearMergedRanges = () => ({
       target: mergeTarget,
@@ -331,10 +356,12 @@ describe('SheetClipboardPlugin', () => {
     source.planPasteMergedRanges = () => ({ target: source.target, operations: [] });
     const commands = createCommands(source);
     const copied = commands.run(CopyRangeCommand, void 0).payload.structured!;
-    expect(() => commands.run(PasteRangeCommand, {
-      payload: { plainText: 'A\t2\n=A1\t', structured: { ...copied, merges: [{ start: [0, 0], end: [2, 0] }] } },
-      target: [2, 2],
-    })).toThrow(expect.objectContaining({ code: SheetClipboardErrorCode.InvalidPayload }));
+    expect(() =>
+      commands.run(PasteRangeCommand, {
+        payload: { plainText: 'A\t2\n=A1\t', structured: { ...copied, merges: [{ start: [0, 0], end: [2, 0] }] } },
+        target: [2, 2],
+      }),
+    ).toThrow(expect.objectContaining({ code: SheetClipboardErrorCode.InvalidPayload }));
   });
 
   it('accepts plain text payloads through the codec fallback', () => {
@@ -398,11 +425,16 @@ describe('SheetClipboardPlugin', () => {
     expect(copy.payload.plainText).toBe('1');
     const normal = commands.run(PasteRangeCommand, { payload: copy.payload, target: [2, 0] });
     const values = commands.run(PasteRangeCommand, {
-      payload: copy.payload, target: [3, 0], mode: SheetPasteMode.Values,
+      payload: copy.payload,
+      target: [3, 0],
+      mode: SheetPasteMode.Values,
     });
 
     expect((normal.pipeline.steps[0]?.transaction?.operations[0] as any)?.uc.value.type).toBe('formula');
-    expect((values.pipeline.steps[0]?.transaction?.operations[0] as any)?.uc.value).toEqual({ type: 'number', value: 1 });
+    expect((values.pipeline.steps[0]?.transaction?.operations[0] as any)?.uc.value).toEqual({
+      type: 'number',
+      value: 1,
+    });
   });
 
   it('BUG-053 repeats a copied block across an integer-multiple target selection', () => {
@@ -450,20 +482,22 @@ describe('SheetClipboardPlugin', () => {
 
   it('BUG-020 rejects multi-cell paste into a merged subordinate cell', () => {
     const source = createSource();
-    source.getMergedRange = (row, column) => row === 0 && column <= 1
-      ? { start: [0, 0], end: [0, 1] }
-      : null;
+    source.getMergedRange = (row, column) => (row === 0 && column <= 1 ? { start: [0, 0], end: [0, 1] } : null);
     const commands = createCommands(source);
 
-    expect(() => commands.run(PasteRangeCommand, {
-      payload: { plainText: 'X\tY' },
-      target: [0, 0],
-    })).toThrow(expect.objectContaining({ code: SheetClipboardErrorCode.TargetIntersectsMergedCells }));
+    expect(() =>
+      commands.run(PasteRangeCommand, {
+        payload: { plainText: 'X\tY' },
+        target: [0, 0],
+      }),
+    ).toThrow(expect.objectContaining({ code: SheetClipboardErrorCode.TargetIntersectsMergedCells }));
     expect(source.readCell(0, 1)).toEqual({ type: 'number', value: 2 });
-    expect(commands.run(PasteRangeCommand, {
-      payload: { plainText: 'X' },
-      target: [0, 0],
-    }).range).toEqual({ start: [0, 0], end: [0, 0] });
+    expect(
+      commands.run(PasteRangeCommand, {
+        payload: { plainText: 'X' },
+        target: [0, 0],
+      }).range,
+    ).toEqual({ start: [0, 0], end: [0, 0] });
   });
 
   it('rebases relative formula references while preserving absolute coordinates', () => {

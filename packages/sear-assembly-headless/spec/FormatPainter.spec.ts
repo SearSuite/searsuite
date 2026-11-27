@@ -1,8 +1,8 @@
 /** @jest-environment node */
 
-import { createSheetEmbeddedSearCoreEditor } from '@searsuite/sear-plugin-sheet-doc-adapter';
 import { createHeadlessEditor } from '../src';
-import { createEmptySheetDocumentState, ExportSheetStateCommand } from '@searsuite/sear-assembly-setup';
+import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
+import { createEmptySheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
 import {
   ApplyFormatPainterCommand,
   FormatPainterMode,
@@ -84,7 +84,7 @@ it('transfers registered inline styles without replacing target text or unrelate
     ],
   });
   state.sheetData.addItem(2, 2, { type: 'string', value: 'Plain target' });
-  const editor = createHeadlessEditor({ sheetState: state, embeddedEditor: createSheetEmbeddedSearCoreEditor() });
+  const editor = createHeadlessEditor({ sheetState: state });
   try {
     editor.commands.run(StartFormatPainterCommand, { source, mode: FormatPainterMode.Persistent });
     editor.commands.run(ApplyFormatPainterCommand, { destination });

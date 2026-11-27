@@ -1,5 +1,5 @@
 import { DocTransaction } from '../src/DocTransaction';
-import { RichDocOT, RichDocOTActionName } from '@searsuite/sear-domain-ot';
+import { RichDocOT } from '@searsuite/sear-domain-ot';
 import {
   DocNodeRegistry,
   ParagraphNode,

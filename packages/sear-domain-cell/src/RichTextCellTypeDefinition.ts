@@ -1,8 +1,8 @@
 import { CellType, RichTextCellCommitStrategy } from '@searsuite/sear-domain-cell-types';
-import { RichTextCell, extractRichText } from '@searsuite/sear-render-registry';
+import { extractRichText } from '@searsuite/sear-domain-cell-types';
 
 import { type CellDisplayTextProvider } from './CellDisplayTextRegistry';
-import { defineCellRenderer } from './CellRendererDefinition';
+
 import { CellTypeDefinition } from './CellTypeDefinition';
 
 /** Built-in persisted cell type for rich-text document values. */
@@ -47,10 +47,6 @@ export class RichTextCellTypeDefinition extends CellTypeDefinition {
       },
       toPlainText: (cell: { value?: unknown }) => extractRichText(cell.value),
     };
-  }
-  /** Creates the renderer definition for rich-text cells. */
-  override createRenderer() {
-    return defineCellRenderer(this.type, RichTextCell);
   }
 }
 

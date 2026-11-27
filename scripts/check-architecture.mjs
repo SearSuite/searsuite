@@ -1,3 +1,4 @@
+import { findKernelPresentationPaths } from './lib/kernel-package-boundaries.mjs';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { collectWorkspaceImports } from './collect-workspace-imports.mjs';
@@ -27,6 +28,18 @@ const hostPackages = new Set(['@searsuite/sear-host-server-node']);
 
 const forbiddenRules = [
   {
+    id: 'state-domain-must-not-depend-on-presentation',
+    message: 'The state kernel must remain independent of assembly, feature plugins, and rendering.',
+    matches(source, target) {
+      return (
+        source === '@searsuite/sear-domain-state' &&
+        (target.startsWith('@searsuite/sear-render') ||
+          target.startsWith('@searsuite/sear-assembly') ||
+          target.startsWith('@searsuite/sear-plugin'))
+      );
+    },
+  },
+  {
     id: 'foundation-must-not-depend-upward',
     message: 'Foundation packages must not depend on domain, render, assembly, plugin, or host packages.',
     matches(source, target) {
@@ -42,7 +55,8 @@ const forbiddenRules = [
   },
   {
     id: 'doc-domain-must-not-depend-on-rendering',
-    message: 'The Doc domain owns schema and runtime contracts; it must not depend on rendering, measurement, or host drawing.',
+    message:
+      'The Doc domain owns schema and runtime contracts; it must not depend on rendering, measurement, or host drawing.',
     matches(source, target) {
       return source === '@searsuite/sear-domain-doc' && target.startsWith('@searsuite/sear-render-');
     },
@@ -157,6 +171,7 @@ function findViolations() {
     }
   }
 
+  inspectBusinessPluginDependencies(violations);
   inspectRuntimeCapabilityContracts(violations);
   inspectDocFeaturePluginLayout(violations);
   inspectSetupFeaturePluginLayout(violations);
@@ -165,12 +180,70 @@ function findViolations() {
   return violations;
 }
 
+function inspectBusinessPluginDependencies(violations) {
+  const neutralAssemblies = new Set(
+    [
+      'sear-assembly-plugin',
+      'sear-assembly-commands',
+      'sear-assembly-doc',
+      'sear-assembly-sheet-state',
+      'sear-assembly-workbook-kernel',
+    ].map((name) => `@searsuite/${name}`),
+  );
+  const graph = new Map();
+  for (const [name, info] of workspacePackages) {
+    const edges = new Set(
+      Object.keys({
+        ...info.packageJson.dependencies,
+        ...info.packageJson.peerDependencies,
+        ...info.packageJson.optionalDependencies,
+      }),
+    );
+    for (const file of collectSourceFiles(join(info.directory, 'src'))) {
+      for (const target of collectWorkspaceImports(file)) edges.add(target);
+    }
+    graph.set(name, edges);
+  }
+  for (const source of graph.keys()) {
+    if (!source.startsWith('@searsuite/sear-plugin-') && !neutralAssemblies.has(source)) continue;
+    const queue = [[source]],
+      visited = new Set([source]);
+    while (queue.length) {
+      const chain = queue.shift(),
+        current = chain[chain.length - 1];
+      for (const target of graph.get(current) ?? []) {
+        if (visited.has(target)) continue;
+        visited.add(target);
+        const path = [...chain, target];
+        if (
+          target.startsWith('@searsuite/sear-render') ||
+          target === '@searsuite/sear-assembly-core' ||
+          target === '@searsuite/sear-assembly-setup' ||
+          target === '@searsuite/sear-assembly-workbook' ||
+          target === '@searsuite/sear-sheet-editor-contract'
+        ) {
+          violations.push({
+            source,
+            target,
+            location: path.join(' -> '),
+            rule: {
+              id: 'business-plugins-must-be-independent-of-presentation',
+              message:
+                'State owners and their runtime dependencies must use neutral state, command, query and observation contracts.',
+            },
+          });
+        } else queue.push(path);
+      }
+    }
+  }
+}
+
 function inspectRuntimeCapabilityContracts(violations) {
   const commonRegistry = 'packages/sear-assembly-plugin/src/RuntimeCapability.ts';
   const editorRegistries = [
-    'packages/sear-assembly-setup/src/sheet/SheetRuntimeExtensionRegistry.ts',
+    'packages/sear-assembly-commands/src/SheetRuntimeExtensionRegistry.ts',
     'packages/sear-assembly-doc/src/plugin/DocRuntimeExtensionRegistry.ts',
-    'packages/sear-assembly-workbook/src/WorkbookRuntimeExtensionRegistry.ts',
+    'packages/sear-assembly-workbook-kernel/src/WorkbookRuntimeExtensionRegistry.ts',
   ];
   for (const location of editorRegistries) {
     const contents = readFileSync(join(workspaceRoot, location), 'utf8');
@@ -181,11 +254,11 @@ function inspectRuntimeCapabilityContracts(violations) {
       location,
       rule: {
         id: 'editors-must-share-runtime-capability-registry',
-        message: 'Sheet, Doc, and Workbook service facades must share the assembly-plugin registry rather than maintain separate storage.',
+        message:
+          'Sheet, Doc, and Workbook service facades must share the assembly-plugin registry rather than maintain separate storage.',
       },
     });
   }
-
 }
 
 function inspectDocFeaturePluginLayout(violations) {
@@ -288,7 +361,8 @@ function inspectForbiddenImports(violations, source, filePath) {
       location: relative(workspaceRoot, filePath),
       rule: {
         id: 'collaboration-plugin-must-use-open-ot-registry',
-        message: 'Collaboration plugins must use the open OT definition and relation registry, not branch on concrete OT families.',
+        message:
+          'Collaboration plugins must use the open OT definition and relation registry, not branch on concrete OT families.',
       },
     });
   }
@@ -310,7 +384,8 @@ function inspectForbiddenImports(violations, source, filePath) {
     location: relative(workspaceRoot, filePath),
     rule: {
       id: 'global-di-container-is-forbidden',
-        message: 'Do not import a process-wide DI container; each composition root or test must create and own its Container.',
+      message:
+        'Do not import a process-wide DI container; each composition root or test must create and own its Container.',
     },
   });
 }
@@ -395,12 +470,15 @@ function main() {
   collectWorkspacePackages();
   const violations = findViolations();
   const cycles = findDependencyCycles();
-  if (!violations.length && !cycles.length) {
+  const presentationPaths = findKernelPresentationPaths(collectPackageDependencyGraph());
+  if (!violations.length && !cycles.length && !presentationPaths.length) {
     console.log('Architecture dependency check passed.');
     return;
   }
 
   console.error('Architecture dependency check failed:');
+  for (const chain of presentationPaths)
+    console.error(`- [business-runtime-must-not-depend-on-presentation] ${chain.join(' -> ')}`);
   for (const violation of violations) {
     console.error(`- [${violation.rule.id}] ${violation.source} -> ${violation.target} (${violation.location})`);
     console.error(`  ${violation.rule.message}`);

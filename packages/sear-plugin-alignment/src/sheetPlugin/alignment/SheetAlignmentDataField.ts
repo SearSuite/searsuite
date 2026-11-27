@@ -1,4 +1,5 @@
-import { type DataEngine, SheetDataFieldNamespace } from '@searsuite/sear-render-engine';
+import { SheetDataFieldNamespace } from '@searsuite/sear-domain-sheet';
+import { type DataEngine } from '@searsuite/sear-domain-state';
 import { type AlignmentMatrix } from '../../AlignmentMatrix';
 
 /** DataEngine field owned by SheetAlignmentPlugin. */

@@ -1,4 +1,4 @@
-import { Pipeline } from '@searsuite/sear-assembly-core';
+import { Pipeline } from '@searsuite/sear-assembly-plugin';
 import type { SheetCommand, SheetCommandContext } from '@searsuite/sear-assembly-commands';
 import type { SheetClipboardCodec, SheetClipboardDataSource } from './SheetClipboardContracts';
 import { CopyRangeCommand, type SheetClipboardCommandResult, type SheetCopyRangeInput } from './SheetClipboardCommands';
@@ -11,11 +11,7 @@ export class CopyRangeSheetCommand implements SheetCommand<SheetClipboardCommand
 
   public readonly id = CopyRangeCommand.id;
 
-  public constructor(
-    source: SheetClipboardDataSource,
-    codec: SheetClipboardCodec,
-    input: SheetCopyRangeInput | void,
-  ) {
+  public constructor(source: SheetClipboardDataSource, codec: SheetClipboardCodec, input: SheetCopyRangeInput | void) {
     this.#source = source;
     this.#codec = codec;
     this.#input = input;

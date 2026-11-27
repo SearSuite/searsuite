@@ -1,4 +1,4 @@
-import { SheetMatrix } from '@searsuite/sear-assembly-core';
+import { SheetMatrix } from '@searsuite/sear-domain-sheet';
 import { AlignmentMatrix, VerticalAlignmentMatrix } from '@searsuite/sear-plugin-alignment';
 import { CellFillMatrix } from '@searsuite/sear-plugin-cell-fill';
 import { CellHighlightMatrix } from '@searsuite/sear-plugin-cell-highlight';
@@ -9,18 +9,16 @@ import { ClearRangeContentsCommand } from '@searsuite/sear-assembly-commands';
 import { SelectRangeCommand } from '@searsuite/sear-plugin-selection';
 import { HandleDocumentInputCommand, IsCellEditingQuery } from '@searsuite/sear-plugin-cell-editor';
 import { PluginKey, type PluginStateRegistration } from '@searsuite/sear-assembly-plugin';
+import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
 import {
-  ExportSheetStateCommand,
-  DocRuntimeCapability,
-  SheetRuntimeCapability,
   createDocEditor,
   createSheetEditor,
   type DocEditor,
-  DocPlugin,
-  SheetPlugin,
   type SheetEditorAdapters,
-  type SheetDocumentState,
 } from '@searsuite/sear-assembly-setup';
+import { DocRuntimeCapability, DocPlugin } from '@searsuite/sear-assembly-doc';
+import { type SheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
+import { SheetRuntimeCapability, SheetPlugin } from '@searsuite/sear-assembly-commands';
 import { ParagraphNode, TextNode } from '@searsuite/sear-domain-doc';
 import { CellType } from '@searsuite/sear-domain-cell-types';
 import { ColumnShapeDimensionsCSRMatrix, CSRMatrix, RowShapeDimensionsCSRMatrix } from '@searsuite/sear-domain-matrix';
@@ -53,6 +51,7 @@ import { HeadlessCursorEngine } from '@searsuite/sear-render-cursor';
 import { HeadlessEventRegistrar } from '@searsuite/sear-render-event-engine';
 import { HeadlessKeyboardRouter, HeadlessPointerCapture, HeadlessTextInput } from '@searsuite/sear-render-input';
 import { HeadlessScroller } from '@searsuite/sear-render-scroll';
+import { createWorkbookEditor } from '../src';
 import {
   ActivateWorkbookSheetCommand,
   AddWorkbookSheetCommand,
@@ -64,8 +63,7 @@ import {
   WorkbookHistoryStatusObservation,
   WorkbookPlugin,
   WorkbookRuntimeCapability,
-  createWorkbookEditor,
-} from '../src';
+} from '@searsuite/sear-assembly-workbook-kernel';
 import { runEditorLifecycleContract } from './support/EditorLifecycleContract';
 
 function createSheetState(): SheetDocumentState {
@@ -149,7 +147,10 @@ it('BUG-974 commits a cell draft before switching sheets', () => {
   const workbook = createWorkbookEditor({
     documentState: createWorkbookDocumentState({
       id: 'draft-switch-workbook',
-      sheets: [{ id: 'sheet-1', name: 'One' }, { id: 'sheet-2', name: 'Two' }],
+      sheets: [
+        { id: 'sheet-1', name: 'One' },
+        { id: 'sheet-2', name: 'Two' },
+      ],
       sheetStates: { 'sheet-1': createSheetState(), 'sheet-2': createSheetState() },
     }),
     adapters: createAdapters(),
@@ -162,8 +163,12 @@ it('BUG-974 commits a cell draft before switching sheets', () => {
     workbook.commands.run(ActivateWorkbookSheetCommand, { sheetId: 'sheet-2' });
     expect(workbook.document.getState().sheetStates['sheet-1'].sheetData.getItem(2, 3)?.value).toBe('alpha');
     workbook.commands.run(ActivateWorkbookSheetCommand, { sheetId: 'sheet-1' });
-    expect(workbook.sheets.getActiveEditor().commands.run(ExportSheetStateCommand, void 0)
-      .sheetState.sheetData.getItem(2, 3)?.value).toBe('alpha');
+    expect(
+      workbook.sheets
+        .getActiveEditor()
+        .commands.run(ExportSheetStateCommand, void 0)
+        .sheetState.sheetData.getItem(2, 3)?.value,
+    ).toBe('alpha');
   } finally {
     workbook.destroy();
   }
@@ -184,13 +189,18 @@ it('BUG-1157 INT15-010 commits a cell draft before adding and activating a sheet
     source.commands.run(HandleDocumentInputCommand, { kind: 'text', text: 'draft-add' });
     expect(source.queries.run(IsCellEditingQuery, void 0)).toBe(true);
     workbook.commands.run(AddWorkbookSheetCommand, {
-      sheet: { id: 'sheet-2', name: 'Two' }, sheetState: createSheetState(),
+      sheet: { id: 'sheet-2', name: 'Two' },
+      sheetState: createSheetState(),
     });
     expect(workbook.sheets.getActiveId()).toBe('sheet-2');
     expect(workbook.document.getState().sheetStates['sheet-1'].sheetData.getItem(0, 0)?.value).toBe('draft-add');
     workbook.commands.run(ActivateWorkbookSheetCommand, { sheetId: 'sheet-1' });
-    expect(workbook.sheets.getActiveEditor().commands.run(ExportSheetStateCommand, void 0)
-      .sheetState.sheetData.getItem(0, 0)?.value).toBe('draft-add');
+    expect(
+      workbook.sheets
+        .getActiveEditor()
+        .commands.run(ExportSheetStateCommand, void 0)
+        .sheetState.sheetData.getItem(0, 0)?.value,
+    ).toBe('draft-add');
   } finally {
     workbook.destroy();
   }
@@ -209,9 +219,12 @@ it('BUG-1157 INT15-010 leaves the draft active when a new sheet cannot be added'
     const source = workbook.sheets.getActiveEditor();
     source.commands.run(SelectRangeCommand, { anchor: [0, 0], focus: [0, 0] });
     source.commands.run(HandleDocumentInputCommand, { kind: 'text', text: 'still-editing' });
-    expect(() => workbook.commands.run(AddWorkbookSheetCommand, {
-      sheet: { id: 'sheet-2', name: 'One' }, sheetState: createSheetState(),
-    })).toThrow();
+    expect(() =>
+      workbook.commands.run(AddWorkbookSheetCommand, {
+        sheet: { id: 'sheet-2', name: 'One' },
+        sheetState: createSheetState(),
+      }),
+    ).toThrow();
     expect(workbook.sheets.getActiveId()).toBe('sheet-1');
     expect(source.queries.run(IsCellEditingQuery, void 0)).toBe(true);
     expect(source.commands.run(ExportSheetStateCommand, void 0).sheetState.sheetData.getItem(0, 0)).toBeNull();
@@ -228,7 +241,10 @@ it('BUG-832 keeps a reusable format brush across sheets and undoes against targe
   const workbook = createWorkbookEditor({
     documentState: createWorkbookDocumentState({
       id: 'format-painter-workbook',
-      sheets: [{ id: 'sheet-1', name: 'One' }, { id: 'sheet-2', name: 'Two' }],
+      sheets: [
+        { id: 'sheet-1', name: 'One' },
+        { id: 'sheet-2', name: 'Two' },
+      ],
       sheetStates: { 'sheet-1': source, 'sheet-2': target },
     }),
     adapters: createAdapters(),
@@ -236,12 +252,14 @@ it('BUG-832 keeps a reusable format brush across sheets and undoes against targe
   const cell = (row: number, column: number) => ({ start: [row, column] as const, end: [row, column] as const });
   try {
     workbook.sheets.getActiveEditor().commands.run(StartFormatPainterCommand, {
-      source: cell(0, 0), mode: FormatPainterMode.Persistent,
+      source: cell(0, 0),
+      mode: FormatPainterMode.Persistent,
     });
     workbook.commands.run(ActivateWorkbookSheetCommand, { sheetId: 'sheet-2' });
     const editor = workbook.sheets.getActiveEditor();
     expect(editor.observations.getSnapshot(FormatPainterObservation)).toMatchObject({
-      mode: FormatPainterMode.Persistent, source: null,
+      mode: FormatPainterMode.Persistent,
+      source: null,
     });
     editor.commands.run(ApplyFormatPainterCommand, { destination: cell(1, 1) });
     expect(editor.commands.run(ExportSheetStateCommand, void 0).sheetState.cellFills.getItem(1, 1)).toBe('#ff0000');
@@ -339,10 +357,12 @@ describe('stateful plugin isolation across WorkbookEditors', () => {
     expect(second.observations.getSnapshot(WorkbookHistoryStatusObservation).canUndo).toBe(false);
 
     await first.commands.run(ConnectWorkbookCollaborationCommand, {
-      sheetId: 'sheet-1', options: { url: 'ws://example.test', resourceId: 'first-sheet' },
+      sheetId: 'sheet-1',
+      options: { url: 'ws://example.test', resourceId: 'first-sheet' },
     });
     await second.commands.run(ConnectWorkbookCollaborationCommand, {
-      sheetId: 'sheet-1', options: { url: 'ws://example.test', resourceId: 'second-sheet' },
+      sheetId: 'sheet-1',
+      options: { url: 'ws://example.test', resourceId: 'second-sheet' },
     });
     first.sheets.getActiveEditor().commands.run(ClearRangeContentsCommand, { anchor: [0, 0], focus: [0, 0] });
 
@@ -375,7 +395,9 @@ describe('Workbook-owned collaboration channels', () => {
       }),
       adapters: {
         ...createAdapters(),
-        registerEnvironment: (value) => { sheetContainer = value; },
+        registerEnvironment: (value) => {
+          sheetContainer = value;
+        },
       },
     });
     try {
@@ -417,7 +439,8 @@ describe('Workbook-owned collaboration channels', () => {
     });
     const workbookCollaboration = editor.services.require(WorkbookCollaborationCapability);
     await editor.commands.run(ConnectWorkbookCollaborationCommand, {
-      sheetId: 'sheet-1', options: { url: 'ws://example.test', resourceId: 'sheet-1' },
+      sheetId: 'sheet-1',
+      options: { url: 'ws://example.test', resourceId: 'sheet-1' },
     });
 
     editor.sheets.getActiveEditor().commands.run(ClearRangeContentsCommand, { anchor: [0, 0], focus: [0, 0] });
@@ -471,15 +494,7 @@ abstract class LifecycleSheetPlugin extends SheetPlugin<null> {
     return { key: this.key, state: null, dataEngine: { enabled: false } };
   }
 
-  public getPluginConfig(): null {
-    return null;
-  }
-
   public apply(): null {
-    return null;
-  }
-
-  public render(): null {
     return null;
   }
 
@@ -520,15 +535,7 @@ abstract class LifecycleDocPlugin extends DocPlugin<null> {
     return { key: this.key, state: null, dataEngine: { enabled: false } };
   }
 
-  public getPluginConfig(): null {
-    return null;
-  }
-
   public apply(): null {
-    return null;
-  }
-
-  public render(): null {
     return null;
   }
 

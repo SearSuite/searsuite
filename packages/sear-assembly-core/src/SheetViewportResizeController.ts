@@ -26,7 +26,8 @@ export class SheetViewportResizeController implements SheetLifecycleController {
 
   /** Routes platform resize notifications through the owning editor's command bus. */
   setResizeExecutor(executor: (size: { width: number; height: number }) => void): void {
-    if (this.#resizeExecutor || this.#context) throw new SearError('Sheet viewport resize executor is already configured.');
+    if (this.#resizeExecutor || this.#context)
+      throw new SearError('Sheet viewport resize executor is already configured.');
     this.#resizeExecutor = executor;
   }
 
@@ -76,7 +77,7 @@ export class SheetViewportResizeController implements SheetLifecycleController {
     core.renderEngine.resize(width, height, scale);
     context.refreshSheetBoundaries();
 
-    core.pluginManager.forEach((plugin) => {
+    core.getViewExtensions().forEach((plugin) => {
       plugin.onResize?.();
       if (!plugin.render) return;
       const shapes = plugin.render(core) || [];

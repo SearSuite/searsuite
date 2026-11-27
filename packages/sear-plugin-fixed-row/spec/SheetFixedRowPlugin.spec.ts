@@ -1,7 +1,7 @@
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import { SheetDataEngine } from '@searsuite/sear-render-engine';
+import { SheetDataEngine } from '@searsuite/sear-domain-sheet';
 import { MatrixOTActionName } from '@searsuite/sear-domain-ot';
-import { createTransaction, Transaction } from '@searsuite/sear-domain-transaction';
+import { createTransaction } from '@searsuite/sear-domain-transaction';
 import {
   FixedRowMatrix,
   SetSheetRowsFixedCommand,
@@ -37,9 +37,7 @@ describe('@searsuite/sear-plugin-fixed-row', () => {
       { p: [0, 1], [MatrixOTActionName.UpdateCell]: { value: null, prev: true } },
     ]);
     expect(() => createSetSheetRowsFixedOperations({ index: -1, fixed: true }, source)).toThrow(RangeError);
-    expect(() => createSetSheetRowsFixedOperations({ index: 4, count: 2, fixed: true }, source)).toThrow(
-      RangeError,
-    );
+    expect(() => createSetSheetRowsFixedOperations({ index: 4, count: 2, fixed: true }, source)).toThrow(RangeError);
 
     const commands = new SheetCommandBus();
     new SheetFixedRowPlugin({ fixedRows }).registerCommands(commands);
@@ -60,13 +58,7 @@ describe('@searsuite/sear-plugin-fixed-row', () => {
     const insert = createTransaction({ key: 'sheet.data' });
     insert.addOperation([{ p: [1], [MatrixOTActionName.RowInsert]: [] } as never]);
     plugin.apply(plugin.getState(), insert);
-    expect([0, 1, 2, 3, 4].map((row) => fixedRows.getItem(0, row) === true)).toEqual([
-      false,
-      false,
-      true,
-      false,
-      true,
-    ]);
+    expect([0, 1, 2, 3, 4].map((row) => fixedRows.getItem(0, row) === true)).toEqual([false, false, true, false, true]);
 
     const remove = createTransaction({ key: 'sheet.data' });
     remove.addOperation([{ p: [2], [MatrixOTActionName.RowDelete]: [] } as never]);

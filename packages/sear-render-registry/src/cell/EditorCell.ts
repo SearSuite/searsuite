@@ -1,6 +1,6 @@
 import { FixBoxNode, Node } from '@searsuite/sear-render-node';
 import { Cell, CellProperties, CellRenderType } from '../Cell';
-import { extractRichText } from './DisplayTextUtils';
+import { extractRichText } from '@searsuite/sear-domain-cell-types';
 import { EmbeddedEditorRenderNode } from './EmbeddedEditorRenderNode';
 import type { SheetDocumentNode } from '@searsuite/sear-sheet-editor-contract';
 
@@ -26,9 +26,7 @@ export class EditorCell extends Cell<CellProperties<SheetDocumentNode[]>> {
     }
 
     return [
-      new FixBoxNode(positionRect, properties).add(
-        new EmbeddedEditorRenderNode(data.value, positionRect, properties),
-      ),
+      new FixBoxNode(positionRect, properties).add(new EmbeddedEditorRenderNode(data.value, positionRect, properties)),
     ];
   }
 

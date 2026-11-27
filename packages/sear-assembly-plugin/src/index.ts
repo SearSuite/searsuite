@@ -245,8 +245,12 @@ export {
 export { SheetFormatTransferRegistry } from './SheetFormatTransferRegistry';
 export { SheetClipboardTransferRegistry } from './SheetClipboardTransferRegistry';
 export type {
-  SheetClipboardCapturedInstance, SheetClipboardTransferContribution, SheetClipboardTransferPlan,
-  SheetClipboardTransferRegistrar, SheetClipboardTransferRequest, SheetPortableClipboardTransfer,
+  SheetClipboardCapturedInstance,
+  SheetClipboardTransferContribution,
+  SheetClipboardTransferPlan,
+  SheetClipboardTransferRegistrar,
+  SheetClipboardTransferRequest,
+  SheetPortableClipboardTransfer,
 } from './SheetClipboardTransfer';
 export { sealSheetContributionWrites, assertSheetContributionWrite } from './SheetContributionWriteBoundary';
 export { createMatrixFormatTransfer, type SheetFormatMatrix } from './createMatrixFormatTransfer';
@@ -258,3 +262,16 @@ export {
   type SheetFormatTransferContribution,
   type SheetFormatTransferRegistrar,
 } from './SheetFormatTransfer';
+
+export * from './CommandExecutionScope';
+export * from './Pipeline';
+export * from './SheetInteractionStore';
+export * from './SheetInteractionReducerRegistry';
+export * from './PipelineStepExecutorRegistry';
+export * from './errors/SearAssemblyErrorCode';
+export * from './errors/SearContractViolationError';
+export * from './errors/SearDocParseError';
+export * from './errors/SearLifecycleError';
+export * from './errors/SearPipelineStepExecutorNotFoundError';
+export * from './errors/SearRegistryConflictError';
+export * from './errors/SearRegistryEntryNotFoundError';

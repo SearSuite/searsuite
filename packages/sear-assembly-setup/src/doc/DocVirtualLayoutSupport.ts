@@ -1,29 +1,14 @@
-import {
-  type RichDocNode,
-  type DocCursorPos,
-  type DocSelection,
-  type RichTextParagraphLayoutDefaults,
-} from '@searsuite/sear-domain-doc';
-import {
-  DocLayoutCache,
-  DocPageMap,
-  type DocBlockLayout,
-  type DocVerticalAlign,
-  type LayoutLine,
-} from '@searsuite/sear-domain-editor';
+import { type RichDocNode, type DocCursorPos, type DocSelection, type RichTextParagraphLayoutDefaults } from '@searsuite/sear-domain-doc';
+import { DocLayoutCache, DocPageMap, type DocBlockLayout, type DocVerticalAlign, type LayoutLine } from '@searsuite/sear-domain-editor';
 import { type PositionRectProps } from '@searsuite/sear-foundation-rect';
-import {
-  type DocVirtualLayoutRenderPhase,
-  type DocVirtualLayoutSummary,
-  type DocVirtualLayoutTimingSummary,
-} from '@searsuite/sear-assembly-doc';
+import { type DocVirtualLayoutRenderPhase, type DocVirtualLayoutSummary, type DocVirtualLayoutTimingSummary } from './DocViewContracts';
 import { type DocEditorContentRect, type DocEditorViewport } from './DocEditorContracts';
 
 export type {
   DocVirtualLayoutRenderPhase,
   DocVirtualLayoutSummary,
   DocVirtualLayoutTimingSummary,
-} from '@searsuite/sear-assembly-doc';
+} from './DocViewContracts';
 
 export interface VirtualBlockRecord {
   readonly id: DocBlockLayout['id'];

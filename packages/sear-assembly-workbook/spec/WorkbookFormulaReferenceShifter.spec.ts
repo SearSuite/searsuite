@@ -1,6 +1,6 @@
 import { FormulaParser } from '@searsuite/sear-domain-formula-engine-ts';
 import { MatrixOTActionName } from '@searsuite/sear-domain-ot';
-import { WorkbookFormulaReferenceShifter } from '../src/WorkbookFormulaReferenceShifter';
+import { WorkbookFormulaReferenceShifter } from '@searsuite/sear-assembly-workbook-kernel';
 
 describe('WorkbookFormulaReferenceShifter', () => {
   const parser = new FormulaParser();

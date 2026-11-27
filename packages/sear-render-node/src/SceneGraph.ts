@@ -5,7 +5,7 @@ import { PositionRect } from '@searsuite/sear-foundation-rect';
 import { HexColor, releaseColor } from '@searsuite/sear-foundation-utils';
 
 import { Node } from './Node';
-import { GenerationalDirtyTracker } from './GenerationalDirtyTracker';
+import { FrameDirtyTracker } from './FrameDirtyTracker';
 import { NodeProperties, type RenderNodeKey } from './types';
 
 /**
@@ -30,8 +30,8 @@ export class SceneGraph<T extends NodeProperties> extends Node<T> {
   }
 
   /** Dirty tracker resolved lazily so tests can replace the DI binding. */
-  get #dirtyTree(): GenerationalDirtyTracker {
-    return this.resolveRuntime<GenerationalDirtyTracker>(GenerationalDirtyTracker.symbol);
+  get #dirtyTree(): FrameDirtyTracker {
+    return this.resolveRuntime<FrameDirtyTracker>(FrameDirtyTracker.symbol);
   }
 
   /**
@@ -92,7 +92,8 @@ export class SceneGraph<T extends NodeProperties> extends Node<T> {
       if (retainExisting && retainedNode) {
         const shouldReplaceRetained =
           (options.replaceRetainedKeys?.has(nodeKey) ?? false) ||
-          (options.replaceRetainedGeometryChanged === true && !hasSameRectSize(retainedNode.positionRect, nextNode.positionRect));
+          (options.replaceRetainedGeometryChanged === true &&
+            !hasSameRectSize(retainedNode.positionRect, nextNode.positionRect));
         if (shouldReplaceRetained) {
           this.#removePluginNodeByKey(nodeKey, { markDirty });
           nextNode.positionRect.key = nodeKey;
@@ -135,10 +136,7 @@ export class SceneGraph<T extends NodeProperties> extends Node<T> {
    * Marks and removes all existing top-level nodes owned by one plugin.
    * @param pluginKeyString - Stable plugin key.
    */
-  public markRemovePluginNode(
-    pluginKeyString: string,
-    options: { readonly markDirty?: boolean } = {},
-  ) {
+  public markRemovePluginNode(pluginKeyString: string, options: { readonly markDirty?: boolean } = {}) {
     const markDirty = options.markDirty !== false;
     const keys = this.#pluginKeysMap.get(pluginKeyString);
 

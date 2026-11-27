@@ -1,19 +1,30 @@
+import { type SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
 import {
-  PluginKey, SheetRangeMoveRegistry, SheetRangeReorderRegistry,
+  PluginKey,
+  SheetRangeMoveRegistry,
+  SheetRangeReorderRegistry,
   type PluginDocumentStateContribution,
 } from '@searsuite/sear-assembly-plugin';
 import { SheetCommandBus, SheetQueryRegistry } from '@searsuite/sear-assembly-commands';
-import { SheetPlugin } from '@searsuite/sear-assembly-setup';
+import { SheetPlugin } from '@searsuite/sear-assembly-commands';
 import {
-  createMatrixRangeMoveOperations, createMatrixRangeReorderOperations,
-  deserializeSparseMatrix, hasMatrixRangeMoveConflict, serializeSparseMatrix,
+  createMatrixRangeMoveOperations,
+  createMatrixRangeReorderOperations,
+  deserializeSparseMatrix,
+  hasMatrixRangeMoveConflict,
+  serializeSparseMatrix,
 } from '@searsuite/sear-domain-matrix';
-import { MatrixOT, MatrixOTActionName, MatrixTransactionOT, MatrixTransactionOTRelation, type Operation } from '@searsuite/sear-domain-ot';
+import {
+  MatrixOT,
+  MatrixOTActionName,
+  MatrixTransactionOT,
+  MatrixTransactionOTRelation,
+  type Operation,
+} from '@searsuite/sear-domain-ot';
 import { Transaction } from '@searsuite/sear-domain-transaction';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
-import { Node } from '@searsuite/sear-render-node';
-import { CellProperties, SheetCellVisualReaderRegistry } from '@searsuite/sear-render-registry';
-import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-render-engine';
+
+import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-domain-sheet';
 import { SheetDemoMatrix } from '../../SheetDemoMatrix';
 import { SheetDemoMarker } from '../../SheetDemoMarker';
 import { registerSheetDemoCommands, registerSheetDemoQueries } from '../../SheetDemoCommands';
@@ -31,6 +42,22 @@ export const SheetDemoStateToken = Symbol.for('SheetDemoPluginState');
 /** Reference implementation of a collaborative, matrix-backed Sheet feature. */
 @Injectable()
 export class SheetDemoPlugin extends SheetPlugin<SheetDemoPluginState> {
+  public registerCellStyles(registry: SheetCellStyleRegistry): void {
+    registry.registerOverride({
+      id: 'sheet.demo.marker',
+      properties: ['fill'],
+      priority: 10,
+      read: (row, column) => {
+        const marker = this.getState().markers.getItem(row, column);
+        return marker === SheetDemoMarker.Review
+          ? { fill: '#FCE3A1' }
+          : marker === SheetDemoMarker.Approved
+          ? { fill: '#C9EDD1' }
+          : {};
+      },
+    });
+  }
+
   public static readonly symbol = Symbol.for('SheetDemoPlugin');
   public static readonly pluginKey = pluginKey;
   public static readonly documentState: PluginDocumentStateContribution<SheetDemoPluginState, SheetDemoPluginState> = {
@@ -45,7 +72,7 @@ export class SheetDemoPlugin extends SheetPlugin<SheetDemoPluginState> {
     },
   };
 
-  public override readonly warnOnDuplicateDepth = false;
+  public readonly warnOnDuplicateDepth = false;
   public override readonly documentState = SheetDemoPlugin.documentState;
   public override readonly transactionOT = {
     ownerId: 'sheet.demo.marker',
@@ -55,8 +82,12 @@ export class SheetDemoPlugin extends SheetPlugin<SheetDemoPluginState> {
   };
   public override interestedIn = [
     MatrixOTActionName.UpdateCell,
-    MatrixOTActionName.RowInsert, MatrixOTActionName.RowDelete, MatrixOTActionName.RowMove,
-    MatrixOTActionName.ColInsert, MatrixOTActionName.ColDelete, MatrixOTActionName.ColMove,
+    MatrixOTActionName.RowInsert,
+    MatrixOTActionName.RowDelete,
+    MatrixOTActionName.RowMove,
+    MatrixOTActionName.ColInsert,
+    MatrixOTActionName.ColDelete,
+    MatrixOTActionName.ColMove,
   ];
 
   public constructor(@Inject(SheetDemoStateToken) state: SheetDemoPluginState) {
@@ -71,31 +102,18 @@ export class SheetDemoPlugin extends SheetPlugin<SheetDemoPluginState> {
     registerSheetDemoQueries(queries, () => this.getState().markers);
   }
 
-  /** This is an override because cell fill already has a separate owner. */
-  public registerCellVisualReaders(registry: SheetCellVisualReaderRegistry): void {
-    registry.registerOverride({
-      id: 'sheet.demo.marker',
-      properties: ['fill'],
-      priority: 10,
-      read: ({ rowIndex, columnIndex }) => {
-        const marker = this.getState().markers.getItem(rowIndex, columnIndex);
-        if (marker === SheetDemoMarker.Review) return { fill: '#FCE3A1' };
-        if (marker === SheetDemoMarker.Approved) return { fill: '#C9EDD1' };
-        return {};
-      },
-    });
-  }
-
   public registerState() {
     return {
       key: this.key,
       state: this.getState(),
       dataEngine: {
-        dataView: [{
-          viewKey: SheetDataFieldNamespace,
-          fieldKey: SheetDemoFieldKey,
-          select: (state: SheetDemoPluginState) => state.markers,
-        }],
+        dataView: [
+          {
+            viewKey: SheetDataFieldNamespace,
+            fieldKey: SheetDemoFieldKey,
+            select: (state: SheetDemoPluginState) => state.markers,
+          },
+        ],
       },
     };
   }
@@ -105,20 +123,24 @@ export class SheetDemoPlugin extends SheetPlugin<SheetDemoPluginState> {
       id: 'sheet.demo.marker',
       hasConflict: ({ source, destination }) =>
         hasMatrixRangeMoveConflict(this.getState().markers, source, destination),
-      plan: ({ source, destination }) => [{
-        target: this.key,
-        operations: createMatrixRangeMoveOperations(this.getState().markers, source, destination),
-      }],
+      plan: ({ source, destination }) => [
+        {
+          target: this.key,
+          operations: createMatrixRangeMoveOperations(this.getState().markers, source, destination),
+        },
+      ],
     });
   }
 
   public registerRangeReorders(registry: SheetRangeReorderRegistry): void {
     registry.register({
       id: 'sheet.demo.marker',
-      plan: ({ range, destinationOf }) => [{
-        target: this.key,
-        operations: createMatrixRangeReorderOperations(this.getState().markers, range, destinationOf),
-      }],
+      plan: ({ range, destinationOf }) => [
+        {
+          target: this.key,
+          operations: createMatrixRangeReorderOperations(this.getState().markers, range, destinationOf),
+        },
+      ],
     });
   }
 
@@ -132,7 +154,4 @@ export class SheetDemoPlugin extends SheetPlugin<SheetDemoPluginState> {
     MatrixOT.apply(state.markers, operations);
     return state;
   }
-
-  public getPluginConfig(): null { return null; }
-  public render(): Node<CellProperties>[] { return []; }
 }

@@ -4,10 +4,9 @@ import {
   TextCellCommitStrategy,
   formatCellText,
 } from '@searsuite/sear-domain-cell-types';
-import { StringCell } from '@searsuite/sear-render-registry';
 
 import { type CellDisplayTextProvider } from './CellDisplayTextRegistry';
-import { defineCellRenderer } from './CellRendererDefinition';
+
 import { CellTypeDefinition } from './CellTypeDefinition';
 
 /** Built-in persisted cell type for plain text values. */
@@ -50,9 +49,5 @@ export class StringCellTypeDefinition extends CellTypeDefinition {
       toPlainText: (cell: { value?: unknown }) => (typeof cell.value === 'string' ? cell.value : ''),
       decodePlainText: (text: string) => (text.length === 0 ? null : { type: this.type, value: text }),
     };
-  }
-  /** Creates the renderer definition for plain string cells. */
-  override createRenderer() {
-    return defineCellRenderer(this.type, StringCell);
   }
 }

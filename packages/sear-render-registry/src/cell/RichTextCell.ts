@@ -1,7 +1,7 @@
 import { FixBoxNode, Node } from '@searsuite/sear-render-node';
 import { Cell, CellProperties } from '../Cell';
 import { CellType, formatCellText } from '@searsuite/sear-domain-cell-types';
-import { extractRichText } from './DisplayTextUtils';
+import { extractRichText } from '@searsuite/sear-domain-cell-types';
 import { EmbeddedEditorRenderNode } from './EmbeddedEditorRenderNode';
 import type { SheetDocumentNode } from '@searsuite/sear-sheet-editor-contract';
 

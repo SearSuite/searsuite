@@ -1,10 +1,18 @@
-import { CellHighlightKind, CellHighlightTextOperator, CellHighlightValueOperator, type CellHighlightCondition } from './CellHighlightRule';
+import {
+  CellHighlightKind,
+  CellHighlightTextOperator,
+  CellHighlightValueOperator,
+  type CellHighlightCondition,
+} from './CellHighlightRule';
 import { type Platform } from '@searsuite/sear-foundation-platform';
-import { formatFormulaValue } from '@searsuite/sear-render-registry';
+import { formatFormulaValue } from '@searsuite/sear-domain-cell-types';
 
 export type CellHighlightValueReader = (row: number, column: number) => unknown;
 export type CellHighlightValueRangeReader = (
-  startRow: number, startColumn: number, endRow: number, endColumn: number,
+  startRow: number,
+  startColumn: number,
+  endRow: number,
+  endColumn: number,
   visit: (value: unknown) => void,
 ) => void;
 
@@ -30,25 +38,32 @@ function textPatternSource(pattern: string): string {
 }
 
 export function matchesCellHighlightWildcard(
-  actual: string, pattern: string, platform: Pick<Platform, 'toLowerCase'>,
+  actual: string,
+  pattern: string,
+  platform: Pick<Platform, 'toLowerCase'>,
 ): boolean {
   if (!hasCellHighlightWildcard(pattern)) return false;
-  return new RegExp(`^${textPatternSource(platform.toLowerCase(pattern))}$`, 'su')
-    .test(platform.toLowerCase(actual));
+  return new RegExp(`^${textPatternSource(platform.toLowerCase(pattern))}$`, 'su').test(platform.toLowerCase(actual));
 }
 
 function matchesTextPattern(actual: string, pattern: string, operator: CellHighlightTextOperator): boolean {
   if (!hasCellHighlightWildcard(pattern)) {
     switch (operator) {
-      case CellHighlightTextOperator.StartsWith: return actual.startsWith(pattern);
-      case CellHighlightTextOperator.EndsWith: return actual.endsWith(pattern);
-      case CellHighlightTextOperator.Contains: return actual.includes(pattern);
-      case CellHighlightTextOperator.NotContains: return !actual.includes(pattern);
+      case CellHighlightTextOperator.StartsWith:
+        return actual.startsWith(pattern);
+      case CellHighlightTextOperator.EndsWith:
+        return actual.endsWith(pattern);
+      case CellHighlightTextOperator.Contains:
+        return actual.includes(pattern);
+      case CellHighlightTextOperator.NotContains:
+        return !actual.includes(pattern);
     }
   }
   const source = textPatternSource(pattern);
   const expression = new RegExp(
-    `${operator === CellHighlightTextOperator.StartsWith ? '^' : ''}${source}${operator === CellHighlightTextOperator.EndsWith ? '$' : ''}`,
+    `${operator === CellHighlightTextOperator.StartsWith ? '^' : ''}${source}${
+      operator === CellHighlightTextOperator.EndsWith ? '$' : ''
+    }`,
     'su',
   );
   const matched = expression.test(actual);
@@ -74,23 +89,34 @@ export function evaluateCellHighlight(
     case CellHighlightKind.BelowAverage: {
       if (typeof value !== 'number' || !Number.isFinite(value) || rangeThreshold === null) return false;
       switch (condition.kind) {
-        case CellHighlightKind.Top: return value >= rangeThreshold;
-        case CellHighlightKind.Bottom: return value <= rangeThreshold;
-        case CellHighlightKind.AboveAverage: return condition.includeEqual ? value >= rangeThreshold : value > rangeThreshold;
-        case CellHighlightKind.BelowAverage: return condition.includeEqual ? value <= rangeThreshold : value < rangeThreshold;
+        case CellHighlightKind.Top:
+          return value >= rangeThreshold;
+        case CellHighlightKind.Bottom:
+          return value <= rangeThreshold;
+        case CellHighlightKind.AboveAverage:
+          return condition.includeEqual ? value >= rangeThreshold : value > rangeThreshold;
+        case CellHighlightKind.BelowAverage:
+          return condition.includeEqual ? value <= rangeThreshold : value < rangeThreshold;
       }
     }
-    case CellHighlightKind.Empty: return text === '';
-    case CellHighlightKind.NotEmpty: return text !== '';
-    case CellHighlightKind.Error: return isErrorValue(value);
-    case CellHighlightKind.NotError: return !isErrorValue(value);
-    case CellHighlightKind.Duplicate: return text !== '' && occurrences > 1;
-    case CellHighlightKind.Unique: return text !== '' && occurrences === 1;
+    case CellHighlightKind.Empty:
+      return text === '';
+    case CellHighlightKind.NotEmpty:
+      return text !== '';
+    case CellHighlightKind.Error:
+      return isErrorValue(value);
+    case CellHighlightKind.NotError:
+      return !isErrorValue(value);
+    case CellHighlightKind.Duplicate:
+      return text !== '' && occurrences > 1;
+    case CellHighlightKind.Unique:
+      return text !== '' && occurrences === 1;
     case CellHighlightKind.Text: {
       const actual = platform.toLowerCase(text);
       const target = platform.toLowerCase(condition.value ?? '');
       return Object.values(CellHighlightTextOperator).includes(condition.operator as CellHighlightTextOperator)
-        ? matchesTextPattern(actual, target, condition.operator as CellHighlightTextOperator) : false;
+        ? matchesTextPattern(actual, target, condition.operator as CellHighlightTextOperator)
+        : false;
     }
     case CellHighlightKind.Value: {
       if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(text.trim())) return false;
@@ -99,22 +125,34 @@ export function evaluateCellHighlight(
       const second = Number(condition.secondValue);
       if (!Number.isFinite(numeric) || !Number.isFinite(first)) return false;
       switch (condition.operator) {
-        case CellHighlightValueOperator.Between: return Number.isFinite(second) && numeric >= Math.min(first, second) && numeric <= Math.max(first, second);
-        case CellHighlightValueOperator.NotBetween: return Number.isFinite(second) && (numeric < Math.min(first, second) || numeric > Math.max(first, second));
-        case CellHighlightValueOperator.Equal: return numeric === first;
-        case CellHighlightValueOperator.NotEqual: return numeric !== first;
-        case CellHighlightValueOperator.Greater: return numeric > first;
-        case CellHighlightValueOperator.GreaterOrEqual: return numeric >= first;
-        case CellHighlightValueOperator.Less: return numeric < first;
-        case CellHighlightValueOperator.LessOrEqual: return numeric <= first;
-        default: return false;
+        case CellHighlightValueOperator.Between:
+          return Number.isFinite(second) && numeric >= Math.min(first, second) && numeric <= Math.max(first, second);
+        case CellHighlightValueOperator.NotBetween:
+          return Number.isFinite(second) && (numeric < Math.min(first, second) || numeric > Math.max(first, second));
+        case CellHighlightValueOperator.Equal:
+          return numeric === first;
+        case CellHighlightValueOperator.NotEqual:
+          return numeric !== first;
+        case CellHighlightValueOperator.Greater:
+          return numeric > first;
+        case CellHighlightValueOperator.GreaterOrEqual:
+          return numeric >= first;
+        case CellHighlightValueOperator.Less:
+          return numeric < first;
+        case CellHighlightValueOperator.LessOrEqual:
+          return numeric <= first;
+        default:
+          return false;
       }
     }
   }
 }
 
 export function countCellHighlightOccurrences(
-  startRow: number, startColumn: number, endRow: number, endColumn: number,
+  startRow: number,
+  startColumn: number,
+  endRow: number,
+  endColumn: number,
   forEachValueInRange: CellHighlightValueRangeReader,
 ): Map<string, number> {
   const counts = new Map<string, number>();

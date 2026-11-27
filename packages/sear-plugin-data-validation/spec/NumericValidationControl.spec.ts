@@ -1,15 +1,28 @@
-import { CellVisualIconShape } from '@searsuite/sear-render-node';
+import { CellVisualIconShape } from '@searsuite/sear-domain-cell-types';
 import { DataValidationKind, DataValidationInputPolicy } from '../src/DataValidationRule';
 import { DataValidationMatrix } from '../src/DataValidationMatrix';
-import {
-  numericValidationControlLayers, numericValidationControlValueAt, readNumericValidationControl,
-} from '../src/NumericValidationControl';
+import { readNumericValidationControl } from '../src/NumericValidationControl';
+import { numericValidationControlLayers, numericValidationControlValueAt } from '@searsuite/sear-render';
 
 const matrix = new DataValidationMatrix(void 0, [1, 2]);
-matrix.setItem(0, 0, [{ id: 'progress', endRow: 0, endColumn: 0,
-  condition: { kind: DataValidationKind.Progress }, inputPolicy: DataValidationInputPolicy.Reject }]);
-matrix.setItem(0, 1, [{ id: 'rating', endRow: 0, endColumn: 1,
-  condition: { kind: DataValidationKind.Rating }, inputPolicy: DataValidationInputPolicy.Reject }]);
+matrix.setItem(0, 0, [
+  {
+    id: 'progress',
+    endRow: 0,
+    endColumn: 0,
+    condition: { kind: DataValidationKind.Progress },
+    inputPolicy: DataValidationInputPolicy.Reject,
+  },
+]);
+matrix.setItem(0, 1, [
+  {
+    id: 'rating',
+    endRow: 0,
+    endColumn: 1,
+    condition: { kind: DataValidationKind.Rating },
+    inputPolicy: DataValidationInputPolicy.Reject,
+  },
+]);
 
 describe('numeric validation controls', () => {
   it('BUG-458 draws half progress and maps a click to a numeric percentage', () => {

@@ -15,12 +15,6 @@ import {
 } from '@searsuite/sear-domain-doc';
 import { type DocStep } from './DocStep';
 
-/** Render pipeline effect declared by a document command transaction. */
-export enum DocTransactionRenderOperationType {
-  Reflow = 'reflow',
-  Repaint = 'repaint',
-}
-
 /** Returns whether two numeric rich-document paths address the same node. */
 function pathEquals(a: number[], b: number[]): boolean {
   if (a.length !== b.length) return false;
@@ -72,8 +66,6 @@ export class DocTransaction {
   public readonly steps: DocStep[] = [];
   /** Command metadata consumed by the document editor host. */
   public readonly meta: Record<string, unknown> = {};
-  /** Render pipeline effect produced by this document transaction. */
-  public readonly renderOperationType: DocTransactionRenderOperationType = DocTransactionRenderOperationType.Reflow;
 
   /**
    * Appends a prepared document step.

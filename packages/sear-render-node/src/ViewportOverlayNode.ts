@@ -1,7 +1,6 @@
 import { type PositionRectProps } from '@searsuite/sear-foundation-rect';
 import { RenderContext } from '@searsuite/sear-render-context';
 
-import { type RichTextRenderNodeProperties } from './RichTextRenderNodeTypes';
 import { RichTextVisualNode } from './RichTextVisualNode';
 
 /** Viewport overlay node that draws transient UI under an identity transform. */

@@ -1,8 +1,13 @@
+import { WorkbookDocumentStateObservation } from '@searsuite/sear-assembly-workbook-kernel';
+import {
+  CaptureWorkbookSessionStateCommand,
+  ExportWorkbookStateCommand,
+  WorkbookActiveSheetEditorObservation,
+} from '@searsuite/sear-assembly-workbook-kernel';
+import { createWorkbookEditor, type WorkbookSheetEditorFactoryInput } from '../src';
 import {
   ActivateWorkbookSheetCommand,
   AddWorkbookSheetCommand,
-  CaptureWorkbookSessionStateCommand,
-  ExportWorkbookStateCommand,
   HideWorkbookSheetCommand,
   MoveWorkbookSheetCommand,
   RecalculateWorkbookFormulasCommand,
@@ -18,7 +23,6 @@ import {
   UnhideWorkbookSheetCommand,
   UndoWorkbookCommand,
   WorkbookActiveSheetSessionStateDefinition,
-  WorkbookActiveSheetEditorObservation,
   WorkbookFormulaPlugin,
   WorkbookFormulaObjectsPlugin,
   WorkbookCollaborationPlugin,
@@ -29,8 +33,6 @@ import {
   WorkbookHistoryStatusObservation,
   WorkbookSessionStore,
   WorkbookSheetSessionsStateDefinition,
-  WorkbookDocumentStateObservation,
-  createWorkbookEditor,
   defineWorkbookCommand,
   WorkbookCommandBus,
   WorkbookPlugin,
@@ -41,22 +43,22 @@ import {
   type WorkbookPluginServiceContext,
   type WorkbookCommandResult,
   type WorkbookCommandDefinition,
-  type WorkbookSheetEditorFactoryInput,
   type WorkbookTransactionCommittedEvent,
-} from '../src';
+} from '@searsuite/sear-assembly-workbook-kernel';
 import { createWorkbookDocumentState } from '@searsuite/sear-domain-workbook';
-import { Pipeline, runInsideCommandExecution, type SearCoreSheet } from '@searsuite/sear-assembly-core';
+import { type SearCoreSheet } from '@searsuite/sear-assembly-core';
+import { Pipeline, runInsideCommandExecution } from '@searsuite/sear-assembly-plugin';
 import { SheetQueryRegistry, type SheetCommandBus } from '@searsuite/sear-assembly-commands';
+import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
+import { type SheetEditor } from '@searsuite/sear-assembly-commands';
+import { type SheetEditorAdapters } from '@searsuite/sear-assembly-setup';
 import {
-  ExportSheetStateCommand,
-  SheetPlugin,
   cloneSheetDocumentState,
   createEmptySheetDocumentState,
-  type SheetEditor,
-  type SheetEditorAdapters,
   type SheetDocumentState,
   type SheetSessionState,
-} from '@searsuite/sear-assembly-setup';
+} from '@searsuite/sear-assembly-sheet-state';
+import { SheetPlugin } from '@searsuite/sear-assembly-commands';
 import {
   PluginKey,
   SessionStateRestorePhase,
@@ -69,10 +71,11 @@ import { type PluginStateRegistration } from '@searsuite/sear-assembly-plugin';
 import { MatrixOT, MatrixOTActionName } from '@searsuite/sear-domain-ot';
 import { createTransaction, Transaction } from '@searsuite/sear-domain-transaction';
 import { defineStateObservation, ObservationRegistry } from '@searsuite/sear-foundation-subscription';
-import { ReadSheetCellDataQuery, SheetDataPlugin, SheetMatrix } from '@searsuite/sear-render-engine';
-import { type CellProperties } from '@searsuite/sear-render-registry';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
+import { ReadSheetCellDataQuery, SheetMatrix } from '@searsuite/sear-domain-sheet';
+
 import { CommandExecutionPhase } from '@searsuite/sear-foundation-common';
-import { type Node } from '@searsuite/sear-render-node';
+
 import { CellType } from '@searsuite/sear-domain-cell-types';
 import {
   FormulaAddInServiceDefinition,
@@ -176,14 +179,6 @@ class ThirdPartyCompanionSheetPlugin extends SheetPlugin<null> {
     return pluginState;
   }
 
-  public render(_searCore: SearCoreSheet): Node<CellProperties> | null {
-    return null;
-  }
-
-  public getPluginConfig(_searCore: SearCoreSheet): unknown {
-    return {};
-  }
-
   public registerState(): PluginStateRegistration<null> {
     return { key: this.key, state: null, dataEngine: { enabled: false } };
   }
@@ -198,14 +193,6 @@ class ConfiguredSheetPlugin extends SheetPlugin<null> {
 
   public apply(pluginState: null, _transaction: Transaction): null {
     return pluginState;
-  }
-
-  public render(_searCore: SearCoreSheet): Node<CellProperties> | null {
-    return null;
-  }
-
-  public getPluginConfig(_searCore: SearCoreSheet): unknown {
-    return {};
   }
 
   public registerState(): PluginStateRegistration<null> {

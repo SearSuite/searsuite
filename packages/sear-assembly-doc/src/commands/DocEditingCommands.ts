@@ -50,8 +50,6 @@ export const MoveDocCursorCommand = defineDocCommand<MoveDocCursorInput>('doc.mo
 export const SelectAllDocCommand = defineDocCommand<void>('doc.selectAll');
 /** Sets the active document selection without changing content. */
 export const SetDocSelectionCommand = defineDocCommand<SetDocSelectionInput>('doc.setSelection');
-/** Requests a document render without changing content. */
-export const RenderDocCommand = defineDocCommand<void>('doc.render');
 /** Focuses the host text-input adapter for the document editor. */
 export const FocusDocCommand = defineDocCommand<void>('doc.focus');
 /** Sets the active IME composition preview text. */

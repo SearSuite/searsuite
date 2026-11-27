@@ -1,4 +1,4 @@
-import { isInsideCommandExecution } from '@searsuite/sear-assembly-core';
+import { isInsideCommandExecution } from '@searsuite/sear-assembly-plugin';
 import { SearError } from '@searsuite/sear-foundation-error';
 import type { SheetClipboardRangeInput } from './SheetClipboardCommands';
 

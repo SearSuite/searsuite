@@ -3,13 +3,7 @@ import { PositionRect, type PositionRectProps } from '@searsuite/sear-foundation
 import { type HexColor } from '@searsuite/sear-foundation-utils';
 import { RenderContext } from '@searsuite/sear-render-context';
 import { ScrollManager } from '@searsuite/sear-render-scroll';
-import {
-  RichTextCaretNode,
-  RichTextCompositionNode,
-  RichTextContentNode,
-  RichTextLineRenderer,
-  RichTextSelectionNode,
-} from '@searsuite/sear-render-node';
+import { RichTextCaretNode, RichTextCompositionNode, RichTextContentNode, RichTextLineRenderer, RichTextSelectionNode } from '@searsuite/sear-render-node';
 import { DocCursorManager } from './DocCursorManager';
 import { type DocCompositionManager } from './DocCompositionManager';
 
@@ -126,7 +120,10 @@ function createSnapshotRect(
     const width = line.chars.reduce((sum, char) => sum + char.width, 0);
     return Math.max(right, origin.x + line.x + width);
   }, origin.x);
-  const maxBottom = snapshot.lines.reduce((bottom, line) => Math.max(bottom, origin.y + line.y + line.height), origin.y);
+  const maxBottom = snapshot.lines.reduce(
+    (bottom, line) => Math.max(bottom, origin.y + line.y + line.height),
+    origin.y,
+  );
   return new PositionRect(origin.x, origin.y, Math.max(0, maxRight - origin.x), Math.max(0, maxBottom - origin.y));
 }
 

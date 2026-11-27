@@ -23,7 +23,6 @@
   },
   "dependencies": {
     "@searsuite/sear-assembly-commands": "workspace:*",
-    "@searsuite/sear-assembly-core": "workspace:*",
     "@searsuite/sear-assembly-plugin": "workspace:*",
     "@searsuite/sear-domain-cell": "workspace:*",
     "@searsuite/sear-domain-cell-types": "workspace:*",
@@ -31,13 +30,7 @@
     "@searsuite/sear-domain-transaction": "workspace:*",
     "@searsuite/sear-foundation-di": "workspace:*",
     "@searsuite/sear-foundation-error": "workspace:*",
-    "@searsuite/sear-plugin-formula": "workspace:*",
-    "@searsuite/sear-plugin-selection": "workspace:*",
-    "@searsuite/sear-render-context": "workspace:*",
-    "@searsuite/sear-render-cursor": "workspace:*",
-    "@searsuite/sear-render-event-engine": "workspace:*",
-    "@searsuite/sear-render-node": "workspace:*",
-    "@searsuite/sear-render-registry": "workspace:*"
+    "@searsuite/sear-plugin-formula": "workspace:*"
   },
   "exports": {
     ".": {

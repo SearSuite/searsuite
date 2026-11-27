@@ -5,14 +5,14 @@ import { FormulaParser } from '@searsuite/sear-domain-formula-engine-ts';
 import { FunctionRegistry } from '@searsuite/sear-domain-formula-engine-ts';
 import { FormulaErrorCode, createFormulaError } from '@searsuite/sear-domain-formula-engine';
 import { CellType } from '@searsuite/sear-domain-cell-types';
-import { SheetDataPlugin } from '@searsuite/sear-render-engine';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
 import { MatrixOTActionName, type Operation } from '@searsuite/sear-domain-ot';
-import { createTransaction, Transaction } from '@searsuite/sear-domain-transaction';
+import { createTransaction } from '@searsuite/sear-domain-transaction';
 import { type Platform } from '@searsuite/sear-foundation-platform';
 import { CellFormulaValueConverterRegistry } from '../src/CellFormulaValueConverterRegistry';
 import { FormulaRefShifter } from '../src/FormulaRefShifter';
 import { FormulaCalculationTraceBus } from '../src/FormulaCalculationTraceBus';
-import { FormulaRenderInvalidator } from '../src/FormulaRenderInvalidator';
+import { FormulaValuePublisher } from '../src/FormulaValuePublisher';
 import { SheetDisplayedValueChanges } from '@searsuite/sear-domain-cell-types';
 import { FormulaResultStore } from '../src/FormulaResultStore';
 import { type FormulaSchedulerDataSource } from '../src/FormulaSchedulerDataSource';
@@ -94,7 +94,7 @@ describe('SheetFormulaPlugin integration', () => {
       cache,
       dataSource,
       platform,
-      new FormulaRenderInvalidator(new SheetDisplayedValueChanges(jest.fn())),
+      new FormulaValuePublisher(new SheetDisplayedValueChanges(jest.fn())),
       trace,
     );
     const plugin = new SheetFormulaPlugin(

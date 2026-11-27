@@ -5,33 +5,13 @@ import {
   CellType,
 } from '@searsuite/sear-domain-cell-types';
 import { type Platform } from '@searsuite/sear-foundation-platform';
-import {
-  Cell,
-  type CellProperties,
-  SheetNodeFactory,
-  SheetRenderCoordinatorManager,
-  SheetRendererRegistry,
-  StringCell,
-} from '@searsuite/sear-render-registry';
-import { emptyPositionRect } from '@searsuite/sear-foundation-rect';
-import { type Node } from '@searsuite/sear-render-node';
-import { CellRenderDefinition, CellTypeCatalog, CellTypeDefinition, defineCellRenderer } from '../src';
+
+import { CellTypeCatalog, CellTypeDefinition } from '../src';
 import { CellDisplayTextRegistry, type CellDisplayTextProvider } from '../src/CellDisplayTextRegistry';
 import { StringCellTypeDefinition } from '../src/BuiltinCellDefinitions';
 
 const contractType = 'contract-cell';
 const contractCommitKey = 'contract-cell-commit';
-const renderOnlyType = 'render-only-cell';
-
-class ContractCell extends Cell<CellProperties> {
-  render(): Node<CellProperties>[] {
-    return [];
-  }
-
-  getDisplayText(): string {
-    return 'rendered';
-  }
-}
 
 function createCommitStrategy(key: string): CellCommitStrategyDefinition {
   return {
@@ -48,11 +28,7 @@ class ContractCellTypeDefinition extends CellTypeDefinition {
 
   readonly type: string;
 
-  constructor(
-    type = contractType,
-    displayText = 'contract display',
-    commitKey = contractCommitKey,
-  ) {
+  constructor(type = contractType, displayText = 'contract display', commitKey = contractCommitKey) {
     super();
     this.#displayText = displayText;
     this.#commitKey = commitKey;
@@ -81,27 +57,12 @@ class ContractCellTypeDefinition extends CellTypeDefinition {
       toPlainText: (cell: { value?: unknown }) => String(cell.value ?? ''),
     };
   }
-
-  override createRenderer() {
-    return defineCellRenderer(this.type, ContractCell);
-  }
-}
-
-class RenderOnlyDefinition extends CellRenderDefinition {
-  readonly type = renderOnlyType;
-
-  override createRenderer() {
-    return defineCellRenderer(this.type, ContractCell);
-  }
 }
 
 interface CatalogHarness {
-  readonly renderCoordinator: SheetRenderCoordinatorManager;
   readonly commits: CellCommitStrategyRegistry;
   readonly clipboardCodecs: CellClipboardCodecRegistry;
   readonly displays: CellDisplayTextRegistry;
-  readonly nodeFactory: SheetNodeFactory;
-  readonly rendererRegistry: SheetRendererRegistry<CellProperties>;
   readonly catalog: CellTypeCatalog;
 }
 
@@ -113,25 +74,12 @@ function createHarness(): CatalogHarness {
   const commits = new CellCommitStrategyRegistry();
   const clipboardCodecs = new CellClipboardCodecRegistry();
   const displays = new CellDisplayTextRegistry(createPlatform());
-  const nodeFactory = new SheetNodeFactory();
-  const rendererRegistry = new SheetRendererRegistry<CellProperties>();
-  const renderCoordinator = new SheetRenderCoordinatorManager(nodeFactory, rendererRegistry, {
-    getFormulaResult: () => void 0,
-  });
-
   return {
     commits,
     clipboardCodecs,
     displays,
-    nodeFactory,
-    rendererRegistry,
-    renderCoordinator,
-    catalog: new CellTypeCatalog(commits, displays, renderCoordinator, clipboardCodecs),
+    catalog: new CellTypeCatalog(commits, displays, clipboardCodecs),
   };
-}
-
-function createCell(nodeFactory: SheetNodeFactory, type: string): Cell<CellProperties> {
-  return nodeFactory.create({ type, value: 'stored value' }, emptyPositionRect, { type }) as Cell<CellProperties>;
 }
 
 describe('CellTypeCatalog', () => {
@@ -170,34 +118,24 @@ describe('CellTypeCatalog', () => {
     expect(catalog.getAll()).toEqual([definition]);
   });
 
-  it('registers stored value validator that delegates to definition', () => {
-    const { catalog, renderCoordinator } = createHarness();
+  it('retains the registered stored-value policy independently of presentation', () => {
+    const { catalog } = createHarness();
     const definition = new ContractCellTypeDefinition();
-    const spy = jest.fn(() => true);
-    Object.assign(definition, { isStoredValue: spy });
-
-    const registerSpy = jest.spyOn(renderCoordinator, 'registerStoredValueValidator');
-
+    const valid = jest.fn(() => true);
+    Object.assign(definition, { isStoredValue: valid });
     catalog.register(definition);
-
-    expect(registerSpy).toHaveBeenCalledWith(contractType, expect.any(Function));
-
-    const validatorFn = registerSpy.mock.calls[0][1];
     const cell = { type: contractType, value: 'test' };
-    expect(validatorFn(cell)).toBe(true);
-    expect(spy).toHaveBeenCalledWith(cell);
+    expect(catalog.get(contractType)?.isStoredValue(cell)).toBe(true);
+    expect(valid).toHaveBeenCalledWith(cell);
   });
 
   it('installs a persisted definition into all registries and removes every capability on disposal', () => {
-    const { catalog, commits, displays, nodeFactory, rendererRegistry, clipboardCodecs } = createHarness();
+    const { catalog, commits, displays, clipboardCodecs } = createHarness();
     const definition = new ContractCellTypeDefinition();
     const dispose = catalog.register(definition);
 
     expect(commits.get(contractCommitKey)).toBeDefined();
     expect(displays.getDisplayText({ type: contractType, value: 'stored value' }, {})).toBe('contract display');
-    const cell = createCell(nodeFactory, contractType);
-    expect(cell).toBeInstanceOf(ContractCell);
-    expect(rendererRegistry.render(cell)).toEqual([]);
     expect(clipboardCodecs.get(contractType)).toBeDefined();
 
     dispose();
@@ -205,29 +143,11 @@ describe('CellTypeCatalog', () => {
     expect(catalog.get(contractType)).toBeUndefined();
     expect(commits.get(contractCommitKey)).toBeUndefined();
     expect(displays.getDisplayText({ type: contractType, value: 'stored value' }, {})).toBe('stored value');
-    expect(() => createCell(nodeFactory, contractType)).toThrow('Cell type not registered');
-    expect(() => rendererRegistry.render(cell)).toThrow('No renderer registered');
     expect(clipboardCodecs.get(contractType)).toBeUndefined();
   });
 
-  it('installs a rendering-only definition only into NodeFactory and RendererRegistry', () => {
-    const { catalog, commits, displays, nodeFactory, rendererRegistry } = createHarness();
-    const dispose = catalog.register(new RenderOnlyDefinition());
-
-    expect(commits.getAll()).toHaveLength(0);
-    expect(displays.getDisplayText({ type: renderOnlyType, value: 'stored value' }, {})).toBe('stored value');
-    const cell = createCell(nodeFactory, renderOnlyType);
-    expect(cell).toBeInstanceOf(ContractCell);
-    expect(rendererRegistry.render(cell)).toEqual([]);
-
-    dispose();
-
-    expect(() => createCell(nodeFactory, renderOnlyType)).toThrow('Cell type not registered');
-    expect(() => rendererRegistry.render(cell)).toThrow('No renderer registered');
-  });
-
   it('restores a built-in definition and all of its capabilities after a third-party override is disposed', () => {
-    const { catalog, commits, displays, nodeFactory, rendererRegistry } = createHarness();
+    const { catalog, commits, displays } = createHarness();
     const builtIn = new StringCellTypeDefinition();
     catalog.register(builtIn);
     const builtInCommit = commits.get(CellType.String);
@@ -240,9 +160,6 @@ describe('CellTypeCatalog', () => {
     expect(commits.get(CellType.String)).not.toBe(builtInCommit);
     expect(commits.get('fallback-string')).toBeUndefined();
     expect(displays.getDisplayText({ type: CellType.String, value: 'stored value' }, {})).toBe('third-party display');
-    const overrideCell = createCell(nodeFactory, CellType.String);
-    expect(overrideCell).toBeInstanceOf(ContractCell);
-    expect(rendererRegistry.render(overrideCell)).toEqual([]);
 
     disposeOverride();
 
@@ -250,10 +167,5 @@ describe('CellTypeCatalog', () => {
     expect(commits.get(CellType.String)).toMatchObject({ key: builtInCommit?.key });
     expect(commits.get('fallback-string')).toMatchObject({ key: builtInFallbackCommit?.key });
     expect(displays.getDisplayText({ type: CellType.String, value: 'stored value' }, {})).toBe('stored value');
-    const restoredCell = createCell(nodeFactory, CellType.String);
-    expect(restoredCell).toBeInstanceOf(StringCell);
-    // The registry association is restored above; rendering a real StringCell
-    // belongs to the render-runtime integration suite, which provides Tree.
-    expect(rendererRegistry).toBeDefined();
   });
 });

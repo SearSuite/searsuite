@@ -3,10 +3,13 @@ import { SheetRangeMoveRegistry, SheetRangeReorderRegistry } from '@searsuite/se
 import { type SheetEditorConfiguration } from '@searsuite/sear-assembly-setup';
 import { MatrixOTActionName } from '@searsuite/sear-domain-ot';
 import { createTransaction } from '@searsuite/sear-domain-transaction';
-import { SheetCellVisualReaderRegistry } from '@searsuite/sear-render-registry';
+import { SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
 import {
-  ReadSheetDemoMarkerQuery, SetSheetDemoMarkerCommand,
-  SheetDemoMarker, SheetDemoMatrix, SheetDemoPlugin,
+  ReadSheetDemoMarkerQuery,
+  SetSheetDemoMarkerCommand,
+  SheetDemoMarker,
+  SheetDemoMatrix,
+  SheetDemoPlugin,
 } from '../src';
 
 describe('SheetDemoPlugin', () => {
@@ -15,10 +18,10 @@ describe('SheetDemoPlugin', () => {
     const plugin = new SheetDemoPlugin({ markers });
     const commands = new SheetCommandBus();
     const queries = new SheetQueryRegistry();
-    const visuals = new SheetCellVisualReaderRegistry();
+    const visuals = new SheetCellStyleRegistry();
     plugin.registerCommands(commands);
     plugin.registerQueries(queries);
-    plugin.registerCellVisualReaders(visuals);
+    plugin.registerCellStyles(visuals);
     const configuredPlugins: NonNullable<SheetEditorConfiguration['plugins']> = [SheetDemoPlugin];
     const executePipeline = jest.fn();
     commands.bind({ executePipeline, applyEffect: () => void 0 });
@@ -29,18 +32,22 @@ describe('SheetDemoPlugin', () => {
     expect(executePipeline).toHaveBeenCalledTimes(1);
     expect(() => commands.run(SetSheetDemoMarkerCommand, { row: 3, column: 0, marker: null })).toThrow();
     expect(queries.run(ReadSheetDemoMarkerQuery, { row: 1, column: 1 })).toBeNull();
-    expect(visuals.read({ rowIndex: 1, columnIndex: 1 })).toEqual({});
+    expect(visuals.read(1, 1)).toEqual({});
 
     const transaction = createTransaction(plugin.key);
-    transaction.addOperation([{
-      p: [1, 1],
-      [MatrixOTActionName.UpdateCell]: { value: SheetDemoMarker.Review, prev: null },
-    } as never]);
+    transaction.addOperation([
+      {
+        p: [1, 1],
+        [MatrixOTActionName.UpdateCell]: { value: SheetDemoMarker.Review, prev: null },
+      } as never,
+    ]);
     plugin.apply(plugin.getState(), transaction);
     expect(queries.run(ReadSheetDemoMarkerQuery, { row: 1, column: 1 })).toBe(SheetDemoMarker.Review);
-    expect(visuals.read({ rowIndex: 1, columnIndex: 1 })).toEqual({ fill: '#FCE3A1' });
+    expect(visuals.read(1, 1)).toEqual({ fill: '#FCE3A1' });
     let stored = 0;
-    markers.forEachStored(() => { stored += 1; });
+    markers.forEachStored(() => {
+      stored += 1;
+    });
     expect(stored).toBe(1);
     expect(() => queries.run(ReadSheetDemoMarkerQuery, { row: 3, column: 0 })).toThrow();
   });
@@ -70,10 +77,12 @@ describe('SheetDemoPlugin', () => {
     const reorders = new SheetRangeReorderRegistry();
     plugin.registerRangeReorders(reorders);
     const reorder = createTransaction(plugin.key);
-    reorder.addOperation([...reorders.plan({
-      range: { start: [2, 0], end: [3, 2] },
-      destinationOf: (row) => row === 2 ? 3 : 2,
-    })[0].operations]);
+    reorder.addOperation([
+      ...reorders.plan({
+        range: { start: [2, 0], end: [3, 2] },
+        destinationOf: (row) => (row === 2 ? 3 : 2),
+      })[0].operations,
+    ]);
     plugin.apply(plugin.getState(), reorder);
     expect(markers.getItem(2, 1)).toBe(SheetDemoMarker.Approved);
     expect(markers.getItem(3, 1)).toBeNull();

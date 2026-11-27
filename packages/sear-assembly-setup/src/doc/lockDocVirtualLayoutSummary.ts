@@ -1,4 +1,4 @@
-import { type DocVirtualLayoutSummary } from '@searsuite/sear-assembly-doc';
+import { type DocVirtualLayoutSummary } from '../index';
 
 const lockedValues = new WeakSet<object>();
 

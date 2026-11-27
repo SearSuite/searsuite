@@ -1,8 +1,13 @@
-import { CellFormats, CellType, NumberCellCommitStrategy, formatCellNumber, interpretNumberInput } from '@searsuite/sear-domain-cell-types';
-import { NumberCell } from '@searsuite/sear-render-registry';
+import {
+  CellFormats,
+  CellType,
+  NumberCellCommitStrategy,
+  formatCellNumber,
+  interpretNumberInput,
+} from '@searsuite/sear-domain-cell-types';
 
 import { type CellDisplayTextProvider } from './CellDisplayTextRegistry';
-import { defineCellRenderer } from './CellRendererDefinition';
+
 import { CellTypeDefinition } from './CellTypeDefinition';
 
 /** Built-in persisted cell type for finite numeric values. */
@@ -48,9 +53,5 @@ export class NumberCellTypeDefinition extends CellTypeDefinition {
         return parsed && !parsed.format ? { type: this.type, value: parsed.value } : null;
       },
     };
-  }
-  /** Creates the renderer definition for number cells. */
-  override createRenderer() {
-    return defineCellRenderer(this.type, NumberCell);
   }
 }

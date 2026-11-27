@@ -24,15 +24,14 @@
   "dependencies": {
     "@searsuite/sear-assembly-config": "workspace:*",
     "@searsuite/sear-foundation-di": "workspace:*",
+    "@searsuite/sear-foundation-error": "workspace:*",
     "@searsuite/sear-foundation-platform": "workspace:*",
     "@searsuite/sear-foundation-rect": "workspace:*",
-    "@searsuite/sear-foundation-storage": "workspace:*",
     "@searsuite/sear-foundation-utils": "workspace:*",
     "@searsuite/sear-render-context": "workspace:*",
     "@searsuite/sear-render-node": "workspace:*",
     "@searsuite/sear-render-registry": "workspace:*",
-    "@searsuite/sear-render-scroll": "workspace:*",
-    "@searsuite/sear-foundation-error": "workspace:*"
+    "@searsuite/sear-render-scroll": "workspace:*"
   },
   "exports": {
     ".": {

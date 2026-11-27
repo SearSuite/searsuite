@@ -1,17 +1,17 @@
-import {
-  SearCoreSheet,
-  type SheetLifecycleContext,
-  type SheetLifecycleController,
-} from '@searsuite/sear-assembly-core';
 import { Plugin, PluginKey, PluginManager } from '@searsuite/sear-assembly-plugin';
-import { createSheetTransaction, LocalActionCommand, TransactionPipelineCommand, SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import { Pipeline } from '@searsuite/sear-assembly-core';
+import {
+  createSheetTransaction,
+  LocalActionCommand,
+  TransactionPipelineCommand,
+  SheetCommandBus,
+} from '@searsuite/sear-assembly-commands';
+import { Pipeline } from '@searsuite/sear-assembly-plugin';
 import { type Operation } from '@searsuite/sear-domain-ot';
 import { TRANSACTION_ORIGIN_META_KEY, Transaction, TransactionOrigin } from '@searsuite/sear-domain-transaction';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
-import { type CellProperties } from '@searsuite/sear-render-registry';
+
 import { CollaborationChannelBinding, type CollaborationChannel } from '../CollaborationChannel';
 import { CollaborationStatusObservation } from '../CollaborationObservation';
 import { type CollaborationConnectOptions, type CollaborationSession } from '../CollaborationSession';
@@ -27,16 +27,13 @@ const pluginKey = new PluginKey('SheetCollaboration');
 
 /** Thin Sheet bridge around the editor-independent collaboration engine. */
 @Injectable()
-export class SheetCollaborationPlugin
-  extends Plugin<SearCoreSheet, CellProperties, null>
-  implements SheetLifecycleController, CollaborationSession
-{
+export class SheetCollaborationPlugin extends Plugin<null> implements CollaborationSession {
   readonly #channelBinding: CollaborationChannelBinding;
-  readonly #plugins: PluginManager<SearCoreSheet, CellProperties>;
+  readonly #plugins: PluginManager;
   readonly #commands: SheetCommandBus;
 
   public static readonly symbol = Symbol.for('SheetCollaborationPlugin');
-  public override readonly warnOnDuplicateDepth = false;
+  public readonly warnOnDuplicateDepth = false;
   public override readonly interestedIn = ['*'];
 
   readonly #registeredOwnerIds = new Set<string>();
@@ -47,7 +44,7 @@ export class SheetCollaborationPlugin
     @Inject(CollaborationChannelBinding.symbol)
     channelBinding: CollaborationChannelBinding,
     @Inject(PluginManager.symbol)
-    plugins: PluginManager<SearCoreSheet, CellProperties>,
+    plugins: PluginManager,
     @Inject(SheetCommandBus.symbol) commands: SheetCommandBus,
   ) {
     super({ key: pluginKey, state: null });
@@ -76,10 +73,15 @@ export class SheetCollaborationPlugin
         return result;
       },
     }));
-    commands.register(DisconnectSheetCollaborationCommand, () =>
-      new LocalActionCommand(DisconnectSheetCollaborationCommand.id, () => bridge.disconnect()));
-    commands.register(ApplySheetCollaborationEventCommand, (event) =>
-      new LocalActionCommand(ApplySheetCollaborationEventCommand.id, () => bridge.#channel.applyExternalEvent(event)));
+    commands.register(
+      DisconnectSheetCollaborationCommand,
+      () => new LocalActionCommand(DisconnectSheetCollaborationCommand.id, () => bridge.disconnect()),
+    );
+    commands.register(
+      ApplySheetCollaborationEventCommand,
+      (event) =>
+        new LocalActionCommand(ApplySheetCollaborationEventCommand.id, () => bridge.#channel.applyExternalEvent(event)),
+    );
     commands.register(ApplyRemoteOperationsCommand, function createApplyRemoteOperationsCommand(input) {
       const owner = bridge.#plugins.getCollaborativeTransactionPlugin(input.ownerId);
       if (!owner) throw new SearError(`Collaborative Sheet owner "${input.ownerId}" is not registered.`);
@@ -111,7 +113,7 @@ export class SheetCollaborationPlugin
     return this.#channel.getStatus();
   }
 
-  public start(_context: SheetLifecycleContext): void {
+  public start(): void {
     this.#registerContributors();
     this.#detachRemoteApplier = this.#channel.attachRemoteApplier((effect) => {
       this.#commands.run(ApplyRemoteOperationsCommand, {
@@ -138,14 +140,6 @@ export class SheetCollaborationPlugin
   }
 
   public apply(_state: null, _transaction: Transaction): null {
-    return null;
-  }
-
-  public render(): null {
-    return null;
-  }
-
-  public getPluginConfig(): null {
     return null;
   }
 

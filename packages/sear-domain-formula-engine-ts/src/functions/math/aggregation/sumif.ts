@@ -9,7 +9,6 @@ import {
   type EvalContext,
   FormulaErrorCode,
   createFormulaError,
-  FormulaNodeKind,
 } from '@searsuite/sear-domain-formula-engine';
 import {
   matchesCriteria,

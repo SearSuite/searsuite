@@ -13,9 +13,8 @@ const stateSubclassDeclarations = [];
 const commandScopeOwners = new Set([
   'sear-assembly-commands/src/SheetCommandBus.ts',
   'sear-assembly-commands/src/DocCommandBus.ts',
-  'sear-assembly-workbook/src/WorkbookCommandBus.ts',
-  'sear-plugin-sheet-doc-adapter/src/SearCoreEditSession.ts',
-  'sear-plugin-sheet-doc-adapter/src/SearCoreEditHistory.ts',
+  'sear-assembly-workbook-kernel/src/WorkbookCommandBus.ts',
+  'sear-assembly-sheet-doc/src/SearCoreEditSession.ts',
 ]);
 
 function createsSemanticOTDirectly(path, source) {
@@ -57,9 +56,8 @@ function createsSemanticOTDirectly(path, source) {
 function collectStateSubclassDeclarations(path, sourceFile) {
   function visit(node) {
     if (ts.isClassDeclaration(node) && node.name) {
-      const extension = node.heritageClauses
-        ?.find((clause) => clause.token === ts.SyntaxKind.ExtendsKeyword)
-        ?.types[0]?.expression;
+      const extension = node.heritageClauses?.find((clause) => clause.token === ts.SyntaxKind.ExtendsKeyword)?.types[0]
+        ?.expression;
       if (extension && ts.isIdentifier(extension)) {
         const privateFields = node.members.filter(
           (member) => ts.isPropertyDeclaration(member) && ts.isPrivateIdentifier(member.name),
@@ -144,10 +142,15 @@ async function visitProductionSource(directory) {
     const source = await readFile(path, 'utf8');
     if (path.includes('/src/'))
       collectStateSubclassDeclarations(path, ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true));
-    if (path.includes('/src/') && /\brunInsideCommandExecution\s*\(/.test(source) &&
-        !commandScopeOwners.has(path.slice(packageRoot.length + 1)) &&
-        path !== join(packageRoot, 'sear-assembly-core', 'src', 'CommandExecutionScope.ts')) {
-      violations.push(`${path}: only command buses and embedded edit-session components may open command execution scope`);
+    if (
+      path.includes('/src/') &&
+      /\brunInsideCommandExecution\s*\(/.test(source) &&
+      !commandScopeOwners.has(path.slice(packageRoot.length + 1)) &&
+      path !== join(packageRoot, 'sear-assembly-core', 'src', 'CommandExecutionScope.ts')
+    ) {
+      violations.push(
+        `${path}: only command buses and embedded edit-session components may open command execution scope`,
+      );
     }
     if (path !== transactionDefinitionPath && /\bnew\s+Transaction(?:\s*<[^>]+>)?\s*\(/.test(source))
       violations.push(`${path}: Transaction must be created through createTransaction(...)`);
@@ -207,8 +210,11 @@ function extendsStateClass(name, root, seen = new Set()) {
 }
 for (const declaration of stateSubclassDeclarations) {
   if (!declaration.privateFields.length) continue;
-  const stateType = extendsStateClass(declaration.parent, 'CSRMatrix') ? 'CSRMatrix'
-    : extendsStateClass(declaration.parent, 'RichDocNode') ? 'RichDocNode' : null;
+  const stateType = extendsStateClass(declaration.parent, 'CSRMatrix')
+    ? 'CSRMatrix'
+    : extendsStateClass(declaration.parent, 'RichDocNode')
+    ? 'RichDocNode'
+    : null;
   if (!stateType) continue;
   violations.push(
     `${declaration.path}: ${stateType} state subclasses cannot store opaque private fields ` +

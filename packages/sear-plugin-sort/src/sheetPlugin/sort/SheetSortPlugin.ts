@@ -1,5 +1,5 @@
 import { defineSheetCommand, type SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import { Pipeline } from '@searsuite/sear-assembly-core';
+import { Pipeline } from '@searsuite/sear-assembly-plugin';
 import { Plugin, PluginKey, type SheetRangeReorderRegistry } from '@searsuite/sear-assembly-plugin';
 import { type CellMatrixElement } from '@searsuite/sear-domain-cell-types';
 import { type CSRMatrix } from '@searsuite/sear-domain-matrix';
@@ -7,7 +7,7 @@ import { createTransaction, type Transaction } from '@searsuite/sear-domain-tran
 import { Injectable } from '@searsuite/sear-foundation-di';
 import { type Platform } from '@searsuite/sear-foundation-platform';
 import { CommandExecutionPhase } from '@searsuite/sear-foundation-common';
-import { type CellProperties } from '@searsuite/sear-render-registry';
+
 import { createSheetSortPermutation } from '../../createSheetSortPermutation';
 import { type SheetSortRangeInput, type SheetSortValue } from '../../SheetSortTypes';
 
@@ -27,17 +27,18 @@ const pluginKey = new PluginKey('SheetSortPlugin');
 
 /** Stateless command owner for stable range sorting. */
 @Injectable()
-export class SheetSortPlugin extends Plugin<unknown, CellProperties, Record<string, never>> {
+export class SheetSortPlugin extends Plugin<Record<string, never>> {
   readonly #dependencies: SheetSortDependencies;
 
-  public override readonly warnOnDuplicateDepth = false;
+  public readonly warnOnDuplicateDepth = false;
   public static readonly symbol = Symbol.for('SheetSortPlugin');
   public static readonly pluginKey = pluginKey;
   #disposeCommandListener: (() => void) | null = null;
 
-  public constructor(dependencies: SheetSortDependencies) { super({ key: pluginKey, state: {} });
+  public constructor(dependencies: SheetSortDependencies) {
+    super({ key: pluginKey, state: {} });
     this.#dependencies = dependencies;
-   }
+  }
 
   public registerCommands(commands: SheetCommandBus): void {
     this.#disposeCommandListener?.();
@@ -49,17 +50,18 @@ export class SheetSortPlugin extends Plugin<unknown, CellProperties, Record<stri
       id: SortSheetRangeCommand.id,
       execute: () => {
         const permutation = createSheetSortPermutation(
-          input, this.#dependencies.readMatrix(), this.#dependencies.readValue,
-          this.#dependencies.platform, this.#dependencies.compareText,
+          input,
+          this.#dependencies.readMatrix(),
+          this.#dependencies.readValue,
+          this.#dependencies.platform,
+          this.#dependencies.compareText,
         );
         const pipeline = new Pipeline(SortSheetRangeCommand.id);
         const plans = this.#dependencies.reorders.plan(permutation);
         if (!permutation.changed) return { pipeline };
         plans.forEach(({ target, operations }) => {
-          if (operations.length) pipeline.addTransaction(
-            SortSheetRangeCommand.id,
-            createTransaction(target, operations),
-          );
+          if (operations.length)
+            pipeline.addTransaction(SortSheetRangeCommand.id, createTransaction(target, operations));
         });
         return { pipeline };
       },
@@ -71,8 +73,10 @@ export class SheetSortPlugin extends Plugin<unknown, CellProperties, Record<stri
     this.#disposeCommandListener = null;
   }
 
-  public registerState() { return { key: this.key, state: this.getState(), dataEngine: { enabled: false } }; }
-  public apply(state: Record<string, never>, _transaction: Transaction): Record<string, never> { return state; }
-  public getPluginConfig(): null { return null; }
-  public render(): [] { return []; }
+  public registerState() {
+    return { key: this.key, state: this.getState(), dataEngine: { enabled: false } };
+  }
+  public apply(state: Record<string, never>, _transaction: Transaction): Record<string, never> {
+    return state;
+  }
 }

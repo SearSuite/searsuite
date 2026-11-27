@@ -1,8 +1,4 @@
-import {
-  getFormulaReferenceColor,
-  formulaReferenceHighlightConfig,
-  FormulaReferenceColorPalette,
-} from '../src/FormulaHighlightConfig';
+import { getFormulaReferenceColor, formulaReferenceHighlightConfig } from '@searsuite/sear-render';
 
 describe('FormulaHighlightConfig', () => {
   it('returns default color if no colors provided', () => {

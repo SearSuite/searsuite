@@ -1,48 +1,15 @@
-import {
-  DocCompositionManager,
-  DocCursorManager,
-  DocInputPlugin,
-  type DocCompositionProvider,
-} from '@searsuite/sear-assembly-core';
-import {
-  isTextNode,
-  RichTextInlineStyleRegistry,
-  RichTextLineBoxRegistry,
-  RichTextBlockFlowRegistry,
-  defaultRichTextParagraphLayoutDefaults,
-  resolveDocNodeId,
-  type RichDocNode,
-  type RichTextParagraphLayoutDefaults,
-} from '@searsuite/sear-domain-doc';
+import { DocCompositionManager, DocCursorManager, type DocCompositionProvider } from '@searsuite/sear-assembly-core';
+import { DocInputPlugin } from '@searsuite/sear-assembly-doc';
+import { isTextNode, RichTextInlineStyleRegistry, RichTextLineBoxRegistry, RichTextBlockFlowRegistry, defaultRichTextParagraphLayoutDefaults, resolveDocNodeId, type RichDocNode, type RichTextParagraphLayoutDefaults } from '@searsuite/sear-domain-doc';
 import { BlockManager, RichTextRunRenderRegistry } from '@searsuite/sear-render-node';
-import {
-  DocLayoutCache,
-  DocLayoutEngine,
-  DocPageMap,
-  type DocBlockLayout,
-  type LayoutLine,
-  type LayoutSnapshot,
-} from '@searsuite/sear-domain-editor';
+import { DocLayoutCache, DocLayoutEngine, DocPageMap, type DocBlockLayout, type LayoutLine, type LayoutSnapshot } from '@searsuite/sear-domain-editor';
 import { Platform } from '@searsuite/sear-foundation-platform';
 import { DocCommandBus } from '@searsuite/sear-assembly-commands';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { TextMeasurementManager, TextShaper } from '@searsuite/sear-render-metrics';
 import { ScrollManager } from '@searsuite/sear-render-scroll';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
-import {
-  type CachedBlockLayout,
-  type DocCursorPos,
-  type DocVirtualLayoutInput,
-  type DocVirtualLayoutMaterializationStats,
-  type DocVirtualLayoutModelStats,
-  type DocVirtualLayoutResult,
-  type DocVirtualLayoutSummary,
-  type VirtualBlockRecord,
-  type DocEditorViewport,
-  PrefixHeightIndex,
-  compareNumericIndex,
-  formatMaterializedIndexes,
-} from './DocVirtualLayoutSupport';
+import { type CachedBlockLayout, type DocCursorPos, type DocVirtualLayoutInput, type DocVirtualLayoutMaterializationStats, type DocVirtualLayoutModelStats, type DocVirtualLayoutResult, type DocVirtualLayoutSummary, type VirtualBlockRecord, type DocEditorViewport, PrefixHeightIndex, compareNumericIndex, formatMaterializedIndexes } from './DocVirtualLayoutSupport';
 import { lockDocVirtualLayoutSummary } from './lockDocVirtualLayoutSummary';
 
 export type {
@@ -131,7 +98,8 @@ export class DocVirtualLayoutStore {
   }
 
   #assertCommandWrite(): void {
-    if (!this.#commands.isExecuting()) throw new SearError('Doc layout changes must run through editor.commands.run(...).');
+    if (!this.#commands.isExecuting())
+      throw new SearError('Doc layout changes must run through editor.commands.run(...).');
   }
 
   public reset(): void {
@@ -332,10 +300,7 @@ export class DocVirtualLayoutStore {
     return [...indexes].sort(compareNumericIndex);
   }
 
-  #materializeBlocks(
-    indexes: readonly number[],
-    input: DocVirtualLayoutInput,
-  ): DocVirtualLayoutMaterializationStats {
+  #materializeBlocks(indexes: readonly number[], input: DocVirtualLayoutInput): DocVirtualLayoutMaterializationStats {
     const blockLayouts: DocBlockLayout[] = [];
     let heightChanged = false;
     let cacheHits = 0;
@@ -366,7 +331,9 @@ export class DocVirtualLayoutStore {
     const cached = this.#blockLayoutCache.get(record.index);
     const needsReflow = input.reflowBlockIds === null || input.reflowBlockIds?.has(record.id) === true;
     if (!needsReflow && cached && cached.contentWidth === this.#contentWidth) {
-      const layout = input.repaintBlockIds?.has(record.id) ? this.#refreshCachedBlockPaintState(record, cached) : cached;
+      const layout = input.repaintBlockIds?.has(record.id)
+        ? this.#refreshCachedBlockPaintState(record, cached)
+        : cached;
       return { layout, fromCache: true };
     }
 

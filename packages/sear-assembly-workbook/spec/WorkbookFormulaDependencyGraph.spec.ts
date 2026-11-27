@@ -1,4 +1,4 @@
-import { WorkbookFormulaDependencyGraph } from '../src';
+import { WorkbookFormulaDependencyGraph } from '@searsuite/sear-assembly-workbook-kernel';
 
 describe('WorkbookFormulaDependencyGraph', () => {
   it('detaches registered and queried references and locks composite results', () => {
@@ -10,9 +10,7 @@ describe('WorkbookFormulaDependencyGraph', () => {
     const snapshot = graph.getDependencies(formulaCell);
     (snapshot[0] as unknown as { start: [number, number] }).start[0] = 8;
     expect(graph.getDependents({ sheetId: 'sheet-2', row: 0, col: 0 })).toEqual([formulaCell]);
-    expect(graph.getDependencies(formulaCell)).toEqual([
-      { sheetId: 'sheet-2', start: [0, 0], end: [1, 1] },
-    ]);
+    expect(graph.getDependencies(formulaCell)).toEqual([{ sheetId: 'sheet-2', start: [0, 0], end: [1, 1] }]);
 
     const result = [[1, 2]];
     graph.setFormulaResult(formulaCell, result);
@@ -75,9 +73,7 @@ describe('WorkbookFormulaDependencyGraph', () => {
     ]);
     graph.setFormulaResult({ sheetId: 'sheet-1', row: 0, col: 0 }, 10);
 
-    expect(graph.markDirty([{ sheetId: 'sheet-2', row: 1, col: 1 }])).toEqual([
-      { sheetId: 'sheet-1', row: 0, col: 0 },
-    ]);
+    expect(graph.markDirty([{ sheetId: 'sheet-2', row: 1, col: 1 }])).toEqual([{ sheetId: 'sheet-1', row: 0, col: 0 }]);
     expect(graph.getFormulaResult({ sheetId: 'sheet-1', row: 0, col: 0 })).toBeUndefined();
   });
 });

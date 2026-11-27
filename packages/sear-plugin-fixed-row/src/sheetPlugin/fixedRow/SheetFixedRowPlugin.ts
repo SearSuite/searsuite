@@ -17,9 +17,8 @@ import {
 } from '@searsuite/sear-domain-ot';
 import { type Transaction } from '@searsuite/sear-domain-transaction';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-render-engine';
-import { type Node } from '@searsuite/sear-render-node';
-import { type CellProperties } from '@searsuite/sear-render-registry';
+import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-domain-sheet';
+
 import { FixedRowMatrix } from '../../FixedRowMatrix';
 import { registerSheetFixedRowCommands } from './SheetFixedRowCommands';
 import { SheetFixedRowsFieldKey } from './SheetFixedRowDataField';
@@ -33,10 +32,10 @@ const pluginKey = new PluginKey('SheetFixedRowPlugin');
 
 /** Owns fixed-row data, commands, structural projections, export, history, and collaboration. */
 @Injectable()
-export class SheetFixedRowPlugin extends Plugin<unknown, CellProperties, SheetFixedRowPluginState> {
+export class SheetFixedRowPlugin extends Plugin<SheetFixedRowPluginState> {
   public static readonly symbol = Symbol.for('SheetFixedRowPlugin');
   public static readonly pluginKey = pluginKey;
-  public override readonly warnOnDuplicateDepth = false;
+  public readonly warnOnDuplicateDepth = false;
   public override readonly transactionOT = {
     ownerId: 'sheet.fixedRow',
     definition: MatrixTransactionOT,
@@ -107,14 +106,6 @@ export class SheetFixedRowPlugin extends Plugin<unknown, CellProperties, SheetFi
     if (operations.length === 0) return null;
     MatrixOT.apply(state.fixedRows, operations);
     return state;
-  }
-
-  public getPluginConfig(): null {
-    return null;
-  }
-
-  public render(): Node<CellProperties>[] {
-    return [];
   }
 }
 

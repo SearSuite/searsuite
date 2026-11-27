@@ -10,7 +10,9 @@ import { FormulaFormatter } from '@searsuite/sear-domain-formula-engine-ts';
 import { type SheetStructureMoveRegistry } from '@searsuite/sear-assembly-plugin';
 import { CellType } from '@searsuite/sear-domain-cell-types';
 import { createUpdateCellOTOperation, MatrixCellUpdateIntent, type MatrixOTOperation } from '@searsuite/sear-domain-ot';
-import { readSheetDataMatrix, SheetDataPlugin, type DataEngine } from '@searsuite/sear-render-engine';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
+import { readSheetDataMatrix } from '@searsuite/sear-domain-sheet';
+import { type DataEngine } from '@searsuite/sear-domain-state';
 
 /** Persists formula text changes after the original-state structure permutation in the same transaction. */
 export function registerFormulaStructureMoves(

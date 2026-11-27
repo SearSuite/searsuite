@@ -16,7 +16,7 @@ export interface DirtyRegionBounds {
 /**
  * Minimal dirty-region storage contract consumed by {@link DirtyRegionCollector}.
  *
- * Sheet uses `GenerationalDirtyTracker`; future document renderers can provide
+ * Sheet uses `FrameDirtyTracker`; future document renderers can provide
  * a block/page dirty source with the same boundary, query and frame-clear
  * contract without depending on Sheet scene internals.
  *

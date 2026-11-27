@@ -1,8 +1,8 @@
 import { RenderContext } from '@searsuite/sear-render-context';
-import { SceneGraph, Node, Tree, NodeProperties, GenerationalDirtyTracker } from '@searsuite/sear-render-node';
+import { SceneGraph, Node, Tree, NodeProperties, FrameDirtyTracker } from '@searsuite/sear-render-node';
 import { PositionRect } from '@searsuite/sear-foundation-rect';
 import { Injectable, Inject } from '@searsuite/sear-foundation-di';
-import { DataStorage } from '@searsuite/sear-foundation-storage';
+
 import { HexColor } from '@searsuite/sear-foundation-utils';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
 import { ScrollManager } from '@searsuite/sear-render-scroll';
@@ -46,8 +46,8 @@ export class HitRenderStrategy<NodeTypeProperties extends NodeProperties> extend
     renderCoordinatorManager: RenderCoordinatorManager,
     @Inject(SceneGraph.symbol) stage: SceneGraph<NodeTypeProperties>,
     @Inject(Tree.symbol) tree: Tree<PositionRect<HexColor>>,
-    @Inject(GenerationalDirtyTracker.symbol)
-    dirtyTree: GenerationalDirtyTracker,
+    @Inject(FrameDirtyTracker.symbol)
+    dirtyTree: FrameDirtyTracker,
     @Inject(Platform.symbol) protected readonly platform: Platform,
   ) {
     super(
@@ -214,16 +214,26 @@ export class HitRenderStrategy<NodeTypeProperties extends NodeProperties> extend
       transform: [number, number, number, number, number, number];
       accepts: (candidate: Node<NodeTypeProperties>) => boolean;
     }[] = [
-      { rect: new PositionRect(0, y, width, height), transform: [1, 0, 0, 1, 0, -y],
-        accepts: (candidate) => candidate.left !== void 0 && candidate.top === void 0 },
-      { rect: new PositionRect(x, 0, width, height), transform: [1, 0, 0, 1, -x, 0],
-        accepts: (candidate) => candidate.top !== void 0 && candidate.left === void 0 },
-      { rect: new PositionRect(0, 0, width, height), transform: [1, 0, 0, 1, 0, 0],
-        accepts: (candidate) => candidate.top !== void 0 && candidate.left !== void 0 },
+      {
+        rect: new PositionRect(0, y, width, height),
+        transform: [1, 0, 0, 1, 0, -y],
+        accepts: (candidate) => candidate.left !== void 0 && candidate.top === void 0,
+      },
+      {
+        rect: new PositionRect(x, 0, width, height),
+        transform: [1, 0, 0, 1, -x, 0],
+        accepts: (candidate) => candidate.top !== void 0 && candidate.left === void 0,
+      },
+      {
+        rect: new PositionRect(0, 0, width, height),
+        transform: [1, 0, 0, 1, 0, 0],
+        accepts: (candidate) => candidate.top !== void 0 && candidate.left !== void 0,
+      },
     ];
     for (const group of groups) {
-      const candidates = node.query(group.rect).filter((candidate) =>
-        candidate.sticky && group.accepts(candidate) && isHitDrawableNode(candidate));
+      const candidates = node
+        .query(group.rect)
+        .filter((candidate) => candidate.sticky && group.accepts(candidate) && isHitDrawableNode(candidate));
       if (candidates.length === 0) continue;
       this.hitRenderContext.save();
       this.hitRenderContext.setTransform(...group.transform);

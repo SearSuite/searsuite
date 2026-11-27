@@ -12,7 +12,7 @@ import {
   type FormulaValue,
 } from '@searsuite/sear-domain-formula-engine';
 import { erf, erfc, isFormulaText, toNumberOrError } from '@searsuite/sear-foundation-utils';
-import { forEachFormulaRangeCellWithMetadata, matchesCriteria, readArg, resolveFormulaRange } from '../../shared/helpers';
+import { forEachFormulaRangeCellWithMetadata, matchesCriteria, readArg } from '../../shared/helpers';
 import { collectReferenceCells, flatten, isRangeArgument, matrixFromArg } from '../shared/mathUtils';
 import { directStatisticalNumber, statisticalScalarNumber } from './statisticalInput';
 import { isBlankScalarInput } from '../../shared/blankScalarInput';
@@ -174,7 +174,11 @@ function checkCount(args: FormulaArg[], min: number, max = Number.POSITIVE_INFIN
 }
 
 function readNumber(
-  args: FormulaArg[], index: number, context: EvalContext, fallback?: number, parseDateText = true,
+  args: FormulaArg[],
+  index: number,
+  context: EvalContext,
+  fallback?: number,
+  parseDateText = true,
 ): NumResult {
   const arg = args[index];
   if (!arg || isFormulaArgumentKind(arg, 'missing')) return fallback === undefined ? valueError() : fallback;
@@ -182,9 +186,7 @@ function readNumber(
   if (isError(value)) return value;
   if (value === '' || (isFormulaText(value) && value.value === '')) return valueError();
   const numeric = toNumberOrError(value);
-  return isError(numeric)
-    ? parseDateText ? numericDateText(value, context) ?? valueError() : valueError()
-    : numeric;
+  return isError(numeric) ? (parseDateText ? numericDateText(value, context) ?? valueError() : valueError()) : numeric;
 }
 
 function readOptionalNumber(args: FormulaArg[], index: number, context: EvalContext): NumResult | undefined {
@@ -192,7 +194,11 @@ function readOptionalNumber(args: FormulaArg[], index: number, context: EvalCont
   return !arg || isFormulaArgumentKind(arg, 'missing') ? undefined : readNumber(args, index, context);
 }
 
-function confidenceInputs(args: FormulaArg[], context: EvalContext, minimumSize: number): [number, number, number] | FormulaError {
+function confidenceInputs(
+  args: FormulaArg[],
+  context: EvalContext,
+  minimumSize: number,
+): [number, number, number] | FormulaError {
   if (args.length !== 3) return valueError();
   const values = args.map((_, index) => readNumber(args, index, context));
   const firstError = values.find(isError);
@@ -253,12 +259,20 @@ function pairValues(args: FormulaArg[], context: EvalContext, zeroTextCells = fa
   const count = Math.min(left.length, right.length);
   for (let index = 0; index < count; index++) {
     if (left[index]!.cell?.source === 'empty' || right[index]!.cell?.source === 'empty') continue;
-    const xv = numericCell(left[index]!.value) ??
-      (zeroTextCells && left[index]!.cell && (typeof left[index]!.value === 'string' || isFormulaText(left[index]!.value))
-        ? 0 : undefined);
-    const yv = numericCell(right[index]!.value) ??
-      (zeroTextCells && right[index]!.cell && (typeof right[index]!.value === 'string' || isFormulaText(right[index]!.value))
-        ? 0 : undefined);
+    const xv =
+      numericCell(left[index]!.value) ??
+      (zeroTextCells &&
+      left[index]!.cell &&
+      (typeof left[index]!.value === 'string' || isFormulaText(left[index]!.value))
+        ? 0
+        : undefined);
+    const yv =
+      numericCell(right[index]!.value) ??
+      (zeroTextCells &&
+      right[index]!.cell &&
+      (typeof right[index]!.value === 'string' || isFormulaText(right[index]!.value))
+        ? 0
+        : undefined);
     if (xv !== undefined && yv !== undefined) {
       x.push(xv);
       y.push(yv);
@@ -276,18 +290,19 @@ function expressionScalarAgainstRange(args: FormulaArg[], context: EvalContext):
     if (operands[index].length !== 1 || operands[1 - index].length <= 1) return false;
     const value = operands[index][0]!.value;
     if (typeof value === 'number') return false;
-    return (typeof value === 'boolean' || typeof value === 'string' || isFormulaText(value)) &&
-      (arg.kind === 'expression' || arg.kind === 'value' &&
-        (arg.sourceKind === FormulaNodeKind.Boolean || arg.sourceAst?.kind === FormulaNodeKind.Call));
+    return (
+      (typeof value === 'boolean' || typeof value === 'string' || isFormulaText(value)) &&
+      (arg.kind === 'expression' ||
+        (arg.kind === 'value' &&
+          (arg.sourceKind === FormulaNodeKind.Boolean || arg.sourceAst?.kind === FormulaNodeKind.Call)))
+    );
   });
 }
 
 function mean(values: number[]): NumResult {
   if (values.length === 0) return divisionError();
   const total = values.reduce((sum, value) => sum + value, 0);
-  return Number.isFinite(total)
-    ? total / values.length
-    : values.reduce((sum, value) => sum + value / values.length, 0);
+  return Number.isFinite(total) ? total / values.length : values.reduce((sum, value) => sum + value / values.length, 0);
 }
 
 function variance(values: number[], sample: boolean): NumResult {
@@ -318,9 +333,7 @@ function percentile(values: number[], k: number, exclusive: boolean): NumResult 
 
 function interpolate(lower: number, upper: number, fraction: number): number {
   const difference = upper - lower;
-  return Number.isFinite(difference)
-    ? lower + fraction * difference
-    : lower * (1 - fraction) + upper * fraction;
+  return Number.isFinite(difference) ? lower + fraction * difference : lower * (1 - fraction) + upper * fraction;
 }
 
 function rankValue(number: number, values: number[], order: number): number {
@@ -331,8 +344,8 @@ function rankValue(number: number, values: number[], order: number): number {
 }
 
 function betaLog(a: number, b: number): number {
-  const smallInteger = Number.isInteger(a) && a >= 1 && a <= 16 ? a
-    : Number.isInteger(b) && b >= 1 && b <= 16 ? b : undefined;
+  const smallInteger =
+    Number.isInteger(a) && a >= 1 && a <= 16 ? a : Number.isInteger(b) && b >= 1 && b <= 16 ? b : undefined;
   if (smallInteger !== undefined) {
     const other = smallInteger === a ? b : a;
     let result = 0;
@@ -366,9 +379,7 @@ function gamma(value: number): NumResult {
   }
   const nearestInteger = Math.round(value);
   const sinPi = Math.sin(Math.PI * (value - nearestInteger)) * (nearestInteger % 2 === 0 ? 1 : -1);
-  const result = value < 0
-    ? Math.PI / (sinPi * Math.exp(logGamma(1 - value)))
-    : Math.exp(logGamma(value));
+  const result = value < 0 ? Math.PI / (sinPi * Math.exp(logGamma(1 - value))) : Math.exp(logGamma(value));
   return Number.isFinite(result) ? result : numberError();
 }
 
@@ -378,11 +389,11 @@ function logGammaSeriesFactor(shape: number, value: number): number {
   let log1pmx = Math.log1p(relative) - relative;
   if (Math.abs(relative) < 0.1) {
     log1pmx = 0;
-    let term = -relative * relative / 2;
+    let term = (-relative * relative) / 2;
     for (let order = 2; order < 64; order++) {
       log1pmx += term;
       if (Math.abs(term) < 1e-19) break;
-      term *= -relative * order / (order + 1);
+      term *= (-relative * order) / (order + 1);
     }
   }
   const reciprocal = 1 / shape;
@@ -474,16 +485,12 @@ function normalPdf(value: number): number {
 
 function standardize(value: number, average: number, deviation: number): number {
   const difference = value - average;
-  return Number.isFinite(difference)
-    ? difference / deviation
-    : value / deviation - average / deviation;
+  return Number.isFinite(difference) ? difference / deviation : value / deviation - average / deviation;
 }
 
 function scaledNormalQuantile(average: number, deviation: number, quantile: number): number {
   const scaled = deviation * quantile;
-  return Number.isFinite(scaled)
-    ? average + scaled
-    : (average / deviation + quantile) * deviation;
+  return Number.isFinite(scaled) ? average + scaled : (average / deviation + quantile) * deviation;
 }
 
 function normalizeRangeValue(value: number, lower: number, upper: number): number {
@@ -495,9 +502,7 @@ function normalizeRangeValue(value: number, lower: number, upper: number): numbe
 
 function interpolateRange(lower: number, upper: number, fraction: number): number {
   const span = upper - lower;
-  return Number.isFinite(span)
-    ? lower + fraction * span
-    : lower * (1 - fraction) + upper * fraction;
+  return Number.isFinite(span) ? lower + fraction * span : lower * (1 - fraction) + upper * fraction;
 }
 
 function normalInverse(probability: number): NumResult {
@@ -622,9 +627,7 @@ function binomialCdf(successes: number, trials: number, probability: number): Nu
 function chiSquarePdf(value: number, df: number): NumResult {
   if (value < 0 || df <= 0) return numberError();
   if (value === 0) return df < 2 ? numberError() : df === 2 ? 0.5 : 0;
-  const density = Math.exp(
-    (df / 2 - 1) * Math.log(value) - value / 2 - (df / 2) * Math.log(2) - logGamma(df / 2),
-  );
+  const density = Math.exp((df / 2 - 1) * Math.log(value) - value / 2 - (df / 2) * Math.log(2) - logGamma(df / 2));
   return Number.isFinite(density) ? density : numberError();
 }
 
@@ -669,7 +672,7 @@ function fCdf(value: number, df1: number, df2: number): NumResult {
 
 function fRightTail(value: number, df1: number, df2: number): NumResult {
   if (value < 0 || df1 <= 0 || df2 <= 0) return numberError();
-  const ratio = (df2 / df1) / value;
+  const ratio = df2 / df1 / value;
   const fraction = value >= 1 ? ratio / (1 + ratio) : df2 / (df1 * value + df2);
   return regularizedBeta(fraction, df2 / 2, df1 / 2);
 }
@@ -718,7 +721,11 @@ function numericMatrixFromArg(arg: FormulaArg, context: EvalContext): Array<Arra
   return result;
 }
 
-function linearRegression(x: number[], y: number[], includeConstant = true): { slope: number; intercept: number } | FormulaError {
+function linearRegression(
+  x: number[],
+  y: number[],
+  includeConstant = true,
+): { slope: number; intercept: number } | FormulaError {
   if (x.length !== y.length || x.length < 2) return divisionError();
   if (!includeConstant) {
     const xScale = x.reduce((scale, value) => Math.max(scale, Math.abs(value)), 0);
@@ -780,12 +787,15 @@ function exactIntegerRegression(x: number[], y: number[]): { slope: number; inte
 
 function regressionDetails(coefficients: number[], statistics: RegressionStatistics): FormulaValue[][] {
   const unavailable = () => notAvailable();
-  const finite = (value: number) => Number.isFinite(value) ? value : numberError();
-  const padded = (first: FormulaValue, second: FormulaValue) =>
-    [first, second, ...Array.from({ length: coefficients.length - 2 }, unavailable)];
+  const finite = (value: number) => (Number.isFinite(value) ? value : numberError());
+  const padded = (first: FormulaValue, second: FormulaValue) => [
+    first,
+    second,
+    ...Array.from({ length: coefficients.length - 2 }, unavailable),
+  ];
   return [
     coefficients,
-    statistics.standardErrors.map((value) => Number.isFinite(value) ? value : unavailable()),
+    statistics.standardErrors.map((value) => (Number.isFinite(value) ? value : unavailable())),
     padded(finite(statistics.rSquared), finite(statistics.standardErrorY)),
     padded(finite(statistics.fStatistic), statistics.degreesOfFreedom),
     padded(finite(statistics.regressionSumSquares), finite(statistics.residualSumSquares)),
@@ -958,8 +968,13 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       if (isError(values)) return values;
       if (values.length === 0) {
         const reference = args.length === 1 ? resolveConditionalReference(args[0], context) : undefined;
-        if (reference && !isError(reference) && reference.startRow === reference.endRow &&
-          reference.startCol === reference.endCol) return error(FormulaErrorCode.NotAvailable);
+        if (
+          reference &&
+          !isError(reference) &&
+          reference.startRow === reference.endRow &&
+          reference.startCol === reference.endCol
+        )
+          return error(FormulaErrorCode.NotAvailable);
         return numberError();
       }
       if (values.some((value) => value <= 0)) return numberError();
@@ -1051,15 +1066,22 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
     case 'QUARTILE.INC': {
       if (args.length !== 2) return valueError();
       const isQuartile = name.startsWith('QUARTILE');
-      if (isQuartile && args[0]?.kind === 'value' &&
+      if (
+        isQuartile &&
+        args[0]?.kind === 'value' &&
         args[0].sourceKind === FormulaNodeKind.String &&
-        typeof args[0].value === 'string' && Number.isNaN(Number(args[0].value)) &&
-        numericDateText(args[0].value, context) !== undefined) return numberError();
+        typeof args[0].value === 'string' &&
+        Number.isNaN(Number(args[0].value)) &&
+        numericDateText(args[0].value, context) !== undefined
+      )
+        return numberError();
       const direct = directStatisticalNumber(args[0]!, context);
       if (isError(direct)) return direct;
       const values = isBlankScalarInput(args[0]!, context)
         ? []
-        : direct === undefined ? numericValues([args[0]!], context) : [direct];
+        : direct === undefined
+        ? numericValues([args[0]!], context)
+        : [direct];
       if (isError(values)) return values;
       const parameter = readNumber(args, 1, context);
       if (isError(parameter)) return parameter;
@@ -1118,9 +1140,12 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
         const text = isFormulaText(raw) ? raw.value : raw;
         if (typeof text === 'string') {
           const normalized = text.trim();
-          order = /^true$/i.test(normalized) ? 1
-            : /^false$/i.test(normalized) ? 0
-            : /^[+-]?\d+$/.test(normalized) ? Number(normalized)
+          order = /^true$/i.test(normalized)
+            ? 1
+            : /^false$/i.test(normalized)
+            ? 0
+            : /^[+-]?\d+$/.test(normalized)
+            ? Number(normalized)
             : valueError();
         } else if (typeof text === 'number') order = text;
         else if (typeof text === 'boolean') order = Number(text);
@@ -1129,7 +1154,7 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       if (isError(order)) return order;
       if (values.length === 0) return notAvailable();
       const descending = order === 0;
-      const betterCount = values.filter((value) => descending ? value > target : value < target).length;
+      const betterCount = values.filter((value) => (descending ? value > target : value < target)).length;
       const equalCount = values.filter((value) => value === target).length;
       if (equalCount === 0) return notAvailable();
       const rank = betterCount + 1;
@@ -1193,8 +1218,10 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
     case 'FREQUENCY': {
       if (args.length !== 2) return valueError();
       const dataArg = args[0]!;
-      if (dataArg.kind === 'value' &&
-        (dataArg.sourceKind === FormulaNodeKind.String || dataArg.sourceKind === FormulaNodeKind.Boolean))
+      if (
+        dataArg.kind === 'value' &&
+        (dataArg.sourceKind === FormulaNodeKind.String || dataArg.sourceKind === FormulaNodeKind.Boolean)
+      )
         return valueError();
       const data = isBlankScalarInput(args[0]!, context) ? [] : numericValues([args[0]!], context);
       const binReference = resolveConditionalReference(args[1]!, context);
@@ -1202,31 +1229,42 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       const binEntries = binReference ? entriesForArg(args[1]!, context) : undefined;
       if (isError(binEntries)) return binEntries;
       const binArg = args[1]!;
-      if (!binEntries && binArg.kind === 'value' &&
-        (binArg.sourceKind === FormulaNodeKind.String || binArg.sourceKind === FormulaNodeKind.Boolean))
+      if (
+        !binEntries &&
+        binArg.kind === 'value' &&
+        (binArg.sourceKind === FormulaNodeKind.String || binArg.sourceKind === FormulaNodeKind.Boolean)
+      )
         return valueError();
       const bins = binEntries
-        ? binEntries.filter((entry) => !isBlankEntry(entry)).map((entry) => isError(entry.value)
-          ? entry.value
-          : binEntries.length > 1 && typeof entry.value === 'boolean'
-            ? undefined
-            : numericCell(entry.value) ?? 0)
+        ? binEntries
+            .filter((entry) => !isBlankEntry(entry))
+            .map((entry) =>
+              isError(entry.value)
+                ? entry.value
+                : binEntries.length > 1 && typeof entry.value === 'boolean'
+                ? undefined
+                : numericCell(entry.value) ?? 0,
+            )
         : numericValues([args[1]!], context);
       if (isError(data)) return data;
       if (isError(bins)) return bins;
       const binError = bins.find(isError);
       if (binError) return binError;
-      const orderedBins = bins.map((value, index) => ({ value, index }))
+      const orderedBins = bins
+        .map((value, index) => ({ value, index }))
         .filter((bin) => bin.value !== undefined)
         .sort((left, right) => left.value - right.value || left.index - right.index);
       const counts = Array(bins.length).fill(0);
       orderedBins.forEach((bin, index) => {
-        counts[bin.index] = data.filter((value) =>
-          value <= bin.value && (index === 0 || value > orderedBins[index - 1]!.value)).length;
+        counts[bin.index] = data.filter(
+          (value) => value <= bin.value && (index === 0 || value > orderedBins[index - 1]!.value),
+        ).length;
       });
-      counts.push(orderedBins.length === 0
-        ? data.length
-        : data.filter((value) => value > orderedBins[orderedBins.length - 1]!.value).length);
+      counts.push(
+        orderedBins.length === 0
+          ? data.length
+          : data.filter((value) => value > orderedBins[orderedBins.length - 1]!.value).length,
+      );
       return counts.map((value) => [value]);
     }
     case 'COVARIANCE.P':
@@ -1303,17 +1341,22 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       if (args.length < 1 || args.length > 4) return valueError();
       const constantIndex = name === 'LOGEST' || name === 'LINEST' ? 2 : 3;
       const constantArg = args[constantIndex];
-      const includeConstant = constantArg && constantArg.kind !== 'missing'
-        ? readBoolean(args, constantIndex, context)
-        : true;
+      const includeConstant =
+        constantArg && constantArg.kind !== 'missing' ? readBoolean(args, constantIndex, context) : true;
       if (isError(includeConstant)) return valueError();
-      const includeStatistics = (name === 'LINEST' || name === 'LOGEST') &&
-        args[3] && args[3].kind !== 'missing' ? readBoolean(args, 3, context) : false;
+      const includeStatistics =
+        (name === 'LINEST' || name === 'LOGEST') && args[3] && args[3].kind !== 'missing'
+          ? readBoolean(args, 3, context)
+          : false;
       if (isError(includeStatistics)) return valueError();
       const knownXArg = args[1];
-      if ((name === 'LINEST' || name === 'LOGEST') && knownXArg?.kind === 'value' &&
+      if (
+        (name === 'LINEST' || name === 'LOGEST') &&
+        knownXArg?.kind === 'value' &&
         (knownXArg.sourceKind === FormulaNodeKind.Boolean || knownXArg.sourceKind === FormulaNodeKind.String) &&
-        knownXArg.sourceAst?.kind !== FormulaNodeKind.Call) return valueError();
+        knownXArg.sourceAst?.kind !== FormulaNodeKind.Call
+      )
+        return valueError();
       const yShape = regressionInputShape(args[0]!, context);
       if (isError(yShape)) return yShape;
       const hasKnownX = args[1] && args[1].kind !== 'missing';
@@ -1327,16 +1370,19 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
         if (isError(yMatrix)) return yMatrix;
         if (isError(xMatrix)) return xMatrix;
         const yValues = yMatrix.flat();
-        if (yValues.some((value) => value === undefined) || xMatrix.some((row) => row.some((value) => value === undefined)))
+        if (
+          yValues.some((value) => value === undefined) ||
+          xMatrix.some((row) => row.some((value) => value === undefined))
+        )
           return valueError();
         const predictors = verticalMultipleX
-          ? xMatrix as number[][]
-          : Array.from({ length: yValues.length }, (_, index) => xMatrix.map((row) => row[index]!)) as number[][];
+          ? (xMatrix as number[][])
+          : (Array.from({ length: yValues.length }, (_, index) => xMatrix.map((row) => row[index]!)) as number[][]);
         const exponential = name === 'GROWTH' || name === 'LOGEST';
         if (exponential && yValues.some((value) => value! <= 0)) return numberError();
         const model = multipleRegression(
           predictors,
-          exponential ? (yValues as number[]).map(Math.log) : yValues as number[],
+          exponential ? (yValues as number[]).map(Math.log) : (yValues as number[]),
           includeConstant,
           includeStatistics,
         );
@@ -1346,26 +1392,36 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
           const output = name === 'LOGEST' ? coefficients.map(Math.exp) : coefficients;
           return includeStatistics ? regressionDetails(output, model.statistics!) : [output];
         }
-        const predictionMatrix = args[2] && args[2].kind !== 'missing'
-          ? numericMatrixFromArg(args[2]!, context) : xMatrix;
+        const predictionMatrix =
+          args[2] && args[2].kind !== 'missing' ? numericMatrixFromArg(args[2]!, context) : xMatrix;
         if (isError(predictionMatrix)) return valueError();
         const predictorCount = model.coefficients.length;
         const predictionRows = verticalMultipleX
-          ? predictionMatrix as number[][]
+          ? (predictionMatrix as number[][])
           : Array.from({ length: predictionMatrix[0]?.length ?? 0 }, (_, index) =>
-            predictionMatrix.map((row) => row[index]!));
-        if (!predictionRows.length || predictionRows.some((row) =>
-          row.length !== predictorCount || row.some((value) => value === undefined))) return valueError();
+              predictionMatrix.map((row) => row[index]!),
+            );
+        if (
+          !predictionRows.length ||
+          predictionRows.some((row) => row.length !== predictorCount || row.some((value) => value === undefined))
+        )
+          return valueError();
         const predictions = predictionRows.map((row) => {
-          const value = row.reduce((sum, predictor, index) => sum + predictor * model.coefficients[index]!, model.intercept);
+          const value = row.reduce(
+            (sum, predictor, index) => sum + predictor * model.coefficients[index]!,
+            model.intercept,
+          );
           return exponential ? Math.exp(value) : value;
         });
         return horizontalMultipleX ? [predictions] : predictions.map((value) => [value]);
       }
       const scalarYWithMultipleX = regressionInputSize(yShape) === 1 && regressionInputSize(xShape) > 1;
       if (!scalarYWithMultipleX && !sameRegressionInputShape(yShape, xShape)) {
-        if ((name === 'TREND' || name === 'GROWTH') && knownXArg?.kind === 'value' &&
-          (knownXArg.sourceKind === FormulaNodeKind.String || knownXArg.sourceKind === FormulaNodeKind.Boolean))
+        if (
+          (name === 'TREND' || name === 'GROWTH') &&
+          knownXArg?.kind === 'value' &&
+          (knownXArg.sourceKind === FormulaNodeKind.String || knownXArg.sourceKind === FormulaNodeKind.Boolean)
+        )
           return valueError();
         return error(FormulaErrorCode.Reference);
       }
@@ -1373,8 +1429,7 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       const y = numericValues([args[0]!], context);
       if (isError(y)) return scalarYWithMultipleX ? valueError() : y;
       if (scalarYWithMultipleX && y.length === 0) return valueError();
-      const x =
-        hasKnownX ? numericValues([args[1]!], context) : y.map((_, index) => index + 1);
+      const x = hasKnownX ? numericValues([args[1]!], context) : y.map((_, index) => index + 1);
       if (isError(x)) return x;
       const exponential = name === 'GROWTH' || name === 'LOGEST';
       if (y.length > 1 && x.length === 1) return error(FormulaErrorCode.Reference);
@@ -1382,55 +1437,61 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       if ((name === 'LOGEST' || name === 'LINEST') && !scalarYWithMultipleX && y.length !== x.length)
         return valueError();
       if ((name === 'TREND' || name === 'GROWTH') && y.length > 1 && y.length !== x.length)
-        return hasKnownX && x.length < regressionInputSize(xShape)
-          ? valueError()
-          : error(FormulaErrorCode.Reference);
+        return hasKnownX && x.length < regressionInputSize(xShape) ? valueError() : error(FormulaErrorCode.Reference);
       if (exponential && y.some((value) => value <= 0)) return numberError();
-      if ((name === 'TREND' || name === 'GROWTH') && y.length !== x.length)
-        return error(FormulaErrorCode.Reference);
+      if ((name === 'TREND' || name === 'GROWTH') && y.length !== x.length) return error(FormulaErrorCode.Reference);
       const values = exponential ? y.map((value) => Math.log(value)) : y;
-      const model = y.length === 1 && x.length > 1
-        ? { slope: 0, intercept: values[0]! }
-        : linearRegression(x, values, includeConstant);
+      const model =
+        y.length === 1 && x.length > 1
+          ? { slope: 0, intercept: values[0]! }
+          : linearRegression(x, values, includeConstant);
       if (isError(model)) return model;
       if (name === 'LOGEST') {
         const coefficients = [model.slope, model.intercept].map((value) => {
           const exponential = Math.exp(value);
           const nearestInteger = Math.round(exponential);
-          return Math.abs(exponential - nearestInteger) <=
-            2 * Number.EPSILON * Math.max(1, Math.abs(exponential))
+          return Math.abs(exponential - nearestInteger) <= 2 * Number.EPSILON * Math.max(1, Math.abs(exponential))
             ? nearestInteger
             : exponential;
         });
         if (!includeStatistics) return [coefficients];
-        const details = multipleRegression(x.map((value) => [value]), values, includeConstant, true);
+        const details = multipleRegression(
+          x.map((value) => [value]),
+          values,
+          includeConstant,
+          true,
+        );
         return details ? regressionDetails(coefficients, details.statistics!) : divisionError();
       }
       if (name === 'LINEST') {
         const coefficients = [model.slope, model.intercept];
         if (!includeStatistics) return [coefficients];
-        const details = multipleRegression(x.map((value) => [value]), values, includeConstant, true);
+        const details = multipleRegression(
+          x.map((value) => [value]),
+          values,
+          includeConstant,
+          true,
+        );
         return details ? regressionDetails(coefficients, details.statistics!) : divisionError();
       }
       const newX = args[2] && args[2].kind !== 'missing' ? numericValues([args[2]!], context) : x;
       if (isError(newX) || newX.length === 0) return valueError();
-      const predictions = newX.map((value) => exponential
-        ? Math.exp(model.intercept + model.slope * value)
-        : model.intercept + model.slope * value);
+      const predictions = newX.map((value) =>
+        exponential ? Math.exp(model.intercept + model.slope * value) : model.intercept + model.slope * value,
+      );
       if (args[2] && args[2].kind !== 'missing') {
         const predictionShape = regressionInputShape(args[2], context);
         if (isError(predictionShape)) return predictionShape;
         if (regressionInputSize(predictionShape) === predictions.length && predictionShape[1] > 1) {
           return Array.from({ length: predictionShape[0] }, (_, row) =>
-            predictions.slice(row * predictionShape[1], (row + 1) * predictionShape[1]));
+            predictions.slice(row * predictionShape[1], (row + 1) * predictionShape[1]),
+          );
         }
       }
       return predictions.map((value) => [value]);
     }
     case 'FISHER':
-      return unary((value) =>
-        value <= -1 || value >= 1 ? numberError() : Math.atanh(value),
-      );
+      return unary((value) => (value <= -1 || value >= 1 ? numberError() : Math.atanh(value)));
     case 'FISHERINV':
       return unary(Math.tanh);
     case 'GAMMA':
@@ -1569,8 +1630,7 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       const cumulative = readBoolean(args, 3, context);
       if ([successes, trials, probability, cumulative].some(isError))
         return [successes, trials, probability, cumulative].find(isError) as FormulaError;
-      if (successes < 0 || trials < 0 || probability < 0 || probability > 1)
-        return numberError();
+      if (successes < 0 || trials < 0 || probability < 0 || probability > 1) return numberError();
       const wholeSuccesses = Math.trunc(successes);
       const wholeTrials = Math.trunc(trials);
       if (wholeSuccesses > wholeTrials) return numberError();
@@ -1586,8 +1646,7 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       const upper = readNumber(args, 3, context, lower as number);
       if ([trials, probability, lower, upper].some(isError))
         return [trials, probability, lower, upper].find(isError) as FormulaError;
-      if (trials < 0 || probability < 0 || probability > 1 || lower < 0 || upper < lower)
-        return numberError();
+      if (trials < 0 || probability < 0 || probability > 1 || lower < 0 || upper < lower) return numberError();
       const wholeTrials = Math.trunc(trials);
       const wholeLower = Math.trunc(lower);
       const wholeUpper = Math.trunc(upper);
@@ -1688,30 +1747,43 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       const populationValue = readNumber(args, 3, context);
       const cumulative = readBoolean(args, 4, context);
       if ([sampleValue, sampleSizeValue, populationSuccessValue, populationValue, cumulative].some(isError))
-        return [sampleValue, sampleSizeValue, populationSuccessValue, populationValue, cumulative].find(isError) as FormulaError;
-      if (![sampleValue, sampleSizeValue, populationSuccessValue, populationValue].every(Number.isFinite) ||
-        sampleValue < 0 || sampleSizeValue < 0 || populationSuccessValue < 0 || populationValue < 0)
+        return [sampleValue, sampleSizeValue, populationSuccessValue, populationValue, cumulative].find(
+          isError,
+        ) as FormulaError;
+      if (
+        ![sampleValue, sampleSizeValue, populationSuccessValue, populationValue].every(Number.isFinite) ||
+        sampleValue < 0 ||
+        sampleSizeValue < 0 ||
+        populationSuccessValue < 0 ||
+        populationValue < 0
+      )
         return numberError();
       const sample = Math.trunc(sampleValue);
       const sampleSize = Math.trunc(sampleSizeValue);
       const populationSuccess = Math.trunc(populationSuccessValue);
       const population = Math.trunc(populationValue);
-      const booleanEmptySample = args[1]?.kind === 'value' &&
-        args[1].sourceKind === FormulaNodeKind.Boolean && sampleSize === 0;
-      if (sampleSize > population || populationSuccess > population ||
+      const booleanEmptySample =
+        args[1]?.kind === 'value' && args[1].sourceKind === FormulaNodeKind.Boolean && sampleSize === 0;
+      if (
+        sampleSize > population ||
+        populationSuccess > population ||
         sample < Math.max(0, sampleSize + populationSuccess - population) ||
-        (sample > Math.min(sampleSize, populationSuccess) && !booleanEmptySample)) return numberError();
+        (sample > Math.min(sampleSize, populationSuccess) && !booleanEmptySample)
+      )
+        return numberError();
       if (booleanEmptySample && sample > 0) return cumulative ? 1 : 0;
       const hyper = (value: number) =>
-        value < Math.max(0, sampleSize + populationSuccess - population) ? 0 : Math.exp(
-          logGamma(populationSuccess + 1) -
-            logGamma(value + 1) -
-            logGamma(populationSuccess - value + 1) +
-            logGamma(population - populationSuccess + 1) -
-            logGamma(sampleSize - value + 1) -
-            logGamma(population - populationSuccess - sampleSize + value + 1) -
-            (logGamma(population + 1) - logGamma(sampleSize + 1) - logGamma(population - sampleSize + 1)),
-        );
+        value < Math.max(0, sampleSize + populationSuccess - population)
+          ? 0
+          : Math.exp(
+              logGamma(populationSuccess + 1) -
+                logGamma(value + 1) -
+                logGamma(populationSuccess - value + 1) +
+                logGamma(population - populationSuccess + 1) -
+                logGamma(sampleSize - value + 1) -
+                logGamma(population - populationSuccess - sampleSize + value + 1) -
+                (logGamma(population + 1) - logGamma(sampleSize + 1) - logGamma(population - sampleSize + 1)),
+            );
       if (!cumulative) return hyper(sample);
       let total = 0;
       for (let value = 0; value <= sample; value++) total += hyper(value);
@@ -1779,19 +1851,18 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       }
       const upperTail = name === 'F.INV.RT';
       if (upperTail ? xOrP <= 0 || xOrP > 1 : xOrP < 0 || xOrP >= 1) return numberError();
-      if (upperTail && xOrP === 1 || !upperTail && xOrP === 0) return 0;
+      if ((upperTail && xOrP === 1) || (!upperTail && xOrP === 0)) return 0;
       if (xOrP === 0.5 && degrees1 === degrees2) return 1;
       if (degrees2 === 2) {
         const cumulative = upperTail ? 1 - xOrP : xOrP;
         const powered = Math.pow(cumulative, 2 / degrees1);
-        const exponent = 2 * (upperTail && xOrP < 1e-8 ? Math.log1p(-xOrP) : Math.log(cumulative)) / degrees1;
+        const exponent = (2 * (upperTail && xOrP < 1e-8 ? Math.log1p(-xOrP) : Math.log(cumulative))) / degrees1;
         const gap = 1 - powered || -Math.expm1(exponent);
-        return 2 * powered / (degrees1 * gap);
+        return (2 * powered) / (degrees1 * gap);
       }
       const inverse = inverseCdf(
-        (value) => (upperTail
-          ? (fRightTail(value, degrees1, degrees2) as number)
-          : (fCdf(value, degrees1, degrees2) as number)),
+        (value) =>
+          upperTail ? (fRightTail(value, degrees1, degrees2) as number) : (fCdf(value, degrees1, degrees2) as number),
         xOrP,
         0,
         100,
@@ -1830,7 +1901,7 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       const p = readNumber(args, 0, context);
       const df = readNumber(args, 1, context);
       if (isError(p) || isError(df)) return isError(p) ? p : df;
-      if (df < 1 || p <= 0 || p > 1 || name === 'T.INV' && p === 1) return numberError();
+      if (df < 1 || p <= 0 || p > 1 || (name === 'T.INV' && p === 1)) return numberError();
       if (p === 1) return 0;
       if (name === 'T.INV' && p === 0.5) return 0;
       const degrees = Math.trunc(df);
@@ -1895,7 +1966,8 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       if (
         actualShape.length !== expectedShape.length ||
         actualShape.some((row, index) => row.length !== expectedShape[index]?.length)
-      ) return notAvailable();
+      )
+        return notAvailable();
       const actual = numericMatrixFromArg(args[0]!, context);
       const expected = numericMatrixFromArg(args[1]!, context);
       if (isError(actual) || isError(expected)) return isError(actual) ? actual : expected;
@@ -1936,8 +2008,8 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       if (isError(pair)) return pair;
       const tails = readNumber(args, 2, context);
       if (isError(tails) || isError(type) || pair.length !== 2) return isError(tails) ? tails : type;
-      if (!Number.isInteger(tails) || !Number.isInteger(type) ||
-        tails < 1 || tails > 2 || type < 1 || type > 3) return numberError();
+      if (!Number.isInteger(tails) || !Number.isInteger(type) || tails < 1 || tails > 2 || type < 1 || type > 3)
+        return numberError();
       if (type === 1 && leftShape.flat().length !== rightShape.flat().length) return notAvailable();
       const left = pair[0]!;
       const right = pair[1]!;
@@ -1977,15 +2049,14 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
     case 'Z.TEST':
     case 'ZTEST': {
       if (args.length < 2 || args.length > 3) return valueError();
-      const singleCell = isFormulaArgumentKind(args[0]!, FormulaNodeKind.Cell) ||
+      const singleCell =
+        isFormulaArgumentKind(args[0]!, FormulaNodeKind.Cell) ||
         isFormulaArgumentKind(args[0]!, FormulaNodeKind.WorkbookCell);
       if (isBlankScalarInput(args[0]!, context))
         return singleCell ? divisionError() : error(FormulaErrorCode.NotAvailable);
       const direct = directStatisticalNumber(args[0]!, context);
       if (isError(direct)) return direct;
-      const values = direct === undefined
-        ? numericValues([args[0]!], context)
-        : [direct];
+      const values = direct === undefined ? numericValues([args[0]!], context) : [direct];
       const target = readNumber(args, 1, context);
       const sigma = readOptionalNumber(args, 2, context);
       if (isError(values) || isError(target) || isError(sigma))
@@ -1995,9 +2066,7 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       if (sigma === undefined && values.length < 2) return divisionError();
       const sampleRoot = name === 'ZTEST' ? Math.fround(Math.sqrt(values.length)) : Math.sqrt(values.length);
       const standardError =
-        sigma === undefined
-          ? (standardDeviation(values, true) as number) / sampleRoot
-          : sigma / sampleRoot;
+        sigma === undefined ? (standardDeviation(values, true) as number) / sampleRoot : sigma / sampleRoot;
       if (!Number.isFinite(standardError) || standardError === 0) return divisionError();
       return normalCdf(-(((mean(values) as number) - target) / standardError));
     }
@@ -2040,26 +2109,36 @@ function evaluateStatistics(name: string, args: FormulaArg[], context: EvalConte
       if (isError(values) || isError(probabilities) || isError(lower) || isError(upper))
         return [values, probabilities, lower, upper].find(isError) as FormulaError;
       if (valueEntries.length !== probabilityEntries.length) {
-        for (const [arg, source] of [[args[0]!, valueEntries], [args[1]!, probabilityEntries]] as const) {
-          if (source.length !== 1 || arg.kind === 'value' && Array.isArray(arg.value)) continue;
+        for (const [arg, source] of [
+          [args[0]!, valueEntries],
+          [args[1]!, probabilityEntries],
+        ] as const) {
+          if (source.length !== 1 || (arg.kind === 'value' && Array.isArray(arg.value))) continue;
           if (typeof source[0]!.value !== 'number') return valueError();
         }
         return notAvailable();
       }
-      for (const [source, parsed] of [[valueEntries, values], [probabilityEntries, probabilities]] as const) {
+      for (const [source, parsed] of [
+        [valueEntries, values],
+        [probabilityEntries, probabilities],
+      ] as const) {
         if (source.length !== 1 || parsed.length !== 0) continue;
         const value = source[0]!.value;
         const text = isFormulaText(value) ? value.value : value;
         if (typeof text === 'string' && (text === '' || !Number.isFinite(Number(text)))) return valueError();
       }
-      if ((valueEntries.length === 1 && values.length === 0) ||
-        (probabilityEntries.length === 1 && probabilities.length === 0)) return valueError();
+      if (
+        (valueEntries.length === 1 && values.length === 0) ||
+        (probabilityEntries.length === 1 && probabilities.length === 0)
+      )
+        return valueError();
       if (
         values.length !== valueEntries.length ||
         probabilities.length !== probabilityEntries.length ||
         probabilities.some((probability: number) => probability <= 0 || probability > 1) ||
         Math.abs(probabilities.reduce((sum: number, probability: number) => sum + probability, 0) - 1) > 1e-10
-      ) return numberError();
+      )
+        return numberError();
       return values.reduce(
         (sum, value, index) => sum + (value >= lower && value <= upper ? probabilities[index]! : 0),
         0,

@@ -7,15 +7,8 @@ import {
   moveCursorCommand,
   type DocCommandContext,
 } from '../src';
-import type { DocSelection, DocCursorPos, RichDocNode } from '@searsuite/sear-domain-doc';
-import type {
-  NodeSchema,
-  RichDocOTOperation,
-  InsertStringOTOperation,
-  DeleteStringOTOperation,
-  InsertNodeOTOperation,
-  DeleteNodeOTOperation,
-} from '@searsuite/sear-domain-ot';
+import type { DocSelection, RichDocNode } from '@searsuite/sear-domain-doc';
+import type { NodeSchema, InsertStringOTOperation, DeleteStringOTOperation } from '@searsuite/sear-domain-ot';
 import { RichDocOT, RichDocOTActionName } from '@searsuite/sear-domain-ot';
 
 function makeDoc(...paragraphs: string[]): RichDocNode[] {
@@ -210,7 +203,7 @@ describe('inputCommand', () => {
     const tr = inputCommand('X')(new DocTransaction(), state);
     const { doc, sel } = applyTransaction(state, tr);
     expect(doc).toHaveLength(1);
-    expect(doc[0].content.map((node) => 'text' in node ? node.text : '').join('')).toBe('helloX!');
+    expect(doc[0].content.map((node) => ('text' in node ? node.text : '')).join('')).toBe('helloX!');
     expect(sel.head).toEqual({ path: [0, 0], offset: 6 });
     const root = { type: 'doc', content: doc } as NodeSchema;
     const restored = RichDocOT.apply(root, RichDocOT.invert(tr.steps.flatMap((step) => step.ops)));
@@ -225,7 +218,7 @@ describe('inputCommand', () => {
       { type: 'text', text: 'ef' },
     ] as unknown as RichDocNode['content'];
     const { doc, sel } = applyTransaction(state, inputCommand('X')(new DocTransaction(), state));
-    expect(doc[0].content.map((node) => 'text' in node ? node.text : '')).toEqual(['aX', 'd', 'ef']);
+    expect(doc[0].content.map((node) => ('text' in node ? node.text : ''))).toEqual(['aX', 'd', 'ef']);
     expect(doc[0].content[1].attrs).toEqual({ textStyle: { italic: true } });
     expect(sel.head).toEqual({ path: [0, 0], offset: 2 });
   });
@@ -288,7 +281,7 @@ describe('deleteBackwardCommand', () => {
     const state = makeState(['abc', 'def'], [0, 0], 1, [1, 0], 2);
     const { doc, sel } = applyTransaction(state, deleteBackwardCommand()(new DocTransaction(), state));
     expect(doc).toHaveLength(1);
-    expect(doc[0].content.map((node) => 'text' in node ? node.text : '').join('')).toBe('af');
+    expect(doc[0].content.map((node) => ('text' in node ? node.text : '')).join('')).toBe('af');
     expect(sel.head).toEqual({ path: [0, 0], offset: 1 });
   });
 

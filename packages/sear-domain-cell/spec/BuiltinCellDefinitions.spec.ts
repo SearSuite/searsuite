@@ -6,7 +6,7 @@ import {
   FunctionRegistry,
 } from '@searsuite/sear-domain-formula-engine-ts';
 import { type EvalContext, type FormulaValue } from '@searsuite/sear-domain-formula-engine';
-import { extractRichText, formatFormulaValue } from '@searsuite/sear-render-registry';
+import { extractRichText, formatFormulaValue } from '@searsuite/sear-domain-cell-types';
 import {
   EmptyCellTypeDefinition,
   StringCellTypeDefinition,
@@ -15,13 +15,10 @@ import {
   FormulaCellTypeDefinition,
   createBuiltinCellDefinitions,
   registerBuiltinCellDefinitions,
-  AffixCellRenderDefinition,
-  EditorCellRenderDefinition,
 } from '../src/BuiltinCellDefinitions';
 import { CellTypeCatalog } from '../src/CellTypeCatalog';
 import { CellTypeDefinition } from '../src/CellTypeDefinition';
-import { defineCellRenderer } from '../src/CellRendererDefinition';
-import { CellRendererDefinition } from '../src/CellRendererDefinition';
+
 import { type CellDisplayContext } from '../src/CellDisplayTextRegistry';
 
 describe('BuiltinCellDefinitions', () => {
@@ -30,7 +27,6 @@ describe('BuiltinCellDefinitions', () => {
       const def = new EmptyCellTypeDefinition();
       expect(def.type).toBe(CellType.Empty);
       expect(def.createCommitStrategies().length).toBe(1);
-      expect(def.createRenderer()).toBeDefined();
     });
   });
 
@@ -39,7 +35,6 @@ describe('BuiltinCellDefinitions', () => {
       const def = new StringCellTypeDefinition();
       expect(def.type).toBe(CellType.String);
       expect(def.createCommitStrategies().length).toBe(2);
-      expect(def.createRenderer()).toBeDefined();
     });
 
     it('validates stored value', () => {
@@ -62,7 +57,6 @@ describe('BuiltinCellDefinitions', () => {
       const def = new NumberCellTypeDefinition();
       expect(def.type).toBe(CellType.Number);
       expect(def.createCommitStrategies().length).toBe(1);
-      expect(def.createRenderer()).toBeDefined();
     });
 
     it('validates stored value', () => {
@@ -88,7 +82,6 @@ describe('BuiltinCellDefinitions', () => {
       const def = new RichTextCellTypeDefinition();
       expect(def.type).toBe(CellType.RichText);
       expect(def.createCommitStrategies().length).toBe(1);
-      expect(def.createRenderer()).toBeDefined();
     });
 
     it('validates stored value', () => {
@@ -113,7 +106,6 @@ describe('BuiltinCellDefinitions', () => {
       const def = new FormulaCellTypeDefinition();
       expect(def.type).toBe(CellType.Formula);
       expect(def.createCommitStrategies().length).toBe(1);
-      expect(def.createRenderer()).toBeDefined();
     });
 
     it('validates stored value', () => {
@@ -148,10 +140,16 @@ describe('BuiltinCellDefinitions', () => {
       mockProvider.getFormulaResult.mockReturnValueOnce('text');
       expect(provider.getDisplayText({ type: CellType.Formula }, contextString)).toBe(formatFormulaValue('text'));
 
-      mockProvider.getFormulaResult.mockReturnValueOnce([[1, 2], [3, 4]]);
+      mockProvider.getFormulaResult.mockReturnValueOnce([
+        [1, 2],
+        [3, 4],
+      ]);
       expect(provider.getDisplayText({ type: CellType.Formula }, contextString)).toBe('1');
 
-      mockProvider.getFormulaResult.mockReturnValueOnce([[1, 2], [3, 4]]);
+      mockProvider.getFormulaResult.mockReturnValueOnce([
+        [1, 2],
+        [3, 4],
+      ]);
       expect(provider.getDisplayText({ type: CellType.Formula }, contextNumber)).toBe('1');
     });
 
@@ -171,15 +169,6 @@ describe('BuiltinCellDefinitions', () => {
       expect(provider.getDisplayText({ type: CellType.Formula, format: { kind: 'excelCode', code } }, context)).toBe(
         evaluateFormula(`=TEXT(1234.5,"${code}")`),
       );
-    });
-  });
-
-  describe('Affix and Editor definitions', () => {
-    it('creates correct renderer definitions', () => {
-      const affix = new AffixCellRenderDefinition();
-      expect(affix.createRenderer()).toBeDefined();
-      const editor = new EditorCellRenderDefinition();
-      expect(editor.createRenderer()).toBeDefined();
     });
   });
 
@@ -215,9 +204,6 @@ function evaluateFormula(formula: string): FormulaValue {
 
 class MockCellTypeDefinition extends CellTypeDefinition {
   readonly type = 'mock';
-  override createRenderer(): CellRendererDefinition {
-    return { type: this.type } as unknown as CellRendererDefinition;
-  }
 }
 
 describe('CellTypeDefinition', () => {

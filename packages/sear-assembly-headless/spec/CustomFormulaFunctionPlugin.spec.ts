@@ -1,11 +1,15 @@
 /** @jest-environment node */
 
 import {
-  createHeadlessEditor, type HeadlessEditor, type HeadlessEditorOptions,
-  type HeadlessWorkbookEditor, type HeadlessWorkbookEditorOptions,
+  createHeadlessWorkbookEditor,
+  createHeadlessEditor,
+  type HeadlessEditor,
+  type HeadlessEditorOptions,
+  type HeadlessWorkbookEditor,
+  type HeadlessWorkbookEditorOptions,
 } from '../src';
 import { defineSheetCommand, LocalActionCommand } from '@searsuite/sear-assembly-commands';
-import { SheetMatrix } from '@searsuite/sear-assembly-core';
+import { SheetMatrix } from '@searsuite/sear-domain-sheet';
 import { AlignmentMatrix, VerticalAlignmentMatrix } from '@searsuite/sear-plugin-alignment';
 import { CellFillMatrix } from '@searsuite/sear-plugin-cell-fill';
 import { CellHighlightMatrix } from '@searsuite/sear-plugin-cell-highlight';
@@ -27,17 +31,17 @@ import {
   defineWorkbookCommand,
   WorkbookFormulaPlugin,
   WorkbookRuntimeCapability,
-} from '@searsuite/sear-assembly-workbook';
+} from '@searsuite/sear-assembly-workbook-kernel';
 import { CellType } from '@searsuite/sear-domain-cell-types';
 import { ColumnShapeDimensionsCSRMatrix, CSRMatrix, RowShapeDimensionsCSRMatrix } from '@searsuite/sear-domain-matrix';
 import { Injectable } from '@searsuite/sear-foundation-di';
+import { type SheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
 import {
   SheetPlugin,
   SheetRuntimeCapability,
-  type SheetDocumentState,
   type SheetPluginRuntimeContext,
   type SheetPluginSetupContext,
-} from '@searsuite/sear-assembly-setup';
+} from '@searsuite/sear-assembly-commands';
 import { GetFormulaCellStatusCommand, waitForFormulaIdle } from '@searsuite/sear-plugin-formula';
 
 const scopedFunction: FormulaFunction = {
@@ -81,15 +85,7 @@ class ScopedFormulaFunctionPlugin extends SheetPlugin<null> {
     return { key: this.key, state: null, dataEngine: { enabled: false } };
   }
 
-  public getPluginConfig(): null {
-    return null;
-  }
-
   public apply(): null {
-    return null;
-  }
-
-  public render(): null {
     return null;
   }
 }
@@ -132,8 +128,13 @@ function createFormulaEditor(options: HeadlessEditorOptions): HeadlessEditor {
     ...options,
     onCreated: (editor) => {
       options.onCreated?.(editor);
-      editor.commands.register(RegisterSheetFormulaContributionCommand, () =>
-        new LocalActionCommand(RegisterSheetFormulaContributionCommand.id, () => pendingSheetRegistrations.get(editor)?.()));
+      editor.commands.register(
+        RegisterSheetFormulaContributionCommand,
+        () =>
+          new LocalActionCommand(RegisterSheetFormulaContributionCommand.id, () =>
+            pendingSheetRegistrations.get(editor)?.(),
+          ),
+      );
     },
   });
 }
@@ -156,16 +157,19 @@ function registerWorkbookFormulaContribution(editor: HeadlessWorkbookEditor, reg
   }
 }
 
-const RegisterWorkbookFormulaContributionCommand = defineWorkbookCommand<void, void>('test.workbookFormula.registerContribution');
+const RegisterWorkbookFormulaContributionCommand = defineWorkbookCommand<void, void>(
+  'test.workbookFormula.registerContribution',
+);
 const pendingWorkbookRegistrations = new WeakMap<HeadlessWorkbookEditor, () => void>();
 
 function createFormulaWorkbookEditor(options: HeadlessWorkbookEditorOptions): HeadlessWorkbookEditor {
-  return createHeadlessEditor({
+  return createHeadlessWorkbookEditor({
     ...options,
     onCreated: (editor) => {
       options.onCreated?.(editor);
       editor.commands.register(RegisterWorkbookFormulaContributionCommand, () =>
-        pendingWorkbookRegistrations.get(editor)?.());
+        pendingWorkbookRegistrations.get(editor)?.(),
+      );
     },
   });
 }
@@ -176,7 +180,8 @@ describe('third-party formula function plugins', () => {
     const editor = createFormulaEditor({ sheetState: state });
     try {
       registerSheetFormulaContribution(editor, () =>
-        editor.services.require(SheetRuntimeCapability.Formula).functions.register(FILTERXML));
+        editor.services.require(SheetRuntimeCapability.Formula).functions.register(FILTERXML),
+      );
       await waitForFormulaIdle(editor.commands);
       expect(formulaResult(editor).status.result).toEqual([['A'], ['B']]);
       const provider = editor.services.require(SheetRuntimeCapability.Formula).results;
@@ -188,7 +193,8 @@ describe('third-party formula function plugins', () => {
     const blocked = createFormulaEditor({ sheetState: state });
     try {
       registerSheetFormulaContribution(blocked, () =>
-        blocked.services.require(SheetRuntimeCapability.Formula).functions.register(FILTERXML));
+        blocked.services.require(SheetRuntimeCapability.Formula).functions.register(FILTERXML),
+      );
       await waitForFormulaIdle(blocked.commands);
       expect(formulaResult(blocked).status.errorCode).toBe(FormulaErrorCode.Value);
     } finally {

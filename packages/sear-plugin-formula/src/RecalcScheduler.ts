@@ -56,7 +56,7 @@ import { cellKey, fromCellKey } from '@searsuite/sear-domain-formula-engine-ts';
 import { isFormulaError } from '@searsuite/sear-foundation-utils';
 import { columnIndexToLabel } from '@searsuite/sear-foundation-utils';
 import { FormulaResultStore } from './FormulaResultStore';
-import { FormulaRenderInvalidator } from './FormulaRenderInvalidator';
+import { FormulaValuePublisher } from './FormulaValuePublisher';
 import { FormulaSchedulerDataSource } from './FormulaSchedulerDataSource';
 import { FormulaCalculationTraceBus } from './FormulaCalculationTraceBus';
 import { type SheetCommandBus } from '@searsuite/sear-assembly-commands';
@@ -76,7 +76,7 @@ export class RecalcScheduler {
   #aggCache: IAggregationCache;
   #dataSource: FormulaSchedulerDataSource;
   #platform: Platform;
-  #renderInvalidator: FormulaRenderInvalidator;
+  #renderInvalidator: FormulaValuePublisher;
   #trace: FormulaCalculationTraceBus;
   #functionRegistry: IFunctionRegistry | undefined;
   #iterationSettings: IFormulaIterationSettingsProvider | undefined;
@@ -93,8 +93,8 @@ export class RecalcScheduler {
     @Inject(FormulaSchedulerDataSource.symbol)
     dataSource: FormulaSchedulerDataSource,
     @Inject(Platform.symbol) platform: Platform,
-    @Inject(FormulaRenderInvalidator.symbol)
-    renderInvalidator: FormulaRenderInvalidator,
+    @Inject(FormulaValuePublisher.symbol)
+    renderInvalidator: FormulaValuePublisher,
     @Inject(FormulaCalculationTraceBus.symbol)
     trace: FormulaCalculationTraceBus,
     @Inject(IFunctionRegistry.symbol) functionRegistry?: IFunctionRegistry,
@@ -120,10 +120,12 @@ export class RecalcScheduler {
     });
     if (disposeExternalService) this.#disposers.push(disposeExternalService);
     if (this.#functionRegistry) {
-      this.#disposers.push(this.#functionRegistry.subscribe((names) => {
-        this.invalidateFunctionCallIndexes();
-        this.markFunctionsDirty(names);
-      }));
+      this.#disposers.push(
+        this.#functionRegistry.subscribe((names) => {
+          this.invalidateFunctionCallIndexes();
+          this.markFunctionsDirty(names);
+        }),
+      );
     }
   }
 
@@ -241,9 +243,9 @@ export class RecalcScheduler {
         settings?.enabled && settings.maxIterations > 0 && settings.maxChange >= 0
           ? this.#evaluateCycle(cycleKeys, context, settings.maxIterations, settings.maxChange)
           : cycleKeys.map((key) => ({
-            key,
-            value: createFormulaError(FormulaErrorCode.Reference),
-          })),
+              key,
+              value: createFormulaError(FormulaErrorCode.Reference),
+            })),
         context,
       );
       for (const key of cycleKeys) this.#graph.markClean(key);
@@ -255,12 +257,7 @@ export class RecalcScheduler {
     }
   }
 
-  #evaluateCycle(
-    keys: CellKey[],
-    context: EvalContext,
-    maxIterations: number,
-    maxChange: number,
-  ): EvalResult[] {
+  #evaluateCycle(keys: CellKey[], context: EvalContext, maxIterations: number, maxChange: number): EvalResult[] {
     const formulas = keys.flatMap((key) => {
       const ast = this.#readAstCache().get(key);
       return ast ? [{ key, ast }] : [];
@@ -272,9 +269,12 @@ export class RecalcScheduler {
       for (let iteration = 0; iteration < maxIterations; iteration++) {
         const results = this.#evaluator.evaluateBatch(formulas, context);
         const next = new Map(results.map(({ key, value }) => [key, value]));
-        const converged = results.every(({ key, value }) =>
-          typeof value === 'number' && typeof previous.get(key) === 'number'
-          && Math.abs(value - (previous.get(key) as number)) <= maxChange);
+        const converged = results.every(
+          ({ key, value }) =>
+            typeof value === 'number' &&
+            typeof previous.get(key) === 'number' &&
+            Math.abs(value - (previous.get(key) as number)) <= maxChange,
+        );
         previous = next;
         if (converged) break;
       }
@@ -331,7 +331,8 @@ export class RecalcScheduler {
         return names.has(ast.name.toUpperCase()) || ast.args.some((arg) => this.#containsFunctionCall(arg, names));
       case FormulaNodeKind.Invoke:
         return (
-          this.#containsFunctionCall(ast.callee, names) || ast.args.some((arg) => this.#containsFunctionCall(arg, names))
+          this.#containsFunctionCall(ast.callee, names) ||
+          ast.args.some((arg) => this.#containsFunctionCall(arg, names))
         );
       case FormulaNodeKind.Array:
         return ast.rows.some((row) => row.some((item) => this.#containsFunctionCall(item, names)));
@@ -482,8 +483,12 @@ export class RecalcScheduler {
 
   #getViewportDependentFormulaKeys(): ReadonlySet<CellKey> {
     if (this.#viewportDependentFormulaKeys) return this.#viewportDependentFormulaKeys;
-    const names = new Set(this.#functionRegistry?.list().filter((name) =>
-      this.#functionRegistry?.get(name)?.volatileOnViewport).map((name) => name.toUpperCase()) ?? []);
+    const names = new Set(
+      this.#functionRegistry
+        ?.list()
+        .filter((name) => this.#functionRegistry?.get(name)?.volatileOnViewport)
+        .map((name) => name.toUpperCase()) ?? [],
+    );
     const keys = new Set<CellKey>();
     if (this.#astCache && names.size > 0) {
       for (const [key, ast] of this.#astCache) {
@@ -613,7 +618,6 @@ export class RecalcScheduler {
           errorCode,
         });
       }
-
     }
 
     this.#flushedBatchCount++;
@@ -624,7 +628,7 @@ export class RecalcScheduler {
       results: flushedResults,
       pendingCount: this.#graph.pendingCount,
     });
-    this.#renderInvalidator.invalidateFormulaResults(changedKeys);
+    this.#renderInvalidator.publishResults(changedKeys);
   }
 
   /**

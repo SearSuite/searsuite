@@ -1,12 +1,12 @@
-import { WorkbookCommandBus } from '../src/WorkbookCommandBus';
-import { ActivateWorkbookSheetCommand } from '../src/WorkbookCommands';
+import { WorkbookCommandBus } from '@searsuite/sear-assembly-workbook-kernel';
+import { ActivateWorkbookSheetCommand } from '@searsuite/sear-assembly-workbook-kernel';
 import {
   CancelWorkbookFormulaReferencePickCommand,
   CaptureWorkbookFormulaDraftCommand,
   PickWorkbookFormulaReferenceCommand,
   RestoreWorkbookFormulaDraftCommand,
-} from '../src/workbookPlugin/formulaReferencePick/WorkbookFormulaReferencePickCommands';
-import { WorkbookFormulaReferencePickPlugin } from '../src/workbookPlugin/formulaReferencePick/WorkbookFormulaReferencePickPlugin';
+} from '@searsuite/sear-assembly-workbook-kernel';
+import { WorkbookFormulaReferencePickPlugin } from '@searsuite/sear-assembly-workbook-kernel';
 import { CancelCellEditCommand, RestoreFormulaEditDraftCommand } from '@searsuite/sear-plugin-cell-editor';
 import { EnsureSelectionVisibleCommand } from '@searsuite/sear-plugin-selection';
 
@@ -24,14 +24,21 @@ function createHarness(failActivation = false) {
   const draft = { cell: [0, 0] as const, text: '=SUM(', selectionStart: 5, selectionEnd: 5 };
   const sheetCommands = { has: jest.fn(() => true), run: jest.fn() };
   const editor = {
-    queries: { has: jest.fn(() => true), run: jest.fn(() => activeId === 'source' ? draft : null) },
+    queries: { has: jest.fn(() => true), run: jest.fn(() => (activeId === 'source' ? draft : null)) },
     commands: sheetCommands,
     services: { require: jest.fn(() => ({ keyboard: { subscribe: jest.fn() } })) },
   };
   const runtime = {
     commands,
-    sheets: { getActiveId: () => activeId, getActiveEditor: () => editor },
-    document: { getState: () => ({ sheets: [{ id: 'source', name: 'Sheet1' }, { id: 'target', name: 'Sheet2' }] }) },
+    sheets: { getActiveId: () => activeId, getActiveClient: () => editor },
+    document: {
+      getState: () => ({
+        sheets: [
+          { id: 'source', name: 'Sheet1' },
+          { id: 'target', name: 'Sheet2' },
+        ],
+      }),
+    },
   };
   const plugin = new WorkbookFormulaReferencePickPlugin(platform as never);
   commands.register(ActivateWorkbookSheetCommand, ({ sheetId }) => {
@@ -88,11 +95,13 @@ describe('WorkbookFormulaReferencePickPlugin', () => {
       anchor: draft.cell,
       focus: draft.cell,
     });
-    expect(started).toEqual(expect.arrayContaining([
-      CaptureWorkbookFormulaDraftCommand.id,
-      PickWorkbookFormulaReferenceCommand.id,
-      RestoreWorkbookFormulaDraftCommand.id,
-    ]));
+    expect(started).toEqual(
+      expect.arrayContaining([
+        CaptureWorkbookFormulaDraftCommand.id,
+        PickWorkbookFormulaReferenceCommand.id,
+        RestoreWorkbookFormulaDraftCommand.id,
+      ]),
+    );
     expect(plugin.hasPendingPick()).toBe(false);
     dispose?.();
   });

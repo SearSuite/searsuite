@@ -15,8 +15,13 @@
  */
 
 import { Injectable, Inject } from '@searsuite/sear-foundation-di';
-import { FormulaErrorCode, type CellKey, type FormulaRichResult, type FormulaValue } from '@searsuite/sear-domain-formula-engine';
-import { type CellMatrixElement } from '@searsuite/sear-assembly-core';
+import {
+  FormulaErrorCode,
+  type CellKey,
+  type FormulaRichResult,
+  type FormulaValue,
+} from '@searsuite/sear-domain-formula-engine';
+import { type CellMatrixElement } from '@searsuite/sear-domain-sheet';
 import { CellType } from '@searsuite/sear-domain-cell-types';
 import { cellKey, fromCellKey } from '@searsuite/sear-domain-formula-engine-ts';
 import { CellFormulaValueConverterRegistry } from './CellFormulaValueConverterRegistry';
@@ -88,7 +93,10 @@ export class FormulaResultStore {
 
   /** Visits projected spill coordinates in a range; formula anchors live in the Sheet data matrix. */
   forEachSpillInRange(
-    startRow: number, startColumn: number, endRow: number, endColumn: number,
+    startRow: number,
+    startColumn: number,
+    endRow: number,
+    endColumn: number,
     visit: (row: number, column: number) => void,
   ): void {
     for (const key of this.#spillCache.keys()) {

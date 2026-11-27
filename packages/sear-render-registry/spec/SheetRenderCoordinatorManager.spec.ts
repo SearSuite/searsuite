@@ -2,10 +2,10 @@ import { Container, Injectable } from '@searsuite/sear-foundation-di';
 import { SheetRenderCoordinatorManager } from '../src/SheetRenderCoordinatorManager';
 import { SheetNodeFactory } from '../src/SheetNodeFactory';
 import { SheetRendererRegistry } from '../src/SheetRendererRegistry';
-import { IFormulaResultProvider, CellProperties, CellContext, Cell } from '../src/Cell';
+import { IFormulaResultProvider, CellProperties, Cell } from '../src/Cell';
 import { PositionRectProps } from '@searsuite/sear-foundation-rect';
-import { StringCell } from '../src/cell/StringCell';
-import { Node, TextNode, FixBoxNode } from '@searsuite/sear-render-node';
+
+import { Node, FixBoxNode } from '@searsuite/sear-render-node';
 import { Platform } from '@searsuite/sear-foundation-platform';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { DefaultCellFormatLocale } from '@searsuite/sear-domain-cell-types';

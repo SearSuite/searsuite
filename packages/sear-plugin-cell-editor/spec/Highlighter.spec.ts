@@ -1,4 +1,4 @@
-import { Highlighter, type Highlighting } from '../src/Highlighter';
+import { Highlighter, type Highlighting } from '@searsuite/sear-render';
 
 class TestHighlighter extends Highlighter {
   public highlight(text: string): Highlighting {

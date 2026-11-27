@@ -1,6 +1,6 @@
 import { SearError } from '@searsuite/sear-foundation-error';
 import { DocCommandBus } from '@searsuite/sear-assembly-commands';
-import { ReflowDocTransaction } from '@searsuite/sear-domain-commands';
+import { DocTransaction } from '@searsuite/sear-domain-commands';
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
 import {
   DocNodeRegistry,
@@ -13,22 +13,20 @@ import {
   type RichTextLineSpacing,
 } from '@searsuite/sear-domain-doc';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { type Node, type NodeProperties } from '@searsuite/sear-render-node';
+
 import {
   LoadDocumentCommand,
-  RenderDocCommand,
   SplitDocParagraphCommand,
   type LoadDocumentInput,
 } from '../../commands/DocEditingCommands';
 import {
   DocPlugin,
-  type DocKeyboardHandlerRegistrationContext,
   type DocPluginRuntime,
   type DocPluginServiceContext,
   type DocPluginSetupContext,
 } from '../../plugin/DocPluginContracts';
 import { createDocCommand } from '../../plugin/DocPluginCommandUtils';
-import { DocContentRenderPluginKey } from '../../plugin/DocFeaturePluginKeys';
+
 import {
   SetDocLineSpacingCommand,
   SetDocParagraphSpacingAfterCommand,
@@ -62,23 +60,8 @@ export class ParagraphPlugin extends DocPlugin<null> {
     return null;
   }
 
-  public getPluginConfig(): null {
-    return null;
-  }
-
-  public render(): Node<NodeProperties>[] | null {
-    return null;
-  }
-
   public configure(context: DocPluginSetupContext): void {
     this.#runtime = context.runtime;
-  }
-
-  public registerKeyboardHandlers({ bindings, commands }: DocKeyboardHandlerRegistrationContext): void {
-    bindings.registerKeyboardHandlers({
-      onEnter: () => void commands.run(SplitDocParagraphCommand, void 0),
-      onSoftEnter: () => void commands.run(SplitDocParagraphCommand, void 0),
-    });
   }
 
   public registerLineBoxes(registry: RichTextLineBoxRegistry): void {
@@ -96,7 +79,6 @@ export class ParagraphPlugin extends DocPlugin<null> {
   public registerCommands(commands: DocCommandBus): void {
     commands.register(LoadDocumentCommand, this.#createLoadDocumentCommand.bind(this));
     commands.register(SplitDocParagraphCommand, this.#createSplitParagraphCommand.bind(this));
-    commands.register(RenderDocCommand, this.#createRenderCommand.bind(this));
     commands.register(SetDocLineSpacingCommand, this.#createSetLineSpacingCommand.bind(this));
     commands.register(SetDocParagraphSpacingAfterCommand, this.#createSetParagraphSpacingAfterCommand.bind(this));
   }
@@ -106,32 +88,25 @@ export class ParagraphPlugin extends DocPlugin<null> {
     function createLoadDocumentTransaction() {
       return plugin.#requireRuntime().document.input.createReplaceDocumentTransaction(input.document);
     }
-    return createDocCommand(LoadDocumentCommand.id, DocContentRenderPluginKey, createLoadDocumentTransaction);
+    return createDocCommand(LoadDocumentCommand.id, createLoadDocumentTransaction);
   }
 
   #createSplitParagraphCommand() {
-    return createDocCommand(
-      SplitDocParagraphCommand.id,
-      DocContentRenderPluginKey,
-      this.#createSplitParagraphTransaction.bind(this),
-      [{ type: 'reset-caret-blink' }],
-    );
-  }
-
-  #createRenderCommand() {
-    return createDocCommand(RenderDocCommand.id, DocContentRenderPluginKey);
+    return createDocCommand(SplitDocParagraphCommand.id, this.#createSplitParagraphTransaction.bind(this), [
+      { type: 'reset-caret-blink' },
+    ]);
   }
 
   #createSetLineSpacingCommand(input: SetDocLineSpacingInput) {
     const lineSpacing = normalizeLineSpacing(input?.lineSpacing);
-    return createDocCommand(SetDocLineSpacingCommand.id, DocContentRenderPluginKey, () =>
+    return createDocCommand(SetDocLineSpacingCommand.id, () =>
       this.#createParagraphAttributeTransaction(RichTextParagraphAttribute.LineSpacing, lineSpacing),
     );
   }
 
   #createSetParagraphSpacingAfterCommand(input: SetDocParagraphSpacingAfterInput) {
     const spacingAfter = normalizeSpacingAfter(input?.spacingAfter);
-    return createDocCommand(SetDocParagraphSpacingAfterCommand.id, DocContentRenderPluginKey, () =>
+    return createDocCommand(SetDocParagraphSpacingAfterCommand.id, () =>
       this.#createParagraphAttributeTransaction(RichTextParagraphAttribute.SpacingAfter, spacingAfter),
     );
   }
@@ -146,7 +121,7 @@ export class ParagraphPlugin extends DocPlugin<null> {
         transaction.updateAttrs([index], key, value, paragraph.attrs[key]);
       }
       return transaction;
-    }, new ReflowDocTransaction());
+    }, new DocTransaction());
   }
 
   #createSplitParagraphTransaction() {

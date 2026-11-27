@@ -11,14 +11,14 @@ import {
   type RichDocNode,
 } from '@searsuite/sear-domain-doc';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { type Node, type NodeProperties } from '@searsuite/sear-render-node';
+
 import {
   DocPlugin,
   type DocPluginRuntime,
   type DocPluginServiceContext,
   type DocPluginSetupContext,
 } from '../../plugin/DocPluginContracts';
-import { DocContentRenderPluginKey } from '../../plugin/DocFeaturePluginKeys';
+
 import { createDocCommand } from '../../plugin/DocPluginCommandUtils';
 
 /** Input accepted by InsertDocTableCommand. */
@@ -58,14 +58,6 @@ export class TablePlugin extends DocPlugin<null> {
     return null;
   }
 
-  public getPluginConfig(): null {
-    return null;
-  }
-
-  public render(): Node<NodeProperties>[] | null {
-    return null;
-  }
-
   public configure(context: DocPluginSetupContext): void {
     this.#runtime = context.runtime;
   }
@@ -83,7 +75,7 @@ export class TablePlugin extends DocPlugin<null> {
     function createInsertTableTransaction() {
       return plugin.#createInsertTableTransaction(input);
     }
-    return createDocCommand(InsertDocTableCommand.id, DocContentRenderPluginKey, createInsertTableTransaction);
+    return createDocCommand(InsertDocTableCommand.id, createInsertTableTransaction);
   }
 
   #createInsertTableTransaction(input: InsertDocTableInput) {

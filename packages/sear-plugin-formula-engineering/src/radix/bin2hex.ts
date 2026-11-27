@@ -1,7 +1,7 @@
 /** BIN2HEX converts binary to hexadecimal. Example: =BIN2HEX("11111011") returns FB. */
 import { engineeringFunction } from '../shared/functionFactory';
 import { numeric, text } from '../shared/arguments';
-import { isFormulaError, numberError } from '../shared/errors';
+import { isFormulaError } from '../shared/errors';
 import { formatSignedRadix, parseSignedRadix } from '../shared/radix';
 export const BIN2HEX = engineeringFunction({
   name: 'BIN2HEX',

@@ -1,5 +1,5 @@
 import { type CursorEngine, CursorToken } from '@searsuite/sear-render-cursor';
-import { type SheetHighlightRegistry } from '@searsuite/sear-plugin-selection';
+import { type SheetHighlightRegistry } from '@searsuite/sear-render';
 import { FormatPainterObservation } from '@searsuite/sear-plugin-format-painter';
 import { type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 

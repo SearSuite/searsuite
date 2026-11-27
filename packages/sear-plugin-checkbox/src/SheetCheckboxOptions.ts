@@ -1,4 +1,3 @@
-import { type CursorRegistry } from '@searsuite/sear-render-cursor';
 import { type CellMatrixElement, SheetCellInputValidationRegistry } from '@searsuite/sear-domain-cell-types';
 import { type CellTypeCatalog } from '@searsuite/sear-domain-cell';
 import { type Transaction } from '@searsuite/sear-domain-transaction';
@@ -12,7 +11,6 @@ export interface CheckboxCellWrite {
 }
 /** Editor-local dependencies; checkbox state stays in the cell-data owner. */
 export interface SheetCheckboxOptions {
-  /** Optional editor-local cursor registry. */ readonly cursor?: CursorRegistry;
   /** Cell-type extension catalog. */ readonly catalog: CellTypeCatalog;
   /** Formula converter registry, when formula support is installed. */ readonly formulas?: CellFormulaValueConverterRegistry;
   /** Shared cell-edit validation registry. */ readonly inputValidation?: SheetCellInputValidationRegistry;
@@ -38,5 +36,4 @@ export interface SheetCheckboxOptions {
     column: number,
     text: string,
   ): { readonly reject: boolean; readonly message?: string };
-  /** Allows the composition root to commit or reject an active edit before pointer toggling. */ beforeToggle?(): boolean;
 }

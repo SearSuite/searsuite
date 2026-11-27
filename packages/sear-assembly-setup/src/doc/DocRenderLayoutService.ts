@@ -1,21 +1,8 @@
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
 import { DocCommandBus } from '@searsuite/sear-assembly-commands';
-import {
-  collectDocReflowBlockIds,
-  collectDocRepaintBlockIds,
-  DocCompositionManager,
-  DocCursorManager,
-  DocInputPlugin,
-  type DocCompositionProvider,
-  type DocRenderOperations,
-} from '@searsuite/sear-assembly-core';
-import {
-  DocLayoutCache,
-  DocBlockLayoutDiff,
-  DocLayoutEngine,
-  DocPageMap,
-  type DocBlockLayout,
-} from '@searsuite/sear-domain-editor';
+import { collectDocReflowBlockIds, collectDocRepaintBlockIds, DocCompositionManager, DocCursorManager, type DocCompositionProvider, type DocRenderOperations } from '@searsuite/sear-assembly-core';
+import { DocInputPlugin } from '@searsuite/sear-assembly-doc';
+import { DocLayoutCache, DocBlockLayoutDiff, DocLayoutEngine, DocPageMap, type DocBlockLayout } from '@searsuite/sear-domain-editor';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { PositionRect } from '@searsuite/sear-foundation-rect';
@@ -25,17 +12,10 @@ import { RenderContext } from '@searsuite/sear-render-context';
 import { Tree } from '@searsuite/sear-render-node';
 import { ScrollManager } from '@searsuite/sear-render-scroll';
 import { type DocEditorContentRect, type DocEditorViewport } from './createDocEditor';
-import {
-  type DocEditorRuntimeConfiguration,
-  DocEditorRuntimeConfigurationSymbol,
-} from './DocEditorRuntimeConfiguration';
-import { DocPluginRuntimeCapability } from '@searsuite/sear-assembly-doc';
+import { type DocEditorRuntimeConfiguration, DocEditorRuntimeConfigurationSymbol } from './DocEditorRuntimeConfiguration';
+import { DocViewRuntimeCapability } from './DocViewCapabilities';
 import { DocRuntimeExtensionRegistry } from '@searsuite/sear-assembly-doc';
-import {
-  DocVirtualLayoutStore,
-  type DocBlockRenderDebugSnapshot,
-  type DocVirtualLayoutSummary,
-} from './DocVirtualLayoutStore';
+import { DocVirtualLayoutStore, type DocBlockRenderDebugSnapshot, type DocVirtualLayoutSummary } from './DocVirtualLayoutStore';
 import { createDocFontDescriptor } from './createDocFontDescriptor';
 import { lockDocVirtualLayoutSummary } from './lockDocVirtualLayoutSummary';
 
@@ -133,7 +113,8 @@ export class DocRenderLayoutService {
   }
 
   #assertCommandWrite(): void {
-    if (!this.#commands.isExecuting()) throw new SearError('Doc layout changes must run through editor.commands.run(...).');
+    if (!this.#commands.isExecuting())
+      throw new SearError('Doc layout changes must run through editor.commands.run(...).');
   }
 
   /** Clears cached layout and page state. */
@@ -214,7 +195,7 @@ export class DocRenderLayoutService {
         lineSpacing: { mode: 'multiple', value: defaultConfig.docLineHeightMultiplier },
         spacingAfter: defaultConfig.docParagraphSpacingAfter,
       } satisfies RichTextParagraphLayoutDefaults,
-      cursorVisible: this.#extensions.get(DocPluginRuntimeCapability.CaretState)?.isVisible() ?? true,
+      cursorVisible: this.#extensions.get(DocViewRuntimeCapability.CaretState)?.isVisible() ?? true,
       reflowBlockIds,
       repaintBlockIds,
     });
@@ -271,7 +252,7 @@ export class DocRenderLayoutService {
       x: latest.documentRect.x + cursorRelative.x,
       y: latest.documentRect.y + cursorRelative.y,
       height: cursorRelative.height,
-      visible: this.#extensions.get(DocPluginRuntimeCapability.CaretState)?.isVisible() ?? true,
+      visible: this.#extensions.get(DocViewRuntimeCapability.CaretState)?.isVisible() ?? true,
     });
     this.#cursorManager.setSelectionRects(
       this.#layoutEngine.getSelectionRects(

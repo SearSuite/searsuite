@@ -1,11 +1,17 @@
-import { createMatrixFormatTransfer, type SheetFormatRange, type SheetFormatTransferPlan, type SheetFormatTransferRegistry } from '@searsuite/sear-assembly-plugin';
+import { type SheetCellStyleRegistry, type SheetCellStyleDefaults } from '@searsuite/sear-domain-cell-types';
+import {
+  createMatrixFormatTransfer,
+  type SheetFormatRange,
+  type SheetFormatTransferPlan,
+  type SheetFormatTransferRegistry,
+} from '@searsuite/sear-assembly-plugin';
 import { SheetRangeMoveRegistry, SheetRangeReorderRegistry } from '@searsuite/sear-assembly-plugin';
 import {
   createMatrixRangeMoveOperations,
   createMatrixRangeReorderOperations,
   hasMatrixRangeMoveConflict,
 } from '@searsuite/sear-domain-matrix';
-import { SheetDataPlugin } from '@searsuite/sear-render-engine';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
 import { MatrixCellUpdateIntent } from '@searsuite/sear-domain-ot';
 import {
   MatrixOT,
@@ -27,19 +33,15 @@ import {
 import { Plugin, PluginKey, type PluginDocumentStateContribution } from '@searsuite/sear-assembly-plugin';
 import { deserializeSparseMatrix, serializeSparseMatrix } from '@searsuite/sear-domain-matrix';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { Node } from '@searsuite/sear-render-node';
+
 import { Transaction } from '@searsuite/sear-domain-transaction';
-import {
-  CellProperties,
-  type SheetCellVisualReaderRegistrationContext,
-  SheetCellVisualReaderRegistry,
-} from '@searsuite/sear-render-registry';
+
 import {
   createInvertibleProjectedOperations,
   SheetDataFieldNamespace,
   type CellMatrixElement,
   type SheetMatrix,
-} from '@searsuite/sear-render-engine';
+} from '@searsuite/sear-domain-sheet';
 import { AlignmentMatrix } from '../../AlignmentMatrix';
 import { SheetHorizontalAlignment } from '@searsuite/sear-domain-cell-types';
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
@@ -76,11 +78,21 @@ const pluginKey = new PluginKey('SheetAlignmentPlugin');
  * alignment projections.
  */
 @Injectable()
-export class SheetAlignmentPlugin extends Plugin<unknown, CellProperties, SheetAlignmentPluginState> {
-  readonly #readCellData: (() => SheetMatrix) | undefined;
+export class SheetAlignmentPlugin extends Plugin<SheetAlignmentPluginState> {
+  public registerCellStyles(registry: SheetCellStyleRegistry, defaults: SheetCellStyleDefaults): void {
+    registry.register({
+      id: 'sheet.alignment.horizontal',
+      properties: ['horizontalAlign'],
+      read: (row, column) => ({
+        horizontalAlign:
+          (this.getState().cellAlignments.getItem(row, column) as SheetHorizontalAlignment | null) ??
+          defaults.read().horizontalAlign ??
+          SheetHorizontalAlignment.Left,
+      }),
+    });
+  }
 
-  /** Alignment data is state-only; duplicate render/event depth diagnostics do not apply. */
-  public override readonly warnOnDuplicateDepth = false;
+  readonly #readCellData: (() => SheetMatrix) | undefined;
   /** Alignment transactions share the registered MatrixOT algebra. */
   public override readonly transactionOT = {
     ownerId: 'sheet.alignment',
@@ -141,31 +153,6 @@ export class SheetAlignmentPlugin extends Plugin<unknown, CellProperties, SheetA
       getColumnCount: () => plugin.getState().cellAlignments.shape[1],
       readCellAlignment: (row, column) =>
         plugin.getState().cellAlignments.getItem(row, column) as SheetHorizontalAlignment | null,
-    });
-  }
-
-  /** Contributes horizontal alignment to the shared Sheet cell visual pipeline. */
-  public registerCellVisualReaders(
-    registry: SheetCellVisualReaderRegistry,
-    context: SheetCellVisualReaderRegistrationContext,
-  ): void {
-    const plugin = this;
-    registry.register({
-      id: 'sheet.alignment.horizontal',
-      properties: ['horizontalAlign'],
-      read({ rowIndex, columnIndex }) {
-        const configuredDefault = (
-          context.readDefaultConfig() as Partial<{
-            defaultCellAlign: SheetHorizontalAlignment;
-          }>
-        ).defaultCellAlign;
-        return {
-          horizontalAlign:
-            (plugin.getState().cellAlignments.getItem(rowIndex, columnIndex) as SheetHorizontalAlignment | null) ??
-            configuredDefault ??
-            SheetHorizontalAlignment.Left,
-        };
-      },
     });
   }
 
@@ -252,23 +239,7 @@ export class SheetAlignmentPlugin extends Plugin<unknown, CellProperties, SheetA
     return pluginState;
   }
 
-  /** Alignment data has no render-time configuration. */
-  public getPluginConfig(): null {
-    return null;
-  }
-
-  /**
-   * Alignment data does not render scene nodes directly.
-   * @returns An empty node list.
-   */
-  public render(): Node<CellProperties>[] {
-    return [];
-  }
-
-  #createInvertibleAlignmentOperations(
-    matrix: AlignmentMatrix,
-    transaction: Transaction,
-  ): MatrixOTOperation<string>[] {
+  #createInvertibleAlignmentOperations(matrix: AlignmentMatrix, transaction: Transaction): MatrixOTOperation<string>[] {
     const createOperation =
       transaction.pluginKey === SheetAlignmentPlugin.pluginKey
         ? createInvertibleDirectAlignmentOperation

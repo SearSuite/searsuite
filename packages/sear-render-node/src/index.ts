@@ -9,7 +9,7 @@
  * @referenceBody
  * `SceneGraph` is the root of the retained render tree. A plugin contributes one or more `Node` values under its
  * own key. `addPluginNode()` replaces that plugin's top-level nodes; `reconcilePluginNodes()` retains nodes with
- * stable keys and updates only what changed. `GenerationalDirtyTracker` records the regions that need repainting.
+ * stable keys and updates only what changed. `FrameDirtyTracker` records the regions that need repainting.
  *
  * Use this layer when implementing a renderer or a visual plugin. Content and selection still come from their
  * domain owners; scene nodes hold the geometry and paint behavior for a view.
@@ -31,7 +31,7 @@ export { type HitColorKey, type NodeProperties, type RenderNodeKey } from './typ
 
 export { Tree } from './Tree';
 export { DirtyTree } from './DirtyTree';
-export { GenerationalDirtyTracker } from './GenerationalDirtyTracker';
+export { FrameDirtyTracker } from './FrameDirtyTracker';
 export { HitColorRegistry } from './HitColorRegistry';
 
 export { Node, type ClipRegion } from './Node';
@@ -40,7 +40,7 @@ export { RenderNode } from './RenderNode';
 export { BoxNode } from './BoxNode';
 export { FixBoxNode } from './FixBoxNode';
 export { CellVisualLayerNode } from './CellVisualLayerNode';
-export { CellVisualIconShape, CellVisualLayerShape, type CellVisualLayer, type CellVisualLabel } from './types';
+export { CellVisualLayerShape, type CellVisualLayer, type CellVisualLabel } from './types';
 export { DashedLineNode } from './DashedLineNode';
 export { createDragGuideNode } from './createDragGuideNode';
 export { AffixNode, AffixTextNode } from './AffixNode';
@@ -80,3 +80,5 @@ export { RTree } from './RTree';
 export { SpatialHash } from './SpatialHash';
 export { Octree } from './Octree';
 export { BVH } from './BVH';
+
+export * from './DocTextStyleRenderContributions';

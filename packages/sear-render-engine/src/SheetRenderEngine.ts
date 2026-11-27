@@ -8,7 +8,7 @@ import { StickyRenderStrategy } from '@searsuite/sear-render-strategy';
 import { ScrollManager } from '@searsuite/sear-render-scroll';
 import { RenderContext } from '@searsuite/sear-render-context';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
-import { RenderStrategy, RenderStrategyManager, DirtyRenderStrategy } from '@searsuite/sear-render-strategy';
+import { RenderStrategyManager, DirtyRenderStrategy } from '@searsuite/sear-render-strategy';
 import {
   RenderCoordinatorManager,
   CellProperties,

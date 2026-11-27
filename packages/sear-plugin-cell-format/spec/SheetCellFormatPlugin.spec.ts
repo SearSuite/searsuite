@@ -2,7 +2,7 @@ import { SheetCommandBus, SheetQueryRegistry } from '@searsuite/sear-assembly-co
 import { CellFormats } from '@searsuite/sear-domain-cell-types';
 import { MatrixOTActionName } from '@searsuite/sear-domain-ot';
 import { createTransaction } from '@searsuite/sear-domain-transaction';
-import { SheetCellVisualReaderRegistry } from '@searsuite/sear-render-registry';
+import { SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
 import {
   AdjustRangeCellFormatDecimalPlacesCommand,
   CellFormatMatrix,
@@ -89,7 +89,11 @@ describe('@searsuite/sear-plugin-cell-format', () => {
         readCellFormat: (row, column) => formats.getItem(row, column),
       },
     );
-    expect(operations.map((operation) => operation.p)).toEqual([[0, 1], [2, 1], [1, 1]]);
+    expect(operations.map((operation) => operation.p)).toEqual([
+      [0, 1],
+      [2, 1],
+      [1, 1],
+    ]);
   });
 
   it('applies direct operations and follows sheet structure operations', () => {
@@ -112,14 +116,14 @@ describe('@searsuite/sear-plugin-cell-format', () => {
     const formats = new CellFormatMatrix(void 0, [2, 2]);
     formats.addItem(1, 0, CellFormats.date);
     const plugin = new SheetCellFormatPlugin({ cellFormats: formats });
-    const visualReaders = new SheetCellVisualReaderRegistry();
+    const visualReaders = new SheetCellStyleRegistry();
     const queries = new SheetQueryRegistry();
 
-    plugin.registerCellVisualReaders(visualReaders);
+    plugin.registerCellStyles(visualReaders);
     plugin.registerQueries(queries);
 
-    expect(visualReaders.read({ rowIndex: 0, columnIndex: 0 })).toEqual({});
-    expect(visualReaders.read({ rowIndex: 1, columnIndex: 0 })).toEqual({ format: CellFormats.date });
+    expect(visualReaders.read(0, 0)).toEqual({});
+    expect(visualReaders.read(1, 0)).toEqual({ format: CellFormats.date });
     expect(queries.run(ReadSheetCellFormatQuery, void 0).getItem(1, 0)).toEqual(CellFormats.date);
   });
 });

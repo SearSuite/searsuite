@@ -3,7 +3,8 @@ import { DocCommandBus } from '@searsuite/sear-assembly-commands';
 import { RichDocNode } from '@searsuite/sear-domain-doc';
 import { type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 
-import { FocusDocCommand, LoadDocumentCommand, RenderDocCommand } from '@searsuite/sear-assembly-doc';
+import { FocusDocCommand, LoadDocumentCommand } from '@searsuite/sear-assembly-doc';
+import { RenderDocCommand } from './DocViewCommands';
 import { DocDocumentSessionCoordinator } from './DocDocumentSessionCoordinator';
 import { type DocEditor } from './createDocEditor';
 import { type DocRuntimeCapabilityReader } from '@searsuite/sear-assembly-doc';

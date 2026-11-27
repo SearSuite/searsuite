@@ -1,7 +1,6 @@
 import { SearError } from '@searsuite/sear-foundation-error';
 import { Injectable } from '@searsuite/sear-foundation-di';
 import { Platform } from '@searsuite/sear-foundation-platform';
-import { NodeProperties } from '@searsuite/sear-render-node';
 import { Transaction } from '@searsuite/sear-domain-transaction';
 import {
   OTTransformPriority,
@@ -16,20 +15,20 @@ import { PluginKey } from './PluginKey';
 
 /** Document-state export contribution bound to the plugin instance that owns the source state. */
 export interface RegisteredPluginDocumentStateContribution {
-  readonly plugin: Plugin<unknown, NodeProperties, unknown>;
+  readonly plugin: Plugin<unknown>;
   readonly contribution: PluginDocumentStateContribution<unknown>;
 }
 
 /** Ordered registry that owns plugin instances for one core/editor runtime. */
 @Injectable()
-export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperties> {
+export class PluginManager {
   readonly #platform: Platform | undefined;
 
   /** DI token for resolving the runtime plugin manager. */
   public static readonly symbol: symbol = Symbol.for('PluginManager');
 
-  readonly #plugins = new Map<string, Plugin<SearCoreType, NodeTypeProperties, any>>();
-  readonly #collaborationOwners = new Map<string, Plugin<SearCoreType, NodeTypeProperties, any>>();
+  readonly #plugins = new Map<string, Plugin<any>>();
+  readonly #collaborationOwners = new Map<string, Plugin<any>>();
   readonly #transactionOTDisposers = new Map<string, Array<() => void>>();
   readonly #transactionOTRegistry = new TransactionOTRegistry();
   #writeToken: object | undefined;
@@ -53,7 +52,7 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
   }
 
   /** Returns all registered plugins in insertion order. */
-  public getAllPlugins(): Plugin<SearCoreType, NodeTypeProperties, any>[] {
+  public getAllPlugins(): Plugin<any>[] {
     return [...this.#plugins.values()];
   }
 
@@ -70,19 +69,19 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
   }
 
   /** Registers a plugin under its key and rejects duplicate ownership. */
-  public registerPlugin<T>(plugin: Plugin<SearCoreType, NodeTypeProperties, T>, token?: object): void {
+  public registerPlugin<T>(plugin: Plugin<T>, token?: object): void {
     this.#assertWritable(token);
+    if (!(plugin instanceof Plugin)) throw new SearError('State registration requires a business Plugin.');
     if (Plugin.prototype.hasStateWriteBoundary.call(plugin)) {
       throw new SearError('Plugin state is already owned by another editor.');
     }
     if (this.#plugins.has(plugin.key.key)) throw new SearError(`Plugin with key ${plugin.key.key} already exists.`);
-    this.#warnSameDepthRegistration(plugin);
     this.#registerTransactionOT(plugin);
     this.#plugins.set(plugin.key.key, plugin);
   }
 
   /** Unregisters a plugin and clears the manager-owned state reference. */
-  public unregisterPlugin(pluginOrKey: Plugin<SearCoreType, NodeTypeProperties, any> | PluginKey | string, token?: object): void {
+  public unregisterPlugin(pluginOrKey: Plugin<any> | PluginKey | string, token?: object): void {
     this.#assertWritable(token);
     const key = getPluginKeyString(pluginOrKey);
     const plugin = this.#plugins.get(key);
@@ -109,7 +108,7 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
   }
 
   /** Lists collaborative transaction owners registered in this runtime. */
-  public getCollaborativeTransactionPlugins(): readonly Plugin<SearCoreType, NodeTypeProperties, any>[] {
+  public getCollaborativeTransactionPlugins(): readonly Plugin<any>[] {
     return [...this.#collaborationOwners.values()];
   }
 
@@ -117,7 +116,7 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
   public getDocumentStateContributions(): readonly RegisteredPluginDocumentStateContribution[] {
     return this.getAllPlugins().flatMap((plugin) =>
       readPluginDocumentStateContributions(plugin).map((contribution) => ({
-        plugin: plugin as unknown as Plugin<unknown, NodeProperties, unknown>,
+        plugin: plugin as unknown as Plugin<unknown>,
         contribution,
       })),
     );
@@ -151,31 +150,13 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
       : null;
   }
 
-  /** Visits plugins in depth order so event, apply and render flows stay deterministic. */
-  public forEach(callbackfn: (plugin: Plugin<SearCoreType, NodeTypeProperties, any>) => void) {
-    const plugins = [...this.#plugins.values()].sort(comparePluginDepth);
+  /** Visits state owners in registration order. */
+  public forEach(callbackfn: (plugin: Plugin<any>) => void) {
+    const plugins = this.#plugins.values();
     for (const plugin of plugins) callbackfn(plugin);
   }
 
-  #warnSameDepthRegistration(plugin: Plugin<SearCoreType, NodeTypeProperties, any>): void {
-    if (!plugin.warnOnDuplicateDepth) return;
-    const depth = plugin.depth ?? 0;
-    const existing = [...this.#plugins.values()].filter(function hasSamePluginDepth(registered) {
-      return registered.warnOnDuplicateDepth && (registered.depth ?? 0) === depth;
-    });
-    if (existing.length === 0) return;
-    this.#platform?.warn?.(
-      `Plugin ${plugin.key.key} has the same depth ${depth} as ${existing
-        .map(function readPluginKey(registered) {
-          return registered.key.key;
-        })
-        .join(
-          ', ',
-        )}; runtime order will follow registration order. Use distinct depth values for deterministic priority.`,
-    );
-  }
-
-  #registerTransactionOT(plugin: Plugin<SearCoreType, NodeTypeProperties, any>): void {
+  #registerTransactionOT(plugin: Plugin<any>): void {
     const contribution = plugin.transactionOT;
     if (!contribution) return;
     const disposers: Array<() => void> = [this.#transactionOTRegistry.registerType(contribution.definition)];
@@ -194,17 +175,14 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
     this.#transactionOTDisposers.set(plugin.key.key, disposers);
   }
 
-  #warnMissingCollaborativeDocumentState(
-    plugin: Plugin<SearCoreType, NodeTypeProperties, any>,
-    ownerId: string,
-  ): void {
+  #warnMissingCollaborativeDocumentState(plugin: Plugin<any>, ownerId: string): void {
     if (readPluginDocumentStateContributions(plugin).length > 0) return;
     this.#platform?.warn?.(
       `Collaborative plugin ${plugin.key.key} (${ownerId}) has no sear-plugin-export document-state contribution.`,
     );
   }
 
-  #disposeTransactionOT(plugin: Plugin<SearCoreType, NodeTypeProperties, any>): void {
+  #disposeTransactionOT(plugin: Plugin<any>): void {
     const contribution = plugin.transactionOT;
     if (contribution && this.#collaborationOwners.get(contribution.ownerId) === plugin) {
       this.#collaborationOwners.delete(contribution.ownerId);
@@ -223,32 +201,23 @@ export class PluginManager<SearCoreType, NodeTypeProperties extends NodeProperti
   }
 }
 
-function readPluginDocumentStateContributions<SearCoreType, NodeTypeProperties extends NodeProperties>(
-  plugin: Plugin<SearCoreType, NodeTypeProperties, any>,
+function readPluginDocumentStateContributions(
+  plugin: Plugin<any>,
 ): readonly PluginDocumentStateContribution<unknown>[] {
   const contribution = plugin.documentState;
   if (!contribution) return [];
-  return (Array.isArray(contribution) ? [...contribution] : [contribution]) as PluginDocumentStateContribution<unknown>[];
+  return (
+    Array.isArray(contribution) ? [...contribution] : [contribution]
+  ) as PluginDocumentStateContribution<unknown>[];
 }
 
-function getPluginKeyString<SearCoreType, NodeTypeProperties extends NodeProperties>(
-  pluginOrKey: Plugin<SearCoreType, NodeTypeProperties, any> | PluginKey | string,
-): string {
+function getPluginKeyString(pluginOrKey: Plugin<any> | PluginKey | string): string {
   if (typeof pluginOrKey === 'string') return pluginOrKey;
   if (pluginOrKey instanceof Plugin) return pluginOrKey.key.key;
   return pluginOrKey.key;
 }
 
-function clearPluginState<SearCoreType, NodeTypeProperties extends NodeProperties>(
-  plugin: Plugin<SearCoreType, NodeTypeProperties, any>,
-): void {
+function clearPluginState(plugin: Plugin<any>): void {
   // The core owns guarded document state; dropping the manager reference is enough.
   if (!Plugin.prototype.hasStateWriteBoundary.call(plugin)) plugin.setState(void 0);
-}
-
-function comparePluginDepth<SearCoreType, NodeTypeProperties extends NodeProperties>(
-  left: Plugin<SearCoreType, NodeTypeProperties, any>,
-  right: Plugin<SearCoreType, NodeTypeProperties, any>,
-): number {
-  return (left.depth ?? 0) - (right.depth ?? 0);
 }

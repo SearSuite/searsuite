@@ -38,7 +38,7 @@
  *
  * Dependencies:
  * - @searsuite/sear-domain-formula-engine (interface layer)
- * - @searsuite/sear-assembly-core (SearCoreSheet, SheetMatrix)
+ * - @searsuite/sear-domain-sheet (SheetMatrix)
  * - @searsuite/sear-assembly-plugin (Plugin base class)
  * - @searsuite/sear-domain-ot (MatrixOTActionName)
  * - @searsuite/sear-foundation-di (dependency injection)
@@ -74,7 +74,7 @@ export {
 } from './FormulaServiceRegistrationCommands';
 export { FormulaCalculationTraceBus } from './FormulaCalculationTraceBus';
 export { FormulaCalculationTraceObservation } from './FormulaObservations';
-export { FormulaRenderInvalidator, type FormulaRenderInvalidationHandler } from './FormulaRenderInvalidator';
+export { FormulaValuePublisher } from './FormulaValuePublisher';
 export { FormulaSchedulerDataSource, type FormulaViewportChangeHandler } from './FormulaSchedulerDataSource';
 export {
   GetFormulaCellStatusCommand,
@@ -92,16 +92,11 @@ export {
   type FormulaIdleCommandResult,
   type FormulaIdleProvider,
 } from './FormulaStatusCommands';
-export { SheetFormulaReferenceHighlightPlugin } from './formulaReferenceHighlight/SheetFormulaReferenceHighlightPlugin';
 export {
   FormulaCrossSheetHighlightSource,
   type FormulaCrossSheetReference,
 } from './formulaReferenceHighlight/FormulaCrossSheetHighlightSource';
 export { CellFormulaValueConverterRegistry, type CellFormulaValueConverter } from './CellFormulaValueConverterRegistry';
-export {
-  sheetFormulaPluginKey,
-  formulaReferenceHighlightConfig,
-  getFormulaReferenceColor,
-  type FormulaReferenceColorPalette,
-  type FormulaReferenceHighlightConfig,
-} from './FormulaHighlightConfig';
+export { sheetFormulaPluginKey } from './SheetFormulaPluginKey';
+
+export { ActivateFormulaHyperlinkCommand } from './ActivateFormulaHyperlinkCommand';

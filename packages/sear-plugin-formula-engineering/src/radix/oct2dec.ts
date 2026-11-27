@@ -1,8 +1,8 @@
 /** OCT2DEC converts octal to decimal. Example: =OCT2DEC("54") returns 44. */
 import { engineeringFunction } from '../shared/functionFactory';
-import { numeric, text } from '../shared/arguments';
-import { isFormulaError, numberError } from '../shared/errors';
-import { formatSignedRadix, parseSignedRadix } from '../shared/radix';
+import { text } from '../shared/arguments';
+import { isFormulaError } from '../shared/errors';
+import { parseSignedRadix } from '../shared/radix';
 export const OCT2DEC = engineeringFunction({
   name: 'OCT2DEC',
   summary: 'Converts octal to decimal.',

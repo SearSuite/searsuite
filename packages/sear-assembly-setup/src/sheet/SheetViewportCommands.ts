@@ -1,12 +1,8 @@
 import { defineSheetCommand, LocalActionCommand, SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import {
-  SessionStateRegistry,
-  SessionStateRestorePhase,
-  defineSessionState,
-} from '@searsuite/sear-assembly-plugin';
+import { SessionStateRegistry, SessionStateRestorePhase, defineSessionState } from '@searsuite/sear-assembly-plugin';
 import { ScrollManager, type ScrollManagerState } from '@searsuite/sear-render-scroll';
 import { SheetViewportResizeController } from '@searsuite/sear-assembly-core';
-import { SheetZoomSessionStateDefinition } from '@searsuite/sear-plugin-zoom';
+import { SheetZoomSessionStateDefinition } from '@searsuite/sear-render';
 
 /** Public programmatic input for an absolute world-space viewport position. */
 export interface SheetScrollToInput {
@@ -28,7 +24,9 @@ export const SheetViewportSessionStateDefinition = defineSessionState<SheetViewp
 
 export const ScrollViewportToCommand = defineSheetCommand<SheetScrollToInput>('view.scrollTo');
 export const ApplyViewportScrollCommand = defineSheetCommand<SheetScrollInput>('view.scroll');
-export const ResizeSheetViewportCommand = defineSheetCommand<{ readonly width: number; readonly height: number }>('view.resize');
+export const ResizeSheetViewportCommand = defineSheetCommand<{ readonly width: number; readonly height: number }>(
+  'view.resize',
+);
 
 /** Registers viewport-owned commands on the editor command bus. */
 export function registerSheetViewportCommands(
@@ -45,7 +43,9 @@ export function registerSheetViewportCommands(
     return new LocalActionCommand(ApplyViewportScrollCommand.id, () => scrollManager.applyInputScroll(update));
   });
   commands.register(ResizeSheetViewportCommand, function createResizeSheetViewportCommand({ width, height }) {
-    return new LocalActionCommand(ResizeSheetViewportCommand.id, () => resizeController.applyViewportResize(width, height));
+    return new LocalActionCommand(ResizeSheetViewportCommand.id, () =>
+      resizeController.applyViewportResize(width, height),
+    );
   });
   resizeController.setResizeExecutor((size) => commands.run(ResizeSheetViewportCommand, size));
   scrollManager.setScrollToExecutor((x, y) => commands.run(ScrollViewportToCommand, { x, y }));
@@ -55,10 +55,7 @@ export function registerSheetViewportCommands(
 }
 
 /** Registers viewport-owned local remount state with the editor-local registry. */
-export function registerSheetViewportSessionState(
-  registry: SessionStateRegistry,
-  scrollManager: ScrollManager,
-): void {
+export function registerSheetViewportSessionState(registry: SessionStateRegistry, scrollManager: ScrollManager): void {
   registry.register(SheetViewportSessionStateDefinition, {
     restorePhase: SessionStateRestorePhase.AfterInitialize,
     restoreAfter: [SheetZoomSessionStateDefinition],

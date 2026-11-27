@@ -1,4 +1,3 @@
-import 'reflect-metadata';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
 import { PluginManager } from '@searsuite/sear-assembly-plugin';
 import { Container } from '@searsuite/sear-foundation-di';

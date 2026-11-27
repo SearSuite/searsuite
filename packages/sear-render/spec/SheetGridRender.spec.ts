@@ -1,5 +1,6 @@
 import { SheetGridRender } from '../src/sheet/SheetGridRender';
-import { SheetDataPlugin, SheetDataFieldNamespace, SheetDataMatrixFieldKey } from '@searsuite/sear-render-engine';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
+import { SheetDataFieldNamespace, SheetDataMatrixFieldKey } from '@searsuite/sear-domain-sheet';
 import { SheetHorizontalAlignment, SheetVerticalAlignment } from '@searsuite/sear-plugin-alignment';
 import { type SheetCellVisualReaderRegistry } from '@searsuite/sear-render-registry';
 import {
@@ -56,7 +57,7 @@ describe('SheetGridRender', () => {
     const core = {
       getDataEngine: () =>
         createDataEngine({ sheetData, rowSizes: dimensions(24, 2), columnSizes: dimensions(100, 5) }),
-      configEngine: { getPluginConfig: () => ({ defaultBorderColor: 'border' }) },
+      configEngine: { getConfig: () => ({ defaultBorderColor: 'border' }) },
       renderEngine: {
         renderCoordinatorManager: { create, createCellContext: () => ({}) },
         scrollManager: { getState: () => ({ x: 0, y: 0 }), getShape: () => [500, 48] },
@@ -94,7 +95,7 @@ describe('SheetGridRender', () => {
     const core = {
       getDataEngine: () => createDataEngine(state),
       configEngine: {
-        getPluginConfig: () => ({ defaultBorderColor: 'border' }),
+        getConfig: () => ({ defaultBorderColor: 'border' }),
         getDefaultConfig: () => ({ defaultCellAlign: SheetHorizontalAlignment.Left }),
       },
       renderEngine: {
@@ -132,13 +133,11 @@ describe('SheetGridRender', () => {
     const missing = { getDataEngine: () => ({ getDataType: () => void 0 }) };
 
     expect(() => plugin.render(missing as never)).toThrow('Sheet data fields are not found in SheetGridRender render.');
-    expect(plugin.registerState()).toEqual({ key: plugin.key, state: plugin.getState() });
     expect(
-      plugin.getPluginConfig({ configEngine: { getPluginConfig: () => ({ defaultBorderColor: 'border' }) } } as never),
+      plugin.getConfig({ configEngine: { getConfig: () => ({ defaultBorderColor: 'border' }) } } as never),
     ).toEqual({
       defaultBorderColor: 'border',
     });
-    expect(plugin.apply([])).toBe(plugin.getState());
     expect(plugin.registerConfig()).toHaveLength(1);
   });
 
@@ -159,7 +158,7 @@ describe('SheetGridRender', () => {
     };
     const core = {
       getDataEngine: () => createDataEngine(state),
-      configEngine: { getPluginConfig: () => ({ defaultBorderColor: 'border', defaultBackgroundColor: '#fefefe' }) },
+      configEngine: { getConfig: () => ({ defaultBorderColor: 'border', defaultBackgroundColor: '#fefefe' }) },
       renderEngine: {
         renderCoordinatorManager: { create, createCellContext: jest.fn() },
         scrollManager: { getState: () => ({ x: 0, y: 200 }), getShape: () => [160, 40] },
@@ -211,7 +210,7 @@ describe('SheetGridRender', () => {
     const core = {
       getDataEngine: () => createDataEngine(state),
       configEngine: {
-        getPluginConfig: () => ({ defaultBorderColor: 'border' }),
+        getConfig: () => ({ defaultBorderColor: 'border' }),
         getDefaultConfig: () => ({}), // missing defaultCellAlign to fallback to Left
       },
       renderEngine: {

@@ -1,7 +1,7 @@
 /** @jest-environment node */
 
 import { LocalActionCommand, defineSheetCommand, type SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import { SheetMatrix } from '@searsuite/sear-assembly-core';
+import { SheetMatrix } from '@searsuite/sear-domain-sheet';
 import { AlignmentMatrix, VerticalAlignmentMatrix } from '@searsuite/sear-plugin-alignment';
 import { CellFillMatrix } from '@searsuite/sear-plugin-cell-fill';
 import { CellHighlightMatrix } from '@searsuite/sear-plugin-cell-highlight';
@@ -16,12 +16,12 @@ import {
   defineStateObservation,
   type ObservationRegistry,
 } from '@searsuite/sear-foundation-subscription';
+import { type SheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
 import {
   SheetPlugin,
-  type SheetDocumentState,
   type SheetPluginRuntimeContext,
   type SheetPluginSetupContext,
-} from '@searsuite/sear-assembly-setup';
+} from '@searsuite/sear-assembly-commands';
 
 import { createHeadlessEditor } from '../src';
 
@@ -79,15 +79,7 @@ class CoordinationPublisherPlugin extends SheetPlugin<null> {
     return { key: this.key, state: null, dataEngine: { enabled: false } };
   }
 
-  public getPluginConfig(): null {
-    return null;
-  }
-
   public apply(): null {
-    return null;
-  }
-
-  public render(): null {
     return null;
   }
 
@@ -117,15 +109,7 @@ class CoordinationCommandPlugin extends SheetPlugin<null> {
     return { key: this.key, state: null, dataEngine: { enabled: false } };
   }
 
-  public getPluginConfig(): null {
-    return null;
-  }
-
   public apply(): null {
-    return null;
-  }
-
-  public render(): null {
     return null;
   }
 }
@@ -168,15 +152,7 @@ class CoordinationConsumerPlugin extends SheetPlugin<null> {
     return { key: this.key, state: null, dataEngine: { enabled: false } };
   }
 
-  public getPluginConfig(): null {
-    return null;
-  }
-
   public apply(): null {
-    return null;
-  }
-
-  public render(): null {
     return null;
   }
 }

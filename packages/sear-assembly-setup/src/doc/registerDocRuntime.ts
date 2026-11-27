@@ -9,23 +9,9 @@ import { KeyboardRouter, PointerCapture, TextInput } from '@searsuite/sear-rende
 import { type NodeProperties } from '@searsuite/sear-render-node';
 import { DocRenderEngine, RenderEngine } from '@searsuite/sear-render-engine';
 import { Scroller, ScrollManager, type ScrollPublisher } from '@searsuite/sear-render-scroll';
-import {
-  DirtyRenderStrategy,
-  EventRenderStrategy,
-  HitRenderStrategy,
-  IncrementalRenderPolicy,
-  OverlayRenderStrategy,
-  RasterCopyExecutor,
-  RenderStrategyManager,
-  ScreenRenderStrategy,
-  StickyRenderStrategy,
-} from '@searsuite/sear-render-strategy';
-import { type SearCoreDoc } from '@searsuite/sear-assembly-core';
-import {
-  RenderContextTextShaper,
-  TextMeasurementManager,
-  TextShaper,
-} from '@searsuite/sear-render-metrics';
+import { DirtyRenderStrategy, EventRenderStrategy, HitRenderStrategy, IncrementalRenderPolicy, OverlayRenderStrategy, RasterCopyExecutor, RenderStrategyManager, ScreenRenderStrategy, StickyRenderStrategy } from '@searsuite/sear-render-strategy';
+
+import { RenderContextTextShaper, TextMeasurementManager, TextShaper } from '@searsuite/sear-render-metrics';
 import { type DocEditorAdapters, type DocEditorViewport } from './createDocEditor';
 import { DocVirtualLayoutStore } from './DocVirtualLayoutStore';
 import { createDocFontDescriptor } from './createDocFontDescriptor';
@@ -47,7 +33,7 @@ export interface DocRuntime {
   /** Event registrar selected by the host or the headless fallback. */
   readonly eventRegistrar: EventRegistrar;
   /** Document plugin manager populated by feature registration. */
-  readonly pluginManager: PluginManager<SearCoreDoc, NodeProperties>;
+  readonly pluginManager: PluginManager;
 }
 
 /** Registers render, input, scroll, command, and plugin runtime services for Doc. */
@@ -76,8 +62,7 @@ export function registerDocRuntime(
   hitRenderContext.resize(viewport.width, viewport.height, devicePixelRatio);
 
   container.registerInstance(RenderContext.symbol, renderContext);
-  const textShaper =
-    adapters.createTextShaper?.(renderContext) ?? new RenderContextTextShaper(renderContext);
+  const textShaper = adapters.createTextShaper?.(renderContext) ?? new RenderContextTextShaper(renderContext);
   container.registerInstance(TextShaper.symbol, textShaper);
   container.registerFactory(
     TextMeasurementManager.symbol,
@@ -118,7 +103,7 @@ export function registerDocRuntime(
   container.register(DocCommandBus.symbol, DocCommandBus, Scope.Singleton);
   container.registerFactory(
     PluginManager.symbol,
-    () => new PluginManager<SearCoreDoc, NodeProperties>(container.resolve<Platform>(Platform.symbol)),
+    () => new PluginManager(container.resolve<Platform>(Platform.symbol)),
     Scope.Singleton,
   );
 
@@ -135,6 +120,6 @@ export function registerDocRuntime(
     renderEngine: container.resolve<DocRenderEngine>(DocRenderEngine.symbol),
     eventEngine,
     eventRegistrar,
-    pluginManager: container.resolve<PluginManager<SearCoreDoc, NodeProperties>>(PluginManager.symbol),
+    pluginManager: container.resolve<PluginManager>(PluginManager.symbol),
   };
 }

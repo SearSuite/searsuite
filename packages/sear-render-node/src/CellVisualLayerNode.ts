@@ -1,9 +1,10 @@
+import { CellVisualIconShape } from '@searsuite/sear-domain-cell-types';
 import { TextShaper, createFontDescriptor } from '@searsuite/sear-render-metrics';
 import { type SheetConfig } from '@searsuite/sear-assembly-config';
 import { drawCellVisualLabels } from './drawCellVisualLabels';
 import { RenderContext } from '@searsuite/sear-render-context';
 import { type PositionRectProps } from '@searsuite/sear-foundation-rect';
-import { CellVisualIconShape, CellVisualLayerShape, type CellVisualLayer, type NodeProperties } from './types';
+import { CellVisualLayerShape, type CellVisualLayer, type NodeProperties } from './types';
 import { RenderNode } from './RenderNode';
 
 /** Draws a feature-contributed visual between a cell background and its content. */

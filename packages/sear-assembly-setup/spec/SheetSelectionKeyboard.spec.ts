@@ -1,4 +1,5 @@
-import 'reflect-metadata';
+import { SheetSelectionView, SheetCellEditorView } from '@searsuite/sear-render';
+import { createEmptySheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
 import { Container, Injectable } from '@searsuite/sear-foundation-di';
 import { SearCoreSheet } from '@searsuite/sear-assembly-core';
 import { SheetQueryRegistry } from '@searsuite/sear-assembly-commands';
@@ -22,10 +23,6 @@ import { HeadlessCollabTransport } from '@searsuite/sear-plugin-collab';
 import { HeadlessToolbar } from '@searsuite/sear-assembly-plugin';
 import {
   FillSheetRangeCommand,
-  HandleSheetRangeDragCommand,
-  HandleSheetSelectionPointerCommand,
-  RestartSheetSelectionNavigationCommand,
-  SheetRangeDragAction,
   SelectRangeCommand,
   GetSelection,
   GetSelections,
@@ -33,7 +30,10 @@ import {
   GetActiveCell,
   SheetSelectionPlugin,
 } from '@searsuite/sear-plugin-selection';
-import { readSheetColumnSizes, readSheetRowSizes } from '@searsuite/sear-render-engine';
+import { RestartSheetSelectionNavigationCommand } from '@searsuite/sear-render';
+import { HandleSheetSelectionPointerCommand } from '@searsuite/sear-render';
+import { HandleSheetRangeDragCommand, SheetRangeDragAction } from '@searsuite/sear-render';
+import { readSheetColumnSizes, readSheetRowSizes } from '@searsuite/sear-domain-sheet';
 import { readSheetCellFormats } from '@searsuite/sear-plugin-cell-format';
 import { SheetHorizontalAlignment } from '@searsuite/sear-domain-cell-types';
 import { DataValidationInputPolicy, DataValidationKind } from '@searsuite/sear-plugin-data-validation';
@@ -43,7 +43,6 @@ import { CellRegion } from '@searsuite/sear-render-registry';
 import {
   HandleDocumentInputCommand,
   IsCellEditingQuery,
-  SheetCellEditorPlugin,
   SheetFormulaBarObservation,
 } from '@searsuite/sear-plugin-cell-editor';
 import { ToggleMergeCellsCommand } from '@searsuite/sear-plugin-cell-merge';
@@ -51,13 +50,8 @@ import { SetSheetFreezeCommand } from '@searsuite/sear-plugin-freeze';
 import { SetSheetRowsFixedCommand } from '@searsuite/sear-plugin-fixed-row';
 import { GetFormulaCellStatusCommand, waitForFormulaIdle } from '@searsuite/sear-plugin-formula';
 import { RedoSheetCommand, UndoSheetCommand } from '@searsuite/sear-plugin-history';
-import {
-  createSheetEditor,
-  createEmptySheetDocumentState,
-  ExportSheetStateCommand,
-  ResizeSheetViewportCommand,
-  ScrollViewportToCommand,
-} from '../src';
+import { createSheetEditor, ResizeSheetViewportCommand, ScrollViewportToCommand } from '../src';
+import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
 
 @Injectable()
 class TestKeyboardRouter extends HeadlessKeyboardRouter {
@@ -111,17 +105,49 @@ function createEditor(
     editor,
     keyboard: TestKeyboardRouter.current!,
     core: localContainer.resolve<SearCoreSheet>(SearCoreSheet.symbol),
-    selection: localContainer.resolve<SheetSelectionPlugin>(SheetSelectionPlugin.symbol),
-    cellEditor: localContainer.resolve<SheetCellEditorPlugin>(SheetCellEditorPlugin.symbol),
+    selection: localContainer.resolve<SheetSelectionView>(SheetSelectionView.symbol),
+    selectionOwner: localContainer.resolve<SheetSelectionPlugin>(SheetSelectionPlugin.symbol),
+    cellEditor: localContainer
+      .resolve<SearCoreSheet>(SearCoreSheet.symbol)
+      .getViewExtensions()
+      .getAll()
+      .find((view) => view instanceof SheetCellEditorView) as SheetCellEditorView,
     platform: localContainer.resolve<HeadlessPlatform>(Platform.symbol),
   };
 }
 
 describe('Sheet selection keyboard regression', () => {
+  it('consumes Escape only while a fill gesture is active', () => {
+    const { editor, core } = createEditor();
+    try {
+      const keyboard = TestKeyboardRouter.current!;
+      expect(keyboard.handlers.onEscape?.()).toBe(false);
+      editor.commands.run(SelectRangeCommand, { anchor: [1, 1], focus: [1, 1] });
+      const config = core.configEngine.getDefaultConfig();
+      const x =
+        readSheetColumnSizes(core.getDataEngine())!.getDimensionRightBoundaryByIndex(1) + (config.sheetOffsetX ?? 50);
+      const y =
+        readSheetRowSizes(core.getDataEngine())!.getDimensionRightBoundaryByIndex(1) + (config.sheetOffsetY ?? 24);
+      editor.commands.run(HandleSheetRangeDragCommand, {
+        action: SheetRangeDragAction.FillBegin,
+        point: { view: { x, y } },
+      });
+      expect(keyboard.handlers.onEscape?.()).toBe(true);
+      expect(keyboard.handlers.onEscape?.()).toBe(false);
+      expect(editor.commands.run(ExportSheetStateCommand, undefined).sheetState.sheetData.getItem(1, 1)?.value).toBe(
+        'keep',
+      );
+    } finally {
+      editor.destroy();
+    }
+  });
   it('BUG-1161 INT15-008 moves the active cell after sorting a filtered row out of view', () => {
     const { editor, core } = createEditor(6, 3, (state) => {
       for (const [row, name, rank] of [
-        [0, 'Name', 'Rank'], [1, 'keep', '3'], [2, 'hide', '1'], [3, 'keep', '2'],
+        [0, 'Name', 'Rank'],
+        [1, 'keep', '3'],
+        [2, 'hide', '1'],
+        [3, 'keep', '2'],
       ] as const) {
         state.sheetData.addItem(row, 0, { type: 'string', value: name });
         state.sheetData.addItem(row, 1, { type: 'string', value: rank });
@@ -130,7 +156,8 @@ describe('Sheet selection keyboard regression', () => {
     try {
       editor.commands.run(CreateSheetFilterCommand, { range: { start: [0, 0], end: [3, 1] } });
       editor.commands.run(SetSheetColumnFilterCommand, {
-        column: 0, predicate: { kind: SheetFilterKind.Values, values: ['keep'] },
+        column: 0,
+        predicate: { kind: SheetFilterKind.Values, values: ['keep'] },
       });
       editor.commands.run(SelectRangeCommand, { anchor: [1, 1], focus: [1, 1] });
       editor.commands.run(SortSheetRangeCommand, {
@@ -141,7 +168,9 @@ describe('Sheet selection keyboard regression', () => {
       expect(readSheetRowSizes(core.getDataEngine())?.getItem(0, 1)).toBe(0);
       expect(editor.queries.run(GetActiveCell, undefined)).toEqual([2, 1]);
       expect(editor.observations.getSnapshot(SheetFormulaBarObservation).text).toBe('2');
-      expect(editor.commands.run(ExportSheetStateCommand, undefined).sheetState.sheetData.getItem(1, 1)?.value).toBe('1');
+      expect(editor.commands.run(ExportSheetStateCommand, undefined).sheetState.sheetData.getItem(1, 1)?.value).toBe(
+        '1',
+      );
     } finally {
       editor.destroy();
     }
@@ -149,14 +178,20 @@ describe('Sheet selection keyboard regression', () => {
 
   it('BUG-039 skips filtered rows for arrows, extended selection, and Enter after editing', () => {
     const { editor, keyboard, core } = createEditor(20, 4, (state) => {
-      for (const [row, name] of [[12, 'Name'], [13, 'Alice'], [14, 'Bob'], [15, 'Cara']] as const) {
+      for (const [row, name] of [
+        [12, 'Name'],
+        [13, 'Alice'],
+        [14, 'Bob'],
+        [15, 'Cara'],
+      ] as const) {
         state.sheetData.addItem(row, 1, { type: 'string', value: name });
       }
     });
     try {
       editor.commands.run(CreateSheetFilterCommand, { range: { start: [12, 1], end: [15, 1] } });
       editor.commands.run(SetSheetColumnFilterCommand, {
-        column: 1, predicate: { kind: SheetFilterKind.Values, values: ['Alice'] },
+        column: 1,
+        predicate: { kind: SheetFilterKind.Values, values: ['Alice'] },
       });
       expect(readSheetRowSizes(core.getDataEngine())?.getItem(0, 14)).toBe(0);
       editor.commands.run(SelectRangeCommand, { anchor: [13, 1], focus: [13, 1] });
@@ -170,7 +205,9 @@ describe('Sheet selection keyboard regression', () => {
       editor.commands.run(HandleDocumentInputCommand, { kind: 'text', text: 'Zoe' });
       keyboard.handlers.onEnter?.(false, false);
       expect(editor.queries.run(GetActiveCell, undefined)).toEqual([16, 1]);
-      expect(editor.commands.run(ExportSheetStateCommand, undefined).sheetState.sheetData.getItem(14, 1)?.value).toBe('Bob');
+      expect(editor.commands.run(ExportSheetStateCommand, undefined).sheetState.sheetData.getItem(14, 1)?.value).toBe(
+        'Bob',
+      );
     } finally {
       editor.destroy();
     }
@@ -295,13 +332,15 @@ describe('Sheet selection keyboard regression', () => {
     });
     try {
       editor.commands.run(FillSheetRangeCommand, {
-        source: { start: [0, 1], end: [0, 1] }, target: [2, 1],
+        source: { start: [0, 1], end: [0, 1] },
+        target: [2, 1],
       });
       let cells = editor.commands.run(ExportSheetStateCommand, undefined).sheetState.sheetData;
       expect(cells.getItem(1, 1)?.formula).toBe('=A2');
       expect(cells.getItem(2, 1)?.formula).toBe('=A3');
       editor.commands.run(FillSheetRangeCommand, {
-        source: { start: [4, 1], end: [4, 1] }, target: [5, 1],
+        source: { start: [4, 1], end: [4, 1] },
+        target: [5, 1],
       });
       cells = editor.commands.run(ExportSheetStateCommand, undefined).sheetState.sheetData;
       expect(cells.getItem(5, 1)?.formula).toBe('=$A$1');
@@ -369,13 +408,18 @@ describe('Sheet selection keyboard regression', () => {
         origin: [0, 0],
         cursor: [0, 0],
       });
-      expect(() => selection.render({} as never, { x: 0, y: 0 })).toThrow('cannot be replaced');
+      expect(() => selection.initializeView({} as never)).toThrow('cannot be replaced');
       selection.onMouseMove(core, pointer(1, 1));
       selection.onMouseUp(core, pointer(1, 1));
-      selection.restartNavigation();
+      editor.commands.run(RestartSheetSelectionNavigationCommand, undefined);
       expect(rangeCommands).toHaveLength(1);
       expect(navigationCommands).toEqual([RestartSheetSelectionNavigationCommand.id]);
-      expect(() => selection.registerQueries(new SheetQueryRegistry())).toThrow('editor.commands.run');
+      expect(() =>
+        core.pluginManager
+          .getAllPlugins()
+          .find((plugin) => plugin instanceof SheetSelectionPlugin)!
+          .registerQueries(new SheetQueryRegistry()),
+      ).toThrow('editor.commands.run');
       expect(phases).toEqual(['started', 'completed', 'started', 'completed', 'started', 'completed']);
       expect(editor.queries.run(GetSelection, undefined)).toEqual({ start: [0, 0], end: [1, 1] });
     } finally {
@@ -885,15 +929,20 @@ describe('Sheet selection keyboard regression', () => {
       state.sheetData.addItem(0, 0, { type: 'number', value: 0.25 });
       state.cellFormats.addItem(0, 0, { kind: 'percent' });
       state.sheetData.addItem(0, 1, { type: 'string', value: 'red' });
-      state.dataValidations?.addItem(0, 1, [{
-        id: 'source-rule', endRow: 0, endColumn: 1,
-        condition: { kind: DataValidationKind.Dropdown, options: [{ label: 'red' }, { label: 'blue' }] },
-        inputPolicy: DataValidationInputPolicy.Reject,
-      }]);
+      state.dataValidations?.addItem(0, 1, [
+        {
+          id: 'source-rule',
+          endRow: 0,
+          endColumn: 1,
+          condition: { kind: DataValidationKind.Dropdown, options: [{ label: 'red' }, { label: 'blue' }] },
+          inputPolicy: DataValidationInputPolicy.Reject,
+        },
+      ]);
     });
     try {
       editor.commands.run(FillSheetRangeCommand, {
-        source: { start: [0, 0], end: [0, 0] }, target: [2, 0],
+        source: { start: [0, 0], end: [0, 0] },
+        target: [2, 0],
       });
       let state = editor.commands.run(ExportSheetStateCommand, undefined).sheetState;
       for (const row of [1, 2]) {
@@ -903,7 +952,8 @@ describe('Sheet selection keyboard regression', () => {
       }
 
       editor.commands.run(FillSheetRangeCommand, {
-        source: { start: [0, 1], end: [0, 1] }, target: [2, 1],
+        source: { start: [0, 1], end: [0, 1] },
+        target: [2, 1],
       });
       state = editor.commands.run(ExportSheetStateCommand, undefined).sheetState;
       for (const row of [1, 2]) {
@@ -976,7 +1026,8 @@ describe('Sheet selection keyboard regression', () => {
     });
     try {
       editor.commands.run(FillSheetRangeCommand, {
-        source: { start: [0, 0], end: [0, 1] }, target: [0, 3],
+        source: { start: [0, 0], end: [0, 1] },
+        target: [0, 3],
       });
       let cells = editor.commands.run(ExportSheetStateCommand, undefined).sheetState.sheetData;
       expect([0, 1, 2, 3].map((col) => cells.getItem(0, col)?.value)).toEqual([1, 2, 3, 4]);
@@ -995,7 +1046,8 @@ describe('Sheet selection keyboard regression', () => {
     });
     try {
       editor.commands.run(FillSheetRangeCommand, {
-        source: { start: [0, 0], end: [0, 1] }, target: [0, 3],
+        source: { start: [0, 0], end: [0, 1] },
+        target: [0, 3],
       });
       const cells = editor.commands.run(ExportSheetStateCommand, undefined).sheetState.sheetData;
       expect([0, 1, 2, 3].map((col) => cells.getItem(0, col)?.value)).toEqual([6, 4, 2, 0]);
@@ -1011,7 +1063,8 @@ describe('Sheet selection keyboard regression', () => {
     });
     try {
       editor.commands.run(FillSheetRangeCommand, {
-        source: { start: [0, 0], end: [1, 0] }, target: [3, 0],
+        source: { start: [0, 0], end: [1, 0] },
+        target: [3, 0],
       });
       let cells = editor.commands.run(ExportSheetStateCommand, undefined).sheetState.sheetData;
       expect([0, 1, 2, 3].map((row) => cells.getItem(row, 0)?.value)).toEqual(['Item1', 'Item2', 'Item3', 'Item4']);
@@ -1033,7 +1086,8 @@ describe('Sheet selection keyboard regression', () => {
     try {
       for (const col of [0, 1]) {
         editor.commands.run(FillSheetRangeCommand, {
-          source: { start: [0, col], end: [1, col] }, target: [3, col],
+          source: { start: [0, col], end: [1, col] },
+          target: [3, col],
         });
       }
       const cells = editor.commands.run(ExportSheetStateCommand, undefined).sheetState.sheetData;
@@ -1096,7 +1150,7 @@ describe('Sheet selection keyboard regression', () => {
         },
       };
       expect(selection.onMouseDown(core, { ...event, clickCount: 2 } as never)).toBe(false);
-      expect(cellEditor.onDblClick(core, event as never)).toBe(false);
+      expect(selection.onDblClick(core, event as never)).toBe(false);
       const values = editor.commands.run(ExportSheetStateCommand, undefined).sheetState.sheetData;
       expect([0, 1, 2, 3, 4].map((row) => values.getItem(row, 2)?.value)).toEqual(Array(5).fill('seed'));
       expect(values.getItem(5, 2)).toBeNull();

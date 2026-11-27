@@ -1,11 +1,15 @@
 import { Plugin, PluginKey } from '@searsuite/sear-assembly-plugin';
 import { SheetCommandBus, SheetQueryRegistry } from '@searsuite/sear-assembly-commands';
-import { CellClipboardCodecRegistry, CellCommitStrategyRegistry, SheetCellInputValidationRegistry } from '@searsuite/sear-domain-cell-types';
+import {
+  CellClipboardCodecRegistry,
+  CellCommitStrategyRegistry,
+  SheetCellInputValidationRegistry,
+} from '@searsuite/sear-domain-cell-types';
 import { type Transaction } from '@searsuite/sear-domain-transaction';
 import { Injectable } from '@searsuite/sear-foundation-di';
 import { SearError } from '@searsuite/sear-foundation-error';
-import { type CellProperties } from '@searsuite/sear-render-registry';
-import { SheetDataPlugin } from '@searsuite/sear-render-engine';
+
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
 import { registerSheetFindReplaceCommands, registerSheetFindReplaceQueries } from '../../SheetFindReplaceCommands';
 import { type SheetFindSource } from '../../findSheetMatches';
 
@@ -13,17 +17,19 @@ const key = new PluginKey('SheetFindReplacePlugin');
 
 /** Stateless Sheet feature; matches always read the current staged data owner. */
 @Injectable()
-export class SheetFindReplacePlugin extends Plugin<unknown, CellProperties, null> {
+export class SheetFindReplacePlugin extends Plugin<null> {
   readonly #data: SheetDataPlugin;
   readonly #codecs: CellClipboardCodecRegistry;
   readonly #commits: CellCommitStrategyRegistry;
-  readonly #projection: Pick<SheetFindSource,
-      'readValue' | 'forEachProjectedValueInRange' | 'isArrayResultAnchor' | 'isCoveredMergeCell' | 'isRowHidden'>;
+  readonly #projection: Pick<
+    SheetFindSource,
+    'readValue' | 'forEachProjectedValueInRange' | 'isArrayResultAnchor' | 'isCoveredMergeCell' | 'isRowHidden'
+  >;
   readonly #inputValidation: SheetCellInputValidationRegistry | undefined;
 
   public static readonly symbol = Symbol.for('SheetFindReplacePlugin');
   public static readonly pluginKey = key;
-  public override readonly warnOnDuplicateDepth = false;
+  public readonly warnOnDuplicateDepth = false;
   #revision = 0;
   #commands: SheetCommandBus | null = null;
 
@@ -31,8 +37,10 @@ export class SheetFindReplacePlugin extends Plugin<unknown, CellProperties, null
     data: SheetDataPlugin,
     codecs: CellClipboardCodecRegistry,
     commits: CellCommitStrategyRegistry,
-    projection: Pick<SheetFindSource,
-      'readValue' | 'forEachProjectedValueInRange' | 'isArrayResultAnchor' | 'isCoveredMergeCell' | 'isRowHidden'> = {},
+    projection: Pick<
+      SheetFindSource,
+      'readValue' | 'forEachProjectedValueInRange' | 'isArrayResultAnchor' | 'isCoveredMergeCell' | 'isRowHidden'
+    > = {},
     inputValidation?: SheetCellInputValidationRegistry,
   ) {
     super({ key, state: null });
@@ -55,10 +63,12 @@ export class SheetFindReplacePlugin extends Plugin<unknown, CellProperties, null
     registerSheetFindReplaceQueries(queries, this.#source());
   }
 
-  public registerState() { return { key: this.key, state: this.getState() }; }
-  public apply(_state: null, _transaction: Transaction): null { return null; }
-  public getPluginConfig(): null { return null; }
-  public render(): [] { return []; }
+  public registerState() {
+    return { key: this.key, state: this.getState() };
+  }
+  public apply(_state: null, _transaction: Transaction): null {
+    return null;
+  }
   public override onTransactionCommitted(transaction: Transaction): void {
     if (this.#commands && !this.#commands.isExecuting()) {
       throw new SearError('Sheet find changes must run through editor.commands.run(...).');
@@ -69,7 +79,9 @@ export class SheetFindReplacePlugin extends Plugin<unknown, CellProperties, null
   #source() {
     const plugin = this;
     return {
-      get matrix() { return plugin.#data.getState().sheetData; },
+      get matrix() {
+        return plugin.#data.getState().sheetData;
+      },
       getRevision: () => plugin.#revision,
       codecs: this.#codecs,
       commitStrategies: this.#commits,

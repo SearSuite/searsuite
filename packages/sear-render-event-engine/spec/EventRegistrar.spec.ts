@@ -1,9 +1,4 @@
-import {
-  EventRegistrar,
-  HeadlessEventRegistrar,
-  normalizeEventKey,
-  getPluginHandlerName,
-} from '../src';
+import { EventRegistrar, HeadlessEventRegistrar, normalizeEventKey, getViewHandlerName } from '../src';
 
 describe('EventRegistrar', () => {
   it('registers each event once and unregisters it cleanly', () => {
@@ -25,10 +20,10 @@ describe('EventRegistrar', () => {
     expect(normalizeEventKey('mousemove')).toBe('mouseMove');
     expect(normalizeEventKey('dblclick')).toBe('dblClick');
 
-    expect(getPluginHandlerName('mousedown')).toBe('onMouseDown');
-    expect(getPluginHandlerName('mouseDown')).toBe('onMouseDown');
-    expect(getPluginHandlerName('mousemove')).toBe('onMouseMove');
-    expect(getPluginHandlerName('dblclick')).toBe('onDblClick');
+    expect(getViewHandlerName('mousedown')).toBe('onMouseDown');
+    expect(getViewHandlerName('mouseDown')).toBe('onMouseDown');
+    expect(getViewHandlerName('mousemove')).toBe('onMouseMove');
+    expect(getViewHandlerName('dblclick')).toBe('onDblClick');
 
     const registrar = new HeadlessEventRegistrar();
     registrar.register('mousedown');

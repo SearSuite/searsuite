@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@searsuite/sear-foundation-di';
-import { type CellMatrixElement } from '@searsuite/sear-assembly-core';
+import { type CellMatrixElement } from '@searsuite/sear-domain-sheet';
 import {
   type FormulaText,
   type FormulaValue,
@@ -136,7 +136,10 @@ export class CellFormulaValueConverterRegistry {
    */
   register(converter: CellFormulaValueConverter): () => void {
     assertCellExtensionWrite(this);
-    const entry = Object.freeze({ cellType: converter.cellType, toFormulaValue: converter.toFormulaValue.bind(converter) });
+    const entry = Object.freeze({
+      cellType: converter.cellType,
+      toFormulaValue: converter.toFormulaValue.bind(converter),
+    });
     const previous = this.#converters.get(entry.cellType);
     this.#converters.set(entry.cellType, entry);
     const registry = this;

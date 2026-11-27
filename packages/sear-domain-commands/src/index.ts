@@ -4,10 +4,8 @@
  * @packageDocumentation
  */
 
+export { DocTransaction } from './DocTransaction';
 export { type DocStep } from './DocStep';
-export { DocTransaction, DocTransactionRenderOperationType } from './DocTransaction';
-export { ReflowDocTransaction } from './ReflowDocTransaction';
-export { RepaintDocTransaction } from './RepaintDocTransaction';
 export {
   type DocCommand,
   type DocCommandContext,
@@ -18,3 +16,5 @@ export {
   selectAllCommand,
   moveCursorCommand,
 } from './DocCommand';
+
+export * from './TextInputEvent';

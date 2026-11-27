@@ -2,8 +2,8 @@ import { FormulaNodeKind } from '@searsuite/sear-domain-formula-engine';
 import { CommandExecutionPhase } from '@searsuite/sear-foundation-common';
 import { GetFormulaCellStatusCommand } from '@searsuite/sear-plugin-formula';
 import { GetActiveCell } from '@searsuite/sear-plugin-selection';
-import { ActivateWorkbookSheetCommand } from '../src/WorkbookCommands';
-import { WorkbookFormulaCrossSheetHighlightPlugin } from '../src/workbookPlugin/formulaHighlight/WorkbookFormulaCrossSheetHighlightPlugin';
+import { ActivateWorkbookSheetCommand } from '@searsuite/sear-assembly-workbook-kernel';
+import { WorkbookFormulaCrossSheetHighlightPlugin } from '@searsuite/sear-assembly-workbook-kernel';
 
 describe('WorkbookFormulaCrossSheetHighlightPlugin', () => {
   it('projects selected formula references only onto their target sheet and clears after selection changes', () => {
@@ -34,7 +34,7 @@ describe('WorkbookFormulaCrossSheetHighlightPlugin', () => {
           };
         },
       },
-      sheets: { getActiveId: () => activeId, getActiveEditor: () => editor },
+      sheets: { getActiveId: () => activeId, getActiveClient: () => editor },
       document: {
         getState: () => ({
           sheets: [

@@ -1,7 +1,8 @@
-import { CellTypeDefinition, defineCellRenderer } from '@searsuite/sear-domain-cell';
+import { CellTypeDefinition } from '@searsuite/sear-domain-cell';
+
 import { CheckboxCellType, checkboxText } from './CheckboxCellValue';
 import { CheckboxCellCommitStrategy } from './CheckboxCellCommitStrategy';
-import { CheckboxCell } from './render/CheckboxCell';
+
 /** Atomic catalog contribution for rendering, editing, display and clipboard behavior. */
 export class CheckboxCellTypeDefinition extends CellTypeDefinition {
   readonly #hasRule: ((row: number, column: number) => boolean) | undefined;
@@ -20,9 +21,6 @@ export class CheckboxCellTypeDefinition extends CellTypeDefinition {
   }
   /** Creates the checkbox edit strategy. */ public override createCommitStrategies() {
     return [new CheckboxCellCommitStrategy(this.#hasRule)];
-  }
-  /** Registers portable glyph rendering. */ public override createRenderer() {
-    return defineCellRenderer(CheckboxCellType, CheckboxCell);
   }
   /** Provides stable boolean text for searches and measurements. */ public override createDisplayTextProvider() {
     return {

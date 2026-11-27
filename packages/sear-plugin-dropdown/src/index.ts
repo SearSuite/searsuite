@@ -11,3 +11,5 @@ export {
   parseDropdownSelection,
   formatDropdownSelection,
 } from '@searsuite/sear-plugin-data-validation';
+
+export { readDropdownIndicator, type DropdownIndicator } from './readDropdownIndicator';

@@ -1,12 +1,16 @@
 import { CSRMatrix } from '@searsuite/sear-domain-matrix';
 import { Rect } from '@searsuite/sear-foundation-rect';
-import { adoptCommittedPluginState } from '../src/adoptCommittedPluginState';
+import { adoptCommittedPluginState } from '@searsuite/sear-assembly-sheet-state';
 
 it('detaches a retained matrix handle while sharing locked sparse storage', () => {
   class OpaqueMatrix extends CSRMatrix<number> {
     #hidden = 1;
-    public readHidden(): number { return this.#hidden; }
-    public changeHidden(value: number): void { this.#hidden = value; }
+    public readHidden(): number {
+      return this.#hidden;
+    }
+    public changeHidden(value: number): void {
+      this.#hidden = value;
+    }
   }
   const matrix = new OpaqueMatrix(void 0, [1, 1]);
   matrix.addItem(0, 0, 4);
@@ -15,8 +19,7 @@ it('detaches a retained matrix handle while sharing locked sparse storage', () =
   matrix.changeHidden(9);
 
   expect(adopted.matrix).not.toBe(matrix);
-  expect((adopted.matrix as unknown as { data: number[] }).data)
-    .toBe((matrix as unknown as { data: number[] }).data);
+  expect((adopted.matrix as unknown as { data: number[] }).data).toBe((matrix as unknown as { data: number[] }).data);
   expect(adopted.matrix.getItem(0, 0)).toBe(4);
   expect(() => matrix.addItem(0, 0, 8)).toThrow('Committed matrix state');
   expect(() => adopted.matrix.changeHidden(8)).toThrow();
@@ -28,16 +31,21 @@ it('takes an independent immutable snapshot of plain state', () => {
 
   expect(adopted).not.toBe(state);
   expect(adopted.definitions).not.toBe(state.definitions);
-  expect(() => { state.definitions[0].id = 'changed'; }).toThrow();
+  expect(() => {
+    state.definitions[0].id = 'changed';
+  }).toThrow();
 });
 
 it('does not retain a plugin proxy that reads mutable external data', () => {
   const external = { value: 1 };
-  const state = new Proxy<{ stored: number; value?: number }>({ stored: 1 }, {
-    get(target, key, receiver) {
-      return key === 'value' ? external.value : Reflect.get(target, key, receiver);
+  const state = new Proxy<{ stored: number; value?: number }>(
+    { stored: 1 },
+    {
+      get(target, key, receiver) {
+        return key === 'value' ? external.value : Reflect.get(target, key, receiver);
+      },
     },
-  });
+  );
 
   const adopted = adoptCommittedPluginState(state);
   external.value = 9;
@@ -45,7 +53,9 @@ it('does not retain a plugin proxy that reads mutable external data', () => {
   expect(state.value).toBe(9);
   expect(adopted.stored).toBe(1);
   expect(adopted.value).toBeUndefined();
-  expect(() => { adopted.stored = 9; }).toThrow();
+  expect(() => {
+    adopted.stored = 9;
+  }).toThrow();
 });
 
 it('does not retain virtual properties in sparse values or matrix metadata', () => {
@@ -57,11 +67,14 @@ it('does not retain virtual properties in sparse values or matrix metadata', () 
     }
   }
   const external = { value: 1 };
-  const proxy = new Proxy<{ stored: number; virtual?: number }>({ stored: 1 }, {
-    get(target, key, receiver) {
-      return key === 'virtual' ? external.value : Reflect.get(target, key, receiver);
+  const proxy = new Proxy<{ stored: number; virtual?: number }>(
+    { stored: 1 },
+    {
+      get(target, key, receiver) {
+        return key === 'virtual' ? external.value : Reflect.get(target, key, receiver);
+      },
     },
-  });
+  );
   const matrix = new ExtensionMatrix(proxy);
   matrix.addItem(0, 0, proxy);
 
@@ -90,7 +103,9 @@ it('does not trust a plugin-supplied matrix lock flag or frozen storage', () => 
   const adopted = adoptCommittedPluginState({ matrix });
   const current = adopted.matrix as unknown as { data: number[] };
 
-  expect(() => { current.data = [9]; }).toThrow();
+  expect(() => {
+    current.data = [9];
+  }).toThrow();
   expect(adopted.matrix.getItem(0, 0)).toBe(4);
   expect(() => matrix.addItem(0, 0, 9)).toThrow('Committed matrix state');
 });
@@ -105,5 +120,8 @@ it('does not retain dynamic rectangle coordinates from a plugin', () => {
   coordinate = 9;
 
   expect(adopted.rect.getPoint(0)).toEqual([1, 0]);
-  expect(adopted.rect.shape).toEqual([[1, 0], [2, 2]]);
+  expect(adopted.rect.shape).toEqual([
+    [1, 0],
+    [2, 2],
+  ]);
 });

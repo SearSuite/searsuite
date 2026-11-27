@@ -1,5 +1,5 @@
 import { PluginKey, SheetStructureMoveRegistry } from '@searsuite/sear-assembly-plugin';
-import { type Pipeline } from '@searsuite/sear-assembly-core';
+import { type Pipeline } from '@searsuite/sear-assembly-plugin';
 import { MatrixOTActionName } from '@searsuite/sear-domain-ot';
 import {
   ClearRangeContentsCommand,
@@ -13,9 +13,7 @@ import {
   createDeleteRowOperations,
   createInsertColumnOperations,
   createInsertRowOperations,
-  registerSheetRangeCommands,
   registerSheetStructureCommands,
-  type SheetRangeCommandDataSource,
   type SheetStructureCommandDataSource,
 } from '../src';
 
@@ -209,8 +207,12 @@ describe('SheetOperationCommands', () => {
       validateClearCell,
     };
 
-    expect(createClearRangeContentsOperations({ anchor: [0, 0], focus: [2, 0] }, dataSource)
-      .map((operation) => operation.p)).toEqual([[0, 0], [2, 0]]);
+    expect(
+      createClearRangeContentsOperations({ anchor: [0, 0], focus: [2, 0] }, dataSource).map((operation) => operation.p),
+    ).toEqual([
+      [0, 0],
+      [2, 0],
+    ]);
     expect(validateClearCell.mock.calls.map(([row]) => row)).toEqual([0, 2]);
   });
 

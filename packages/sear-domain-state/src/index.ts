@@ -322,3 +322,17 @@
  */
 
 export { SearState } from './SearState';
+
+export { StateKernel } from './StateKernel';
+export { StateKernelBatch } from './StateKernelBatch';
+export { type StateKernelAdapter, type StateKernelCommit } from './StateKernelContracts';
+
+export { StatePlugin } from './StatePlugin';
+export { type StateOwnerKey } from './StateOwnerKey';
+export {
+  DataEngine,
+  type DataEngineViewFieldSelector,
+  type DataEngineViewFieldRegistration,
+  type DataEngineRegistrationOptions,
+} from './DataEngine';
+export { DataViewFieldDuplicateError } from './DataViewFieldDuplicateError';

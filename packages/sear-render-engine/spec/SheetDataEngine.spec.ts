@@ -1,5 +1,6 @@
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
-import { DataViewFieldDuplicateError, SheetDataEngine } from '../src';
+import { SheetDataEngine } from '@searsuite/sear-domain-sheet';
+import { DataViewFieldDuplicateError } from '@searsuite/sear-domain-state';
 
 describe('SheetDataEngine', () => {
   it('keeps the committed registry private and requires its owner token for writes', () => {
@@ -12,9 +13,13 @@ describe('SheetDataEngine', () => {
     expect((engine as unknown as { dataTypeRegistry?: unknown }).dataTypeRegistry).toBeUndefined();
     expect(() => engine.replaceDataType(key, { value: 'bypass' })).toThrow();
     expect(() => engine.registerDataType(key, { value: 'bypass' })).toThrow();
-    expect(() => engine.registerDataViewField(key, {
-      viewKey: 'sheet', fieldKey: 'value', select: (state: { value: string }) => state.value,
-    })).toThrow();
+    expect(() =>
+      engine.registerDataViewField(key, {
+        viewKey: 'sheet',
+        fieldKey: 'value',
+        select: (state: { value: string }) => state.value,
+      }),
+    ).toThrow();
     expect(engine.getDataType(key)).toEqual({ value: 'before' });
     engine.replaceDataType(key, { value: 'after' }, token);
     expect(engine.getDataType(key)).toEqual({ value: 'after' });
@@ -71,7 +76,9 @@ describe('SheetDataEngine', () => {
     field.fieldKey = 'forged';
     options.dataView.push({ ...field });
     expect(() => (retained.dataView as unknown as unknown[]).push({ ...field })).toThrow();
-    expect(() => { (retained.dataView![0] as { fieldKey: string }).fieldKey = 'forged'; }).toThrow();
+    expect(() => {
+      (retained.dataView![0] as { fieldKey: string }).fieldKey = 'forged';
+    }).toThrow();
     expect(engine.getDataTypeOptions(key)).toBe(retained);
     expect(engine.getDataViewFieldKeys('customView')).toEqual(['value']);
     expect(engine.readDataViewField('customView', 'value')).toBe(3);

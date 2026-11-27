@@ -1,7 +1,7 @@
-import { type SheetDocumentState } from '@searsuite/sear-assembly-setup';
+import { type SheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
 import { type WorkbookDocumentState } from '@searsuite/sear-domain-workbook';
-import { WorkbookFormulaEvaluationRuntime } from '../src/WorkbookFormulaEvaluationRuntime';
-import { WorkbookFormulaObjectsMetadataKey } from '../src/WorkbookFormulaObjects';
+import { WorkbookFormulaEvaluationRuntime } from '@searsuite/sear-assembly-workbook-kernel';
+import { WorkbookFormulaObjectsMetadataKey } from '@searsuite/sear-assembly-workbook-kernel';
 
 const state = {
   id: 'book',
@@ -15,7 +15,7 @@ const state = {
   sheetStates: {
     data: {
       sheetData: {
-        getItem: (row: number, col: number) => row === 0 && col === 1 ? { value: 'Amount' } : null,
+        getItem: (row: number, col: number) => (row === 0 && col === 1 ? { value: 'Amount' } : null),
       },
     },
   },

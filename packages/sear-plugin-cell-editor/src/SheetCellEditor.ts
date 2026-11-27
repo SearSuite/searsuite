@@ -1,37 +1,26 @@
-import { buildSelectionUpdate, readCellEditorGeometryFields, resolveReferenceHighlightBounds } from './SheetCellEditorGeometry';
+import { DocEditModel } from '@searsuite/sear-assembly-doc';
+import { readSheetColumnSizes } from '@searsuite/sear-plugin-resize';
+import { type CellDocumentFormatting, type SheetCellEditorOptions } from './SheetCellEditorOptions';
+import { PublishCellEditDraftCommand, SynchronizeCellEditModelCommand } from './SheetCellEditorCommands';
 import { IsCellEditingQuery } from './IsCellEditingQuery';
 import { ReadSelectedCellEditTextQuery } from './ReadSelectedCellEditTextQuery';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { columnIndexToLabel } from '@searsuite/sear-foundation-utils';
-import {
-  SearCoreSheet,
-  CellMatrixElement,
-  SheetMatrix,
-  Pipeline,
-  SheetInteractionReducerRegistry,
-  runOutsideCommandExecution,
-} from '@searsuite/sear-assembly-core';
+import { CellMatrixElement, SheetMatrix } from '@searsuite/sear-domain-sheet';
+import { Pipeline, runOutsideCommandExecution } from '@searsuite/sear-assembly-plugin';
 import {
   RectOT,
   RectOTActionName,
-  MatrixOTActionName,
   createUpdateRectOTOperation,
   createUpdateCellOTOperation,
   createResizeRowOTOperation,
 } from '@searsuite/sear-domain-ot';
 import { DocCursorDirection } from '@searsuite/sear-domain-commands';
 import { Plugin, PluginKey } from '@searsuite/sear-assembly-plugin';
-import { EventWithOffsetAndTarget } from '@searsuite/sear-render-event-engine';
-import {
-  PositionRect,
-  Rect as RectRange,
-  Point,
-  createEmptyRect,
-  createEmptyRectShape,
-} from '@searsuite/sear-foundation-rect';
-import { Inject, Injectable, type Container } from '@searsuite/sear-foundation-di';
+import { Point, createEmptyRect, createEmptyRectShape } from '@searsuite/sear-foundation-rect';
+import { Injectable } from '@searsuite/sear-foundation-di';
 import { Transaction } from '@searsuite/sear-domain-transaction';
-import { ConfigUnit, type SheetConfig } from '@searsuite/sear-assembly-config';
+
 import {
   createSheetTransaction,
   TransactionPipelineCommand,
@@ -43,14 +32,9 @@ import {
   type SheetCommandDefinition,
   type SheetCommandResult,
 } from '@searsuite/sear-assembly-commands';
-import { Node } from '@searsuite/sear-render-node';
 import { readSheetCellAlignments } from '@searsuite/sear-plugin-alignment';
-import { CoordinateTransformer } from '@searsuite/sear-render-context';
-import { createFontDescriptor, TextShaper } from '@searsuite/sear-render-metrics';
-import { activeFixedRowOffsets, getSheetRangePositionRect } from '@searsuite/sear-render';
 import { SheetCellMergePlugin } from '@searsuite/sear-plugin-cell-merge';
-import { readSheetFixedRows } from '@searsuite/sear-plugin-fixed-row';
-import { readSheetFreeze } from '@searsuite/sear-plugin-freeze';
+
 import {
   createSetRangeCellFormatOperations,
   readSheetCellFormats,
@@ -58,8 +42,6 @@ import {
   type CellFormatMatrix,
 } from '@searsuite/sear-plugin-cell-format';
 import {
-  SheetHighlightPipelineStepName,
-  SheetHighlightPlugin,
   SheetSelectionInteractionName,
   SheetSelectionPipelineStepName,
   SheetSelectionPlugin,
@@ -68,18 +50,13 @@ import {
   GetActiveCell,
   GetSelections,
 } from '@searsuite/sear-plugin-selection';
-import { type DataEngine, readSheetDataMatrix, readSheetRowVisibility, SheetDataPlugin } from '@searsuite/sear-render-engine';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
+import { readSheetDataMatrix, readSheetRowVisibility } from '@searsuite/sear-domain-sheet';
+import { type DataEngine } from '@searsuite/sear-domain-state';
 import { readSheetRowSizes, SheetResizePlugin } from '@searsuite/sear-plugin-resize';
 import { type CSRMatrix, type DimensionsCSRMatrix } from '@searsuite/sear-domain-matrix';
-import { CellProperties, CellRegion, EmptyCell, EmbeddedEditorRenderNode } from '@searsuite/sear-render-registry';
-import {
-  TextInput,
-  TextInputKind,
-  type TextInputEvent,
-  KeyboardRouter,
-  PointerCapture,
-} from '@searsuite/sear-render-input';
-import { HexColor } from '@searsuite/sear-foundation-utils';
+import { TextInputKind } from '@searsuite/sear-domain-commands';
+
 import {
   FormulaDateSystem,
   IFormulaParser,
@@ -89,11 +66,9 @@ import {
 } from '@searsuite/sear-domain-formula-engine';
 import { type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 import { SheetFormulaBarObservation, type SheetFormulaBarState } from './SheetFormulaBarObservation';
-import { CursorRegistry, CursorEngine, CursorToken } from '@searsuite/sear-render-cursor';
 import {
   RichDocNode,
   DocSelection,
-  getTextNodeLength,
   normalizeDocForEdit,
   stringToRichDoc,
   isDocSemanticallyEmpty,
@@ -101,14 +76,8 @@ import {
   getDocumentOffset,
   cloneRichDocument,
 } from '@searsuite/sear-domain-doc';
-import {
-  SheetEmbeddedEditor,
-  type SheetEditSession,
-  type SheetEmbeddedEditorContext,
-  type SheetTextSelection,
-} from '@searsuite/sear-sheet-editor-contract';
-import { EditorState, EDITOR_BORDER_COLOR } from './EditorTypes';
-import { EditorCursorBlinker } from './EditorCursorBlinker';
+import { type SheetTextSelection } from '@searsuite/sear-assembly-doc';
+import { EditorState } from './EditorTypes';
 import { Platform } from '@searsuite/sear-foundation-platform';
 import {
   CellClipboardCodecRegistry,
@@ -121,9 +90,7 @@ import {
   SheetCellInputValidationRegistry,
 } from '@searsuite/sear-domain-cell-types';
 import { getCellEditableValue } from './CellEditableValue';
-import { computeCellEditorOverflowLeftX } from './computeCellEditorOverflowLeftX';
 import { registerSheetRangeTextStyleCommand } from './SheetRangeTextStyleCommand';
-import { Highlighter } from './Highlighter';
 import {
   SheetCellEditorExitReason,
   SheetCellEditorInteractionName,
@@ -139,12 +106,8 @@ import {
   CommitCellEditCommand,
   InsertCurrentDateTimeCommand,
   HandleDocumentInputCommand,
-  HandleCellEditorPointerCommand,
-  BeginCellEditorDragSelectionCommand,
-  EndCellEditorDragSelectionCommand,
   ReplaceFormulaReferenceCommand,
   EndFormulaReferencePickCommand,
-  RequestCellEditorRenderCommand,
   UpdateCellEditorDocumentSelectionCommand,
   SetCellInlineStyleCommand,
   AcceptFormulaSuggestionCommand,
@@ -160,7 +123,6 @@ import {
   type SheetCancelCellEditInput,
   type SheetCommitCellEditInput,
   type SheetDocumentInputCommandInput,
-  type SheetCellEditorPointerInput,
   type SheetFormulaReferenceReplacementInput,
   type SheetDocumentSelectionCommandInput,
   type SheetInlineStyleCommandInput,
@@ -173,25 +135,15 @@ import {
 } from './formulaAssist/FormulaInputAssistObservation';
 import { cloneFormulaInputAssistState } from './formulaAssist/cloneFormulaInputAssistState';
 import { formulaDocumentPosition } from './formulaAssist/formulaDocumentPosition';
-import { FormulaReferencePickService, type FormulaEditDraft } from './formulaAssist/FormulaReferencePick';
+import { type FormulaEditDraft } from './formulaAssist/FormulaReferencePick';
 import { ReadFormulaEditDraftQuery } from './formulaAssist/ReadFormulaEditDraftQuery';
-import {
-  canPickFormulaReference,
-  canStartFormulaReferencePick,
-  formatPickedReference,
-  type PickedReferenceKind,
-} from './formulaAssist/formatPickedReference';
+import { canPickFormulaReference, type PickedReferenceKind } from './formulaAssist/formatPickedReference';
 import { completeFormulaForCommit } from './formulaAssist/completeFormulaForCommit';
 import { FormulaAutoCloseTracker } from './formulaAssist/FormulaAutoCloseTracker';
 import { cycleFormulaReference } from './formulaAssist/cycleFormulaReference';
 import { diagnoseFormulaInput } from './formulaAssist/diagnoseFormulaInput';
 
 const key = new PluginKey('SheetCellEditor');
-
-interface SheetCellEditorConfig {
-  /** Opaque editor surface that hides committed cell text and grid lines while editing. */
-  editorBackgroundColor: string;
-}
 
 interface CellEditorSheetFields {
   sheetData: SheetMatrix;
@@ -201,9 +153,10 @@ interface CellEditorSheetFields {
   cellFormats: CellFormatMatrix | null;
 }
 
-
 function readCellEditorSheetFields(dataEngine: DataEngine): CellEditorSheetFields | null {
-  const geometry = readCellEditorGeometryFields(dataEngine);
+  const rowSizes = readSheetRowSizes(dataEngine),
+    columnSizes = readSheetColumnSizes(dataEngine);
+  const geometry = rowSizes && columnSizes ? { rowSizes, columnSizes } : null;
   const sheetData = readSheetDataMatrix(dataEngine);
   const cellAlignments = readSheetCellAlignments(dataEngine);
   const cellFormats = readSheetCellFormats(dataEngine);
@@ -211,22 +164,13 @@ function readCellEditorSheetFields(dataEngine: DataEngine): CellEditorSheetField
   return { sheetData, rowSizes: geometry.rowSizes, columnSizes: geometry.columnSizes, cellAlignments, cellFormats };
 }
 
-
-
 /** Coordinates Sheet cell edit sessions, text input, and embedded editors. */
 @Injectable()
-export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties, EditorState> {
+export class SheetCellEditorPlugin extends Plugin<EditorState> {
   readonly #mergePlugin: SheetCellMergePlugin;
   readonly #selectionPlugin: SheetSelectionPlugin;
-  readonly #textInput: TextInput;
-  readonly #keyboardRouter: KeyboardRouter;
-  readonly #pointerCapture: PointerCapture;
-  readonly #cursorRegistry: CursorRegistry;
-  readonly #cursorEngine: CursorEngine;
   readonly #platform: Platform;
   readonly #commitStrategies: CellCommitStrategyRegistry;
-  readonly #highlighter: Highlighter;
-  readonly #coordinates: CoordinateTransformer;
   readonly #formulaSourceProvider: IFormulaSourceProvider | undefined;
   readonly #cellFormatLocaleProvider: ICellFormatLocaleProvider | undefined;
   readonly #queries: SheetQueryRegistry | undefined;
@@ -235,34 +179,66 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
   readonly #dateSystemProvider: IFormulaDateSystemProvider | undefined;
   readonly #cellCodecs: CellClipboardCodecRegistry | undefined;
 
+  readonly #data: DataEngine;
+  readonly #formatting: CellDocumentFormatting;
+  public constructor(options: SheetCellEditorOptions) {
+    super({ key, state: [createEmptyRect(), createEmptyRect(), createEmptyRect()] });
+    this.#data = options.data;
+    this.#mergePlugin = options.merges;
+    this.#selectionPlugin = options.selection;
+    this.#platform = options.platform;
+    this.#commitStrategies = options.commitStrategies;
+    this.#formulaSourceProvider = options.formulaSourceProvider;
+    this.#cellFormatLocaleProvider = options.cellFormatLocaleProvider;
+    this.#queries = options.queries;
+    this.#formulaParser = options.formulaParser;
+    this.#inputValidation = options.inputValidation;
+    this.#dateSystemProvider = options.dateSystemProvider;
+    this.#cellCodecs = options.cellCodecs;
+    this.#formatting = options.formatting;
+    registerSheetCellEditorInteractionReducers(options.interactionReducers);
+  }
+  public isEditing(): boolean {
+    return this.#isEditing;
+  }
+  /** Read-only view of the single document owner. Mutation authority remains command-scoped. */
+  public readEditModel(): DocEditModel | null {
+    return this.#editSession;
+  }
+  public readDocumentSession() {
+    return { pendingDoc: cloneRichDocument(this.#session.pendingDoc), docSelection: this.getDocumentSelection() };
+  }
+  public readFormulaAssist() {
+    return cloneFormulaInputAssistState(this.#formulaAssistState);
+  }
+  public readReferencePick() {
+    return this.#referencePick ? { ...this.#referencePick, start: [...this.#referencePick.start] as Point } : null;
+  }
+  public readLastPickedReference() {
+    return this.#lastPickedReference
+      ? { ...this.#lastPickedReference, cell: [...this.#lastPickedReference.cell] as Point }
+      : null;
+  }
+  public onEditorDestroy(): void {
+    this.assertRuntimeWriteAllowed();
+    this.#disposeEmbeddedSession();
+    this.#formulaAssistListeners.clear();
+    this.#formulaBarListeners.clear();
+  }
   /** DI token for resolving SheetCellEditorPlugin. */
   public static readonly symbol: symbol = Symbol.for('SheetCellEditorPlugin');
   /** Stable plugin key for SheetCellEditorPlugin. */
   public static readonly pluginKey = key;
-  /** Default visual configuration for the inline cell editor. */
-  public static readonly defaultConfig: SheetCellEditorConfig = {
-    editorBackgroundColor: '#ffffff',
-  };
-
-  /** Registers rich-document node types used by the sheet cell editor. */
-  public static registerServices(_context: { readonly container: Container }): void {}
 
   // ─── Editing session state ─────────────────────────────────────────────
 
   #isEditing: boolean = false;
   #boundaryCommitSequence = 0;
 
-  /** True while the user is holding the mouse button and dragging to extend the text selection. */
-  #isDragSelecting: boolean = false;
-  #disposePointerCapture: (() => void) | null = null;
-
   // ─── Embedded editor session ───────────────────────────────────────────
 
-  #editSession: SheetEditSession | null = null;
+  #editSession: DocEditModel | null = null;
   #initialEditSnapshot: string | null = null;
-  #disposeEditKeyboardHandlers: (() => void) | null = null;
-  readonly #embeddedEditor: SheetEmbeddedEditor | undefined;
-  #embeddedContext: SheetEmbeddedEditorContext | null = null;
   #sessionState: {
     pendingDoc: RichDocNode[];
     docSelection: DocSelection;
@@ -287,26 +263,8 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
       head: { path: [...head.path], offset: head.offset },
     };
   }
-
-  // ─── Render cache ──────────────────────────────────────────────────────
-
-  /** PositionRect from previous frame, used to union dirty region on size changes. */
-  #lastEditorRect: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null = null;
-
-  /** Leftmost X of center/right-aligned overflow text from the cell being edited. Used to mark a separate dirty rect for the overflow area so the grid cell is not redrawn there. */
-  #lastOverflowLeftX: number | null = null;
-  #commandCore: SearCoreSheet | null = null;
-  #core: SearCoreSheet | null = null;
-  #textShaper: TextShaper | undefined;
   #functionRegistry: IFunctionRegistry | null = null;
   #formulaAnalysis: FormulaInputAnalysis | null = null;
-  #referencePickService: FormulaReferencePickService | undefined;
-  #referencePickBindingClosed = false;
   #formulaAssistState: FormulaInputAssistState = {
     suggestions: [],
     selectedIndex: 0,
@@ -316,116 +274,17 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
   };
   readonly #formulaAssistListeners = new Set<(state: FormulaInputAssistState) => void>();
   readonly #formulaBarListeners = new Set<(state: SheetFormulaBarState) => void>();
-  #referencePick: { readonly start: Point; readonly kind: PickedReferenceKind; readonly replaceStart: number; replaceEnd: number } | null = null;
-  #crossSheetReferencePick: { readonly start: Point; end: Point } | null = null;
+  #referencePick: {
+    readonly start: Point;
+    readonly kind: PickedReferenceKind;
+    readonly replaceStart: number;
+    replaceEnd: number;
+  } | null = null;
   #lastPickedReference: { readonly start: number; readonly text: string; readonly cell: Point } | null = null;
   readonly #formulaAutoClose = new FormulaAutoCloseTracker();
-  // ─── Dependencies ─────────────────────────────────────────────────────
-
-  readonly #blinker: EditorCursorBlinker;
   #commands: SheetCommandBus | undefined;
   /** @inheritdoc */
   public override interestedIn: string[] = [];
-
-  /** Creates a SheetCellEditorPlugin instance. */
-  constructor(
-    @Inject(SheetCellMergePlugin.symbol)
-    mergePlugin: SheetCellMergePlugin,
-    @Inject(SheetSelectionPlugin.symbol)
-    selectionPlugin: SheetSelectionPlugin,
-    @Inject(TextInput.symbol) textInput: TextInput,
-    @Inject(KeyboardRouter.symbol)
-    keyboardRouter: KeyboardRouter,
-    @Inject(PointerCapture.symbol)
-    pointerCapture: PointerCapture,
-    @Inject(CursorRegistry.symbol) cursorRegistry: CursorRegistry,
-    @Inject(CursorEngine.symbol) cursorEngine: CursorEngine,
-    @Inject(Platform.symbol) platform: Platform,
-    @Inject(CellCommitStrategyRegistry.symbol)
-    commitStrategies: CellCommitStrategyRegistry,
-    @Inject(Highlighter.symbol) highlighter: Highlighter,
-    @Inject(CoordinateTransformer.symbol)
-    coordinates: CoordinateTransformer,
-    @Inject(SheetInteractionReducerRegistry.symbol)
-    interactionReducers: SheetInteractionReducerRegistry,
-    @Inject(SheetEmbeddedEditor.symbol)
-    embeddedEditor?: unknown,
-    @Inject(SheetCommandBus.symbol)
-    commands?: SheetCommandBus,
-    @Inject(IFormulaSourceProvider.symbol)
-    formulaSourceProvider?: IFormulaSourceProvider,
-    @Inject(TextShaper.symbol) textShaper?: TextShaper,
-    @Inject(ICellFormatLocaleProvider.symbol)
-    cellFormatLocaleProvider?: ICellFormatLocaleProvider,
-    @Inject(SheetQueryRegistry.symbol)
-    queries?: SheetQueryRegistry,
-    @Inject(IFormulaParser.symbol)
-    formulaParser?: IFormulaParser,
-    @Inject(SheetCellInputValidationRegistry.symbol)
-    inputValidation?: SheetCellInputValidationRegistry,
-    @Inject(IFormulaDateSystemProvider.symbol)
-    dateSystemProvider?: IFormulaDateSystemProvider,
-    @Inject(CellClipboardCodecRegistry.symbol)
-    cellCodecs?: CellClipboardCodecRegistry,
-  ) {
-    super({
-      key,
-      state: [createEmptyRect(), createEmptyRect(), createEmptyRect()],
-    });
-    this.#mergePlugin = mergePlugin;
-    this.#selectionPlugin = selectionPlugin;
-    this.#textInput = textInput;
-    this.#keyboardRouter = keyboardRouter;
-    this.#pointerCapture = pointerCapture;
-    this.#cursorRegistry = cursorRegistry;
-    this.#cursorEngine = cursorEngine;
-    this.#platform = platform;
-    this.#commitStrategies = commitStrategies;
-    this.#highlighter = highlighter;
-    this.#coordinates = coordinates;
-    this.#formulaSourceProvider = formulaSourceProvider;
-    this.#cellFormatLocaleProvider = cellFormatLocaleProvider;
-    this.#queries = queries;
-    this.#formulaParser = formulaParser;
-    this.#inputValidation = inputValidation;
-    this.#dateSystemProvider = dateSystemProvider;
-    this.#cellCodecs = cellCodecs;
-
-    this.#commands = commands;
-    this.#embeddedEditor = isSheetEmbeddedEditor(embeddedEditor) ? embeddedEditor : undefined;
-
-    this.#blinker = new EditorCursorBlinker(this.#platform, () => this.#requestRerender());
-    registerSheetCellEditorInteractionReducers(interactionReducers);
-
-    this.#cursorRegistry.register({
-      kind: 'predicate',
-      priority: 'high',
-      test: this.#isCellEditorCursorTarget.bind(this),
-      cursor: 'text',
-    });
-
-    this.#textShaper = textShaper;
-
-    // TextInput handles IME composition and printable character input only.
-    this.#textInput.subscribe({
-      onTextInput: this.#handleEditorTextInput.bind(this),
-      onDelete: this.#handleEditorTextDelete.bind(this), // clipboard Cut
-      onCut: () => this.#readSelectedCellEditText(),
-    });
-    this.#keyboardRouter.subscribe({
-      onEdit: this.#handleStartEditingKey.bind(this),
-      onInsertCurrentDate: () => this.#insertCurrentDateTime('date'),
-      onInsertCurrentTime: () => this.#insertCurrentDateTime('time'),
-    });
-  }
-
-  /** Binds this plugin to the core owned by its editor-local container. */
-  public bindCore(core: SearCoreSheet): void {
-    if (this.#core && this.#core !== core) {
-      throw new SearError('Sheet cell editor core is already bound to an editor.');
-    }
-    this.#core = core;
-  }
 
   /** Binds the editor-local registry after formula services have been assembled. */
   public bindFormulaRegistry(registry: IFunctionRegistry): void {
@@ -436,15 +295,6 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
   }
 
   /** Binds the optional parent-workbook reference picker. */
-  public bindReferencePickService(service: FormulaReferencePickService): void {
-    if (this.#referencePickBindingClosed && this.#referencePickService !== service) {
-      throw new SearError('Sheet cell editor reference picker cannot be bound after command registration.');
-    }
-    if (this.#referencePickService && this.#referencePickService !== service) {
-      throw new SearError('Sheet cell editor reference picker is already bound to an editor.');
-    }
-    this.#referencePickService = service;
-  }
 
   /** Publishes formula authoring state through the editor's typed observation registry. */
   public registerObservations(observations: ObservationRegistry): void {
@@ -499,7 +349,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
           : text.length,
       };
     }
-    const dataEngine = this.#core?.getDataEngine();
+    const dataEngine = this.#data;
     const stored = dataEngine ? readSheetDataMatrix(dataEngine)?.getItem(cell[0], cell[1]) : null;
     const value = getCellEditableValue(stored, { row: cell[0], col: cell[1] }, this.#formulaSourceProvider);
     const text = Array.isArray(value)
@@ -530,61 +380,6 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
     );
   }
 
-  /** Explicitly binds services for isolated plugin tests or custom local assembly. */
-  public bindRuntimeServices(container: Container): void {
-    if (Plugin.prototype.hasStateWriteBoundary.call(this)) {
-      throw new SearError('Sheet cell editor runtime services cannot be rebound after assembly.');
-    }
-    const core = resolveOptional<SearCoreSheet>(container, SearCoreSheet.symbol);
-    if (core) this.bindCore(core);
-    this.#textShaper = resolveOptional(container, TextShaper.symbol) ?? this.#textShaper;
-  }
-
-  #handleEditorTextInput(event: TextInputEvent): void {
-    this.#executeEditorInput(event);
-  }
-
-  #handleEditorTextDelete(): void {
-    this.#executeEditorInput({ kind: 'delete' });
-  }
-
-  #subscribeEditHandlers(): void {
-    this.#disposeEditKeyboardHandlers?.();
-    const dispose = this.#keyboardRouter.subscribe({
-      onDelete: this.#handleEditorDeleteKey.bind(this),
-      onEnter: this.#handleEditorEnterKey.bind(this),
-      onEscape: this.#handleEditorEscapeKey.bind(this),
-      onToggleReference: () => this.#getCommandBus()?.run(CycleFormulaReferenceCommand, void 0),
-      onArrowLeft: this.#handleEditorArrowLeft.bind(this),
-      onArrowRight: this.#handleEditorArrowRight.bind(this),
-      onArrowUp: this.#handleEditorArrowUp.bind(this),
-      onArrowDown: this.#handleEditorArrowDown.bind(this),
-      onHome: (_primaryModifier, shiftKey) => this.#moveEditorToLineBoundary('start', shiftKey),
-      onEnd: (shiftKey) => this.#moveEditorToLineBoundary('end', shiftKey),
-      onLineEnd: (shiftKey) => this.#handleEditorSuggestionBoundary('end', shiftKey),
-      onPage: (direction, shiftKey) => this.#handleEditorSuggestionPage(direction, shiftKey),
-      onSelectRow: () => this.#executeEditorInput({ kind: TextInputKind.Text, text: ' ' }),
-      onFillDown: () => {},
-      onFillRight: () => {},
-      onCopyFormulaAbove: () => {},
-      onTab: this.#handleEditorTabKey.bind(this),
-      onSelectAll: this.#handleEditorSelectAllKey.bind(this),
-      onSoftEnter: this.#handleEditorSoftEnterKey.bind(this),
-      onToggleBold: () => this.#executeEditorInput({ kind: 'keyDown', key: 'b', ctrlKey: true }),
-      onToggleItalic: () => this.#executeEditorInput({ kind: 'keyDown', key: 'i', ctrlKey: true }),
-      onToggleUnderline: () => this.#executeEditorInput({ kind: 'keyDown', key: 'u', ctrlKey: true }),
-      onToggleStrikethrough: () =>
-        this.#executeEditorInput({ kind: 'keyDown', key: 'x', ctrlKey: true, shiftKey: true }),
-      onUndo: () => this.#executeEditorInput({ kind: 'keyDown', key: 'z', ctrlKey: true }),
-      onRedo: () => this.#executeEditorInput({ kind: 'keyDown', key: 'z', ctrlKey: true, shiftKey: true }),
-    });
-    this.#disposeEditKeyboardHandlers = typeof dispose === 'function' ? dispose : null;
-  }
-
-  #isCellEditorCursorTarget(properties: CellProperties): boolean {
-    return properties.isEdit === true;
-  }
-
   #handleEditorDeleteKey(direction: 'backward' | 'forward' = 'backward', byWord = false): void {
     this.#executeEditorInput({ kind: 'delete', direction, byWord });
   }
@@ -593,7 +388,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
     if (this.#isEditing) return;
     const cell = this.#selectionPlugin.getState()[0].getPoint(0);
     if (cell[0] < 0 || cell[1] < 0) return;
-    this.#openCellEditor(this.#resolveCore(), cell[0], cell[1], false);
+    this.#openCellEditor(cell[0], cell[1], false);
   }
 
   #insertCurrentDateTime(kind: 'date' | 'time'): boolean {
@@ -603,27 +398,31 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
     return true;
   }
 
-  #handleEditorEnterKey(shiftKey: boolean, primaryModifier = false): void {
+  #handleEditorEnterKey(shiftKey: boolean, primaryModifier = false, minimumRowHeight?: number): void {
     if (this.#acceptSelectedFormulaSuggestion()) return;
-    const searCore = this.#resolveCore();
-    const extendsSheet = !primaryModifier && !shiftKey &&
-      this.#selectionPlugin.getDownwardEntryExtensionIndex() !== null;
+    const extendsSheet =
+      !primaryModifier && !shiftKey && this.#selectionPlugin.getDownwardEntryExtensionIndex() !== null;
     const historyId = extendsSheet ? `cell-boundary-entry:${++this.#boundaryCommitSequence}` : null;
-    if (!this.commitEdit(searCore, primaryModifier, historyId ? { id: historyId, phase: 'begin' } : undefined)) return;
+    if (!this.commitEdit(primaryModifier, historyId ? { id: historyId, phase: 'begin' } : undefined, minimumRowHeight))
+      return;
     if (!primaryModifier && !shiftKey)
       this.#selectionPlugin.extendForDownwardEntry(historyId ? { id: historyId, phase: 'end' } : undefined);
     if (!primaryModifier)
       this.#selectionPlugin.navigate(shiftKey ? SelectionMoveDirection.Up : SelectionMoveDirection.Down);
-    this.#selectionPlugin.restartNavigation();
   }
 
   #handleEditorEscapeKey(): void {
     if (this.#formulaAssistState.suggestions.length) {
-      this.#publishFormulaAssist({ suggestions: [], selectedIndex: 0, signature: null, diagnostic: null, anchor: null });
+      this.#publishFormulaAssist({
+        suggestions: [],
+        selectedIndex: 0,
+        signature: null,
+        diagnostic: null,
+        anchor: null,
+      });
       return;
     }
-    this.cancelEdit(this.#resolveCore());
-    this.#selectionPlugin.restartNavigation();
+    this.cancelEdit();
   }
 
   #handleEditorArrowLeft(shiftKey: boolean, primaryModifier: boolean, altKey = false): void {
@@ -677,16 +476,14 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
     this.#executeEditorInput({ kind: 'arrow', direction: DocCursorDirection.Down, shiftKey });
   }
 
-  #handleEditorTabKey(shiftKey: boolean): void {
+  #handleEditorTabKey(shiftKey: boolean, minimumRowHeight?: number): void {
     if (!shiftKey && this.#acceptSelectedFormulaSuggestion()) return;
-    const searCore = this.#resolveCore();
     const extendsSheet = !shiftKey && this.#selectionPlugin.getRightwardEntryExtensionIndex() !== null;
     const historyId = extendsSheet ? `cell-boundary-entry:${++this.#boundaryCommitSequence}` : null;
-    if (!this.commitEdit(searCore, false, historyId ? { id: historyId, phase: 'begin' } : undefined)) return;
+    if (!this.commitEdit(false, historyId ? { id: historyId, phase: 'begin' } : undefined, minimumRowHeight)) return;
     if (!shiftKey)
       this.#selectionPlugin.extendForRightwardEntry(historyId ? { id: historyId, phase: 'end' } : undefined);
     this.#selectionPlugin.navigate(shiftKey ? SelectionMoveDirection.Left : SelectionMoveDirection.Right);
-    this.#selectionPlugin.restartNavigation();
   }
 
   #handleEditorSelectAllKey(): void {
@@ -696,34 +493,12 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
   #handleEditorSoftEnterKey(): void {
     this.#executeEditorInput({ kind: 'softEnter' });
   }
-
-  /** Returns the core owned by this editor-local plugin instance. */
-  #resolveCore(): SearCoreSheet {
-    const core = this.#commandCore ?? this.#core;
-    if (!core) throw new SearError('SheetCellEditorPlugin is not bound to a Sheet editor core.');
-    return core;
+  #getCommandBus(): SheetCommandBus {
+    if (!this.#commands) throw new SearError('Cell editor commands are not bound.');
+    return this.#commands;
   }
-
-  #getCommandBus(_core?: SearCoreSheet): SheetCommandBus | null {
-    if (this.#commands) return this.#commands;
-    this.#platform?.warn('SheetCellEditorPlugin getCommandBus skipped: SheetCommandBus is missing.');
-    return null;
-  }
-
-  #runCellEditorCommand<Input>(
-    core: SearCoreSheet,
-    definition: SheetCommandDefinition<Input>,
-    input: Input,
-  ): void {
-    const commands = this.#getCommandBus(core);
-    if (!commands) return;
-    const previousCore = this.#commandCore;
-    this.#commandCore = core;
-    try {
-      commands.run(definition, input);
-    } finally {
-      this.#commandCore = previousCore;
-    }
+  #runCellEditorCommand<Input>(definition: SheetCommandDefinition<Input>, input: Input): void {
+    this.#getCommandBus().run(definition, input);
   }
 
   #executeEditorInput(input: SheetDocumentInputCommandInput): void {
@@ -735,10 +510,14 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
   #applyDocumentInputCommand(input: SheetDocumentInputCommandInput): void {
     this.#referencePick = null;
     this.#lastPickedReference = null;
-    if (!this.#isEditing && TextInput.isTextInput(input) && input.text) {
+    if (
+      !this.#isEditing &&
+      (input.kind === TextInputKind.Text || input.kind === TextInputKind.CompositionUpdate) &&
+      input.text
+    ) {
       const anchor = this.#queries?.run(GetActiveCell, void 0);
       if (!anchor) return;
-      this.#openCellEditor(this.#resolveCore(), anchor[0], anchor[1], true);
+      this.#openCellEditor(anchor[0], anchor[1], true);
     }
     const session = this.#editSession;
     if (!session) return;
@@ -848,11 +627,10 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
     }
     this.#formulaAutoClose.reconcile(before, (session.getDocument() as RichDocNode[]).map(paraText).join('\n'));
     this.#syncSessionState();
-    this.#blinker.reset();
     const selection = update.selection ?? this.#editSession?.getSelection();
     if (selection) this.#updateSheetDocumentSelection(selection);
     this.#refreshFormulaAssist();
-    this.#requestRerender();
+    this.#publishDraftChange();
   }
 
   #refreshFormulaAssist(): void {
@@ -904,19 +682,8 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
       selectedIndex: 0,
       signature: this.#formulaAnalysis.signature,
       diagnostic: awaitingFirstArgument ? null : diagnostic,
-      anchor: this.#getFormulaAssistAnchor(),
+      anchor: this.#formulaAssistState.anchor,
     });
-  }
-
-  #getFormulaAssistAnchor(): FormulaInputAssistState['anchor'] {
-    const rect = this.#lastEditorRect;
-    if (!rect) return null;
-    const cursor = this.#editSession?.getCursor();
-    return this.#coordinates.worldToView(
-      cursor
-        ? { x: rect.x + cursor.rect.x, y: rect.y + cursor.rect.y + cursor.rect.height }
-        : { x: rect.x + 8, y: rect.y + rect.height },
-    );
   }
 
   #publishFormulaAssist(state: FormulaInputAssistState): void {
@@ -935,9 +702,12 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
   #moveFormulaSuggestion(input: FormulaSuggestionMove): boolean {
     const count = this.#formulaAssistState.suggestions.length;
     if (!count) return false;
-    const selectedIndex = 'boundary' in input
-      ? input.boundary === 'start' ? 0 : count - 1
-      : input.step === 'page'
+    const selectedIndex =
+      'boundary' in input
+        ? input.boundary === 'start'
+          ? 0
+          : count - 1
+        : input.step === 'page'
         ? Math.max(0, Math.min(count - 1, this.#formulaAssistState.selectedIndex + input.direction * 5))
         : (this.#formulaAssistState.selectedIndex + input.direction + count) % count;
     this.#publishFormulaAssist({ ...this.#formulaAssistState, selectedIndex });
@@ -973,8 +743,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
     const selection = session.getSelection() ?? update.selection;
     if (selection) this.#updateSheetDocumentSelection(selection);
     this.#refreshFormulaAssist();
-    this.#requestRerender();
-    this.#textInput.refocus();
+    this.#publishDraftChange();
   }
 
   #cycleReference(): void {
@@ -1000,8 +769,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
     this.#syncSessionState();
     this.#updateSheetDocumentSelection(session.getSelection()!);
     this.#refreshFormulaAssist();
-    this.#requestRerender();
-    this.#textInput.refocus();
+    this.#publishDraftChange();
   }
 
   #syncSessionState(): void {
@@ -1018,21 +786,15 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
   }
 
   #updateSheetDocumentSelection(selection: SheetTextSelection): void {
-    const commands = this.#getCommandBus(this.#resolveCore());
+    const commands = this.#getCommandBus();
     if (!commands) return;
     commands.run(UpdateCellEditorDocumentSelectionCommand, {
       anchor: [Number(selection.anchor.path[0] ?? 0), selection.anchor.offset],
       head: [Number(selection.head.path[0] ?? 0), selection.head.offset],
     });
   }
-
-  #requestRerender(): void {
-    if (!this.#isEditing) return;
-    const core = this.#commandCore ?? this.#core;
-    if (!core) return;
-    const commands = this.#getCommandBus(core);
-    if (!commands) return;
-    commands.run(RequestCellEditorRenderCommand, void 0);
+  #publishDraftChange(): void {
+    if (this.#isEditing) this.#getCommandBus().run(PublishCellEditDraftCommand, undefined);
   }
 
   /** Registers the commands. */
@@ -1041,8 +803,26 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
       throw new SearError('Sheet cell editor commands are already bound to an editor.');
     }
     this.#commands = commands;
-    this.#referencePickBindingClosed = true;
-    if (this.#queries) registerSheetRangeTextStyleCommand(commands, this.#queries, this.#embeddedEditor);
+    if (this.#queries) registerSheetRangeTextStyleCommand(commands, this.#queries, this.#formatting);
+    commands.register(
+      PublishCellEditDraftCommand,
+      () =>
+        new PipelineExecutionCommand(
+          PublishCellEditDraftCommand.id,
+          new Pipeline(PublishCellEditDraftCommand.id).invalidate('cell-edit-draft', this.key),
+        ),
+    );
+    commands.register(
+      SynchronizeCellEditModelCommand,
+      () =>
+        new LocalActionCommand(SynchronizeCellEditModelCommand.id, () => {
+          this.#syncSessionState();
+          const selection = this.#editSession?.getSelection();
+          if (selection) this.#updateSheetDocumentSelection(selection);
+          this.#refreshFormulaAssist();
+          this.#publishDraftChange();
+        }),
+    );
     const cellEditor = this;
     commands.register(
       StartFormulaBarEditCommand,
@@ -1050,7 +830,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
         new LocalActionCommand(StartFormulaBarEditCommand.id, () => {
           if (cellEditor.#isEditing) return;
           const cell = cellEditor.#queries?.run(GetActiveCell, void 0);
-          if (cell) cellEditor.#openCellEditor(cellEditor.#resolveCore(), cell[0], cell[1], false);
+          if (cell) cellEditor.#openCellEditor(cell[0], cell[1], false);
         }),
     );
     commands.register(
@@ -1064,10 +844,10 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
           if (!cellEditor.#isEditing) return;
           switch (input.action) {
             case 'enter':
-              cellEditor.#handleEditorEnterKey(input.shiftKey, input.primaryModifier);
+              cellEditor.#handleEditorEnterKey(input.shiftKey, input.primaryModifier, input.minimumRowHeight);
               break;
             case 'tab':
-              cellEditor.#handleEditorTabKey(input.shiftKey);
+              cellEditor.#handleEditorTabKey(input.shiftKey, input.minimumRowHeight);
               break;
             case 'softEnter':
               cellEditor.#handleEditorSoftEnterKey();
@@ -1114,22 +894,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
         cellEditor.#applyDocumentInputCommand(input);
       });
     });
-    commands.register(
-      HandleCellEditorPointerCommand,
-      (input) =>
-        new LocalActionCommand(HandleCellEditorPointerCommand.id, () => cellEditor.#handleEditorPointer(input)),
-    );
-    commands.register(
-      BeginCellEditorDragSelectionCommand,
-      () => new LocalActionCommand(BeginCellEditorDragSelectionCommand.id, () => cellEditor.#beginDragSelection()),
-    );
-    commands.register(
-      EndCellEditorDragSelectionCommand,
-      (input) =>
-        new LocalActionCommand(EndCellEditorDragSelectionCommand.id, () =>
-          cellEditor.#endDragSelection(input.disposeCapture),
-        ),
-    );
+
     commands.register(
       ReplaceFormulaReferenceCommand,
       (input) =>
@@ -1169,11 +934,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
         cellEditor.#restoreFormulaDraft(input.draft, input.reference),
       );
     });
-    commands.register(RequestCellEditorRenderCommand, function createCellEditorRenderCommand() {
-      return new LocalActionCommand(RequestCellEditorRenderCommand.id, function requestCellEditorRender(): void {
-        if (cellEditor.#isEditing) cellEditor.#resolveCore().requestRender(cellEditor);
-      });
-    });
+
     commands.register(
       UpdateCellEditorDocumentSelectionCommand,
       function createCellEditorDocumentSelectionCommand(input: SheetDocumentSelectionCommandInput) {
@@ -1193,7 +954,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
           const update = session.setInlineStyle(input);
           cellEditor.#syncSessionState();
           if (update.selection) cellEditor.#updateSheetDocumentSelection(update.selection);
-          cellEditor.#requestRerender();
+          cellEditor.#publishDraftChange();
         });
       },
     );
@@ -1207,7 +968,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
     if (!this.#isEditing) {
       const cell = this.#queries?.run(GetActiveCell, void 0);
       if (!cell) return;
-      this.#openCellEditor(this.#resolveCore(), cell[0], cell[1], false);
+      this.#openCellEditor(cell[0], cell[1], false);
     }
     const session = this.#editSession;
     if (!session) return;
@@ -1240,17 +1001,17 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
     this.#syncSessionState();
     if (selection) this.#updateSheetDocumentSelection(selection);
     this.#refreshFormulaAssist();
-    this.#requestRerender();
+    this.#publishDraftChange();
   }
 
   /** Registers the read-only draft projection used during workbook sheet switching. */
   public registerQueries(queries: SheetQueryRegistry): void {
     queries.register(IsCellEditingQuery, () => this.#isEditing);
-    queries.register(ReadFormulaEditDraftQuery, () => this.#readFormulaDraft());
-    queries.register(ReadSelectedCellEditTextQuery, () => this.#readSelectedCellEditText());
+    queries.register(ReadFormulaEditDraftQuery, () => this.readFormulaDraft());
+    queries.register(ReadSelectedCellEditTextQuery, () => this.readSelectedCellEditText());
   }
 
-  #readSelectedCellEditText(): string | null {
+  public readSelectedCellEditText(): string | null {
     const session = this.#editSession;
     if (!this.#isEditing || !session) return null;
     const document = session.getDocument() as RichDocNode[];
@@ -1261,7 +1022,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
     return document.map(paraText).join('\n').slice(Math.min(anchor, head), Math.max(anchor, head));
   }
 
-  #readFormulaDraft(): FormulaEditDraft | null {
+  public readFormulaDraft(): FormulaEditDraft | null {
     const session = this.#editSession;
     if (!this.#isEditing || !session) return null;
     const document = session.getDocument() as RichDocNode[];
@@ -1282,8 +1043,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
   }
 
   #restoreFormulaDraft(draft: FormulaEditDraft, reference?: string): void {
-    const core = this.#resolveCore();
-    this.#openCellEditor(core, draft.cell[0], draft.cell[1], true);
+    this.#openCellEditor(draft.cell[0], draft.cell[1], true);
     const session = this.#editSession;
     if (!session) return;
     session.handleInput({ type: 'insertText', text: draft.text });
@@ -1294,7 +1054,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
       head: formulaDocumentPosition(document, draft.selectionEnd),
     });
     if (reference)
-      this.#runCellEditorCommand(core, ReplaceFormulaReferenceCommand, {
+      this.#runCellEditorCommand(ReplaceFormulaReferenceCommand, {
         reference,
         start: draft.selectionStart,
         end: draft.selectionEnd,
@@ -1304,7 +1064,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
       const selection = session.getSelection();
       if (selection) this.#updateSheetDocumentSelection(selection);
       this.#refreshFormulaAssist();
-      this.#requestRerender();
+      this.#publishDraftChange();
     }
   }
 
@@ -1334,7 +1094,7 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
     const selection = update.selection ?? session.getSelection();
     if (selection) this.#updateSheetDocumentSelection(selection);
     this.#refreshFormulaAssist();
-    this.#requestRerender();
+    this.#publishDraftChange();
   }
 
   #createBeginCellEditCommand(input: SheetBeginCellEditInput): PipelineExecutionCommand {
@@ -1353,7 +1113,6 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
       target: input.anchor,
       editor: input.editor,
     });
-    pipeline.addPostRender(SheetHighlightPipelineStepName.Refresh, SheetHighlightPlugin.pluginKey);
     return pipeline;
   }
 
@@ -1364,14 +1123,18 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
         new Pipeline(SheetCellEditorPipelineName.CommitEdit),
       );
     }
-    const core = this.#resolveCore();
+    if (
+      input?.minimumRowHeight !== undefined &&
+      (!Number.isFinite(input.minimumRowHeight) || input.minimumRowHeight <= 0)
+    )
+      throw new SearError('Minimum row height must be positive and finite.');
     const nextSelection = input?.nextSelection;
     const name =
       input?.pipelineName ??
       (nextSelection ? SheetCellEditorPipelineName.EditExitAndSelect : SheetCellEditorPipelineName.CommitEdit);
     const pipeline = input?.fillSelection
-      ? this.#buildCommitPipeline(core, name, true)
-      : this.#buildCommitPipeline(core, name);
+      ? this.#buildCommitPipeline(name, true, input?.minimumRowHeight)
+      : this.#buildCommitPipeline(name, false, input?.minimumRowHeight);
     if (nextSelection) {
       pipeline.add(SheetCellEditorPipelineStepName.SelectCell, this.#createSelectionTransaction(nextSelection));
       pipeline.addInteraction(SheetSelectionPipelineStepName.RecordSelectionChange, {
@@ -1387,9 +1150,8 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
 
   #createCurrentDateTimeCommand(kind: 'date' | 'time'): PipelineExecutionCommand {
     const pipeline = new Pipeline('cell.insertCurrentDateTime');
-    const core = this.#resolveCore();
     const cell = this.#queries?.run(GetActiveCell, void 0);
-    const fields = readCellEditorSheetFields(core.getDataEngine());
+    const fields = readCellEditorSheetFields(this.#data);
     if (!cell || !fields || cell[0] < 0 || cell[1] < 0 || this.#isEditing) {
       return new PipelineExecutionCommand(InsertCurrentDateTimeCommand.id, pipeline);
     }
@@ -1443,485 +1205,87 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
   }
 
   #createCancelCellEditCommand(_input: SheetCancelCellEditInput | void): PipelineExecutionCommand {
-    const core = this.#resolveCore();
-    const { transaction, dirtyRects } = this.#performCleanup(core);
+    const { transaction } = this.#performCleanup();
     const pipeline = new Pipeline(SheetCellEditorPipelineName.CancelEdit);
     pipeline.add(SheetCellEditorPipelineStepName.ExitEditMode, transaction);
-    dirtyRects.forEach((rect) => pipeline.markDirty(rect));
     this.#appendEditExitInteraction(pipeline, SheetCellEditorExitReason.Cancel);
     pipeline.addPostCommit('finish-cell-edit', () => this.#finishEditSession('cancel'));
     return new PipelineExecutionCommand(CancelCellEditCommand.id, pipeline);
   }
 
-  /**
-   * Compute the leftmost X coordinate that center/right-aligned text extends
-   * to when it overflows the cell boundary.  Returns `cellLeftX` when there
-   * is no leftward overflow.
-   *
-   * Mirrors the textX formula in TextNode.drawScene to compute the same
-   * position the renderer used for the committed cell value.
-   */
-  #computeOverflowLeftX(
-    searCore: SearCoreSheet,
-    defaultState: CellEditorSheetFields,
-    anchor: [number, number],
-    cellLeftX: number,
-    baseWidth: number,
-    cellPadding: number,
-  ): number {
-    return computeCellEditorOverflowLeftX(
-      readSheetConfig(searCore),
-      defaultState,
-      this.#textShaper,
-      anchor,
-      cellLeftX,
-      baseWidth,
-      cellPadding,
-    );
-  }
-
-  // ─── Enter edit mode ───────────────────────────────────────────────────
-
-  /** @inheritdoc */
-  public override onDblClick(searCore: SearCoreSheet, event: EventWithOffsetAndTarget<CellProperties>): boolean {
-    if (this.#selectionPlugin.onFillHandleDoubleClick(event)) return false;
-    if (this.#isEditing) return false;
-    const offsetX = event.origin?.offsetX;
-    const offsetY = event.origin?.offsetY;
-    if (typeof offsetX === 'number' || typeof offsetY === 'number') {
-      const sheetConfig = readSheetConfig(searCore);
-      if (
-        (typeof offsetX === 'number' && offsetX < (sheetConfig.sheetOffsetX ?? 50)) ||
-        (typeof offsetY === 'number' && offsetY < (sheetConfig.sheetOffsetY ?? 24))
-      ) {
-        return true;
-      }
-    }
-
-    const { target } = event;
-    if (!target) return true;
-
-    const { region, startRowIndex, startColIndex } = target.properties;
-    if (region !== void 0 && region !== CellRegion.Grid) return true;
-    if (startRowIndex === void 0 || startColIndex === void 0) return true;
-    const row = Number(startRowIndex);
-    const col = Number(startColIndex);
-
-    this.#openCellEditor(searCore, row, col, false);
-    return false;
-  }
-
-  #openCellEditor(searCore: SearCoreSheet, row: number, col: number, replaceContent: boolean): void {
+  #openCellEditor(row: number, col: number, replaceContent: boolean): void {
     const mergedCell = this.#mergePlugin.isMergedCell(row, col);
     const anchor: Point = mergedCell ? mergedCell.getPoint(0) : [row, col];
     const focus: Point = mergedCell ? mergedCell.getPoint(1) : [row, col];
-    this.#runCellEditorCommand(searCore, EnsureSelectionVisibleCommand, { anchor, focus });
-    this.#runCellEditorCommand(searCore, OpenCellEditorCommand, { row, column: col, replaceContent });
+    this.#runCellEditorCommand(EnsureSelectionVisibleCommand, { anchor, focus });
+    this.#runCellEditorCommand(OpenCellEditorCommand, { row, column: col, replaceContent });
   }
-
   #createOpenCellEditorCommand(input: SheetOpenCellEditorInput): PipelineExecutionCommand {
-    if (!this.#embeddedEditor) {
-      throw new SearError('SheetCellEditorPlugin requires a SheetEmbeddedEditor to edit rich-text cell content.');
-    }
-    const searCore = this.#resolveCore();
     const { row, column: col, replaceContent = false } = input;
-
-    // Determine anchor (merged area top-left) and focus (merged area bottom-right)
-    const mergedCell = this.#mergePlugin.isMergedCell(row, col);
-    const anchor: Point = mergedCell ? mergedCell.getPoint(0) : [row, col];
-    const focus: Point = mergedCell ? mergedCell.getPoint(1) : [row, col];
-
-    // Read existing cell data as initial editor content
-    const dataState = readCellEditorSheetFields(searCore.getDataEngine());
-    const cellData = dataState?.sheetData.getItem(anchor[0], anchor[1]);
-
-    // Formula cells persist their source in `formula`; their displayed
-    // result is derived separately and must never become editor content.
-    const rawValue = replaceContent
+    const merged = this.#mergePlugin.isMergedCell(row, col);
+    const anchor: Point = merged ? merged.getPoint(0) : [row, col];
+    const focus: Point = merged ? merged.getPoint(1) : [row, col];
+    const fields = readCellEditorSheetFields(this.#data);
+    const cell = fields?.sheetData.getItem(anchor[0], anchor[1]);
+    const raw = replaceContent
       ? undefined
-      : getCellEditableValue(cellData, { row: anchor[0], col: anchor[1] }, this.#formulaSourceProvider);
-    const format = dataState?.cellFormats?.getItem(anchor[0], anchor[1]) ?? null;
-    const editValue = cellData?.type === CellType.Number && typeof rawValue === 'number'
-      ? formatCellNumberForEditor(rawValue, format, this.#cellFormatLocaleProvider?.getCellFormatLocale())
-      : rawValue;
-    let initialDoc: RichDocNode[];
-    if (Array.isArray(editValue)) {
-      initialDoc = normalizeDocForEdit(editValue as RichDocNode[]);
-    } else if (typeof editValue === 'string' || typeof editValue === 'number' || typeof editValue === 'boolean') {
-      initialDoc = String(editValue).split(/\r\n|\r|\n/).flatMap((line) => stringToRichDoc(line));
-    } else {
-      initialDoc = normalizeDocForEdit([]);
-    }
-
+      : getCellEditableValue(cell, { row: anchor[0], col: anchor[1] }, this.#formulaSourceProvider);
+    const value =
+      cell?.type === CellType.Number && typeof raw === 'number'
+        ? formatCellNumberForEditor(
+            raw,
+            fields?.cellFormats?.getItem(...anchor) ?? null,
+            this.#cellFormatLocaleProvider?.getCellFormatLocale(),
+          )
+        : raw;
+    const initial = Array.isArray(value)
+      ? normalizeDocForEdit(value as RichDocNode[])
+      : typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+      ? String(value)
+          .split(/\r\n|\r|\n/)
+          .flatMap((line) => stringToRichDoc(line))
+      : normalizeDocForEdit([]);
     const pipeline = this.#createBeginCellEditPipeline({ anchor, focus, editor: SheetCellEditorKind.Cell });
-    let preparedContext: SheetEmbeddedEditorContext | null = null;
-    let preparedSession: SheetEditSession | null = null;
-    pipeline.addPreparedAction('prepare-cell-editor', () => {
-      const context = this.#createEmbeddedEditorContext(searCore, anchor, focus, initialDoc);
-      preparedSession = this.#embeddedEditor!.createEditSession(context);
-      preparedContext = context;
+    let prepared: DocEditModel | null = null;
+    pipeline.addPreparedAction('prepare-cell-edit-model', () => {
+      prepared = new DocEditModel(initial, () => this.assertRuntimeWriteAllowed());
       return () => {
-        preparedSession?.dispose();
-        preparedSession = null;
-        preparedContext = null;
+        prepared?.dispose();
+        prepared = null;
       };
     });
-    pipeline.addPostCommit('activate-cell-editor', () => {
-      if (!preparedContext || !preparedSession)
-        throw new SearError('Cell editor session was not prepared before commit.');
-      try {
-        this.#activateCellEditor(preparedContext, preparedSession, initialDoc);
-      } catch (error) {
-        try {
-          this.#runCellEditorCommand(searCore, CancelCellEditCommand, { restoreOriginalDocument: true });
-        } catch (cleanupError) {
-          this.#platform?.warn('Cell editor activation cleanup failed.', cleanupError);
-        }
-        throw error;
-      } finally {
-        preparedSession = null;
-        preparedContext = null;
-      }
+    pipeline.addPostCommit('activate-cell-edit-model', () => {
+      if (!prepared) throw new SearError('Edit model was not prepared.');
+      this.#activateCellEditor(prepared, initial);
+      prepared = null;
     });
     return new PipelineExecutionCommand(OpenCellEditorCommand.id, pipeline);
   }
-
-  #activateCellEditor(
-    context: SheetEmbeddedEditorContext,
-    editSession: SheetEditSession,
-    initialDoc: RichDocNode[],
-  ): void {
-    this.#embeddedContext = context;
-    this.#editSession = editSession;
-    this.#initialEditSnapshot = JSON.stringify(editSession.getDocument());
-    this.#highlighter.clear();
+  #activateCellEditor(session: DocEditModel, initialDoc: RichDocNode[]): void {
+    this.#editSession?.dispose();
+    this.#editSession = session;
+    this.#initialEditSnapshot = JSON.stringify(session.getDocument());
     this.#formulaAutoClose.clear();
     this.#isEditing = true;
     this.#session.pendingDoc = initialDoc;
-    const lastParaIdx = Math.max(0, initialDoc.length - 1);
-    const lastOffset = getTextNodeLength(initialDoc, [lastParaIdx, 0]);
-    this.#session.docSelection = {
-      anchor: { path: [lastParaIdx, 0], offset: lastOffset },
-      head: { path: [lastParaIdx, 0], offset: lastOffset },
-    };
     this.#syncSessionState();
-
-    this.#textInput.startListener();
-    this.#subscribeEditHandlers();
-    this.#keyboardRouter.startListener();
-    this.#blinker.start();
-    this.#cursorEngine.override('text');
     this.#refreshFormulaAssist();
-  }
-
-  #createEmbeddedEditorContext(
-    searCore: SearCoreSheet,
-    anchor: Point,
-    focus: Point,
-    initialDocument: RichDocNode[],
-  ): SheetEmbeddedEditorContext {
-    const dataEngine = searCore.getDataEngine();
-    const geometryState = readCellEditorGeometryFields(dataEngine);
-    const resolveRect = () => {
-      if (this.#lastEditorRect) return this.#lastEditorRect;
-      const rect = geometryState
-        ? getSheetRangePositionRect(anchor, focus, {
-            rowSizes: geometryState.rowSizes,
-            columnSizes: geometryState.columnSizes,
-            offsetX: readSheetConfig(searCore).sheetOffsetX ?? 50,
-            offsetY: readSheetConfig(searCore).sheetOffsetY ?? 24,
-          })
-        : null;
-      return rect ?? { x: 0, y: 0, width: 0, height: 0 };
-    };
-    return {
-      renderContext: searCore.renderEngine.renderContext,
-      isCommandExecuting: () => this.#commands?.isExecuting() === true,
-      defaultFontSize: readSheetConfig(searCore).sheetCellFontSize,
-      defaultFontFamily: readSheetConfig(searCore).sheetCellFontFamily,
-      geometry: {
-        get cellRect() {
-          return resolveRect();
-        },
-        get clipRect() {
-          return resolveRect();
-        },
-        toLocalPoint: (point: { x: number; y: number }) => {
-          const rect = resolveRect();
-          return { x: point.x - rect.x, y: point.y - rect.y };
-        },
-        toSheetPoint: (point: { x: number; y: number }) => {
-          const rect = resolveRect();
-          return { x: point.x + rect.x, y: point.y + rect.y };
-        },
-        containsPoint: (point: { x: number; y: number }) => {
-          const rect = resolveRect();
-          return (
-            point.x >= rect.x && point.y >= rect.y && point.x <= rect.x + rect.width && point.y <= rect.y + rect.height
-          );
-        },
-      },
-      documentAccessor: {
-        read: () => cloneRichDocument((this.#editSession?.getDocument() ?? initialDocument) as readonly RichDocNode[]),
-        commit: (document: readonly RichDocNode[]) => {},
-      },
-      invalidate: (invalidation) => {
-        const rects = invalidation.rects ?? [resolveRect()];
-        rects.forEach((rect) =>
-          searCore.renderEngine.markDirty(new PositionRect<HexColor>(rect.x, rect.y, rect.width, rect.height)),
-        );
-      },
-    };
-  }
-
-  /** @inheritdoc */
-  public override onMouseDown(
-    searCore: SearCoreSheet,
-    event: EventWithOffsetAndTarget<CellProperties>,
-  ): boolean | void {
-    if (this.#isEditing && event.origin.button === 2) return false;
-    // Retained SVG nodes may be replaced between presses, so the browser can
-    // omit dblclick even though the second mouse down has detail >= 2.
-    if (!this.#isEditing && (event.clickCount ?? event.origin?.clickCount ?? event.origin?.detail ?? 0) >= 2) {
-      if (this.onDblClick(searCore, event) === false) {
-        event.origin.preventDefault();
-        return false;
-      }
-    }
-    const selected = buildSelectionUpdate(searCore, event);
-    const pointerInsideEditor = this.#isPointerInsideEditor(searCore, event);
-    if (selected) {
-      const region = event.target?.properties.region;
-      const pickKind: PickedReferenceKind = region === CellRegion.RowHeader ? 'row'
-        : region === CellRegion.ColumnHeader ? 'column' : 'cell';
-      if (!this.#isEditing && this.#referencePickService?.hasPendingPick()) {
-        event.origin.preventDefault();
-        this.#crossSheetReferencePick = { start: selected.anchor, end: selected.anchor };
-        return false;
-      }
-      const draft = this.#readFormulaDraft();
-      const previousPick = this.#lastPickedReference;
-      const replacesPreviousPick = !!(
-        draft && previousPick &&
-        draft.selectionStart === draft.selectionEnd &&
-        draft.selectionEnd === previousPick.start + previousPick.text.length &&
-        draft.text.slice(previousPick.start, draft.selectionEnd) === previousPick.text
-      );
-      if (
-        this.#isEditing && draft && !pointerInsideEditor &&
-        (canStartFormulaReferencePick(draft.text, draft.selectionStart, draft.selectionEnd) || replacesPreviousPick)
-      ) {
-        event.origin.preventDefault();
-        let start = Math.min(draft.selectionStart, draft.selectionEnd);
-        let end = Math.max(draft.selectionStart, draft.selectionEnd);
-        let pickStart = selected.anchor;
-        if (replacesPreviousPick && previousPick) {
-          start = previousPick.start;
-          if (event.origin.shiftKey) pickStart = previousPick.cell;
-        }
-        // A merged-cell click selects its entire rectangle, but references its anchor cell.
-        const reference = formatPickedReference(
-          pickStart,
-          pickKind === 'cell' ? selected.anchor : selected.focus,
-          undefined,
-          pickKind,
-        );
-        this.#runCellEditorCommand(searCore, ReplaceFormulaReferenceCommand, {
-          reference,
-          start,
-          end,
-          pickStart,
-          pickKind,
-        });
-        this.#textInput.refocus();
-        return false;
-      }
-    }
-    if (this.#isEditing) {
-      const rect = this.#lastEditorRect;
-      if (rect) {
-        const scroll = searCore.renderEngine.scrollManager.getState();
-        const originEvent = event.origin;
-        const pointer = this.#coordinates.viewToWorld({ x: originEvent.offsetX, y: originEvent.offsetY }, scroll);
-        const { x: worldX, y: worldY } = pointer;
-        if (worldX >= rect.x && worldX <= rect.x + rect.width && worldY >= rect.y && worldY <= rect.y + rect.height) {
-          // Prevent the canvas from stealing focus away from the hidden
-          // input, which must keep focus for IME composition to work.
-          originEvent.preventDefault();
-          this.#runCellEditorCommand(searCore, HandleCellEditorPointerCommand, {
-            type: 'pointerDown',
-            point: pointer,
-            clickCount: event.clickCount ?? originEvent.clickCount ?? originEvent.detail ?? 1,
-          });
-          this.#runCellEditorCommand(searCore, BeginCellEditorDragSelectionCommand, void 0);
-          // Refocus hidden input in case preventDefault was insufficient
-          // (some browsers may still blur on certain pointer events).
-          this.#textInput.refocus();
-          return false;
-        }
-      }
-      // Clicked outside editor: exit edit mode, then select new cell
-      const { offsetX, offsetY } = event.origin;
-      const properties = event.target?.properties;
-      const target: CellProperties | null = properties?.type === undefined
-        ? null
-        : { ...properties, type: properties.type };
-      const point = { x: offsetX, y: offsetY };
-      const cursor = this.#cursorRegistry.resolve(target, {
-        core: searCore,
-        origin: event.origin,
-        view: this.#coordinates.viewToWorld(point, { x: 0, y: 0 }),
-        world: this.#coordinates.viewToWorld(point),
-        target,
-      });
-      const isResizeHandle = cursor === CursorToken.RowResize || cursor === CursorToken.ColumnResize;
-      const selectionUpdate = isResizeHandle ? null : buildSelectionUpdate(searCore, event, this.pluginKey);
-      const input = {
-        reason: SheetCellEditorExitReason.OutsideClick,
-        pipelineName: SheetCellEditorPipelineName.EditExitAndSelect,
-      } satisfies SheetCommitCellEditInput;
-      this.#runCellEditorCommand(
-        searCore,
-        CommitCellEditCommand,
-        selectionUpdate ? { ...input, nextSelection: selectionUpdate } : input,
-      );
-      if (!this.#isEditing) this.#selectionPlugin.restartNavigation();
-      else {
-        event.origin.preventDefault();
-        this.#textInput.refocus();
-      }
-      return isResizeHandle && !this.#isEditing ? void 0 : false;
-    }
-  }
-
-  #isPointerInsideEditor(searCore: SearCoreSheet, event: EventWithOffsetAndTarget<CellProperties>): boolean {
-    const rect = this.#lastEditorRect;
-    if (!this.#isEditing || !rect) return false;
-    const scroll = searCore.renderEngine.scrollManager.getState();
-    const pointer = this.#coordinates.viewToWorld({ x: event.origin.offsetX, y: event.origin.offsetY }, scroll);
-    return (
-      pointer.x >= rect.x &&
-      pointer.x <= rect.x + rect.width &&
-      pointer.y >= rect.y &&
-      pointer.y <= rect.y + rect.height
-    );
-  }
-
-  // ─── Drag-to-select ────────────────────────────────────────────────────
-
-  /** @inheritdoc */
-  public override onMouseMove(
-    searCore: SearCoreSheet,
-    event: EventWithOffsetAndTarget<CellProperties>,
-  ): boolean | void {
-    if (this.#crossSheetReferencePick) {
-      const selected = buildSelectionUpdate(searCore, event);
-      if (selected) this.#crossSheetReferencePick.end = selected.focus;
-      return false;
-    }
-    if (this.#referencePick) {
-      const selected = buildSelectionUpdate(searCore, event);
-      if (selected) {
-        const reference = formatPickedReference(
-          this.#referencePick.start,
-          selected.focus,
-          undefined,
-          this.#referencePick.kind,
-        );
-        this.#runCellEditorCommand(searCore, ReplaceFormulaReferenceCommand, {
-          reference,
-          start: this.#referencePick.replaceStart,
-          end: this.#referencePick.replaceEnd,
-        });
-      }
-      return false;
-    }
-    if (!this.#isEditing || !this.#isDragSelecting) return;
-    const rect = this.#lastEditorRect;
-    if (!rect || !this.#editSession) return false;
-
-    const scroll = searCore.renderEngine.scrollManager.getState();
-    const originEvent = event.origin;
-
-    // Clamp world coords to editor bounds so dragging past the edge
-    // snaps the selection head to the nearest text position.
-    const pointer = this.#coordinates.viewToWorld({ x: originEvent.offsetX, y: originEvent.offsetY }, scroll);
-    const worldX = Math.max(rect.x, Math.min(rect.x + rect.width, pointer.x));
-    const worldY = Math.max(rect.y, Math.min(rect.y + rect.height, pointer.y));
-    this.#runCellEditorCommand(searCore, HandleCellEditorPointerCommand, {
-      type: 'pointerMove',
-      point: { x: worldX, y: worldY },
-    });
-
-    // Prevent SheetSelectionPlugin from modifying the sheet selection
-    // while the user is dragging inside the cell editor.
-    return false;
-  }
-
-  #handleEditorPointer(input: SheetCellEditorPointerInput): void {
-    if (!this.#editSession) return;
-    const update = this.#editSession.handlePointer({
-      type: input.type,
-      point: input.point,
-      ...(input.type === 'pointerDown' ? { clickCount: input.clickCount ?? 1 } : { buttons: 1 }),
-    });
-    this.#syncSessionState();
-    if (update.selection) this.#updateSheetDocumentSelection(update.selection);
-    this.#refreshFormulaAssist();
-    this.#requestRerender();
-  }
-
-  #beginDragSelection(): void {
-    if (!this.#isEditing) return;
-    const core = this.#resolveCore();
-    this.#isDragSelecting = true;
-    this.#disposePointerCapture?.();
-    this.#disposePointerCapture = this.#pointerCapture.start({
-      onRelease: () => this.#runCellEditorCommand(core, EndCellEditorDragSelectionCommand, { disposeCapture: false }),
-    });
-  }
-
-  #endDragSelection(disposeCapture: boolean): void {
-    this.#isDragSelecting = false;
-    if (disposeCapture) this.#disposePointerCapture?.();
-    this.#disposePointerCapture = null;
-  }
-
-  /** @inheritdoc */
-  public override onMouseUp(_searCore: SearCoreSheet, event: EventWithOffsetAndTarget<CellProperties>): boolean | void {
-    if (this.#crossSheetReferencePick) {
-      const pick = this.#crossSheetReferencePick;
-      this.#crossSheetReferencePick = null;
-      const selected = buildSelectionUpdate(_searCore, event);
-      this.#referencePickService?.pick(pick.start, selected?.focus ?? pick.end);
-      return false;
-    }
-    if (this.#referencePick) {
-      this.#runCellEditorCommand(_searCore, EndFormulaReferencePickCommand, void 0);
-      return false;
-    }
-    if (!this.#isEditing && event.target) {
-      this.#textInput.startListener();
-      this.#textInput.refocus();
-    }
-    if (!this.#isEditing || !this.#isDragSelecting) return;
-    this.#runCellEditorCommand(_searCore, EndCellEditorDragSelectionCommand, { disposeCapture: true });
-    return false;
   }
 
   // ─── Exit edit mode: commit / cancel / cleanup ─────────────────────────
 
   /** Commits the active cell edit session through its owning command. */
   public commitEdit(
-    searCore: SearCoreSheet,
     fillSelection = false,
     historyGroup?: SheetCommandResult['historyGroup'],
+    minimumRowHeight?: number,
   ): boolean {
     if (!this.#isEditing) return false;
-    this.#runCellEditorCommand(searCore, CommitCellEditCommand, {
+    this.#runCellEditorCommand(CommitCellEditCommand, {
       reason: SheetCellEditorExitReason.Commit,
       fillSelection,
       historyGroup,
+      minimumRowHeight,
     });
     return !this.#isEditing;
   }
@@ -1951,16 +1315,15 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
       ...this.#formulaAssistState,
       suggestions: [],
       diagnostic,
-      anchor: this.#getFormulaAssistAnchor(),
+      anchor: this.#formulaAssistState.anchor,
     });
-    this.#textInput.refocus();
     return false;
   }
 
   #getCommitTargets(anchor: Point, fillSelection: boolean): Point[] {
     const ranges = fillSelection && this.#queries?.has(GetSelections) ? this.#queries.run(GetSelections, void 0) : [];
     if (!ranges.length) return [anchor];
-    const rowVisibility = this.#core ? readSheetRowVisibility(this.#core.getDataEngine()) : null;
+    const rowVisibility = readSheetRowVisibility(this.#data);
     const targets: Point[] = [];
     const visited = new Set<string>();
     for (const range of ranges) {
@@ -1991,19 +1354,16 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
         message,
         start: 0,
         end,
-        ...(cell[0] >= 0 && cell[1] >= 0
-          ? { cellAddress: `${columnIndexToLabel(cell[1])}${cell[0] + 1}` }
-          : {}),
+        ...(cell[0] >= 0 && cell[1] >= 0 ? { cellAddress: `${columnIndexToLabel(cell[1])}${cell[0] + 1}` } : {}),
       },
-      anchor: this.#getFormulaAssistAnchor(),
+      anchor: this.#formulaAssistState.anchor,
     });
-    this.#textInput.refocus();
   }
 
   /** Cancels the active cell edit session without committing its draft. */
-  public cancelEdit(searCore: SearCoreSheet): void {
+  public cancelEdit(): void {
     if (!this.#isEditing) return;
-    this.#runCellEditorCommand(searCore, CancelCellEditCommand, { restoreOriginalDocument: true });
+    this.#runCellEditorCommand(CancelCellEditCommand, { restoreOriginalDocument: true });
   }
 
   /**
@@ -2017,17 +1377,17 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
    * console so the entire operation is observable.
    */
   #buildCommitPipeline(
-    searCore: SearCoreSheet,
     name: string = SheetCellEditorPipelineName.CommitEdit,
     fillSelection = false,
+    minimumRowHeight?: number,
   ): Pipeline {
     const pipeline = new Pipeline(name);
 
     // Step 1: Cell value update
-    const editorState = searCore.getDataEngine().getDataType<EditorState>(this.pluginKey);
+    const editorState = this.#data.getDataType<EditorState>(this.pluginKey);
     if (editorState) {
       const anchor = editorState[0].getPoint(0);
-      const dataState = readCellEditorSheetFields(searCore.getDataEngine());
+      const dataState = readCellEditorSheetFields(this.#data);
       // Reopening and closing an unchanged cell must preserve its stored type and explicit formatting.
       if (
         dataState &&
@@ -2054,47 +1414,32 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
         const { cell: newValue, format: inferredFormat } = this.#commitStrategies.commitWithFormat(commitContext);
 
         const operations = [];
-        const ranges = fillSelection && this.#queries?.has(GetSelections) ? this.#queries.run(GetSelections, void 0) : [];
+        const ranges =
+          fillSelection && this.#queries?.has(GetSelections) ? this.#queries.run(GetSelections, void 0) : [];
         const targets = this.#getCommitTargets(anchor, fillSelection);
         if (ranges.length) {
           for (const [row, col] of targets) {
             const oldValue = dataState.sheetData.getItem(row, col);
             const value = newValue
               ? this.#cellCodecs?.get(newValue.type)?.rebase?.(newValue, {
-                rowDelta: row - anchor[0], columnDelta: col - anchor[1],
-              }) ?? newValue
+                  rowDelta: row - anchor[0],
+                  columnDelta: col - anchor[1],
+                }) ?? newValue
               : null;
             operations.push(createUpdateCellOTOperation<CellMatrixElement>([row, col], value, oldValue));
           }
         } else operations.push(createUpdateCellOTOperation<CellMatrixElement>(anchor, newValue, prevValue));
         const tx = createSheetTransaction(SheetDataPlugin.pluginKey, operations);
         pipeline.add(SheetCellEditorPipelineStepName.CommitValue, tx);
-        if (plainText.includes('\n') && this.#textShaper) {
-          const rowSizes = readSheetRowSizes(searCore.getDataEngine());
-          if (rowSizes) {
-            const config = readSheetConfig(searCore);
-            const font = createFontDescriptor({
-              fontSize: config.sheetCellFontSize ?? 10,
-              fontFamily: config.sheetCellFontFamily ?? 'sans-serif',
-            });
-            const contentHeight = plainText
-              .split('\n')
-              .reduce((height, line) => height + this.#textShaper!.shape({ text: line || ' ', font }).height, 0);
-            const requiredHeight = Math.ceil(contentHeight + 16);
-            const rows = new Set(operations.map((operation) => operation.p[0]));
-            const resizeOperations = [...rows].flatMap((row) => {
-              const currentHeight = rowSizes.getItem(0, row) ?? 0;
-              return requiredHeight > currentHeight
-                ? [createResizeRowOTOperation([row], requiredHeight, currentHeight)]
-                : [];
-            });
-            if (resizeOperations.length) {
-              pipeline.add(
-                'expand-multiline-rows',
-                createSheetTransaction(SheetResizePlugin.pluginKey, resizeOperations),
-              );
-            }
-          }
+        if (minimumRowHeight !== undefined) {
+          const rowSizes = readSheetRowSizes(this.#data);
+          const rows = new Set(operations.map((operation) => operation.p[0]));
+          const resize = [...rows].flatMap((row) => {
+            const current = rowSizes?.getItem(0, row) ?? 0;
+            return minimumRowHeight > current ? [createResizeRowOTOperation([row], minimumRowHeight, current)] : [];
+          });
+          if (resize.length)
+            pipeline.add('expand-multiline-rows', createSheetTransaction(SheetResizePlugin.pluginKey, resize));
         }
         if (inferredFormat && dataState.cellFormats) {
           const formatRanges = ranges.length
@@ -2124,9 +1469,8 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
     }
 
     // Step 2: Exit edit mode (clears editor overlay, cursor, listeners)
-    const { transaction: cleanupTx, dirtyRects } = this.#performCleanup(searCore);
+    const { transaction: cleanupTx } = this.#performCleanup();
     pipeline.add(SheetCellEditorPipelineStepName.ExitEditMode, cleanupTx);
-    dirtyRects.forEach((rect) => pipeline.markDirty(rect));
     pipeline.addPostCommit('finish-cell-edit', () => this.#finishEditSession('commit'));
 
     return pipeline;
@@ -2149,43 +1493,16 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
       type: SheetCellEditorInteractionName.SessionEnded,
       reason,
     });
-    pipeline.addPostRender(SheetHighlightPipelineStepName.Refresh, SheetHighlightPlugin.pluginKey);
   }
-
-  /**
-   * Plans the editor state reset without changing the active edit session.
-   *
-   * Returns the transaction and any dirty rects that should be
-   * flushed before the final render. The dirty rects are NOT applied
-   * immediately; the caller should pass them to Pipeline.markDirty() so the
-   * frame-level dirty tracker consumes it together with scene mutations.
-   */
-  #performCleanup(_searCore: SearCoreSheet): {
-    transaction: Transaction;
-    dirtyRects: PositionRect<HexColor>[];
-  } {
-    if (Plugin.prototype.hasStateWriteBoundary.call(this) && !this.#commands?.isExecuting()) {
-      throw new SearError('Sheet cell editor changes must run through editor.commands.run(...).');
-    }
-    const dirtyRects: PositionRect<HexColor>[] = [];
-    if (this.#lastEditorRect) {
-      const { x, y, width, height } = this.#lastEditorRect;
-      dirtyRects.push(new PositionRect<HexColor>(x, y, width, height));
-      if (this.#lastOverflowLeftX !== null && this.#lastOverflowLeftX < x) {
-        const overflowWidth = x - this.#lastOverflowLeftX - 1;
-        if (overflowWidth > 0) {
-          dirtyRects.push(new PositionRect<HexColor>(this.#lastOverflowLeftX, y, overflowWidth, height));
-        }
-      }
-    }
-
-    const emptyRect = createEmptyRectShape();
-    const operations = [
-      createUpdateRectOTOperation([0], emptyRect[0], emptyRect[1]),
-      createUpdateRectOTOperation([1], emptyRect[0], emptyRect[1]),
-      createUpdateRectOTOperation([2], emptyRect[0], emptyRect[1]),
-    ];
-    return { transaction: createSheetTransaction(this.pluginKey, operations), dirtyRects };
+  #performCleanup(): { transaction: Transaction } {
+    this.assertRuntimeWriteAllowed();
+    const empty = createEmptyRectShape();
+    return {
+      transaction: createSheetTransaction(
+        this.pluginKey,
+        [0, 1, 2].map((index) => createUpdateRectOTOperation([index], empty[0], empty[1])),
+      ),
+    };
   }
 
   #finishEditSession(action: 'commit' | 'cancel'): void {
@@ -2202,57 +1519,22 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
   }
 
   #completeCleanup(): void {
-    this.#blinker.stop();
     this.#isEditing = false;
     this.#initialEditSnapshot = null;
     // Ensure drag state is always cleaned up regardless of how editing ended.
-    this.#isDragSelecting = false;
     this.#referencePick = null;
-    this.#crossSheetReferencePick = null;
     this.#lastPickedReference = null;
     this.#formulaAutoClose.clear();
-    this.#disposePointerCapture?.();
-    this.#disposePointerCapture = null;
-    this.#highlighter.clear();
     this.#formulaAnalysis = null;
     this.#publishFormulaAssist({ suggestions: [], selectedIndex: 0, signature: null, diagnostic: null, anchor: null });
-
-    this.#cursorEngine.override(null);
-
-    this.#lastEditorRect = null;
-    this.#lastOverflowLeftX = null;
 
     // Selection mode also receives text, using the same input surface so an
     // in-flight composition survives the transition into cell editing.
     this.#publishFormulaBarState();
   }
-
   #disposeEmbeddedSession(): void {
-    this.#disposeEditKeyboardHandlers?.();
-    this.#disposeEditKeyboardHandlers = null;
-    try {
-      this.#editSession?.dispose();
-    } finally {
-      this.#editSession = null;
-      this.#embeddedContext = null;
-    }
-  }
-
-  // ─── Plugin interface: state registration / reducer / render ───────────
-
-  /** Returns the plugin config. */
-  public getPluginConfig(_searCore: SearCoreSheet): null {
-    return null;
-  }
-
-  /** Registers visual defaults for the inline cell editor. */
-  public override registerConfig() {
-    return [
-      {
-        key: this.key,
-        config: new ConfigUnit(SheetCellEditorPlugin.defaultConfig),
-      },
-    ];
+    this.#editSession?.dispose();
+    this.#editSession = null;
   }
 
   /** @inheritdoc */
@@ -2313,259 +1595,9 @@ export class SheetCellEditorPlugin extends Plugin<SearCoreSheet, CellProperties,
       anchor: { path: [anchor[0], 0], offset: anchor[1] },
       head: { path: [head[0], 0], offset: head[1] },
     };
+    this.#editSession?.setSelection(this.#session.docSelection);
     this.#publishFormulaBarState();
   }
-
-  /** Renders SheetCellEditorPlugin scene output. */
-  public render(
-    searCore: SearCoreSheet,
-    offset: { x: number; y: number } = {
-      x: readSheetConfig(searCore).sheetOffsetX ?? 50,
-      y: readSheetConfig(searCore).sheetOffsetY ?? 24,
-    },
-  ): Node<CellProperties>[] {
-    const dataEngine = searCore.getDataEngine();
-    const editorState = dataEngine.getDataType<EditorState>(this.pluginKey);
-    if (!editorState) return [];
-    if (editorState[1].shape.join('') === RectRange.Empty.join('')) return [];
-
-    const defaultState = readCellEditorSheetFields(dataEngine);
-    if (!defaultState) return [];
-    const { rowSizes, columnSizes } = defaultState;
-
-    const anchor = editorState[1].getPoint(0);
-    const focus = editorState[1].getPoint(1);
-
-    const rangeRect = getSheetRangePositionRect(anchor, focus, {
-      rowSizes,
-      columnSizes,
-      offsetX: offset.x,
-      offsetY: offset.y,
-    });
-    if (!rangeRect) return [];
-    const scrollState = searCore.renderEngine.scrollManager.getState();
-    const fixedRows = readSheetFixedRows(dataEngine);
-    const fixedY =
-      fixedRows && anchor[0] === focus[0]
-        ? activeFixedRowOffsets(fixedRows, rowSizes, scrollState.y, readSheetFreeze(dataEngine).rows, offset.y).get(
-            anchor[0],
-          )
-        : undefined;
-    const { x: startX, width: baseWidth, height: baseHeight } = rangeRect;
-    const startY = fixedY ?? rangeRect.y;
-    const cellPadding = readSheetConfig(searCore).cellPadding ?? 4;
-
-    const editorText = this.#session.pendingDoc.map(paraText).join('\n');
-    const cursorOffset = getDocumentOffset(this.#session.pendingDoc, this.#session.docSelection.head);
-    const highlighting = this.#highlighter.highlight(editorText, {
-      cursorOffset,
-    });
-    const lineCount = editorText.split('\n').length;
-    const sheetConfig = readSheetConfig(searCore);
-    const fontSize = sheetConfig.sheetCellFontSize ?? 10;
-    // The embedded Doc editor uses 12px by default even when Sheet cells use 10px.
-    const font = createFontDescriptor({
-      fontSize: Math.max(fontSize, 12),
-      fontFamily: sheetConfig.sheetCellFontFamily ?? 'Inter, ui-sans-serif, system-ui, sans-serif',
-    });
-    const textWidth = this.#textShaper
-      ? Math.max(...editorText.split('\n').map((line) => this.#textShaper!.shape({ text: line, font }).width))
-      : 0;
-    const viewportWidth = searCore.renderEngine.scrollManager.getShape()[0];
-    const viewportLeft = scrollState.x + offset.x;
-    const viewportRight = scrollState.x + viewportWidth - 8;
-    const editorWidth = Math.max(
-      baseWidth,
-      Math.min(Math.ceil(textWidth + cellPadding * 2 + 8), viewportRight - viewportLeft),
-    );
-    const editorX =
-      editorWidth > baseWidth && startX >= viewportLeft && startX < viewportRight
-        ? Math.max(viewportLeft, Math.min(startX, viewportRight - editorWidth))
-        : startX;
-    const expandedHeight = lineCount > 1 ? Math.ceil(lineCount * fontSize * 1.5 + cellPadding * 2) : baseHeight;
-    const editorHeight = Math.max(baseHeight, expandedHeight);
-    const nextRow = focus[0] + 1;
-    const previousRow = anchor[0] - 1;
-    const expandUpward =
-      editorHeight > baseHeight &&
-      previousRow >= 0 &&
-      nextRow < defaultState.sheetData.shape[0] &&
-      defaultState.sheetData.getItem(nextRow, anchor[1]) !== null &&
-      defaultState.sheetData.getItem(previousRow, anchor[1]) === null &&
-      startY - (editorHeight - baseHeight) >= offset.y;
-    const preferredY = expandUpward ? startY + baseHeight - editorHeight : startY;
-    const viewportOffsetY = fixedY === undefined ? scrollState.y : 0;
-    const viewportTop = viewportOffsetY + offset.y;
-    const viewportBottom = viewportOffsetY + searCore.renderEngine.scrollManager.getShape()[1] - 8;
-    const editorY = editorHeight > baseHeight &&
-      startY >= viewportTop && startY < viewportBottom &&
-      editorHeight <= viewportBottom - viewportTop
-      ? Math.max(viewportTop, Math.min(preferredY, viewportBottom - editorHeight))
-      : preferredY;
-    const positionRect = {
-      x: editorX,
-      y: editorY,
-      width: editorWidth,
-      height: editorHeight,
-    };
-    const cursor = this.#editSession?.getCursor();
-
-    // Position hidden input at cursor screen coords so the OS IME candidate
-    // window is anchored near the cell being edited.
-    if (cursor) {
-      this.#textInput.setPosition(
-        positionRect.x + cursor.rect.x - scrollState.x,
-        positionRect.y + cursor.rect.y - (fixedY === undefined ? scrollState.y : 0),
-      );
-    }
-
-    // ── Dirty-region management ───────────────────────────────────────────
-    // Compute leftward overflow for center/right-aligned cells.
-    // The overflow area must be a SEPARATE dirty rect from the editor/cell
-    // rect: if we extended the editor's dirty rect to cover the overflow,
-    // DirtyRenderStrategy would find the grid cell's FixBoxNode intersecting
-    // the extended rect and redraw the TextNode, re-painting the overflow
-    // text we just cleared.  A separate rect that stops 1 px short of the
-    // cell's left edge does not intersect the grid cell, so the overflow
-    // area is cleared without the grid cell redrawing there.
-    const cellLeftX = startX;
-    const overflowLeftX = this.#computeOverflowLeftX(searCore, defaultState, anchor, cellLeftX, baseWidth, cellPadding);
-    this.#lastOverflowLeftX = overflowLeftX < cellLeftX ? overflowLeftX : null;
-
-    const STROKE = 2;
-    const prev = this.#lastEditorRect;
-    const left = (prev ? Math.min(prev.x, positionRect.x) : positionRect.x) - STROKE;
-    const top = (prev ? Math.min(prev.y, positionRect.y) : positionRect.y) - STROKE;
-    const right =
-      (prev
-        ? Math.max(prev.x + prev.width, positionRect.x + positionRect.width)
-        : positionRect.x + positionRect.width) + STROKE;
-    const bottom =
-      (prev
-        ? Math.max(prev.y + prev.height, positionRect.y + positionRect.height)
-        : positionRect.y + positionRect.height) + STROKE;
-    searCore.renderEngine.markDirty(new PositionRect<HexColor>(left, top, right - left, bottom - top));
-
-    // Mark overflow area as a separate dirty rect (1 px inset so it does not
-    // touch the grid cell's left edge and trigger a redraw there).
-    if (this.#lastOverflowLeftX !== null) {
-      const overflowWidth = cellLeftX - this.#lastOverflowLeftX - 1;
-      if (overflowWidth > 0) {
-        searCore.renderEngine.markDirty(
-          new PositionRect<HexColor>(this.#lastOverflowLeftX, top, overflowWidth, bottom - top),
-        );
-      }
-    }
-
-    this.#lastEditorRect = { ...positionRect };
-    if (this.#formulaAssistState.suggestions.length || this.#formulaAssistState.signature) {
-      const anchor = this.#getFormulaAssistAnchor();
-      const previous = this.#formulaAssistState.anchor;
-      if (anchor && (!previous || previous.x !== anchor.x || previous.y !== anchor.y)) {
-        this.#getCommandBus(searCore)?.run(UpdateFormulaAssistAnchorCommand, anchor);
-      }
-    }
-
-    // ── Create editor cell node ───────────────────────────────────────────
-    const { renderCoordinatorManager } = searCore.renderEngine;
-    const pluginConfig =
-      searCore.configEngine.getPluginConfig?.<SheetCellEditorConfig>(this.key) ?? SheetCellEditorPlugin.defaultConfig;
-    const cell = renderCoordinatorManager.create({ type: EmptyCell.symbol }, positionRect, {
-      type: EmptyCell.symbol,
-      isEdit: true,
-      fill: pluginConfig.editorBackgroundColor,
-      strokeWidth: 2,
-      stroke: EDITOR_BORDER_COLOR,
-      depth: this.depth + 5,
-      skipHit: true,
-    });
-    const nodes = cell?.render();
-    const editorNodes = nodes ? [nodes].flat() : [];
-    const docOverlayNodes =
-      editorNodes.length > 0 && this.#editSession
-        ? [
-            new EmbeddedEditorRenderNode<CellProperties>(
-              this.#session.pendingDoc,
-              positionRect,
-              { type: EmptyCell.symbol, isEdit: true, depth: this.depth + 6 },
-              this.#editSession,
-              { cursorVisible: this.#blinker.visible },
-            ),
-          ]
-        : [];
-    if (fixedY !== undefined) {
-      [...editorNodes, ...docOverlayNodes].forEach((node) => node.setStickyTree(true, { top: positionRect.y }));
-    }
-    // Keep reference outlines inside their cells so adjacent references do
-    // not paint over one another along a shared grid boundary.
-    const referenceHighlightInset = 0.5;
-    const referenceNodes = highlighting.cellRanges.flatMap((reference) => {
-      const bounds = resolveReferenceHighlightBounds(reference, {
-        rowCount: rowSizes.shape[1],
-        colCount: columnSizes.shape[1],
-      });
-      if (!bounds) return [];
-      const referenceRect = getSheetRangePositionRect(bounds.start, bounds.end, {
-        rowSizes,
-        columnSizes,
-        offsetX: offset.x,
-        offsetY: offset.y,
-      });
-      if (!referenceRect) return [];
-      const referenceCell = renderCoordinatorManager.create(
-        { type: EmptyCell.symbol },
-        {
-          x: referenceRect.x + referenceHighlightInset,
-          y: referenceRect.y + referenceHighlightInset,
-          width: Math.max(0, referenceRect.width - referenceHighlightInset * 2),
-          height: Math.max(0, referenceRect.height - referenceHighlightInset * 2),
-        },
-        {
-          type: EmptyCell.symbol,
-          strokeWidth: 1,
-          stroke: reference.color,
-          fill: reference.fill,
-          depth: this.depth + 4,
-          skipHit: true,
-        },
-      );
-      const nodes = referenceCell?.render();
-      const overlayNodes = nodes ? [nodes].flat() : [];
-      // Reference highlights are stroke/fill overlays only. Mark them as
-      // edit-layer nodes after rendering so EmptyCell does not mount editable
-      // text content for these reference ranges.
-      overlayNodes.forEach((node) => {
-        (node.properties as Record<string, unknown>)['isEdit'] = true;
-      });
-      return overlayNodes;
-    });
-    return [...referenceNodes, ...editorNodes, ...docOverlayNodes];
-  }
-
-
-}
-
-function resolveOptional<Service>(container: Container, identifier: string | symbol): Service | undefined {
-  try {
-    return container.resolve<Service>(identifier);
-  } catch (_error) {
-    return void 0;
-  }
-}
-
-function readSheetConfig(searCore: SearCoreSheet): Partial<SheetConfig> {
-  return searCore.configEngine.getDefaultConfig() as Partial<SheetConfig>;
-}
-
-function isSheetEmbeddedEditor(value: unknown): value is SheetEmbeddedEditor {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<SheetEmbeddedEditor>;
-  return (
-    typeof candidate.initialize === 'function' &&
-    typeof candidate.createRenderSession === 'function' &&
-    typeof candidate.createEditSession === 'function' &&
-    typeof candidate.dispose === 'function'
-  );
 }
 
 function previousWordBoundary(text: string, caret: number): number {

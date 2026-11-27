@@ -1,5 +1,10 @@
+import { type SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
 import { SheetRangeMoveRegistry, SheetRangeReorderRegistry } from '@searsuite/sear-assembly-plugin';
-import { createMatrixRangeMoveOperations, createMatrixRangeReorderOperations, hasMatrixRangeMoveConflict } from '@searsuite/sear-domain-matrix';
+import {
+  createMatrixRangeMoveOperations,
+  createMatrixRangeReorderOperations,
+  hasMatrixRangeMoveConflict,
+} from '@searsuite/sear-domain-matrix';
 import {
   MatrixOT,
   MatrixOTActionName,
@@ -20,13 +25,17 @@ import {
 import { Plugin, PluginKey, type PluginDocumentStateContribution } from '@searsuite/sear-assembly-plugin';
 import { deserializeSparseMatrix, serializeSparseMatrix, type CSRMatrix } from '@searsuite/sear-domain-matrix';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { CellClipboardCodecRegistry, SheetDisplayedValueChanges, type CellMatrixElement } from '@searsuite/sear-domain-cell-types';
-import { Node } from '@searsuite/sear-render-node';
+import {
+  CellClipboardCodecRegistry,
+  SheetDisplayedValueChanges,
+  type CellMatrixElement,
+} from '@searsuite/sear-domain-cell-types';
+
 import { Transaction } from '@searsuite/sear-domain-transaction';
-import { CellProperties, SheetCellVisualReaderRegistry } from '@searsuite/sear-render-registry';
-import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-render-engine';
+
+import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-domain-sheet';
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import { SheetDataPlugin } from '@searsuite/sear-render-engine';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
 import { DuplicateMatrix, type SheetDuplicateHighlight } from '../../DuplicateMatrix';
 import { registerSheetDuplicateCommands } from './SheetDuplicateCommands';
 import { SheetDuplicateFieldKey } from './SheetDuplicateDataField';
@@ -41,7 +50,19 @@ const pluginKey = new PluginKey('SheetDuplicatePlugin');
 
 /** Plugin that owns duplicate-highlight data and duplicate row commands. */
 @Injectable()
-export class SheetDuplicatePlugin extends Plugin<unknown, CellProperties, SheetDuplicatePluginState> {
+export class SheetDuplicatePlugin extends Plugin<SheetDuplicatePluginState> {
+  public registerCellStyles(registry: SheetCellStyleRegistry): void {
+    registry.registerOverride({
+      id: 'sheet.duplicate.rangeMove',
+      properties: ['fill'],
+      priority: 100,
+      read: (row, column) => {
+        const fill = this.getState().duplicates.getItem(row, column);
+        return fill != null && this.#getVisibleHighlights().has(`${row}:${column}`) ? { fill } : {};
+      },
+    });
+  }
+
   readonly #sheetData: SheetDataPlugin;
   readonly #cellCodecs: CellClipboardCodecRegistry;
   readonly #readDisplayText: ((row: number, column: number, cell: CellMatrixElement | null) => string) | undefined;
@@ -52,7 +73,7 @@ export class SheetDuplicatePlugin extends Plugin<unknown, CellProperties, SheetD
   #visibleHighlightsData: unknown = null;
   #visibleHighlightsMatrix: unknown = null;
   /** Duplicate state is data-only and does not use render-depth diagnostics. */
-  public override readonly warnOnDuplicateDepth = false;
+  public readonly warnOnDuplicateDepth = false;
   /** Duplicate-highlight transactions share the registered MatrixOT algebra. */
   public override readonly transactionOT = {
     ownerId: 'sheet.duplicate',
@@ -110,7 +131,9 @@ export class SheetDuplicatePlugin extends Plugin<unknown, CellProperties, SheetD
     this.#sheetData = sheetData;
     this.#cellCodecs = cellCodecs;
     this.#readDisplayText = readDisplayText;
-    displayedValueChanges?.subscribe(() => { this.#highlightRevision += 1; });
+    displayedValueChanges?.subscribe(() => {
+      this.#highlightRevision += 1;
+    });
   }
 
   /** Registers duplicate commands owned by this plugin. */
@@ -122,7 +145,8 @@ export class SheetDuplicatePlugin extends Plugin<unknown, CellProperties, SheetD
       getRowCount: () => plugin.getState().duplicates.shape[0],
       getColumnCount: () => plugin.getState().duplicates.shape[1],
       readCell: (row, column) => plugin.#sheetData.getState().sheetData.getItem(row, column),
-      readCellText: (cell, row, column) => plugin.#readDisplayText?.(row, column, cell) ?? plugin.#cellCodecs.toPlainText(cell),
+      readCellText: (cell, row, column) =>
+        plugin.#readDisplayText?.(row, column, cell) ?? plugin.#cellCodecs.toPlainText(cell),
       readDisplayedText: (row, column) => {
         const cell = plugin.#sheetData.getState().sheetData.getItem(row, column);
         return plugin.#readDisplayText?.(row, column, cell) ?? (cell ? plugin.#cellCodecs.toPlainText(cell) : '');
@@ -131,25 +155,15 @@ export class SheetDuplicatePlugin extends Plugin<unknown, CellProperties, SheetD
     });
   }
 
-  /** Contributes duplicate highlights to the shared Sheet cell visual pipeline. */
-  public registerCellVisualReaders(registry: SheetCellVisualReaderRegistry): void {
-    const plugin = this;
-    registry.registerOverride({
-      id: 'sheet.duplicate.rangeMove',
-      properties: ['fill'],
-      priority: 100,
-      read({ rowIndex, columnIndex }) {
-        const fill = plugin.getState().duplicates.getItem(rowIndex, columnIndex);
-        return fill != null && plugin.#getVisibleHighlights().has(`${rowIndex}:${columnIndex}`) ? { fill } : {};
-      },
-    });
-  }
-
   #getVisibleHighlights(): Set<string> {
     const data = this.#sheetData.getState().sheetData;
     const highlights = this.getState().duplicates;
-    if (this.#visibleHighlights && this.#visibleHighlightsRevision === this.#highlightRevision &&
-      this.#visibleHighlightsData === data && this.#visibleHighlightsMatrix === highlights) {
+    if (
+      this.#visibleHighlights &&
+      this.#visibleHighlightsRevision === this.#highlightRevision &&
+      this.#visibleHighlightsData === data &&
+      this.#visibleHighlightsMatrix === highlights
+    ) {
       return this.#visibleHighlights;
     }
     const groups = new Map<string, string[]>();
@@ -164,7 +178,9 @@ export class SheetDuplicatePlugin extends Plugin<unknown, CellProperties, SheetD
       groups.set(key, group);
     });
     const visible = new Set<string>();
-    groups.forEach((group) => { if (group.length > 1) group.forEach((key) => visible.add(key)); });
+    groups.forEach((group) => {
+      if (group.length > 1) group.forEach((key) => visible.add(key));
+    });
     this.#visibleHighlights = visible;
     this.#visibleHighlightsRevision = this.#highlightRevision;
     this.#visibleHighlightsData = data;
@@ -215,10 +231,12 @@ export class SheetDuplicatePlugin extends Plugin<unknown, CellProperties, SheetD
   public registerRangeReorders(registry: SheetRangeReorderRegistry): void {
     registry.register({
       id: 'sheet.duplicate.rangeReorder',
-      plan: ({ range, destinationOf }) => [{
-        target: this.key,
-        operations: createMatrixRangeReorderOperations(this.getState().duplicates, range, destinationOf),
-      }],
+      plan: ({ range, destinationOf }) => [
+        {
+          target: this.key,
+          operations: createMatrixRangeReorderOperations(this.getState().duplicates, range, destinationOf),
+        },
+      ],
     });
   }
 
@@ -232,16 +250,6 @@ export class SheetDuplicatePlugin extends Plugin<unknown, CellProperties, SheetD
     if (operations.length === 0) return null;
     MatrixOT.apply(pluginState.duplicates, operations);
     return pluginState;
-  }
-
-  /** Duplicate state has no render-time configuration. */
-  public getPluginConfig(): null {
-    return null;
-  }
-
-  /** Duplicate state contributes through grid cell properties, not scene nodes. */
-  public render(): Node<CellProperties>[] {
-    return [];
   }
 }
 

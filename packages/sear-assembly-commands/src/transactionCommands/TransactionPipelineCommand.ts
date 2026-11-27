@@ -1,4 +1,4 @@
-import { Pipeline } from '@searsuite/sear-assembly-core';
+import { Pipeline } from '@searsuite/sear-assembly-plugin';
 import { Transaction } from '@searsuite/sear-domain-transaction';
 
 import { SheetCommand, SheetCommandContext, SheetCommandResult } from '../SheetCommand';

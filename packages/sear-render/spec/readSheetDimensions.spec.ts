@@ -1,9 +1,5 @@
-import {
-  type DataEngine,
-  SheetColumnSizesFieldKey,
-  SheetDataFieldNamespace,
-  SheetRowSizesFieldKey,
-} from '@searsuite/sear-render-engine';
+import { SheetColumnSizesFieldKey, SheetDataFieldNamespace, SheetRowSizesFieldKey } from '@searsuite/sear-domain-sheet';
+import { type DataEngine } from '@searsuite/sear-domain-state';
 import { readSheetColumnSizes, readSheetRowSizes } from '../src/sheet/readSheetDimensions';
 
 describe('readSheetDimensions', () => {

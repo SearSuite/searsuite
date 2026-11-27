@@ -8,7 +8,7 @@ import {
   SheetHorizontalAlignment,
 } from '@searsuite/sear-domain-cell-types';
 import { EmbeddedEditorRenderNode } from './EmbeddedEditorRenderNode';
-import { formatFormulaValue } from './DisplayTextUtils';
+import { formatFormulaValue } from '@searsuite/sear-domain-cell-types';
 import { HexColor } from '@searsuite/sear-foundation-utils';
 
 /** Renderer for empty persisted cells and active empty editor cells. */
@@ -29,14 +29,14 @@ export class EmptyCell extends Cell<CellProperties<null>> {
     const displayValue = this.getDisplayText();
     if (!displayValue) return new FixBoxNode(positionRect, properties);
     const format = this.#getEffectiveFormat();
-    const numericDisplay = typeof value === 'number'
-      ? formatCellNumberDisplay(value, format, this.context.cellFormatLocale)
-      : null;
+    const numericDisplay =
+      typeof value === 'number' ? formatCellNumberDisplay(value, format, this.context.cellFormatLocale) : null;
     const boxProperties: CellProperties<null> = {
       ...properties,
-      horizontalAlign: typeof value === 'number' && properties.horizontalAlign === undefined
-        ? SheetHorizontalAlignment.Right
-        : properties.horizontalAlign,
+      horizontalAlign:
+        typeof value === 'number' && properties.horizontalAlign === undefined
+          ? SheetHorizontalAlignment.Right
+          : properties.horizontalAlign,
     };
     const textProperties: CellProperties<null> = {
       ...properties,
@@ -44,9 +44,7 @@ export class EmptyCell extends Cell<CellProperties<null>> {
       ...(displayValue.startsWith('#') ? { textColor: '#FF0000' as HexColor } : {}),
       ...(numericDisplay?.color === undefined ? {} : { textColor: numericDisplay.color }),
       ...(numericDisplay?.fillCharacter === undefined ? {} : { textFillCharacter: numericDisplay.fillCharacter }),
-      ...(typeof value === 'number' && normalizeCellFormat(format).kind === 'general'
-        ? { fitNumberValue: value }
-        : {}),
+      ...(typeof value === 'number' && normalizeCellFormat(format).kind === 'general' ? { fitNumberValue: value } : {}),
     };
     return new FixBoxNode(positionRect, boxProperties).add(new TextNode(displayValue, positionRect, textProperties));
   }
@@ -66,8 +64,9 @@ export class EmptyCell extends Cell<CellProperties<null>> {
 
   #getEffectiveFormat(): unknown {
     const { row, col, formulaResultProvider } = this.context;
-    return this.properties.format ?? (
-      row === void 0 || col === void 0 ? undefined : formulaResultProvider?.getFormulaResultFormat?.(row, col)
+    return (
+      this.properties.format ??
+      (row === void 0 || col === void 0 ? undefined : formulaResultProvider?.getFormulaResultFormat?.(row, col))
     );
   }
 }

@@ -2,28 +2,46 @@
 export { DataValidationMatrix, type PositionedDataValidationRule } from './DataValidationMatrix';
 export { type DataValidationIssue } from './DataValidationIssue';
 export {
-  DataValidationKind, DataValidationOperator, DataValidationTextMode, DataValidationInputPolicy,
-  DataValidationDropdownMode, hasIntegerSolution, type DataValidationCondition, type DataValidationOption, type DataValidationRule,
+  DataValidationKind,
+  DataValidationOperator,
+  DataValidationTextMode,
+  DataValidationInputPolicy,
+  DataValidationDropdownMode,
+  hasIntegerSolution,
+  type DataValidationCondition,
+  type DataValidationOption,
+  type DataValidationRule,
 } from './DataValidationRule';
 export { evaluateDataValidation, type DataValidationEvaluationContext } from './evaluateDataValidation';
 export { parseDataValidationDate } from './parseDataValidationDate';
 export { DataValidationWarningObservation, type DataValidationWarning } from './DataValidationObservations';
 export {
-  DataValidationEvaluatorRegistry, DataValidationEvaluatorRegistryCapability,
+  DataValidationEvaluatorRegistry,
+  DataValidationEvaluatorRegistryCapability,
   type DataValidationExternalEvaluator,
 } from './DataValidationEvaluatorRegistry';
 export { UnregisterDataValidationEvaluatorCommand } from './DataValidationEvaluatorCommands';
 export {
-  SetDataValidationRuleCommand, RemoveDataValidationRuleCommand, ClearDataValidationRulesCommand,
+  SetDataValidationRuleCommand,
+  RemoveDataValidationRuleCommand,
+  ClearDataValidationRulesCommand,
   SetNumericValidationControlValueCommand,
-  ReadDataValidationRulesQuery, ReadDataValidationCellRulesQuery, ReadDataValidationIssueQuery,
+  ReadDataValidationRulesQuery,
+  ReadDataValidationCellRulesQuery,
+  ReadDataValidationIssueQuery,
   CanEvaluateDataValidationKindQuery,
   type SetDataValidationRuleInput,
 } from './sheetPlugin/dataValidation/SheetDataValidationCommands';
 export {
-  SheetDataValidationPlugin, type SheetDataValidationPluginState,
+  SheetDataValidationPlugin,
+  type SheetDataValidationPluginState,
   type SheetDataValidationDependencies,
 } from './sheetPlugin/dataValidation/SheetDataValidationPlugin';
-export { SheetDataValidationFieldKey, readSheetDataValidations } from './sheetPlugin/dataValidation/SheetDataValidationDataField';
+export {
+  SheetDataValidationFieldKey,
+  readSheetDataValidations,
+} from './sheetPlugin/dataValidation/SheetDataValidationDataField';
 
 export { parseDropdownSelection, resolveDropdownSelection, formatDropdownSelection } from './DropdownSelection';
+
+export { type NumericValidationControl, type NumericValidationControlKind } from './NumericValidationControl';

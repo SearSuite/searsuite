@@ -12,7 +12,7 @@ import {
 } from '@searsuite/sear-domain-formula-engine';
 import { cellKey } from '@searsuite/sear-domain-formula-engine-ts';
 import { isFormulaError } from '@searsuite/sear-foundation-utils';
-import { FormulaRenderInvalidator } from '../src/FormulaRenderInvalidator';
+import { FormulaValuePublisher } from '../src/FormulaValuePublisher';
 import { SheetDisplayedValueChanges } from '@searsuite/sear-domain-cell-types';
 
 describe('RecalcScheduler', () => {
@@ -93,7 +93,7 @@ describe('RecalcScheduler', () => {
       warn: jest.fn(),
     };
     renderInvalidator = {
-      invalidateFormulaResults: jest.fn(),
+      publishResults: jest.fn(),
     };
     trace = {
       emit: jest.fn(),
@@ -135,13 +135,27 @@ describe('RecalcScheduler', () => {
       subscribe: () => () => {},
     };
     const viewportScheduler = new RecalcScheduler(
-      graph, evaluator, resultStore, aggCache, dataSource, platform, renderInvalidator, trace as never,
+      graph,
+      evaluator,
+      resultStore,
+      aggCache,
+      dataSource,
+      platform,
+      renderInvalidator,
+      trace as never,
       registry as never,
     );
     const key = cellKey(2, 3);
-    const viewportCache = new Map([[key, {
-      kind: 'call', name: 'INFO', args: [{ kind: 'string', value: 'origin' }],
-    } as never]]);
+    const viewportCache = new Map([
+      [
+        key,
+        {
+          kind: 'call',
+          name: 'INFO',
+          args: [{ kind: 'string', value: 'origin' }],
+        } as never,
+      ],
+    ]);
     viewportScheduler.bindAstCache(viewportCache);
 
     viewportChangedHandler();
@@ -207,10 +221,12 @@ describe('RecalcScheduler', () => {
     expect(platform.queueMicrotask).toHaveBeenCalledTimes(1);
     graph.pendingCount = 0;
     platform.queueMicrotask.mock.calls[0][0]();
-    expect(trace.emit).toHaveBeenCalledWith(expect.objectContaining({
-      type: FormulaRecalculationCompletedEventType,
-      generation: 1,
-    }));
+    expect(trace.emit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: FormulaRecalculationCompletedEventType,
+        generation: 1,
+      }),
+    );
   });
 
   it('handles cycle keys (lines 99-100)', () => {
@@ -414,7 +430,7 @@ describe('RecalcScheduler', () => {
     scheduler.resumePendingWork();
 
     expect(resultStore.set).toHaveBeenCalledTimes(8);
-    expect(renderInvalidator.invalidateFormulaResults).toHaveBeenCalledWith(results.map((result) => result.key));
+    expect(renderInvalidator.publishResults).toHaveBeenCalledWith(results.map((result) => result.key));
     expect(trace.emit).toHaveBeenCalledWith(
       expect.objectContaining({
         type: FormulaErrorChangedEventType,
@@ -515,18 +531,19 @@ describe('RecalcScheduler', () => {
   });
 
   it('uses the formula render invalidator as a no-op bridge until assembly binds it', () => {
-    const invalidator = new FormulaRenderInvalidator(new SheetDisplayedValueChanges(jest.fn()));
-    expect(() => invalidator.invalidateFormulaResults([])).not.toThrow();
-    expect(() => invalidator.invalidateFormulaResults([cellKey(0, 0)])).not.toThrow();
+    const changes = new SheetDisplayedValueChanges(jest.fn());
+    const invalidator = new FormulaValuePublisher(changes);
+    expect(() => invalidator.publishResults([])).not.toThrow();
+    expect(() => invalidator.publishResults([cellKey(0, 0)])).not.toThrow();
 
     const handler = jest.fn();
-    const dispose = invalidator.bind(handler);
-    invalidator.invalidateFormulaResults([cellKey(0, 1)]);
-    expect(handler).toHaveBeenCalledWith([cellKey(0, 1)]);
+    const dispose = changes.subscribe(handler);
+    invalidator.publishResults([cellKey(0, 1)]);
+    expect(handler).toHaveBeenCalledWith([{ row: 0, column: 1 }]);
 
     dispose();
     expect(() => dispose()).not.toThrow();
-    invalidator.invalidateFormulaResults([cellKey(0, 2)]);
+    invalidator.publishResults([cellKey(0, 2)]);
     expect(handler).toHaveBeenCalledTimes(1);
   });
 });

@@ -38,9 +38,6 @@ export interface SheetSelectRangeInput {
 export interface SheetEnsureSelectionVisibleInput extends SheetSelectRangeInput {}
 
 export const SelectRangeCommand = defineSheetCommand<SheetSelectRangeInput>('sheet.selectRange');
-/** Restarts selection keyboard navigation after another editor releases focus. */
-export const RestartSheetSelectionNavigationCommand =
-  defineSheetCommand<void>('sheet.selection.navigation.restart');
 
 export const EnsureSelectionVisibleCommand =
   defineSheetCommand<SheetEnsureSelectionVisibleInput>('view.ensureSelectionVisible');
@@ -50,10 +47,13 @@ export const GetSelection = defineSheetQuery<void, SheetRangeBounds | null>('she
 /** All disjoint selections, with the current active rectangle last. */
 export const GetSelections = defineSheetQuery<void, readonly SheetRangeBounds[]>('sheet.selection.getAll');
 /** Detached keyboard navigation anchors for diagnostics and extensions. */
-export const GetSelectionNavigation = defineSheetQuery<void, {
-  readonly origin: Point | null;
-  readonly cursor: Point | null;
-}>('sheet.selection.navigation');
+export const GetSelectionNavigation = defineSheetQuery<
+  void,
+  {
+    readonly origin: Point | null;
+    readonly cursor: Point | null;
+  }
+>('sheet.selection.navigation');
 /** Clears every rectangle of a disjoint selection in one data transaction. */
 export const ClearSelectedContentsCommand = defineSheetCommand<void>('sheet.selection.clearContents');
 

@@ -1,7 +1,7 @@
 /** HEX2BIN converts hexadecimal to binary. Example: =HEX2BIN("F") returns 1111. */
 import { engineeringFunction } from '../shared/functionFactory';
 import { numeric, text } from '../shared/arguments';
-import { isFormulaError, numberError } from '../shared/errors';
+import { isFormulaError } from '../shared/errors';
 import { formatSignedRadix, parseSignedRadix } from '../shared/radix';
 export const HEX2BIN = engineeringFunction({
   name: 'HEX2BIN',

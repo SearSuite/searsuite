@@ -1,8 +1,9 @@
-import { CursorRegistry, CursorEngine, CursorToken, SheetCursorPlugin } from '../src';
+import { CursorRegistry, CursorEngine, CursorToken } from '../src';
+import { SheetCursorView } from '@searsuite/sear-render';
 import { RenderContext } from '@searsuite/sear-render-context';
 import { CoordinateEngine } from '@searsuite/sear-render-coord';
 
-describe('SheetCursorPlugin', () => {
+describe('SheetCursorView', () => {
   it('implements plugin contract completely', () => {
     const registry = new CursorRegistry();
     const engine = { mount: jest.fn(), apply: jest.fn() } as unknown as CursorEngine;
@@ -12,12 +13,7 @@ describe('SheetCursorPlugin', () => {
       screenToWorld: jest.fn((x: number, y: number) => ({ x: x + 10, y: y + 20 })),
     } as unknown as CoordinateEngine;
 
-    const plugin = new SheetCursorPlugin(registry, engine, coordinates, renderContext);
-
-    expect(plugin.apply({}, {} as any)).toBeNull();
-    expect(plugin.getPluginConfig()).toEqual({});
-    expect(plugin.render()).toBeNull();
-    expect(plugin.registerState()).toEqual({ key: expect.any(Object), state: {} });
+    const plugin = new SheetCursorView(registry, engine, coordinates, renderContext);
 
     // onMouseMove with valid target properties
     plugin.onMouseMove({} as any, {

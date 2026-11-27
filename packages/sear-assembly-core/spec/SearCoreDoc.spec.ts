@@ -1,12 +1,16 @@
+import { PipelineStepExecutorRegistry } from '@searsuite/sear-assembly-plugin';
+import { ViewExtensionRegistry } from '@searsuite/sear-render-event-engine';
+import { createTransaction } from '@searsuite/sear-domain-transaction';
+import { ViewExtensionBase } from '@searsuite/sear-render-event-engine';
 import { SearCoreDoc } from '../src/SearCoreDoc';
-import { Pipeline, PipelineStepKind } from '../src/Pipeline';
+import { Pipeline, PipelineStepKind } from '@searsuite/sear-assembly-plugin';
 import { Plugin, PluginKey, PluginManager } from '@searsuite/sear-assembly-plugin';
 import { type Node, type NodeProperties } from '@searsuite/sear-render-node';
 import { DocLayoutEngine } from '@searsuite/sear-domain-editor';
 import { RichTextBlockFlowRegistry } from '@searsuite/sear-domain-doc';
 import type { Schema } from '@searsuite/sear-domain-doc-schema';
 
-class TestDocPlugin extends Plugin<SearCoreDoc, NodeProperties, number> {
+class TestDocPlugin extends Plugin<number> {
   constructor(public readonly testKey = new PluginKey('test-doc-plugin')) {
     super({ key: testKey, state: 1 });
   }
@@ -15,16 +19,8 @@ class TestDocPlugin extends Plugin<SearCoreDoc, NodeProperties, number> {
     return state + 1;
   }
 
-  getPluginConfig(): null {
-    return null;
-  }
-
   registerState() {
     return { key: this.key, state: this.getState() };
-  }
-
-  render(_core: SearCoreDoc): Node<NodeProperties> | Node<NodeProperties>[] | null {
-    return null;
   }
 }
 
@@ -44,15 +40,15 @@ function createCore() {
     shape: jest.fn(() => ({ glyphs: [], clusters: [], caretStops: [{ textOffset: 0, x: 0 }], width: 0, height: 10 })),
   };
   const calculateLayoutPerParagraph = jest.fn(() => [
-      [
-        {
-          chars: [{ char: 'A', width: 5, height: 10, fontAscent: 8, textNodeIndex: 0, textNodeOffset: 0 }],
-          width: 5,
-          height: 10,
-          fontAscent: 8,
-        },
-      ],
-    ]);
+    [
+      {
+        chars: [{ char: 'A', width: 5, height: 10, fontAscent: 8, textNodeIndex: 0, textNodeOffset: 0 }],
+        width: 5,
+        height: 10,
+        fontAscent: 8,
+      },
+    ],
+  ]);
   const blockManager = {
     add: jest.fn(),
     calculateLayoutPerParagraph,
@@ -78,7 +74,10 @@ function createCore() {
     cursor as never,
     composition as never,
     new DocLayoutEngine(new RichTextBlockFlowRegistry()),
-    new PluginManager<SearCoreDoc, NodeProperties>(),
+    new PluginManager(),
+    new PipelineStepExecutorRegistry(),
+    {},
+    new ViewExtensionRegistry(),
   );
 
   return { blockManager, composition, core, cursor };
@@ -90,8 +89,9 @@ describe('SearCoreDoc', () => {
     const change = jest.fn();
     let executing = false;
     core.enforceCommandBoundary(() => executing);
-    expect(() => core.executePipeline(new Pipeline('outside').addLocalAction('change', change)))
-      .toThrow('editor.commands.run');
+    expect(() => core.executePipeline(new Pipeline('outside').addLocalAction('change', change))).toThrow(
+      'editor.commands.run',
+    );
     expect(change).not.toHaveBeenCalled();
     executing = true;
     core.executePipeline(new Pipeline('inside').addLocalAction('change', change));
@@ -99,7 +99,7 @@ describe('SearCoreDoc', () => {
   });
 
   it('keeps committed third-party plugin state and registration behind the command boundary', () => {
-    class MutableDocPlugin extends Plugin<SearCoreDoc, NodeProperties, { value: number }> {
+    class MutableDocPlugin extends Plugin<{ value: number }> {
       constructor() {
         super({ key: new PluginKey('mutable-doc-plugin'), state: { value: 1 } });
       }
@@ -110,14 +110,6 @@ describe('SearCoreDoc', () => {
 
       registerState() {
         return { key: this.key, state: this.getState() };
-      }
-
-      getPluginConfig(): null {
-        return null;
-      }
-
-      render(): null {
-        return null;
       }
     }
 
@@ -130,20 +122,20 @@ describe('SearCoreDoc', () => {
     core.initialize();
 
     expect(() => Object.assign(core, { pluginManager: new PluginManager() })).toThrow();
-    expect(() => { retained.value = 9; }).toThrow();
+    expect(() => {
+      retained.value = 9;
+    }).toThrow();
     expect(() => plugin.setState({ value: 9 })).toThrow('command transaction');
     expect(() => core.pluginManager.registerPlugin(new TestDocPlugin())).toThrow('owning runtime');
     expect(() => core.registerPlugin(new TestDocPlugin())).toThrow('editor.commands.run');
     expect(() => core.unregisterPlugin(plugin.key)).toThrow('editor.commands.run');
 
     executing = true;
-    core.executePipeline(Pipeline.fromTransaction('doc.mutable-plugin', {
-      pluginKey: plugin.key,
-      operations: [],
-      meta: {},
-    } as never));
+    core.executePipeline(Pipeline.fromTransaction('doc.mutable-plugin', createTransaction(plugin.key)));
     expect(core.getPlugin<{ value: number }>(plugin.key)).toEqual({ value: 2 });
-    expect(() => { plugin.getState().value = 9; }).toThrow();
+    expect(() => {
+      plugin.getState().value = 9;
+    }).toThrow();
     core.registerPlugin(new TestDocPlugin());
   });
 
@@ -163,15 +155,21 @@ describe('SearCoreDoc', () => {
     const change = jest.fn();
     core.enforceCommandBoundary(() => false);
 
-    const addedOnStart = new Pipeline('doc-hook-added-step').addRender('refresh', new PluginKey('refresh'));
-    addedOnStart.use({ onStart: (pipeline) => { pipeline.addLocalAction('change', change); } });
+    const addedOnStart = new Pipeline('doc-hook-added-step').invalidate('refresh', new PluginKey('refresh'));
+    addedOnStart.use({
+      onStart: (pipeline) => {
+        pipeline.addLocalAction('change', change);
+      },
+    });
     expect(() => core.executePipeline(addedOnStart)).toThrow('editor.commands.run');
 
-    const changedOnStepStart = new Pipeline('doc-hook-mutated-step').addRender('refresh', new PluginKey('refresh'));
-    changedOnStepStart.use({ onStepStart: (step) => {
-      step.kind = PipelineStepKind.LocalAction;
-      step.localAction = change;
-    } });
+    const changedOnStepStart = new Pipeline('doc-hook-mutated-step').invalidate('refresh', new PluginKey('refresh'));
+    changedOnStepStart.use({
+      onStepStart: (step) => {
+        step.kind = PipelineStepKind.LocalAction;
+        step.localAction = change;
+      },
+    });
     expect(() => core.executePipeline(changedOnStepStart)).toThrow('editor.commands.run');
     expect(change).not.toHaveBeenCalled();
   });
@@ -179,11 +177,13 @@ describe('SearCoreDoc', () => {
   it('runs post-commit actions after successful staging only', () => {
     const { core } = createCore();
     const published = jest.fn();
-    expect(() => core.executePipeline(
-      new Pipeline('failed-post-commit')
-        .addPostCommit('publish', published)
-        .addLocalAction('fail', () => { throw new Error('staging failed'); }),
-    )).toThrow('staging failed');
+    expect(() =>
+      core.executePipeline(
+        new Pipeline('failed-post-commit').addPostCommit('publish', published).addLocalAction('fail', () => {
+          throw new Error('staging failed');
+        }),
+      ),
+    ).toThrow('staging failed');
     expect(published).not.toHaveBeenCalled();
 
     core.executePipeline(new Pipeline('successful-post-commit').addPostCommit('publish', published));
@@ -362,12 +362,12 @@ describe('SearCoreDoc', () => {
 
     core.bindDocRenderRequestHandler(renderFrame);
     core.executePipeline(
-      new Pipeline('doc.test').addLocalAction('doc.test', commit).addRender('doc.test:render', pluginKey),
+      new Pipeline('doc.test').addLocalAction('doc.test', commit).invalidate('doc.test:render', pluginKey),
     );
 
     expect(commit).toHaveBeenCalledTimes(1);
-    expect(renderFrame).toHaveBeenCalledWith([{ renderPluginKey: pluginKey, renderOperations: [] }]);
-    expect(core.getDocRenderRequests()).toEqual([{ renderPluginKey: pluginKey, renderOperations: [] }]);
+    expect(renderFrame).toHaveBeenCalledWith([{ projectionKey: pluginKey, renderOperations: [] }]);
+    expect(core.getDocRenderRequests()).toEqual([{ projectionKey: pluginKey, renderOperations: [] }]);
   });
 
   it('batches document render steps into one frame after dirty regions are marked', () => {
@@ -379,22 +379,25 @@ describe('SearCoreDoc', () => {
     core.bindDocRenderRequestHandler(renderFrame);
     core.executePipeline(
       new Pipeline('doc.test.batch')
-        .addRender('doc.first:render', firstPluginKey)
-        .addRender('doc.second:render', secondPluginKey),
+        .invalidate('doc.first:render', firstPluginKey)
+        .invalidate('doc.second:render', secondPluginKey),
     );
 
     expect(renderFrame).toHaveBeenCalledTimes(1);
     expect(renderFrame).toHaveBeenCalledWith([
-      { renderPluginKey: firstPluginKey, renderOperations: [] },
-      { renderPluginKey: secondPluginKey, renderOperations: [] },
+      { projectionKey: firstPluginKey, renderOperations: [] },
+      { projectionKey: secondPluginKey, renderOperations: [] },
     ]);
   });
 
-  it('adds plugin render nodes directly to the configured render stage', () => {
+  it('adds independently registered view nodes to the configured render stage', () => {
     const { core } = createCore();
     const stage = { addPluginNode: jest.fn() };
-    const renderPlugin = new (class extends TestDocPlugin {
-      public override render = jest.fn<Node<NodeProperties>[], [SearCoreDoc, { x: number; y: number }?]>(() => []);
+    const renderPlugin = new (class extends ViewExtensionBase<SearCoreDoc, NodeProperties> {
+      public constructor() {
+        super(new PluginKey('test-doc-view'));
+      }
+      public render = jest.fn<Node<NodeProperties>[], [SearCoreDoc, { x: number; y: number }?]>(() => []);
     })();
     const docCore = new SearCoreDoc(
       { add: jest.fn(), calculateLayoutPerParagraph: jest.fn(), clear: jest.fn(), maxWidth: 0 } as never,
@@ -404,12 +407,13 @@ describe('SearCoreDoc', () => {
       } as never,
       { measure: jest.fn(() => ({ active: false, text: '', textWidth: 0, caretPixelOffset: 0 })) } as never,
       new DocLayoutEngine(new RichTextBlockFlowRegistry()),
-      new PluginManager<SearCoreDoc, NodeProperties>(),
-      undefined,
+      new PluginManager(),
+      new PipelineStepExecutorRegistry(),
       { renderStage: stage as never },
+      new ViewExtensionRegistry(),
     );
 
-    docCore.registerPlugin(renderPlugin);
+    docCore.getViewExtensions().register(renderPlugin);
     docCore.initialize();
 
     expect(renderPlugin.render).toHaveBeenCalledWith(docCore);

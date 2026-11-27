@@ -1,17 +1,33 @@
-import { FileDownload, UnavailableFileDownload } from '@searsuite/sear-foundation-platform';
-import 'reflect-metadata';
+import { SheetKernel } from '@searsuite/sear-assembly-sheet-kernel';
+import { SheetView, type SheetViewSetupContext, type SheetViewRuntimeContext } from '../src/sheet/SheetViewContracts';
+import { SheetSelectionView, SheetCellEditorView } from '@searsuite/sear-render';
+import { SheetViewCapability } from '@searsuite/sear-assembly-setup';
+
 import { UserInteractionService } from '@searsuite/sear-foundation-user-interaction';
-import { PipelineStepKind, runInsideCommandExecution, SearCoreSheet, SheetInteractionStore, SheetLifecycleCoordinator, SheetMatrix } from '@searsuite/sear-assembly-core';
+import { SearCoreSheet, SheetLifecycleCoordinator } from '@searsuite/sear-assembly-core';
+import { SheetMatrix } from '@searsuite/sear-domain-sheet';
+import { PipelineStepKind, runInsideCommandExecution, SheetInteractionStore } from '@searsuite/sear-assembly-plugin';
 import { AlignmentMatrix, SheetHorizontalAlignment, VerticalAlignmentMatrix } from '@searsuite/sear-plugin-alignment';
 import { CellFillMatrix } from '@searsuite/sear-plugin-cell-fill';
 import {
-  AddCellHighlightRuleCommand, CellHighlightKind, CellHighlightMatrix, CellHighlightStyle,
-  CellHighlightValueOperator, ClearCellHighlightRulesCommand, ReadCellHighlightRulesQuery,
+  AddCellHighlightRuleCommand,
+  CellHighlightKind,
+  CellHighlightMatrix,
+  CellHighlightStyle,
+  CellHighlightValueOperator,
+  ClearCellHighlightRulesCommand,
+  ReadCellHighlightRulesQuery,
   UpdateCellHighlightRuleCommand,
 } from '@searsuite/sear-plugin-cell-highlight';
 import {
-  DataValidationEvaluatorRegistry, DataValidationEvaluatorRegistryCapability, DataValidationInputPolicy, DataValidationKind,
-  DataValidationWarningObservation, ReadDataValidationIssueQuery, ReadDataValidationRulesQuery, SetDataValidationRuleCommand,
+  DataValidationEvaluatorRegistry,
+  DataValidationEvaluatorRegistryCapability,
+  DataValidationInputPolicy,
+  DataValidationKind,
+  DataValidationWarningObservation,
+  ReadDataValidationIssueQuery,
+  ReadDataValidationRulesQuery,
+  SetDataValidationRuleCommand,
   SheetDataValidationPlugin,
 } from '@searsuite/sear-plugin-data-validation';
 import { PickDropdownOptionCommand, ReadDropdownCellQuery } from '@searsuite/sear-plugin-dropdown';
@@ -22,7 +38,7 @@ import {
   SheetBorderPreset,
   SheetBorderLineStyle,
 } from '@searsuite/sear-plugin-cell-border';
-import { SheetHeaderHighlightPlugin } from '@searsuite/sear-plugin-header-highlight';
+import { SheetHeaderHighlightView } from '@searsuite/sear-render';
 import { DuplicateMatrix } from '@searsuite/sear-plugin-duplicate';
 import { CellFormatMatrix } from '@searsuite/sear-plugin-cell-format';
 import { CellMergeMatrix, ToggleMergeCellsCommand } from '@searsuite/sear-plugin-cell-merge';
@@ -52,28 +68,43 @@ import {
   MoveColumnsCommand,
   type SheetCommandBus,
 } from '@searsuite/sear-assembly-commands';
-import { CellType, SheetCellInputValidationRegistry, SheetDisplayedValueChanges } from '@searsuite/sear-domain-cell-types';
+import {
+  CellType,
+  SheetCellInputValidationRegistry,
+  SheetDisplayedValueChanges,
+} from '@searsuite/sear-domain-cell-types';
 import { CellCommitStrategyRegistry } from '@searsuite/sear-domain-cell-types';
-import { CellDisplayTextRegistry, CellTypeCatalog, type CellRenderDefinition } from '@searsuite/sear-domain-cell';
+import { CellDisplayTextRegistry, CellTypeCatalog, CellTypeDefinition } from '@searsuite/sear-domain-cell';
 import { SheetCellVisualReaderRegistry, SheetRenderCoordinatorManager } from '@searsuite/sear-render-registry';
 import {
-  FindSheetMatchesQuery, FindSheetMatchPageQuery, ReadSheetFindRevisionQuery,
-  ReplaceAllSheetMatchesCommand, SheetFindReplacePlugin,
+  FindSheetMatchesQuery,
+  FindSheetMatchPageQuery,
+  ReadSheetFindRevisionQuery,
+  ReplaceAllSheetMatchesCommand,
+  SheetFindReplacePlugin,
 } from '@searsuite/sear-plugin-find-replace';
 import { SheetFilterPlugin } from '@searsuite/sear-plugin-filter';
-import { DataEngine } from '@searsuite/sear-render-engine';
-import { ReadSheetCellDataQuery } from '@searsuite/sear-render-engine';
+import { DataEngine } from '@searsuite/sear-domain-state';
+import { ReadSheetCellDataQuery } from '@searsuite/sear-domain-sheet';
 import { SheetClipboard, type SheetClipboardPayload } from '@searsuite/sear-plugin-clipboard';
 import {
-  FormatPainterMode, FormatPainterObservation, SheetFormatPainterPlugin, StartFormatPainterCommand,
+  FormatPainterMode,
+  FormatPainterObservation,
+  SheetFormatPainterPlugin,
+  StartFormatPainterCommand,
 } from '@searsuite/sear-plugin-format-painter';
 import { cellKey } from '@searsuite/sear-domain-formula-engine-ts';
 import {
-  FormulaAddInServiceDefinition, FormulaCalculationTraceEventType, IAggregationCache,
-  IDependencyGraph, IFormulaExternalServiceProvider, IFormulaTextServiceProvider, IFunctionRegistry,
+  FormulaAddInServiceDefinition,
+  FormulaCalculationTraceEventType,
+  IAggregationCache,
+  IDependencyGraph,
+  IFormulaExternalServiceProvider,
+  IFormulaTextServiceProvider,
+  IFunctionRegistry,
 } from '@searsuite/sear-domain-formula-engine';
 import { SetRangeAlignmentCommand } from '@searsuite/sear-plugin-alignment';
-import { Injectable, Inject, Container } from '@searsuite/sear-foundation-di';
+import { Injectable, Container } from '@searsuite/sear-foundation-di';
 import { DataStorage } from '@searsuite/sear-foundation-storage';
 import { Platform, type PlatformFrameRequestCallback } from '@searsuite/sear-foundation-platform';
 import { NodePlatform as HeadlessPlatform } from '@searsuite/sear-node-adapters';
@@ -81,12 +112,31 @@ import { ColumnShapeDimensionsCSRMatrix, CSRMatrix, RowShapeDimensionsCSRMatrix 
 import { Rect } from '@searsuite/sear-foundation-rect';
 import { defineStateObservation, type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 import {
-  ApplyRemoteOperationsCommand, CollaborationChannel, CollaborationChannelBinding, CollaborationConnectionState,
-  ConnectSheetCollaborationCommand, DisconnectSheetCollaborationCommand, HeadlessCollabTransport,
+  ApplyRemoteOperationsCommand,
+  CollaborationChannel,
+  CollaborationChannelBinding,
+  CollaborationConnectionState,
+  ConnectSheetCollaborationCommand,
+  DisconnectSheetCollaborationCommand,
+  HeadlessCollabTransport,
 } from '@searsuite/sear-plugin-collab';
-import { CursorEngine, CursorRegistry, CursorRuleKind, CursorToken, HeadlessCursorEngine } from '@searsuite/sear-render-cursor';
+import {
+  CursorEngine,
+  CursorRegistry,
+  CursorRuleKind,
+  CursorToken,
+  HeadlessCursorEngine,
+} from '@searsuite/sear-render-cursor';
 import { EventEngine, HeadlessEventRegistrar } from '@searsuite/sear-render-event-engine';
-import { HeadlessKeyboardRouter, HeadlessPointerCapture, PointerCapture, type PointerCaptureHandlers, type KeyboardRouterHandlers, KeyboardRouter, HeadlessTextInput } from '@searsuite/sear-render-input';
+import {
+  HeadlessKeyboardRouter,
+  HeadlessPointerCapture,
+  PointerCapture,
+  type PointerCaptureHandlers,
+  type KeyboardRouterHandlers,
+  KeyboardRouter,
+  HeadlessTextInput,
+} from '@searsuite/sear-render-input';
 import { WebTextInput, WebKeyboardRouter } from '@searsuite/sear-browser-adapters';
 import { CellRegion, type CellProperties } from '@searsuite/sear-render-registry';
 import {
@@ -98,26 +148,32 @@ import { HeadlessScroller } from '@searsuite/sear-render-scroll';
 import { OverlayRenderStrategy, RenderStrategyManager, type RenderStrategy } from '@searsuite/sear-render-strategy';
 import { HeadlessToolbar, SearToolbar } from '@searsuite/sear-assembly-plugin';
 import {
-  CellFormulaValueConverterRegistry, FormulaCalculationTraceBus, FormulaRenderInvalidator,
-  FormulaResultProviderRegistry, FormulaResultStore, FormulaRichResultProviderRegistry,
-  FormulaSourceProviderRegistry, RecalcScheduler, SheetFormulaPlugin,
+  CellFormulaValueConverterRegistry,
+  FormulaCalculationTraceBus,
+  FormulaValuePublisher,
+  FormulaResultProviderRegistry,
+  FormulaResultStore,
+  FormulaRichResultProviderRegistry,
+  FormulaSourceProviderRegistry,
+  RecalcScheduler,
+  SheetFormulaPlugin,
 } from '@searsuite/sear-plugin-formula';
 import { RedoSheetCommand, SheetHistoryStatusObservation, UndoSheetCommand } from '@searsuite/sear-plugin-history';
-import { SetSheetZoomCommand, SheetZoomPlugin, SheetZoomSessionStateDefinition } from '@searsuite/sear-plugin-zoom';
+import { SetSheetZoomCommand } from '@searsuite/sear-render';
+import { SheetZoomView, SheetZoomSessionStateDefinition } from '@searsuite/sear-render';
 import {
   EnsureSelectionVisibleCommand,
   GetActiveCell,
-  HandleSheetRangeDragCommand,
   MoveSheetRangeCommand,
   GetSheetRangeMoveConflict,
   AnalyzeSheetRangeMove,
   SelectRangeCommand,
   SheetSelectionPlugin,
-  SheetRangeDrag,
-  SheetRangeDragAction,
-  SheetHighlightRegistry,
   SheetSelectionSessionStateDefinition,
 } from '@searsuite/sear-plugin-selection';
+import { SheetHighlightRegistry } from '@searsuite/sear-render';
+import { HandleSheetRangeDragCommand, SheetRangeDragAction } from '@searsuite/sear-render';
+import { SheetRangeDrag } from '@searsuite/sear-render';
 import {
   BeginCellEditCommand,
   CancelCellEditCommand,
@@ -128,27 +184,29 @@ import {
   SheetFormulaBarObservation,
   StartFormulaBarEditCommand,
   SetFormulaBarDraftCommand,
-  RequestCellEditorRenderCommand,
   SheetCellEditorPlugin,
   UpdateCellEditorDocumentSelectionCommand,
 } from '@searsuite/sear-plugin-cell-editor';
-import { BeginSheetResizeDragCommand, ResizeSheetRowsCommand } from '@searsuite/sear-plugin-resize';
-import { SheetPlugin, SheetRuntimeCapability, type SheetPluginRuntimeContext, type SheetPluginSetupContext } from '../src/sheet/SheetPluginContracts';
-import { defineSheetRuntimeCapability } from '../src/sheet/SheetRuntimeExtensionRegistry';
-import { createSheetEditor, type SheetDocumentState } from '../src/sheet/createSheetEditor';
+import { RequestCellEditorRenderCommand } from '@searsuite/sear-render';
+import { ResizeSheetRowsCommand } from '@searsuite/sear-plugin-resize';
+import { BeginSheetResizeDragCommand } from '@searsuite/sear-render';
+import { SheetPlugin, type SheetPluginSetupContext } from '@searsuite/sear-assembly-commands';
+import { defineSheetRuntimeCapability } from '@searsuite/sear-assembly-commands';
+import { createSheetEditor } from '../src/sheet/createSheetEditor';
+import { type SheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
 import {
   ApplyViewportScrollCommand,
   ScrollViewportToCommand,
   SheetViewportSessionStateDefinition,
 } from '../src/sheet/SheetViewportCommands';
-import { ExportSheetStateCommand } from '../src/sheet/SheetStateSnapshotCommands';
-import { UpdateSheetDefaultConfigCommand } from '../src/sheet/SheetConfigCommands';
-import { UnregisterSheetInputValidatorCommand } from '../src/sheet/SheetInputValidationCommands';
-import { CaptureSheetSessionStateCommand } from '../src/sheet/SheetSessionStateCommands';
+import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
+import { UpdateSheetDefaultConfigCommand } from '@searsuite/sear-assembly-sheet-kernel';
+import { UnregisterSheetInputValidatorCommand } from '@searsuite/sear-assembly-sheet-kernel';
+import { CaptureSheetSessionStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
 import { FakeSheetEmbeddedEditor, SheetEmbeddedEditor } from '@searsuite/sear-sheet-editor-contract';
 import { RenderContextTextShaper, TextShaper } from '@searsuite/sear-render-metrics';
 
-const strategyPluginKey = new PluginKey('StrategyPlugin');
+const strategyPluginKey = new PluginKey('StrategyView');
 const testStrategyToken = Symbol('TestStrategy');
 const testStrategyTokenAfter = Symbol('TestStrategyAfter');
 const thirdPartyStatusObservation = defineStateObservation<number>('third-party.status');
@@ -160,54 +218,26 @@ const testStrategy = {
 } as unknown as RenderStrategy<CellProperties>;
 
 @Injectable()
-class StrategyPlugin extends SheetPlugin<null> {
-  public static readonly symbol = Symbol.for('StrategyPlugin');
+class StrategyView extends SheetView {
+  public static readonly symbol = Symbol.for('StrategyView');
 
   public constructor() {
-    super({ key: strategyPluginKey, state: null });
+    super(strategyPluginKey);
   }
 
-  public registerState() {
-    return { key: this.key, state: null };
-  }
-
-  public getPluginConfig(): null {
-    return null;
-  }
-
-  public apply(): null {
-    return null;
-  }
-
-  public render(): null {
-    return null;
-  }
-
-  public configure(context: SheetPluginSetupContext): void {
+  public configure(context: SheetViewSetupContext): void {
     context.addStrategy(testStrategyToken, testStrategy, { before: OverlayRenderStrategy.symbol });
   }
 }
 
 @Injectable()
-class StrategyPluginAfter extends SheetPlugin<null> {
-  public static readonly symbol = Symbol.for('StrategyPluginAfter');
+class StrategyViewAfter extends SheetView {
+  public static readonly symbol = Symbol.for('StrategyViewAfter');
   public constructor() {
-    super({ key: new PluginKey('StrategyPluginAfter'), state: null });
-  }
-  public registerState() {
-    return { key: this.key, state: null };
-  }
-  public getPluginConfig(): null {
-    return null;
-  }
-  public apply(): null {
-    return null;
-  }
-  public render(): null {
-    return null;
+    super(new PluginKey('StrategyViewAfter'));
   }
 
-  public configure(context: SheetPluginSetupContext): void {
+  public configure(context: SheetViewSetupContext): void {
     context.addStrategy(testStrategyTokenAfter, testStrategy, { after: OverlayRenderStrategy.symbol });
   }
 }
@@ -246,15 +276,7 @@ class ThirdPartyObservationPlugin extends SheetPlugin<null> {
     return { key: this.key, state: null };
   }
 
-  public getPluginConfig(): null {
-    return null;
-  }
-
   public apply(): null {
-    return null;
-  }
-
-  public render(): null {
     return null;
   }
 }
@@ -291,15 +313,7 @@ class ThirdPartySessionPlugin extends SheetPlugin<null> {
     return { key: this.key, state: null };
   }
 
-  public getPluginConfig(): null {
-    return null;
-  }
-
   public apply(): null {
-    return null;
-  }
-
-  public render(): null {
     return null;
   }
 }
@@ -396,8 +410,12 @@ describe('createSheetEditor', () => {
     @Injectable()
     class TestClipboard extends SheetClipboard {
       public payload: SheetClipboardPayload | null = null;
-      public async read(): Promise<SheetClipboardPayload | null> { return this.payload; }
-      public async write(payload: SheetClipboardPayload): Promise<void> { this.payload = payload; }
+      public async read(): Promise<SheetClipboardPayload | null> {
+        return this.payload;
+      }
+      public async write(payload: SheetClipboardPayload): Promise<void> {
+        this.payload = payload;
+      }
     }
 
     const state = createSheetState({ size: 6 });
@@ -474,74 +492,103 @@ describe('createSheetEditor', () => {
     @Injectable()
     class ForgedFormulaBoundaryPlugin extends SheetPlugin<null> {
       public static readonly symbol = Symbol.for('ForgedFormulaBoundaryPlugin');
-      public constructor() { super({ key: new PluginKey('ForgedFormulaBoundaryPlugin'), state: null }); }
+      public constructor() {
+        super({ key: new PluginKey('ForgedFormulaBoundaryPlugin'), state: null });
+      }
       public configure(context: SheetPluginSetupContext): void {
         for (const token of [
-          IDependencyGraph.symbol, IAggregationCache.symbol, FormulaResultStore.symbol,
-          FormulaCalculationTraceBus.symbol, IFunctionRegistry.symbol,
-          IFormulaExternalServiceProvider.symbol, IFormulaTextServiceProvider.symbol,
-          FormulaResultProviderRegistry.symbol, FormulaRichResultProviderRegistry.symbol,
+          IDependencyGraph.symbol,
+          IAggregationCache.symbol,
+          FormulaResultStore.symbol,
+          FormulaCalculationTraceBus.symbol,
+          IFunctionRegistry.symbol,
+          IFormulaExternalServiceProvider.symbol,
+          IFormulaTextServiceProvider.symbol,
+          FormulaResultProviderRegistry.symbol,
+          FormulaRichResultProviderRegistry.symbol,
           FormulaSourceProviderRegistry.symbol,
         ]) {
           Object.assign(context.container.resolve<object>(token), { enforceCommandBoundary: () => void 0 });
         }
       }
-      public registerState() { return { key: this.key, state: null }; }
-      public getPluginConfig(): null { return null; }
-      public apply(): null { return null; }
-      public render(): null { return null; }
+      public registerState() {
+        return { key: this.key, state: null };
+      }
+      public apply(): null {
+        return null;
+      }
     }
     const editor = createSheetEditor({
       sheetState: createSheetState(),
       adapters: {
         ...createHeadlessAdapters(),
-        registerEnvironment: (value) => { container = value; },
+        registerEnvironment: (value) => {
+          container = value;
+        },
       },
       plugins: [ForgedFormulaBoundaryPlugin],
     });
     try {
       const services = container!;
       const formula = services.resolve<SheetFormulaPlugin>(SheetFormulaPlugin.symbol);
-      expect(() => { (formula as unknown as { graph: unknown }).graph = {}; }).toThrow();
-      expect(() => { (formula as unknown as { resultStore: unknown }).resultStore = {}; }).toThrow();
-      expect(() => services.resolve<IDependencyGraph>(IDependencyGraph.symbol).updateCell(cellKey(0, 0), []))
-        .toThrow('editor.commands.run');
-      expect(() => services.resolve<IAggregationCache>(IAggregationCache.symbol).setSum(0, 0, 0, 0, 1))
-        .toThrow('editor.commands.run');
-      expect(() => services.resolve<FormulaResultStore>(FormulaResultStore.symbol).set(cellKey(0, 0), 1))
-        .toThrow('editor.commands.run');
-      expect(() => services.resolve<IFunctionRegistry>(IFunctionRegistry.symbol).register({
-        name: 'FORGED', evaluate: () => 1,
-      })).toThrow('editor.commands.run');
-      expect(() => services.resolve<FormulaResultProviderRegistry>(FormulaResultProviderRegistry.symbol).register({
-        provider: { getFormulaResult: () => 1 },
-      })).toThrow('editor.commands.run');
-      expect(() => services.resolve<FormulaRichResultProviderRegistry>(FormulaRichResultProviderRegistry.symbol).register({
-        provider: { getFormulaRichResult: () => undefined },
-      })).toThrow('editor.commands.run');
-      expect(() => services.resolve<FormulaSourceProviderRegistry>(FormulaSourceProviderRegistry.symbol).register({
-        provider: { getFormulaSource: () => '=1' },
-      })).toThrow('editor.commands.run');
+      expect(() => {
+        (formula as unknown as { graph: unknown }).graph = {};
+      }).toThrow();
+      expect(() => {
+        (formula as unknown as { resultStore: unknown }).resultStore = {};
+      }).toThrow();
+      expect(() => services.resolve<IDependencyGraph>(IDependencyGraph.symbol).updateCell(cellKey(0, 0), [])).toThrow(
+        'editor.commands.run',
+      );
+      expect(() => services.resolve<IAggregationCache>(IAggregationCache.symbol).setSum(0, 0, 0, 0, 1)).toThrow(
+        'editor.commands.run',
+      );
+      expect(() => services.resolve<FormulaResultStore>(FormulaResultStore.symbol).set(cellKey(0, 0), 1)).toThrow(
+        'editor.commands.run',
+      );
+      expect(() =>
+        services.resolve<IFunctionRegistry>(IFunctionRegistry.symbol).register({
+          name: 'FORGED',
+          evaluate: () => 1,
+        }),
+      ).toThrow('editor.commands.run');
+      expect(() =>
+        services.resolve<FormulaResultProviderRegistry>(FormulaResultProviderRegistry.symbol).register({
+          provider: { getFormulaResult: () => 1 },
+        }),
+      ).toThrow('editor.commands.run');
+      expect(() =>
+        services.resolve<FormulaRichResultProviderRegistry>(FormulaRichResultProviderRegistry.symbol).register({
+          provider: { getFormulaRichResult: () => undefined },
+        }),
+      ).toThrow('editor.commands.run');
+      expect(() =>
+        services.resolve<FormulaSourceProviderRegistry>(FormulaSourceProviderRegistry.symbol).register({
+          provider: { getFormulaSource: () => '=1' },
+        }),
+      ).toThrow('editor.commands.run');
     } finally {
       editor.destroy();
     }
   });
 
   it('installs command boundaries despite forged setup methods on retained services', () => {
-    let runtime: SheetPluginSetupContext['runtime'] | null = null;
+    let runtime: SheetViewSetupContext['runtime'] | null = null;
     let evaluators: DataValidationEvaluatorRegistry | null = null;
     let dataEngine: DataEngine | null = null;
-    let pluginManager: PluginManager<SearCoreSheet, CellProperties> | null = null;
+    let pluginManager: PluginManager | null = null;
     let channel: CollaborationChannel | null = null;
     let formulaServices: IFormulaExternalServiceProvider | null = null;
     @Injectable()
-    class ForgedBoundaryPlugin extends SheetPlugin<null> {
-      public static readonly symbol = Symbol.for('ForgedBoundaryPlugin');
-      public constructor() { super({ key: new PluginKey('ForgedBoundaryPlugin'), state: null }); }
-      public configure(context: SheetPluginSetupContext): void {
+    class ForgedBoundaryView extends SheetView {
+      public static readonly symbol = Symbol.for('ForgedBoundaryView');
+      public constructor() {
+        super(new PluginKey('ForgedBoundaryView'));
+      }
+      public configure(context: SheetViewSetupContext): void {
         runtime = context.runtime;
         dataEngine = context.container.resolve<DataEngine>(DataEngine.symbol);
-        pluginManager = context.container.resolve<PluginManager<SearCoreSheet, CellProperties>>(PluginManager.symbol);
+        pluginManager = context.container.resolve<PluginManager>(PluginManager.symbol);
         Object.assign(dataEngine, { enforceWriteBoundary: () => void 0 });
         Object.assign(pluginManager, { enforceWriteBoundary: () => void 0 });
         Object.assign(context.runtime.config, { enforceCommandBoundary: () => void 0 });
@@ -550,60 +597,65 @@ describe('createSheetEditor', () => {
         Object.assign(context.runtime.events.engine, { enforceWriteBoundary: () => void 0 });
         Object.assign(context.runtime.events.engine.eventRegistrar, { enforceCommandBoundary: () => void 0 });
         channel = context.container.resolve<CollaborationChannelBinding>(CollaborationChannelBinding.symbol).channel;
-        formulaServices = context.container.resolve<IFormulaExternalServiceProvider>(IFormulaExternalServiceProvider.symbol);
+        formulaServices = context.container.resolve<IFormulaExternalServiceProvider>(
+          IFormulaExternalServiceProvider.symbol,
+        );
         Object.assign(channel, { enforceCommandBoundary: () => void 0 });
         Object.assign(formulaServices, { enforceTeardownBoundary: () => void 0 });
         Object.assign(context.runtime.queries, { enforceWriteBoundary: () => void 0 });
         Object.assign(context.runtime.observations, { enforceWriteBoundary: () => void 0 });
         Object.assign(context.runtime.extensions, { enforceWriteBoundary: () => void 0 });
         Object.assign(context.runtime.render.strategies, { enforceCommandBoundary: () => void 0 });
-        Object.assign(context.container.resolve<SheetCellInputValidationRegistry>(SheetCellInputValidationRegistry.symbol),
-          { enforceCommandBoundary: () => void 0 });
+        Object.assign(
+          context.container.resolve<SheetCellInputValidationRegistry>(SheetCellInputValidationRegistry.symbol),
+          { enforceCommandBoundary: () => void 0 },
+        );
         const validation = context.container.resolve<SheetDataValidationPlugin>(SheetDataValidationPlugin.symbol);
         evaluators = (validation as unknown as { dependencies: { evaluators: DataValidationEvaluatorRegistry } })
           .dependencies.evaluators;
         Object.assign(validation, { sealRuntimeWrites: () => void 0 });
         Object.assign(evaluators, { enforceCommandBoundary: () => void 0 });
       }
-      public registerState() { return { key: this.key, state: null }; }
-      public getPluginConfig(): null { return null; }
-      public apply(): null { return null; }
-      public render(): null { return null; }
     }
     const editor = createSheetEditor({
       sheetState: createSheetState(),
       adapters: createHeadlessAdapters(),
-      plugins: [ForgedBoundaryPlugin],
+      viewExtensions: [ForgedBoundaryView],
       onCreated: ({ commands }) => {
         Object.assign(commands, { enforceRegistrationBoundary: () => void 0 });
       },
     });
     try {
       const services = runtime!;
-      expect(() => services.config.updateDefaultConfigOverrides({ cellPadding: 40 }))
-        .toThrow('editor.commands.run');
-      expect(() => dataEngine!.replaceDataType(new PluginKey('forged'), {}))
-        .toThrow('command transaction');
-      expect(() => pluginManager!.unregisterPlugin('missing'))
-        .toThrow('owning runtime');
+      expect(() => services.config.updateDefaultConfigOverrides({ cellPadding: 40 })).toThrow('editor.commands.run');
+      expect(() => dataEngine!.replaceDataType(new PluginKey('forged'), {})).toThrow('command transaction');
+      expect(() => pluginManager!.unregisterPlugin('missing')).toThrow('owning runtime');
       expect(() => services.scroll.manager.resize(400, 300)).toThrow('editor.commands.run');
       expect(() => services.scroll.manager.destroy()).toThrow('editor owner');
       expect(() => services.events.engine.on('mouseDown', () => void 0)).toThrow('editor.commands.run');
       expect(() => services.events.engine.eventRegistrar.register('forged')).toThrow('editor.commands.run');
       expect(() => channel!.disconnect()).toThrow('editor.commands.run');
       expect(() => formulaServices!.destroy()).toThrow('editor owner');
-      expect(() => services.queries.register(defineSheetQuery<void, number>('test.forgedQuery'), () => 1))
-        .toThrow('editor.commands.run');
-      expect(() => services.observations.register(defineStateObservation<number>('test.forgedObservation'), {
-        getSnapshot: () => 1, subscribe: () => () => void 0,
-      })).toThrow('editor.commands.run');
-      expect(() => services.extensions.register(defineSheetRuntimeCapability<number>('test.forgedCapability'), 1))
-        .toThrow('editor.commands.run');
+      expect(() => services.queries.register(defineSheetQuery<void, number>('test.forgedQuery'), () => 1)).toThrow(
+        'editor.commands.run',
+      );
+      expect(() =>
+        services.observations.register(defineStateObservation<number>('test.forgedObservation'), {
+          getSnapshot: () => 1,
+          subscribe: () => () => void 0,
+        }),
+      ).toThrow('editor.commands.run');
+      expect(() =>
+        services.extensions.register(defineSheetRuntimeCapability<number>('test.forgedCapability'), 1),
+      ).toThrow('editor.commands.run');
       expect(() => services.render.strategies.addStrategy('forged', {} as never)).toThrow('editor.commands.run');
       expect(() => evaluators!.register(DataValidationKind.Formula, () => true)).toThrow('editor.commands.run');
-      expect(() => editor.commands.register(defineSheetCommand<void>('test.forgedRegistration'),
-        () => new LocalActionCommand('test.forgedRegistration', () => void 0)))
-        .toThrow('editor.commands.run');
+      expect(() =>
+        editor.commands.register(
+          defineSheetCommand<void>('test.forgedRegistration'),
+          () => new LocalActionCommand('test.forgedRegistration', () => void 0),
+        ),
+      ).toThrow('editor.commands.run');
     } finally {
       editor.destroy();
     }
@@ -618,16 +670,26 @@ describe('createSheetEditor', () => {
       sheetState: createSheetState(),
       adapters: {
         ...createHeadlessAdapters(),
-        registerEnvironment: (value) => { container = value; },
+        registerEnvironment: (value) => {
+          container = value;
+        },
       },
       onCreated: ({ commands }) => {
-        commands.register(RegisterEventCommand, () => new LocalActionCommand(RegisterEventCommand.id, () => {
-          const events = container!.resolve<EventEngine<CellProperties>>(EventEngine.symbol);
-          unregister = events.registerEvent('mouseDown', () => void 0);
-        }));
-        commands.register(UnregisterEventCommand, () => new LocalActionCommand(UnregisterEventCommand.id, () => {
-          unregister?.();
-        }));
+        commands.register(
+          RegisterEventCommand,
+          () =>
+            new LocalActionCommand(RegisterEventCommand.id, () => {
+              const events = container!.resolve<EventEngine<CellProperties>>(EventEngine.symbol);
+              unregister = events.registerEvent('mouseDown', () => void 0);
+            }),
+        );
+        commands.register(
+          UnregisterEventCommand,
+          () =>
+            new LocalActionCommand(UnregisterEventCommand.id, () => {
+              unregister?.();
+            }),
+        );
       },
     });
     try {
@@ -652,7 +714,9 @@ describe('createSheetEditor', () => {
       sheetState: createSheetState(),
       adapters: {
         ...createHeadlessAdapters(),
-        registerEnvironment: (value) => { container = value; },
+        registerEnvironment: (value) => {
+          container = value;
+        },
       },
     });
     const services = container!.resolve<IFormulaExternalServiceProvider>(IFormulaExternalServiceProvider.symbol);
@@ -671,13 +735,17 @@ describe('createSheetEditor', () => {
       sheetState: createSheetState(),
       adapters: {
         ...createHeadlessAdapters(),
-        registerEnvironment: (value) => { container = value; },
+        registerEnvironment: (value) => {
+          container = value;
+        },
       },
     });
     try {
       const selection = container!.resolve<SheetSelectionPlugin>(SheetSelectionPlugin.symbol);
-      expect(() => { (selection as unknown as { depth: number }).depth = 900; }).toThrow();
-      expect(() => { (selection as unknown as { apply: unknown }).apply = () => null; }).toThrow();
+      expect('depth' in selection).toBe(false);
+      expect(() => {
+        (selection as unknown as { apply: unknown }).apply = () => null;
+      }).toThrow();
       const cellEditor = container!.resolve<SheetCellEditorPlugin>(SheetCellEditorPlugin.symbol);
       const formula = container!.resolve<SheetFormulaPlugin>(SheetFormulaPlugin.symbol);
       const filter = container!.resolve<SheetFilterPlugin>(SheetFilterPlugin.symbol);
@@ -697,20 +765,28 @@ describe('createSheetEditor', () => {
         () => formula.onTransactionCommitted(transaction),
         () => filter.onTransactionCommitted(transaction),
         () => find.onTransactionCommitted(transaction),
-      ]) expect(callback).toThrow('editor.commands.run');
+      ])
+        expect(callback).toThrow('editor.commands.run');
 
       Object.assign(formula, { initialDataComplete: false, initialDirtyKeys: [cellKey(0, 0)] });
-      expect(() => formula.onInitialDataCell({} as never, { type: CellType.Formula, formula: '=A1' }, 0, 0))
-        .toThrow('initial data scanning has completed');
-      expect(() => formula.onInitialDataComplete({} as never)).toThrow('initial data scanning has completed');
+      expect(() => formula.onInitialDataCell({ type: CellType.Formula, formula: '=A1' }, 0, 0)).toThrow(
+        'initial data scanning has completed',
+      );
+      expect(() => formula.onInitialDataComplete()).toThrow('initial data scanning has completed');
       expect(Reflect.get(formula, 'updateAstCache')).toBeUndefined();
       expect(Reflect.get(formula, 'rebuildDependencyGraph')).toBeUndefined();
       expect([...scheduler.getFormulaKeys()]).toEqual(formulaKeys);
       expect(() => scheduler.dispose()).toThrow('editor.commands.run');
-      expect(() => trace.emit({
-        type: FormulaCalculationTraceEventType.DependenciesChanged,
-        key: cellKey(0, 0), row: 0, col: 0, previousDependencies: [], dependencies: [],
-      })).toThrow('editor.commands.run');
+      expect(() =>
+        trace.emit({
+          type: FormulaCalculationTraceEventType.DependenciesChanged,
+          key: cellKey(0, 0),
+          row: 0,
+          col: 0,
+          previousDependencies: [],
+          dependencies: [],
+        }),
+      ).toThrow('editor.commands.run');
 
       expect(filter.version).toBe(filterVersion);
       expect(editor.queries.run(ReadSheetFindRevisionQuery, undefined)).toBe(findRevision);
@@ -729,7 +805,9 @@ describe('createSheetEditor', () => {
       sheetState,
       adapters: {
         ...createHeadlessAdapters(),
-        registerEnvironment: (value) => { container = value; },
+        registerEnvironment: (value) => {
+          container = value;
+        },
       },
     });
     try {
@@ -746,13 +824,18 @@ describe('createSheetEditor', () => {
         }
         if (value instanceof Rect) {
           expect(Object.isFrozen(value)).toBe(true);
-          expect(() => value.update([[0, 0], [0, 0]])).toThrow();
+          expect(() =>
+            value.update([
+              [0, 0],
+              [0, 0],
+            ]),
+          ).toThrow();
           return;
         }
         expect(Object.isFrozen(value)).toBe(true);
         for (const entry of Object.values(value)) assertLocked(entry);
       };
-      const plugins = container!.resolve<PluginManager<SearCoreSheet, CellProperties>>(PluginManager.symbol);
+      const plugins = container!.resolve<PluginManager>(PluginManager.symbol);
       for (const plugin of plugins.getAllPlugins()) assertLocked(plugin.getState());
       expect(sheetState.sheetData.getItem(0, 0)?.value).toBe('original');
     } finally {
@@ -768,7 +851,9 @@ describe('createSheetEditor', () => {
       sheetState: createSheetState(),
       adapters: {
         ...createHeadlessAdapters(),
-        registerEnvironment: (value) => { container = value; },
+        registerEnvironment: (value) => {
+          container = value;
+        },
       },
       onCreated: ({ commands }) => {
         registry = container!.resolve<SheetHighlightRegistry>(SheetHighlightRegistry.symbol);
@@ -794,7 +879,9 @@ describe('createSheetEditor', () => {
       sheetState: createSheetState(),
       adapters: {
         ...createHeadlessAdapters(),
-        registerEnvironment: (value) => { container = value; },
+        registerEnvironment: (value) => {
+          container = value;
+        },
       },
     });
     try {
@@ -815,7 +902,9 @@ describe('createSheetEditor', () => {
         listenerAuthority.push(editor.commands.isExecuting());
         try {
           runInsideCommandExecution('forged', () => channel.disconnect());
-        } catch (error) { listenerWrites.push(error); }
+        } catch (error) {
+          listenerWrites.push(error);
+        }
       });
 
       await editor.commands.run(ConnectSheetCollaborationCommand, options).completion;
@@ -836,7 +925,9 @@ describe('createSheetEditor', () => {
       sheetState: createSheetState(),
       adapters: {
         ...createHeadlessAdapters(),
-        registerEnvironment: (value) => { container = value; },
+        registerEnvironment: (value) => {
+          container = value;
+        },
       },
     });
     try {
@@ -847,7 +938,9 @@ describe('createSheetEditor', () => {
         observedAuthority.push(editor.commands.isExecuting());
         try {
           runInsideCommandExecution('forged', () => store.apply({ type: 'forged' }));
-        } catch (error) { errors.push(error); }
+        } catch (error) {
+          errors.push(error);
+        }
       });
 
       editor.commands.run(SelectRangeCommand, { anchor: [0, 0], focus: [0, 0] });
@@ -876,7 +969,11 @@ describe('createSheetEditor', () => {
       editor.commands.run(StartFormulaBarEditCommand, void 0);
       editor.commands.run(SetFormulaBarDraftCommand, { text: '=SUM(1,2)', selectionStart: 4, selectionEnd: 8 });
       expect(editor.observations.getSnapshot(SheetFormulaBarObservation)).toMatchObject({
-        cell: [0, 0], text: '=SUM(1,2)', editing: true, selectionStart: 4, selectionEnd: 8,
+        cell: [0, 0],
+        text: '=SUM(1,2)',
+        editing: true,
+        selectionStart: 4,
+        selectionEnd: 8,
       });
       editor.commands.run(CancelCellEditCommand, void 0);
 
@@ -895,8 +992,9 @@ describe('createSheetEditor', () => {
     state.sheetData.addItem(0, 0, { type: CellType.Number, value: 0.25 });
     state.cellFormats.addItem(0, 0, { kind: 'percent' });
     const editor = createSheetEditor({ sheetState: state, adapters: createHeadlessAdapters() });
-    expect(editor.queries.run(FindSheetMatchesQuery, { text: '25%' }))
-      .toMatchObject([{ row: 0, column: 0, text: '25%' }]);
+    expect(editor.queries.run(FindSheetMatchesQuery, { text: '25%' })).toMatchObject([
+      { row: 0, column: 0, text: '25%' },
+    ]);
     expect(editor.queries.run(FindSheetMatchesQuery, { text: '0.25' })).toEqual([]);
     editor.destroy();
   });
@@ -911,9 +1009,14 @@ describe('createSheetEditor', () => {
     editor.commands.run(ReplaceAllSheetMatchesCommand, { text: 'foo', replacement: 'bar' });
     expect(editor.queries.run(ReadSheetFindRevisionQuery, undefined)).toBe(1);
     expect(editor.queries.run(FindSheetMatchesQuery, { text: 'bar' })).toHaveLength(2);
-    expect(() => editor.queries.run(FindSheetMatchPageQuery, {
-      text: 'foo', limit: 1, cursor: page.matches[0], expectedRevision: page.revision,
-    })).toThrow('Find results changed');
+    expect(() =>
+      editor.queries.run(FindSheetMatchPageQuery, {
+        text: 'foo',
+        limit: 1,
+        cursor: page.matches[0],
+        expectedRevision: page.revision,
+      }),
+    ).toThrow('Find results changed');
     editor.commands.run(UndoSheetCommand, undefined);
     expect(editor.queries.run(FindSheetMatchesQuery, { text: 'foo' })).toHaveLength(2);
     editor.destroy();
@@ -967,7 +1070,7 @@ describe('createSheetEditor', () => {
           : axis === 0
           ? { x: 25 * zoom, y: screen(0, 91).y }
           : { x: screen(234, 0).x, y: 18 * zoom };
-      const selection = container!.resolve<SheetSelectionPlugin>(SheetSelectionPlugin.symbol);
+      const selection = container!.resolve<SheetSelectionView>(SheetSelectionView.symbol);
       const pointer = container!.resolve<RangeMovePointer>(PointerCapture.symbol);
       selection.onMouseDown(core, {
         origin: { offsetX: start.x, offsetY: start.y },
@@ -1003,7 +1106,7 @@ describe('createSheetEditor', () => {
         },
       });
       const remote = createSheetEditor({ sheetState: makeState(), adapters: createHeadlessAdapters() });
-      const plugins = container!.resolve<PluginManager<SearCoreSheet, CellProperties>>(PluginManager.symbol);
+      const plugins = container!.resolve<PluginManager>(PluginManager.symbol);
       const replay = (result: ReturnType<typeof local.commands.run>) => {
         result.pipeline.steps.forEach(({ transaction }) => {
           if (!transaction) return;
@@ -1103,7 +1206,7 @@ describe('createSheetEditor', () => {
     (axis, region) => {
       const state = createSheetState({ size: 4 });
       state.sheetData.addItem(0, 0, { type: CellType.String, value: 'axis-drag' });
-      const headerRender = jest.spyOn(SheetHeaderHighlightPlugin.prototype, 'render');
+      const headerRender = jest.spyOn(SheetHeaderHighlightView.prototype, 'render');
       let container: Container | undefined;
       const editor = createSheetEditor({
         sheetState: state,
@@ -1117,7 +1220,7 @@ describe('createSheetEditor', () => {
         },
       });
       const core = container!.resolve<SearCoreSheet>(SearCoreSheet.symbol);
-      const selection = container!.resolve<SheetSelectionPlugin>(SheetSelectionPlugin.symbol);
+      const selection = container!.resolve<SheetSelectionView>(SheetSelectionView.symbol);
       const pointer = container!.resolve<RangeMovePointer>(PointerCapture.symbol);
       const focus: [number, number] =
         axis === 0 ? [1, state.sheetData.shape[1] - 1] : [state.sheetData.shape[0] - 1, 1];
@@ -1238,7 +1341,7 @@ describe('createSheetEditor', () => {
     editor.commands.run(ScrollViewportToCommand, { x: 20, y: 10 });
     const scroll = core.renderEngine.scrollManager.getState();
     const point = { x: (x - scroll.x) * zoom, y: (y - scroll.y) * zoom };
-    const selection = container!.resolve<SheetSelectionPlugin>(SheetSelectionPlugin.symbol);
+    const selection = container!.resolve<SheetSelectionView>(SheetSelectionView.symbol);
     const pointer = container!.resolve<RangeMovePointer>(PointerCapture.symbol);
     const cursor = container!.resolve<CursorEngine>(CursorEngine.symbol);
     const override = jest.spyOn(cursor, 'override');
@@ -1293,7 +1396,7 @@ describe('createSheetEditor', () => {
     const core = container!.resolve<SearCoreSheet>(SearCoreSheet.symbol);
     const platform = container!.resolve<RangeMovePlatform>(Platform.symbol);
     const pointer = container!.resolve<RangeMovePointer>(PointerCapture.symbol);
-    const selection = container!.resolve<SheetSelectionPlugin>(SheetSelectionPlugin.symbol);
+    const selection = container!.resolve<SheetSelectionView>(SheetSelectionView.symbol);
     editor.commands.run(SelectRangeCommand, { anchor: [0, 0], focus: [0, 0] });
     selection.onMouseDown(core, {
       origin: { offsetX: 80, offsetY: 48 },
@@ -1328,7 +1431,7 @@ describe('createSheetEditor', () => {
       },
     });
     const remote = createSheetEditor({ sheetState: makeState(), adapters: createHeadlessAdapters() });
-    const plugins = container!.resolve<PluginManager<SearCoreSheet, CellProperties>>(PluginManager.symbol);
+    const plugins = container!.resolve<PluginManager>(PluginManager.symbol);
     const replay = (result: {
       pipeline: { steps: readonly { transaction?: import('@searsuite/sear-domain-transaction').Transaction }[] };
     }) => {
@@ -1371,7 +1474,7 @@ describe('createSheetEditor', () => {
       },
     });
     const core = container!.resolve<SearCoreSheet>(SearCoreSheet.symbol);
-    const selection = container!.resolve<SheetSelectionPlugin>(SheetSelectionPlugin.symbol);
+    const selection = container!.resolve<SheetSelectionView>(SheetSelectionView.symbol);
     const pointer = container!.resolve<RangeMovePointer>(PointerCapture.symbol);
     const keyboard = container!.resolve<RangeMoveKeyboard>(KeyboardRouter.symbol);
     const drag = container!.resolve<SheetRangeDrag>(SheetRangeDrag.symbol);
@@ -1412,11 +1515,13 @@ describe('createSheetEditor', () => {
       adapters: {
         ...createHeadlessAdapters(),
         pointerCapture: RangeMovePointer,
-        registerEnvironment: (value) => { container = value; },
+        registerEnvironment: (value) => {
+          container = value;
+        },
       },
     });
     const core = container!.resolve<SearCoreSheet>(SearCoreSheet.symbol);
-    const selection = container!.resolve<SheetSelectionPlugin>(SheetSelectionPlugin.symbol);
+    const selection = container!.resolve<SheetSelectionView>(SheetSelectionView.symbol);
     const drag = container!.resolve<SheetRangeDrag>(SheetRangeDrag.symbol);
     const embedded = container!.resolve<SheetEmbeddedEditor>(SheetEmbeddedEditor.symbol);
     expect(() => embedded.dispose()).toThrow('editor owner');
@@ -1428,7 +1533,9 @@ describe('createSheetEditor', () => {
     expect(drag.isActive()).toBe(true);
     expect(() => drag.destroy()).toThrow('editor owner');
     expect(() => SheetRangeDrag.prototype.destroy.call(drag)).toThrow('editor owner');
-    expect(() => drag.bind(core, () => selection.getState()[1], {})).toThrow('already bound');
+    expect(() =>
+      drag.bind(core, () => container!.resolve<SheetSelectionPlugin>(SheetSelectionPlugin.symbol).getState()[1], {}),
+    ).toThrow('already bound');
     expect(() => drag.setUserInteraction(undefined)).toThrow('already bound');
     Object.assign(drag, { destroyed: true, core: null, readSelection: () => null });
     expect(drag.isActive()).toBe(true);
@@ -1454,7 +1561,7 @@ describe('createSheetEditor', () => {
       },
     });
     const core = container!.resolve<SearCoreSheet>(SearCoreSheet.symbol);
-    const selection = container!.resolve<SheetSelectionPlugin>(SheetSelectionPlugin.symbol);
+    const selection = container!.resolve<SheetSelectionView>(SheetSelectionView.symbol);
     const pointer = container!.resolve<RangeMovePointer>(PointerCapture.symbol);
     const confirmation = container!.resolve<RangeMoveConfirmation>(UserInteractionService.symbol);
     let resolve: (confirmed: boolean) => void = () => {};
@@ -1671,7 +1778,7 @@ describe('createSheetEditor', () => {
       },
     });
     editor.commands.run(SelectRangeCommand, { anchor: [0, 0], focus: [0, 0] });
-    const plugin = editorContainer!.resolve<SheetCellEditorPlugin>(SheetCellEditorPlugin.symbol);
+    const plugin = editorContainer!.resolve<SheetCellEditorView>(SheetCellEditorView.symbol);
     const core = editorContainer!.resolve<SearCoreSheet>(SearCoreSheet.symbol);
     plugin.onMouseUp(core, { target: { properties: {} } } as never);
     const input = document.getElementById('searTextInput') as HTMLInputElement;
@@ -1785,7 +1892,7 @@ describe('createSheetEditor', () => {
 
   it('registers one editor-local neutral text shaper and accepts a host override', () => {
     const defaultEditor = createSheetEditor({ sheetState: createSheetState(), adapters: createHeadlessAdapters() });
-    expect(defaultEditor.services.require(SheetRuntimeCapability.TextShaper)).toBeInstanceOf(RenderContextTextShaper);
+    expect(defaultEditor.services.require(SheetViewCapability.TextShaper)).toBeInstanceOf(RenderContextTextShaper);
     defaultEditor.destroy();
 
     const customTextShaper = {
@@ -1798,7 +1905,7 @@ describe('createSheetEditor', () => {
         createTextShaper: () => customTextShaper,
       },
     });
-    expect(customEditor.services.require(SheetRuntimeCapability.TextShaper)).toBe(customTextShaper);
+    expect(customEditor.services.require(SheetViewCapability.TextShaper)).toBe(customTextShaper);
     customEditor.destroy();
   });
 
@@ -1807,7 +1914,7 @@ describe('createSheetEditor', () => {
     state.cellAlignments.addItem(0, 1, SheetHorizontalAlignment.Right);
     state.cellFills.addItem(1, 0, '#ffcc00');
     const editor = createSheetEditor({ sheetState: state, adapters: createHeadlessAdapters() });
-    const visualReaders = editor.services.require(SheetRuntimeCapability.Render).cellVisualReaders;
+    const visualReaders = editor.services.require(SheetViewCapability.Render).cellVisualReaders;
 
     expect(visualReaders.read({ rowIndex: 0, columnIndex: 1 })).toMatchObject({
       horizontalAlign: SheetHorizontalAlignment.Right,
@@ -1822,10 +1929,11 @@ describe('createSheetEditor', () => {
     const state = createSheetState({ size: 3 });
     state.sheetData.addItem(0, 0, { type: 'number', value: 10 });
     const editor = createSheetEditor({ sheetState: state, adapters: createHeadlessAdapters() });
-    const visualReaders = editor.services.require(SheetRuntimeCapability.Render).cellVisualReaders;
+    const visualReaders = editor.services.require(SheetViewCapability.Render).cellVisualReaders;
 
     editor.commands.run(AddCellHighlightRuleCommand, {
-      anchor: [0, 0], focus: [1, 1],
+      anchor: [0, 0],
+      focus: [1, 1],
       condition: { kind: CellHighlightKind.Value, operator: CellHighlightValueOperator.Greater, value: '5' },
       style: CellHighlightStyle.RedFill,
     });
@@ -1845,15 +1953,21 @@ describe('createSheetEditor', () => {
   it('registers data validation commands, document state, history and evaluator capability', () => {
     const editor = createSheetEditor({ sheetState: createSheetState({ size: 3 }), adapters: createHeadlessAdapters() });
     editor.commands.run(SetDataValidationRuleCommand, {
-      anchor: [0, 0], focus: [2, 0],
-      rule: { condition: { kind: DataValidationKind.Dropdown, options: [{ label: 'Ready' }] },
-        inputPolicy: DataValidationInputPolicy.Reject },
+      anchor: [0, 0],
+      focus: [2, 0],
+      rule: {
+        condition: { kind: DataValidationKind.Dropdown, options: [{ label: 'Ready' }] },
+        inputPolicy: DataValidationInputPolicy.Reject,
+      },
     });
     expect(editor.queries.run(ReadDataValidationRulesQuery, void 0)).toHaveLength(1);
     expect(editor.commands.run(ExportSheetStateCommand, void 0).sheetState.dataValidations?.getRules()).toHaveLength(1);
     expect(editor.services.require(DataValidationEvaluatorRegistryCapability)).toBeDefined();
-    expect(() => editor.services.require(DataValidationEvaluatorRegistryCapability)
-      .register(DataValidationKind.Person, () => true)).toThrow('editor.commands.run');
+    expect(() =>
+      editor.services
+        .require(DataValidationEvaluatorRegistryCapability)
+        .register(DataValidationKind.Person, () => true),
+    ).toThrow('editor.commands.run');
     editor.commands.run(UndoSheetCommand, void 0);
     expect(editor.queries.run(ReadDataValidationRulesQuery, void 0)).toHaveLength(0);
     editor.destroy();
@@ -1864,68 +1978,91 @@ describe('createSheetEditor', () => {
     state.sheetData.addItem(0, 0, { type: CellType.Number, value: 45200 });
     state.sheetData.addItem(0, 1, { type: CellType.Number, value: 45200 });
     state.cellFormats.addItem(0, 0, { kind: 'date' });
-    const editor = createSheetEditor({ sheetState: state,
-      embeddedEditor: new FakeSheetEmbeddedEditor(), adapters: createHeadlessAdapters() });
+    const editor = createSheetEditor({
+      sheetState: state,
+      embeddedEditor: new FakeSheetEmbeddedEditor(),
+      adapters: createHeadlessAdapters(),
+    });
     editor.commands.run(SetDataValidationRuleCommand, {
-      anchor: [0, 1], focus: [0, 1],
-      rule: { condition: { kind: DataValidationKind.Dropdown,
-        sourceRange: { start: [0, 0], end: [0, 0] } },
-      inputPolicy: DataValidationInputPolicy.Reject },
+      anchor: [0, 1],
+      focus: [0, 1],
+      rule: {
+        condition: { kind: DataValidationKind.Dropdown, sourceRange: { start: [0, 0], end: [0, 0] } },
+        inputPolicy: DataValidationInputPolicy.Reject,
+      },
     });
     expect(editor.queries.run(ReadDataValidationIssueQuery, [0, 1])).toBeNull();
     const picker = editor.queries.run(ReadDropdownCellQuery, { row: 0, column: 1 });
     expect(picker?.options.map((option) => option.label)).toEqual(['2023-10-1']);
     editor.commands.run(PickDropdownOptionCommand, { row: 0, column: 1, label: '2023-10-1' });
-    expect(editor.queries.run(ReadSheetCellDataQuery, void 0).getItem(0, 1))
-      .toMatchObject({ type: CellType.String, value: '2023-10-1' });
+    expect(editor.queries.run(ReadSheetCellDataQuery, void 0).getItem(0, 1)).toMatchObject({
+      type: CellType.String,
+      value: '2023-10-1',
+    });
     expect(editor.queries.run(ReadDataValidationIssueQuery, [0, 1])).toBeNull();
     editor.destroy();
   });
 
   it('BUG-631 commits typed checkbox validation choices as boolean cells', () => {
-    const editor = createSheetEditor({ sheetState: createSheetState(),
-      embeddedEditor: new FakeSheetEmbeddedEditor(), adapters: createHeadlessAdapters() });
+    const editor = createSheetEditor({
+      sheetState: createSheetState(),
+      embeddedEditor: new FakeSheetEmbeddedEditor(),
+      adapters: createHeadlessAdapters(),
+    });
     editor.commands.run(SetDataValidationRuleCommand, {
-      anchor: [0, 0], focus: [0, 0],
-      rule: { condition: { kind: DataValidationKind.Checkbox },
-        inputPolicy: DataValidationInputPolicy.Reject },
+      anchor: [0, 0],
+      focus: [0, 0],
+      rule: { condition: { kind: DataValidationKind.Checkbox }, inputPolicy: DataValidationInputPolicy.Reject },
     });
     editor.commands.run(SelectRangeCommand, { anchor: [0, 0], focus: [0, 0] });
     editor.commands.run(HandleDocumentInputCommand, { kind: 'text', text: 'TRUE' });
     editor.commands.run(CommitCellEditCommand, void 0);
-    expect(editor.queries.run(ReadSheetCellDataQuery, void 0).getItem(0, 0))
-      .toMatchObject({ type: CheckboxCellType, value: true });
+    expect(editor.queries.run(ReadSheetCellDataQuery, void 0).getItem(0, 0)).toMatchObject({
+      type: CheckboxCellType,
+      value: true,
+    });
     expect(editor.queries.run(ReadDataValidationIssueQuery, [0, 0])).toBeNull();
     editor.commands.run(HandleDocumentInputCommand, { kind: 'text', text: 'FALSE' });
     editor.commands.run(CommitCellEditCommand, void 0);
-    expect(editor.queries.run(ReadSheetCellDataQuery, void 0).getItem(0, 0))
-      .toMatchObject({ type: CheckboxCellType, value: false });
+    expect(editor.queries.run(ReadSheetCellDataQuery, void 0).getItem(0, 0)).toMatchObject({
+      type: CheckboxCellType,
+      value: false,
+    });
     editor.destroy();
   });
 
   it('BUG-472 assembles identity validation and commits all 18 digits as text', () => {
-    const editor = createSheetEditor({ sheetState: createSheetState(),
-      embeddedEditor: new FakeSheetEmbeddedEditor(), adapters: createHeadlessAdapters() });
+    const editor = createSheetEditor({
+      sheetState: createSheetState(),
+      embeddedEditor: new FakeSheetEmbeddedEditor(),
+      adapters: createHeadlessAdapters(),
+    });
     editor.commands.run(SetDataValidationRuleCommand, {
-      anchor: [0, 0], focus: [0, 0],
-      rule: { condition: { kind: DataValidationKind.IdentityCard },
-        inputPolicy: DataValidationInputPolicy.Reject },
+      anchor: [0, 0],
+      focus: [0, 0],
+      rule: { condition: { kind: DataValidationKind.IdentityCard }, inputPolicy: DataValidationInputPolicy.Reject },
     });
     editor.commands.run(SelectRangeCommand, { anchor: [0, 0], focus: [0, 0] });
     editor.commands.run(HandleDocumentInputCommand, { kind: 'text', text: '110105194912310011' });
     editor.commands.run(CommitCellEditCommand, void 0);
 
-    expect(editor.queries.run(ReadSheetCellDataQuery, void 0).getItem(0, 0))
-      .toMatchObject({ type: CellType.String, value: '110105194912310011' });
+    expect(editor.queries.run(ReadSheetCellDataQuery, void 0).getItem(0, 0)).toMatchObject({
+      type: CellType.String,
+      value: '110105194912310011',
+    });
     expect(editor.queries.run(ReadDataValidationIssueQuery, [0, 0])).toBeNull();
     editor.destroy();
   });
 
   it('rejects invalid edits and publishes warnings for allowed invalid edits', () => {
-    const editor = createSheetEditor({ sheetState: createSheetState(),
-      embeddedEditor: new FakeSheetEmbeddedEditor(), adapters: createHeadlessAdapters() });
+    const editor = createSheetEditor({
+      sheetState: createSheetState(),
+      embeddedEditor: new FakeSheetEmbeddedEditor(),
+      adapters: createHeadlessAdapters(),
+    });
     editor.commands.run(SetDataValidationRuleCommand, {
-      anchor: [0, 0], focus: [0, 0],
+      anchor: [0, 0],
+      focus: [0, 0],
       rule: { condition: { kind: DataValidationKind.Number }, inputPolicy: DataValidationInputPolicy.Reject },
     });
     editor.commands.run(SelectRangeCommand, { anchor: [0, 0], focus: [0, 0] });
@@ -1936,7 +2073,9 @@ describe('createSheetEditor', () => {
 
     const id = editor.queries.run(ReadDataValidationRulesQuery, void 0)[0]!.rule.id;
     editor.commands.run(SetDataValidationRuleCommand, {
-      id, anchor: [0, 0], focus: [0, 0],
+      id,
+      anchor: [0, 0],
+      focus: [0, 0],
       rule: { condition: { kind: DataValidationKind.Number }, inputPolicy: DataValidationInputPolicy.Warn },
     });
     const warning = jest.fn();
@@ -1949,12 +2088,14 @@ describe('createSheetEditor', () => {
     editor.destroy();
   });
 
-
   it('clears every rule when multiple rules share one highlight anchor', () => {
     const editor = createSheetEditor({ sheetState: createSheetState({ size: 3 }), adapters: createHeadlessAdapters() });
     for (const kind of [CellHighlightKind.Empty, CellHighlightKind.NotEmpty]) {
       editor.commands.run(AddCellHighlightRuleCommand, {
-        anchor: [0, 0], focus: [1, 1], condition: { kind }, style: CellHighlightStyle.RedFill,
+        anchor: [0, 0],
+        focus: [1, 1],
+        condition: { kind },
+        style: CellHighlightStyle.RedFill,
       });
     }
     expect(editor.queries.run(ReadCellHighlightRulesQuery, void 0)).toHaveLength(2);
@@ -1966,36 +2107,58 @@ describe('createSheetEditor', () => {
   it('BUG-438 updates a highlight rule across anchors and restores both anchors on undo', () => {
     const editor = createSheetEditor({ sheetState: createSheetState({ size: 5 }), adapters: createHeadlessAdapters() });
     editor.commands.run(AddCellHighlightRuleCommand, {
-      anchor: [1, 1], focus: [2, 1],
+      anchor: [1, 1],
+      focus: [2, 1],
       condition: { kind: CellHighlightKind.Value, operator: CellHighlightValueOperator.Greater, value: '5' },
       style: CellHighlightStyle.RedFill,
     });
     editor.commands.run(AddCellHighlightRuleCommand, {
-      anchor: [1, 1], focus: [2, 1], condition: { kind: CellHighlightKind.Empty }, style: CellHighlightStyle.RedFill,
+      anchor: [1, 1],
+      focus: [2, 1],
+      condition: { kind: CellHighlightKind.Empty },
+      style: CellHighlightStyle.RedFill,
     });
     const before = editor.queries.run(ReadCellHighlightRulesQuery, void 0);
     const id = before[0]!.rule.id;
     const priority = before[0]!.rule.priority;
 
     editor.commands.run(UpdateCellHighlightRuleCommand, {
-      id, anchor: [2, 2], focus: [3, 2],
+      id,
+      anchor: [2, 2],
+      focus: [3, 2],
       condition: { kind: CellHighlightKind.Value, operator: CellHighlightValueOperator.Greater, value: '15' },
       style: CellHighlightStyle.GreenFill,
     });
     expect(editor.queries.run(ReadCellHighlightRulesQuery, void 0)).toMatchObject([
-      { row: 2, column: 2, rule: { id, priority, endRow: 3, endColumn: 2,
-        condition: { value: '15' }, style: CellHighlightStyle.GreenFill } },
+      {
+        row: 2,
+        column: 2,
+        rule: {
+          id,
+          priority,
+          endRow: 3,
+          endColumn: 2,
+          condition: { value: '15' },
+          style: CellHighlightStyle.GreenFill,
+        },
+      },
       { row: 1, column: 1, rule: { condition: { kind: CellHighlightKind.Empty } } },
     ]);
     editor.commands.run(UndoSheetCommand, void 0);
     expect(editor.queries.run(ReadCellHighlightRulesQuery, void 0)).toMatchObject([
-      { row: 1, column: 1, rule: { id, endRow: 2, endColumn: 1,
-        condition: { value: '5' }, style: CellHighlightStyle.RedFill } },
+      {
+        row: 1,
+        column: 1,
+        rule: { id, endRow: 2, endColumn: 1, condition: { value: '5' }, style: CellHighlightStyle.RedFill },
+      },
       { row: 1, column: 1, rule: { condition: { kind: CellHighlightKind.Empty } } },
     ]);
     editor.commands.run(RedoSheetCommand, void 0);
-    expect(editor.queries.run(ReadCellHighlightRulesQuery, void 0).find(({ rule }) => rule.id === id))
-      .toMatchObject({ row: 2, column: 2, rule: { endRow: 3, endColumn: 2, style: CellHighlightStyle.GreenFill } });
+    expect(editor.queries.run(ReadCellHighlightRulesQuery, void 0).find(({ rule }) => rule.id === id)).toMatchObject({
+      row: 2,
+      column: 2,
+      rule: { endRow: 3, endColumn: 2, style: CellHighlightStyle.GreenFill },
+    });
     editor.destroy();
   });
 
@@ -2004,7 +2167,8 @@ describe('createSheetEditor', () => {
     state.sheetData.addItem(0, 0, { type: 'number', value: 10 });
     const editor = createSheetEditor({ sheetState: state, adapters: createHeadlessAdapters() });
     editor.commands.run(AddCellHighlightRuleCommand, {
-      anchor: [0, 0], focus: [1, 1],
+      anchor: [0, 0],
+      focus: [1, 1],
       condition: { kind: CellHighlightKind.Value, operator: CellHighlightValueOperator.Greater, value: '5' },
       style: CellHighlightStyle.RedFill,
     });
@@ -2021,10 +2185,16 @@ describe('createSheetEditor', () => {
 
   it('splits a partially moved highlight rule and restores its identity on undo', () => {
     const state = createSheetState({ size: 6 });
-    state.cellHighlights.setItem(0, 0, [{
-      id: 'source-rule', priority: 1, endRow: 2, endColumn: 2,
-      condition: { kind: CellHighlightKind.NotEmpty }, style: CellHighlightStyle.RedFill,
-    }]);
+    state.cellHighlights.setItem(0, 0, [
+      {
+        id: 'source-rule',
+        priority: 1,
+        endRow: 2,
+        endColumn: 2,
+        condition: { kind: CellHighlightKind.NotEmpty },
+        style: CellHighlightStyle.RedFill,
+      },
+    ]);
     const editor = createSheetEditor({ sheetState: state, adapters: createHeadlessAdapters() });
     const input = { source: { start: [1, 1], end: [2, 2] }, target: [3, 3] } as const;
     expect(editor.queries.run(AnalyzeSheetRangeMove, input).status).toBe(SheetRangeMoveStatus.Allowed);
@@ -2043,21 +2213,35 @@ describe('createSheetEditor', () => {
       { row: 0, column: 0, rule: { id: 'source-rule', endRow: 2, endColumn: 2 } },
     ]);
     editor.commands.run(RedoSheetCommand, void 0);
-    expect(editor.commands.run(ExportSheetStateCommand, void 0).sheetState.cellHighlights.findRules(3, 3)).toHaveLength(1);
+    expect(editor.commands.run(ExportSheetStateCommand, void 0).sheetState.cellHighlights.findRules(3, 3)).toHaveLength(
+      1,
+    );
     editor.destroy();
   });
 
   it('requires confirmation for target rules and preserves their uncovered portions', () => {
     const state = createSheetState({ size: 6 });
     const condition = { kind: CellHighlightKind.NotEmpty } as const;
-    state.cellHighlights.setItem(0, 0, [{
-      id: 'source-rule', priority: 1, endRow: 1, endColumn: 1,
-      condition, style: CellHighlightStyle.YellowFill,
-    }]);
-    state.cellHighlights.setItem(2, 2, [{
-      id: 'target-rule', priority: 2, endRow: 4, endColumn: 4,
-      condition, style: CellHighlightStyle.RedFill,
-    }]);
+    state.cellHighlights.setItem(0, 0, [
+      {
+        id: 'source-rule',
+        priority: 1,
+        endRow: 1,
+        endColumn: 1,
+        condition,
+        style: CellHighlightStyle.YellowFill,
+      },
+    ]);
+    state.cellHighlights.setItem(2, 2, [
+      {
+        id: 'target-rule',
+        priority: 2,
+        endRow: 4,
+        endColumn: 4,
+        condition,
+        style: CellHighlightStyle.RedFill,
+      },
+    ]);
     const editor = createSheetEditor({ sheetState: state, adapters: createHeadlessAdapters() });
     const input = { source: { start: [0, 0], end: [1, 1] }, target: [2, 2] } as const;
     expect(editor.queries.run(AnalyzeSheetRangeMove, input).status).toBe(SheetRangeMoveStatus.RequiresConfirmation);
@@ -2078,10 +2262,16 @@ describe('createSheetEditor', () => {
 
   it('confirms and clears destination rules when the source has no highlight rule', () => {
     const state = createSheetState({ size: 5 });
-    state.cellHighlights.setItem(2, 2, [{
-      id: 'target-rule', priority: 1, endRow: 3, endColumn: 3,
-      condition: { kind: CellHighlightKind.NotEmpty }, style: CellHighlightStyle.RedFill,
-    }]);
+    state.cellHighlights.setItem(2, 2, [
+      {
+        id: 'target-rule',
+        priority: 1,
+        endRow: 3,
+        endColumn: 3,
+        condition: { kind: CellHighlightKind.NotEmpty },
+        style: CellHighlightStyle.RedFill,
+      },
+    ]);
     const editor = createSheetEditor({ sheetState: state, adapters: createHeadlessAdapters() });
     const input = { source: { start: [0, 0], end: [1, 1] }, target: [2, 2] } as const;
     expect(editor.queries.run(AnalyzeSheetRangeMove, input).status).toBe(SheetRangeMoveStatus.RequiresConfirmation);
@@ -2092,10 +2282,16 @@ describe('createSheetEditor', () => {
 
   it('trims a destination rule whose anchor lies outside the overwritten range', () => {
     const state = createSheetState({ size: 6 });
-    state.cellHighlights.setItem(1, 3, [{
-      id: 'target-rule', priority: 1, endRow: 4, endColumn: 4,
-      condition: { kind: CellHighlightKind.NotEmpty }, style: CellHighlightStyle.RedFill,
-    }]);
+    state.cellHighlights.setItem(1, 3, [
+      {
+        id: 'target-rule',
+        priority: 1,
+        endRow: 4,
+        endColumn: 4,
+        condition: { kind: CellHighlightKind.NotEmpty },
+        style: CellHighlightStyle.RedFill,
+      },
+    ]);
     const editor = createSheetEditor({ sheetState: state, adapters: createHeadlessAdapters() });
     const input = { source: { start: [0, 0], end: [1, 1] }, target: [2, 2] } as const;
     expect(editor.queries.run(AnalyzeSheetRangeMove, input).status).toBe(SheetRangeMoveStatus.RequiresConfirmation);
@@ -2130,7 +2326,7 @@ describe('createSheetEditor', () => {
     expect(embeddedEditor.initializeCount).toBe(1);
     expect(isCommandExecuting?.()).toBe(false);
     expect(editorContainer!.resolve(SheetEmbeddedEditor.symbol)).toBe(embeddedEditor);
-    expect(editor.services.require(SheetRuntimeCapability.EmbeddedEditor)).toEqual({
+    expect(editor.services.require(SheetViewCapability.EmbeddedEditor)).toEqual({
       editor: embeddedEditor,
     });
 
@@ -2168,27 +2364,23 @@ describe('createSheetEditor', () => {
     expect(firstContainer!.resolve(SessionStateRegistry.symbol)).not.toBe(
       secondContainer!.resolve(SessionStateRegistry.symbol),
     );
-    expect(first.services.require(SheetRuntimeCapability.Toolbar)).toBe(
-      firstContainer!.resolve(SearToolbar.symbol),
+    expect(first.services.require(SheetViewCapability.Toolbar)).toBe(firstContainer!.resolve(SearToolbar.symbol));
+    expect(first.services.require(SheetViewCapability.Toolbar)).not.toBe(
+      second.services.require(SheetViewCapability.Toolbar),
     );
-    expect(first.services.require(SheetRuntimeCapability.Toolbar)).not.toBe(
-      second.services.require(SheetRuntimeCapability.Toolbar),
-    );
-    expect(first.services.require(SheetRuntimeCapability.Events).engine).toBe(
-      firstContainer!.resolve(EventEngine.symbol),
-    );
-    expect(first.services.require(SheetRuntimeCapability.Events).engine).toBe(
+    expect(first.services.require(SheetViewCapability.Events).engine).toBe(firstContainer!.resolve(EventEngine.symbol));
+    expect(first.services.require(SheetViewCapability.Events).engine).toBe(
       firstContainer!.resolve<SearCoreSheet>(SearCoreSheet.symbol).eventEngine,
     );
-    expect(first.services.require(SheetRuntimeCapability.Collaboration).session).not.toBe(
-      second.services.require(SheetRuntimeCapability.Collaboration).session,
+    expect(first.services.require(SheetViewCapability.Collaboration).session).not.toBe(
+      second.services.require(SheetViewCapability.Collaboration).session,
     );
 
     first.commands.run(SelectRangeCommand, { anchor: [0, 0], focus: [0, 0] });
     second.commands.run(SelectRangeCommand, { anchor: [1, 1], focus: [1, 1] });
     first.destroy();
 
-    expect(() => first.services.require(SheetRuntimeCapability.Toolbar)).toThrow(
+    expect(() => first.services.require(SheetViewCapability.Toolbar)).toThrow(
       'Runtime capability registry for SheetEditor has been destroyed.',
     );
 
@@ -2337,7 +2529,7 @@ describe('createSheetEditor', () => {
     let editorContainer: Container | undefined;
     const editor = createSheetEditor({
       sheetState: createSheetState({ includeHiddenOriginalSizes: true }),
-      plugins: [StrategyPlugin, StrategyPluginAfter],
+      viewExtensions: [StrategyView, StrategyViewAfter],
       adapters: {
         platform: HeadlessPlatform,
         createRenderContexts: () => ({
@@ -2415,13 +2607,7 @@ describe('createSheetEditor', () => {
       public registerState() {
         return { key: this.key, state: null };
       }
-      public getPluginConfig(): null {
-        return null;
-      }
       public apply(): null {
-        return null;
-      }
-      public render(): null {
         return null;
       }
       // no configure, initialize, start, etc.
@@ -2436,13 +2622,7 @@ describe('createSheetEditor', () => {
       public registerState() {
         return { key: this.key, state: null };
       }
-      public getPluginConfig(): null {
-        return null;
-      }
       public apply(): null {
-        return null;
-      }
-      public render(): null {
         return null;
       }
       public initialize() {}
@@ -2480,7 +2660,6 @@ describe('createSheetEditor', () => {
   it('covers remaining branches (custom container, no plugins, multiple destroy, onCreated)', () => {
     const onCreated = jest.fn();
     let editorContainer: Container | undefined;
-    const registerCellEditorServicesSpy = jest.spyOn(SheetCellEditorPlugin, 'registerServices');
 
     const editor = createSheetEditor({
       // no viewport, uses default
@@ -2509,7 +2688,6 @@ describe('createSheetEditor', () => {
     });
 
     expect(onCreated).toHaveBeenCalledWith(editor);
-    expect(registerCellEditorServicesSpy).toHaveBeenCalled();
     expect(editor.commands).toBeDefined();
     expect(editor.observations).toBeDefined();
     expect(editor.commands.getRegisteredCommandIds()).toEqual(
@@ -2533,7 +2711,7 @@ describe('createSheetEditor', () => {
       ]),
     );
     editor.commands.run(SetSheetZoomCommand, 1.2);
-    expect(editorContainer!.resolve<SheetZoomPlugin>(SheetZoomPlugin.symbol).getScale()).toBe(1.2);
+    expect(editorContainer!.resolve<SheetZoomView>(SheetZoomView.symbol).getScale()).toBe(1.2);
     editor.commands.run(ScrollViewportToCommand, { x: 10, y: 12 });
     const scrollManager = editorContainer!.resolve<SearCoreSheet>(SearCoreSheet.symbol).renderEngine.scrollManager;
     const commandIds: string[] = [];
@@ -2544,13 +2722,10 @@ describe('createSheetEditor', () => {
     });
     expect(commandIds).toContain(ApplyViewportScrollCommand.id);
     stopObserving();
-    expect(
-      scrollManager.getState(),
-    ).toMatchObject({
+    expect(scrollManager.getState()).toMatchObject({
       x: 10,
       y: 12,
     });
-    registerCellEditorServicesSpy.mockRestore();
     editor.commands.run(SelectRangeCommand, { anchor: [0, 0], focus: [1, 1] });
     expect(
       editorContainer!.resolve<SheetSelectionPlugin>(SheetSelectionPlugin.symbol).getState()[0].getPoint(1),
@@ -2583,34 +2758,37 @@ describe('createSheetEditor', () => {
           editorContainer = container;
         },
       },
-      onCreated: ({ commands }) => commands.register(invalidate, (keys) =>
-        new LocalActionCommand(invalidate.id, () => editorContainer!
-          .resolve<FormulaRenderInvalidator>(FormulaRenderInvalidator.symbol).invalidateFormulaResults(keys))),
+      onCreated: ({ commands }) =>
+        commands.register(
+          invalidate,
+          (keys) =>
+            new LocalActionCommand(invalidate.id, () =>
+              editorContainer!.resolve<FormulaValuePublisher>(FormulaValuePublisher.symbol).publishResults(keys),
+            ),
+        ),
     });
     const core = editorContainer!.resolve<SearCoreSheet>(SearCoreSheet.symbol);
     const requestRender = jest.spyOn(core, 'requestRender');
-    const executePipeline = jest.spyOn(core, 'executePipeline');
-    const invalidator = editorContainer!.resolve<FormulaRenderInvalidator>(FormulaRenderInvalidator.symbol);
+    const executePipeline = jest.spyOn(editorContainer!.resolve<SheetKernel>(SheetKernel.symbol), 'executePipeline');
+    const invalidator = editorContainer!.resolve<FormulaValuePublisher>(FormulaValuePublisher.symbol);
 
     editor.commands.run(invalidate, [0]);
 
     expect(requestRender).toHaveBeenCalledTimes(1);
     expect(requestRender.mock.calls[0][0].key.key).toBe('SheetGrid$');
-    expect(executePipeline).toHaveBeenCalledTimes(1);
-    expect(executePipeline.mock.calls[0][0].steps.map((step) => step.kind)).toEqual([PipelineStepKind.Render]);
+    expect(executePipeline).not.toHaveBeenCalled();
 
     editor.commands.run(ToggleMergeCellsCommand, { anchor: [0, 0], focus: [0, 1] });
     requestRender.mockClear();
     executePipeline.mockClear();
     editor.commands.run(invalidate, [0]);
-    expect(requestRender).not.toHaveBeenCalled();
-    expect(executePipeline.mock.calls[0][0].steps.map((step) => step.renderPluginKey?.key)).toEqual([
-      'SheetGrid$', 'SheetCellMergeRender$',
-    ]);
+    expect(requestRender).toHaveBeenCalledTimes(1);
+    expect(requestRender.mock.calls[0].map((view) => view.key.key)).toEqual(['SheetGrid$', 'SheetCellMergeRender$']);
+    expect(executePipeline).not.toHaveBeenCalled();
 
     editor.destroy();
     requestRender.mockClear();
-    invalidator.invalidateFormulaResults([1]);
+    invalidator.publishResults([1]);
     expect(requestRender).not.toHaveBeenCalled();
   });
 
@@ -2626,23 +2804,44 @@ describe('createSheetEditor', () => {
       sheetState: state,
       adapters: {
         ...createHeadlessAdapters(),
-        registerEnvironment: (container) => { editorContainer = container; },
+        registerEnvironment: (container) => {
+          editorContainer = container;
+        },
       },
       onCreated: ({ commands }) => {
-        commands.register(setTestResult, (value) => new LocalActionCommand(setTestResult.id, () =>
-          editorContainer!.resolve<FormulaResultStore>(FormulaResultStore.symbol).set(cellKey(1, 0), value)));
-        commands.register(publishTestResult, () => new LocalActionCommand(publishTestResult.id, () =>
-          editorContainer!.resolve<SheetDisplayedValueChanges>(SheetDisplayedValueChanges.symbol)
-            .publish([{ row: 1, column: 0 }])));
-        commands.register(invalidateTestResult, () => new LocalActionCommand(invalidateTestResult.id, () =>
-          editorContainer!.resolve<FormulaRenderInvalidator>(FormulaRenderInvalidator.symbol)
-            .invalidateFormulaResults([cellKey(1, 0)])));
+        commands.register(
+          setTestResult,
+          (value) =>
+            new LocalActionCommand(setTestResult.id, () =>
+              editorContainer!.resolve<FormulaResultStore>(FormulaResultStore.symbol).set(cellKey(1, 0), value),
+            ),
+        );
+        commands.register(
+          publishTestResult,
+          () =>
+            new LocalActionCommand(publishTestResult.id, () =>
+              editorContainer!
+                .resolve<SheetDisplayedValueChanges>(SheetDisplayedValueChanges.symbol)
+                .publish([{ row: 1, column: 0 }]),
+            ),
+        );
+        commands.register(
+          invalidateTestResult,
+          () =>
+            new LocalActionCommand(invalidateTestResult.id, () =>
+              editorContainer!
+                .resolve<FormulaValuePublisher>(FormulaValuePublisher.symbol)
+                .publishResults([cellKey(1, 0)]),
+            ),
+        );
       },
     });
-    const visualReaders = editor.services.require(SheetRuntimeCapability.Render).cellVisualReaders;
+    const visualReaders = editor.services.require(SheetViewCapability.Render).cellVisualReaders;
     editor.commands.run(AddCellHighlightRuleCommand, {
-      anchor: [0, 0], focus: [1, 0],
-      condition: { kind: CellHighlightKind.Duplicate }, style: CellHighlightStyle.RedFill,
+      anchor: [0, 0],
+      focus: [1, 0],
+      condition: { kind: CellHighlightKind.Duplicate },
+      style: CellHighlightStyle.RedFill,
     });
     const changes = editorContainer!.resolve<SheetDisplayedValueChanges>(SheetDisplayedValueChanges.symbol);
     const received = jest.fn();
@@ -2669,15 +2868,21 @@ describe('createSheetEditor', () => {
       sheetState: createSheetState(),
       adapters: {
         ...createHeadlessAdapters(),
-        registerEnvironment: (container) => { editorContainer = container; },
+        registerEnvironment: (container) => {
+          editorContainer = container;
+        },
       },
-      onCreated: ({ commands }) => commands.register(updateDerivedState, () =>
-        new LocalActionCommand(updateDerivedState.id, () => {
-          const graph = editorContainer!.resolve<IDependencyGraph>(IDependencyGraph.symbol);
-          const aggregates = editorContainer!.resolve<IAggregationCache>(IAggregationCache.symbol);
-          graph.updateCell(cellKey(0, 0), []);
-          aggregates.setSum(0, 0, 0, 0, 1);
-        })),
+      onCreated: ({ commands }) =>
+        commands.register(
+          updateDerivedState,
+          () =>
+            new LocalActionCommand(updateDerivedState.id, () => {
+              const graph = editorContainer!.resolve<IDependencyGraph>(IDependencyGraph.symbol);
+              const aggregates = editorContainer!.resolve<IAggregationCache>(IAggregationCache.symbol);
+              graph.updateCell(cellKey(0, 0), []);
+              aggregates.setSum(0, 0, 0, 0, 1);
+            }),
+        ),
     });
     const graph = editorContainer!.resolve<IDependencyGraph>(IDependencyGraph.symbol);
     const aggregates = editorContainer!.resolve<IAggregationCache>(IAggregationCache.symbol);
@@ -2808,7 +3013,7 @@ describe('createSheetEditor', () => {
       },
     });
     const remote = createSheetEditor({ sheetState: createSheetState({ size: 4 }), adapters: createHeadlessAdapters() });
-    const plugins = container!.resolve<PluginManager<SearCoreSheet, CellProperties>>(PluginManager.symbol);
+    const plugins = container!.resolve<PluginManager>(PluginManager.symbol);
     const replay = (result: ReturnType<typeof local.commands.run>) => {
       result.pipeline.steps.forEach(({ transaction }) => {
         if (!transaction) return;
@@ -2935,23 +3140,32 @@ describe('default sheet sorting', () => {
   it('BUG-579 moves a validation rule with its row and restores it on undo', () => {
     const state = createSheetState({ size: 4 });
     for (const [row, name, number] of [
-      [0, 'Name', 'Num'], [1, 'apple', 3], [2, 'banana', 1], [3, 'pear', 2],
+      [0, 'Name', 'Num'],
+      [1, 'apple', 3],
+      [2, 'banana', 1],
+      [3, 'pear', 2],
     ] as const) {
       state.sheetData.addItem(row, 0, { type: CellType.String, value: name });
-      state.sheetData.addItem(row, 1, { type: typeof number === 'number' ? CellType.Number : CellType.String, value: number });
+      state.sheetData.addItem(row, 1, {
+        type: typeof number === 'number' ? CellType.Number : CellType.String,
+        value: number,
+      });
     }
     state.cellFills.addItem(1, 1, '#bbffbb');
     const editor = createSheetEditor({ sheetState: state, adapters: createHeadlessAdapters() });
-    const sort = (direction: SheetSortDirection) => editor.commands.run(SortSheetRangeCommand, {
-      range: { start: [0, 0], end: [3, 1] }, firstRowIsHeader: true,
-      keys: [{ column: 0, direction }],
-    });
+    const sort = (direction: SheetSortDirection) =>
+      editor.commands.run(SortSheetRangeCommand, {
+        range: { start: [0, 0], end: [3, 1] },
+        firstRowIsHeader: true,
+        keys: [{ column: 0, direction }],
+      });
     const read = () => editor.commands.run(ExportSheetStateCommand, void 0).sheetState;
     try {
       sort(SheetSortDirection.Descending);
       expect(read().sheetData.getItem(3, 0)?.value).toBe('apple');
       editor.commands.run(SetDataValidationRuleCommand, {
-        anchor: [3, 1], focus: [3, 1],
+        anchor: [3, 1],
+        focus: [3, 1],
         rule: { condition: { kind: DataValidationKind.Number }, inputPolicy: DataValidationInputPolicy.Reject },
       });
       sort(SheetSortDirection.Ascending);
@@ -2985,15 +3199,11 @@ describe('default sheet sorting', () => {
       keys: [{ column: 0, direction: SheetSortDirection.Ascending }],
     });
     const read = () => editor.commands.run(ExportSheetStateCommand, void 0).sheetState;
-    expect([0, 1, 2].map((row) => read().sheetData.getItem(row, 1)?.value))
-      .toEqual(['first', 'second', 'third']);
-    expect([0, 1, 2].map((row) => read().cellFills.getItem(row, 1)))
-      .toEqual(['#00ff00', '#0000ff', '#ff0000']);
+    expect([0, 1, 2].map((row) => read().sheetData.getItem(row, 1)?.value)).toEqual(['first', 'second', 'third']);
+    expect([0, 1, 2].map((row) => read().cellFills.getItem(row, 1))).toEqual(['#00ff00', '#0000ff', '#ff0000']);
     editor.commands.run(UndoSheetCommand, void 0);
-    expect([0, 1, 2].map((row) => read().sheetData.getItem(row, 1)?.value))
-      .toEqual(['third', 'first', 'second']);
-    expect([0, 1, 2].map((row) => read().cellFills.getItem(row, 1)))
-      .toEqual(['#ff0000', '#00ff00', '#0000ff']);
+    expect([0, 1, 2].map((row) => read().sheetData.getItem(row, 1)?.value)).toEqual(['third', 'first', 'second']);
+    expect([0, 1, 2].map((row) => read().cellFills.getItem(row, 1))).toEqual(['#ff0000', '#00ff00', '#0000ff']);
     editor.destroy();
   });
 
@@ -3003,10 +3213,12 @@ describe('default sheet sorting', () => {
     state.sheetData.addItem(2, 0, { type: CellType.Number, value: 1 });
     state.cellMerges.addItem(1, 1, { endRow: 1, endColumn: 2 });
     const editor = createSheetEditor({ sheetState: state, adapters: createHeadlessAdapters() });
-    expect(() => editor.commands.run(SortSheetRangeCommand, {
-      range: { start: [0, 0], end: [2, 2] },
-      keys: [{ column: 0, direction: SheetSortDirection.Ascending }],
-    })).toThrow('merged cells');
+    expect(() =>
+      editor.commands.run(SortSheetRangeCommand, {
+        range: { start: [0, 0], end: [2, 2] },
+        keys: [{ column: 0, direction: SheetSortDirection.Ascending }],
+      }),
+    ).toThrow('merged cells');
     expect(state.sheetData.getItem(0, 0)?.value).toBe(2);
     editor.destroy();
   });
@@ -3038,15 +3250,20 @@ describe('default sheet sorting', () => {
     state.sheetData.addItem(1, 3, { type: CellType.Formula, formula: '=SUM(1:2)' });
     state.sheetData.addItem(1, 4, { type: CellType.Formula, formula: '=Sheet2!A1' });
     const editor = createSheetEditor({ sheetState: state, adapters: createHeadlessAdapters() });
-    const sort = (direction: SheetSortDirection) => editor.commands.run(SortSheetRangeCommand, {
-      range: { start: [0, 0], end: [1, 4] },
-      keys: [{ column: 0, direction }],
-    });
+    const sort = (direction: SheetSortDirection) =>
+      editor.commands.run(SortSheetRangeCommand, {
+        range: { start: [0, 0], end: [1, 4] },
+        keys: [{ column: 0, direction }],
+      });
     const read = () => editor.commands.run(ExportSheetStateCommand, void 0).sheetState.sheetData;
 
     sort(SheetSortDirection.Ascending);
-    expect([1, 2, 3, 4].map((column) => read().getItem(0, column)?.formula))
-      .toEqual(['=#REF!', '=SUM(#REF!)', '=SUM(#REF!)', '=#REF!']);
+    expect([1, 2, 3, 4].map((column) => read().getItem(0, column)?.formula)).toEqual([
+      '=#REF!',
+      '=SUM(#REF!)',
+      '=SUM(#REF!)',
+      '=#REF!',
+    ]);
     expect(read().getItem(1, 1)?.formula).toBe('=A$1');
     editor.commands.run(UndoSheetCommand, void 0);
     expect(read().getItem(1, 1)?.formula).toBe('=A1');
@@ -3068,26 +3285,39 @@ it('guards input validators retained by a Sheet plugin after assembly', () => {
   class RetainedValidatorPlugin extends SheetPlugin<null> {
     public static readonly symbol = Symbol.for('RetainedValidatorPlugin');
     #disposeInitial: (() => void) | undefined;
-    public constructor() { super({ key: new PluginKey('RetainedValidatorPlugin'), state: null }); }
+    public constructor() {
+      super({ key: new PluginKey('RetainedValidatorPlugin'), state: null });
+    }
     public configure(context: SheetPluginSetupContext): void {
-      const registry = context.container.resolve<SheetCellInputValidationRegistry>(SheetCellInputValidationRegistry.symbol);
+      const registry = context.container.resolve<SheetCellInputValidationRegistry>(
+        SheetCellInputValidationRegistry.symbol,
+      );
       retained = registry;
       this.#disposeInitial = registry.register('test.initial', () => ({ valid: true, reject: false }));
     }
     public registerCommands(commands: SheetCommandBus): void {
-      commands.register(RegisterValidatorCommand, () => new LocalActionCommand(RegisterValidatorCommand.id, () => {
-        disposeRuntime = retained!.register('test.runtime', () => ({ valid: false, reject: true }));
-      }));
+      commands.register(
+        RegisterValidatorCommand,
+        () =>
+          new LocalActionCommand(RegisterValidatorCommand.id, () => {
+            disposeRuntime = retained!.register('test.runtime', () => ({ valid: false, reject: true }));
+          }),
+      );
     }
-    public registerState() { return { key: this.key, state: null }; }
-    public getPluginConfig(): null { return null; }
-    public apply(): null { return null; }
-    public render(): null { return null; }
-    public dispose(): void { this.#disposeInitial?.(); }
+    public registerState() {
+      return { key: this.key, state: null };
+    }
+    public apply(): null {
+      return null;
+    }
+    public dispose(): void {
+      this.#disposeInitial?.();
+    }
   }
 
   const editor = createSheetEditor({
-    sheetState: createSheetState({ size: 2 }), adapters: createHeadlessAdapters(),
+    sheetState: createSheetState({ size: 2 }),
+    adapters: createHeadlessAdapters(),
     plugins: [RetainedValidatorPlugin],
   });
   const events: string[] = [];
@@ -3095,8 +3325,9 @@ it('guards input validators retained by a Sheet plugin after assembly', () => {
     if (event.phase === 'completed') events.push(event.id);
   });
   try {
-    expect(() => retained!.register('test.direct', () => ({ valid: false, reject: true })))
-      .toThrow('editor.commands.run');
+    expect(() => retained!.register('test.direct', () => ({ valid: false, reject: true }))).toThrow(
+      'editor.commands.run',
+    );
     editor.commands.run(RegisterValidatorCommand, undefined);
     expect(retained!.validate(0, 0, 'x').reject).toBe(true);
     disposeRuntime!();
@@ -3117,36 +3348,49 @@ it('guards lifecycle controllers retained by a Sheet plugin after assembly', () 
   let unregisterInitial: (() => void) | undefined;
   let unregisterRuntime: (() => void) | undefined;
   const controller = (name: string) => ({
-    start: () => { calls.push(`start:${name}`); },
-    destroy: () => { calls.push(`destroy:${name}`); },
+    start: () => {
+      calls.push(`start:${name}`);
+    },
+    destroy: () => {
+      calls.push(`destroy:${name}`);
+    },
   });
 
   @Injectable()
-  class RetainedLifecyclePlugin extends SheetPlugin<null> {
-    public static readonly symbol = Symbol.for('RetainedLifecyclePlugin');
-    public constructor() { super({ key: new PluginKey('RetainedLifecyclePlugin'), state: null }); }
-    public configure(context: SheetPluginSetupContext): void {
+  class RetainedLifecycleView extends SheetView {
+    public static readonly symbol = Symbol.for('RetainedLifecycleView');
+    public constructor() {
+      super(new PluginKey('RetainedLifecycleView'));
+    }
+    public configure(context: SheetViewSetupContext): void {
       retained = context.runtime.lifecycle;
       unregisterInitial = retained.register(controller('initial'));
     }
-    public initialize(context: SheetPluginRuntimeContext): void { retainedCore = context.core; }
-    public registerCommands(commands: SheetCommandBus): void {
-      commands.register(RegisterLifecycleCommand, () => new LocalActionCommand(RegisterLifecycleCommand.id, () => {
-        unregisterRuntime = retained!.register(controller('runtime'));
-      }));
-      commands.register(RemoveLifecycleCommand, () => new LocalActionCommand(RemoveLifecycleCommand.id, () => {
-        unregisterRuntime?.();
-      }));
+    public initialize(context: SheetViewRuntimeContext): void {
+      retainedCore = context.core;
     }
-    public registerState() { return { key: this.key, state: null }; }
-    public getPluginConfig(): null { return null; }
-    public apply(): null { return null; }
-    public render(): null { return null; }
+    public registerCommands(commands: SheetCommandBus): void {
+      commands.register(
+        RegisterLifecycleCommand,
+        () =>
+          new LocalActionCommand(RegisterLifecycleCommand.id, () => {
+            unregisterRuntime = retained!.register(controller('runtime'));
+          }),
+      );
+      commands.register(
+        RemoveLifecycleCommand,
+        () =>
+          new LocalActionCommand(RemoveLifecycleCommand.id, () => {
+            unregisterRuntime?.();
+          }),
+      );
+    }
   }
 
   const editor = createSheetEditor({
-    sheetState: createSheetState({ size: 2 }), adapters: createHeadlessAdapters(),
-    plugins: [RetainedLifecyclePlugin],
+    sheetState: createSheetState({ size: 2 }),
+    adapters: createHeadlessAdapters(),
+    viewExtensions: [RetainedLifecycleView],
   });
   try {
     expect(() => retained!.register(controller('direct'))).toThrow('editor.commands.run');
@@ -3154,8 +3398,12 @@ it('guards lifecycle controllers retained by a Sheet plugin after assembly', () 
     expect(() => retained!.destroy()).toThrow('editor owner');
     expect(() => retainedCore!.destroy()).toThrow('editor owner');
     expect(() => retainedCore!.getRenderEngine().scrollManager.destroy()).toThrow('editor owner');
-    expect(() => { (retainedCore as unknown as { dataEngine: unknown }).dataEngine = {}; }).toThrow();
-    expect(() => { (retainedCore as unknown as { eventEngine: unknown }).eventEngine = {}; }).toThrow();
+    expect(() => {
+      (retainedCore as unknown as { dataEngine: unknown }).dataEngine = {};
+    }).toThrow();
+    expect(() => {
+      (retainedCore as unknown as { eventEngine: unknown }).eventEngine = {};
+    }).toThrow();
     editor.commands.run(RegisterLifecycleCommand, undefined);
     expect(() => unregisterRuntime!()).toThrow('editor.commands.run');
     editor.commands.run(RemoveLifecycleCommand, undefined);
@@ -3172,18 +3420,20 @@ it('prevents retained Sheet plugins from clearing active sessions directly', () 
     sheetState: createSheetState({ size: 2 }),
     adapters: {
       ...createHeadlessAdapters(),
-      registerEnvironment: (value) => { container = value; },
+      registerEnvironment: (value) => {
+        container = value;
+      },
     },
   });
   try {
     editor.commands.run(StartFormatPainterCommand, {
-      source: { start: [0, 0], end: [0, 0] }, mode: FormatPainterMode.Persistent,
+      source: { start: [0, 0], end: [0, 0] },
+      mode: FormatPainterMode.Persistent,
     });
     const painter = container!.resolve<SheetFormatPainterPlugin>(SheetFormatPainterPlugin.symbol);
     expect(editor.observations.getSnapshot(FormatPainterObservation).mode).toBe(FormatPainterMode.Persistent);
     expect(() => painter.destroy()).toThrow('editor.commands.run');
-    expect(() => Object.defineProperty(painter, 'assertRuntimeWriteAllowed', { value: () => void 0 }))
-      .toThrow();
+    expect(() => Object.defineProperty(painter, 'assertRuntimeWriteAllowed', { value: () => void 0 })).toThrow();
     expect(() => SheetFormatPainterPlugin.prototype.destroy.call(painter)).toThrow('editor.commands.run');
     expect(editor.observations.getSnapshot(FormatPainterObservation).mode).toBe(FormatPainterMode.Persistent);
   } finally {
@@ -3197,12 +3447,14 @@ it('rejects rebinding retained cell editor runtime services after assembly', () 
     sheetState: createSheetState({ size: 2 }),
     adapters: {
       ...createHeadlessAdapters(),
-      registerEnvironment: (value) => { container = value; },
+      registerEnvironment: (value) => {
+        container = value;
+      },
     },
   });
   try {
-    const cellEditor = container!.resolve<SheetCellEditorPlugin>(SheetCellEditorPlugin.symbol);
-    expect(() => cellEditor.bindRuntimeServices(container!)).toThrow('cannot be rebound after assembly');
+    const cellEditor = container!.resolve<SheetCellEditorView>(SheetCellEditorView.symbol);
+    expect(() => cellEditor.bindCore({} as SearCoreSheet)).toThrow('already bound');
   } finally {
     editor.destroy();
   }
@@ -3212,10 +3464,9 @@ it('guards cell extensions retained by a Sheet plugin after assembly', () => {
   const RegisterCellExtensionCommand = defineSheetCommand<void>('test.cellExtension.register');
   const RemoveCellExtensionCommand = defineSheetCommand<void>('test.cellExtension.remove');
   const cellType = 'test.retained-cell';
-  const definition: CellRenderDefinition = {
-    type: cellType,
-    createRenderer: () => ({ cellType, register: () => () => void 0 }),
-  };
+  const definition = new (class extends CellTypeDefinition {
+    public readonly type = cellType;
+  })();
   let catalog: CellTypeCatalog | null = null;
   let commits: CellCommitStrategyRegistry | null = null;
   let displays: CellDisplayTextRegistry | null = null;
@@ -3225,10 +3476,12 @@ it('guards cell extensions retained by a Sheet plugin after assembly', () => {
   let disposeDefinition: (() => void) | undefined;
   let disposeConverter: (() => void) | undefined;
   @Injectable()
-  class RetainedCellExtensionPlugin extends SheetPlugin<null> {
-    public static readonly symbol = Symbol.for('RetainedCellExtensionPlugin');
-    public constructor() { super({ key: new PluginKey('RetainedCellExtensionPlugin'), state: null }); }
-    public configure(context: SheetPluginSetupContext): void {
+  class RetainedCellExtensionView extends SheetView {
+    public static readonly symbol = Symbol.for('RetainedCellExtensionView');
+    public constructor() {
+      super(new PluginKey('RetainedCellExtensionView'));
+    }
+    public configure(context: SheetViewSetupContext): void {
       catalog = context.runtime.cells.catalog;
       commits = context.container.resolve(CellCommitStrategyRegistry.symbol);
       displays = context.container.resolve(CellDisplayTextRegistry.symbol);
@@ -3237,38 +3490,40 @@ it('guards cell extensions retained by a Sheet plugin after assembly', () => {
       converters = context.container.resolve(CellFormulaValueConverterRegistry.symbol);
     }
     public registerCommands(commands: SheetCommandBus): void {
-      commands.register(RegisterCellExtensionCommand, () =>
-        new LocalActionCommand(RegisterCellExtensionCommand.id, () => {
-          disposeDefinition = catalog!.register(definition);
-          disposeConverter = converters!.register({ cellType, toFormulaValue: () => 42 });
-        }));
-      commands.register(RemoveCellExtensionCommand, () =>
-        new LocalActionCommand(RemoveCellExtensionCommand.id, () => {
-          disposeConverter?.();
-          disposeDefinition?.();
-        }));
+      commands.register(
+        RegisterCellExtensionCommand,
+        () =>
+          new LocalActionCommand(RegisterCellExtensionCommand.id, () => {
+            disposeDefinition = catalog!.register(definition);
+            disposeConverter = converters!.register({ cellType, toFormulaValue: () => 42 });
+          }),
+      );
+      commands.register(
+        RemoveCellExtensionCommand,
+        () =>
+          new LocalActionCommand(RemoveCellExtensionCommand.id, () => {
+            disposeConverter?.();
+            disposeDefinition?.();
+          }),
+      );
     }
-    public registerState() { return { key: this.key, state: null }; }
-    public getPluginConfig(): null { return null; }
-    public apply(): null { return null; }
-    public render(): null { return null; }
   }
 
   const editor = createSheetEditor({
-    sheetState: createSheetState({ size: 2 }), adapters: createHeadlessAdapters(),
-    plugins: [RetainedCellExtensionPlugin],
+    sheetState: createSheetState({ size: 2 }),
+    adapters: createHeadlessAdapters(),
+    viewExtensions: [RetainedCellExtensionView],
   });
   try {
     expect(() => catalog!.register(definition)).toThrow('editor.commands.run');
-    expect(() => converters!.register({ cellType, toFormulaValue: () => 42 }))
-      .toThrow('editor.commands.run');
+    expect(() => converters!.register({ cellType, toFormulaValue: () => 42 })).toThrow('editor.commands.run');
     expect(() => catalog!.unregister(CellType.String)).toThrow('editor.commands.run');
     expect(() => commits!.unregister('test')).toThrow('editor.commands.run');
-    expect(() => displays!.register({ cellType: 'test', getDisplayText: () => 'changed' }))
-      .toThrow('editor.commands.run');
+    expect(() => displays!.register({ cellType: 'test', getDisplayText: () => 'changed' })).toThrow(
+      'editor.commands.run',
+    );
     expect(() => visuals!.destroy()).toThrow('editor.commands.run');
-    expect(() => coordinator!.registerStoredValueValidator('test', () => true))
-      .toThrow('editor.commands.run');
+    expect(() => coordinator!.registerStoredValueValidator('test', () => true)).toThrow('editor.commands.run');
     editor.commands.run(RegisterCellExtensionCommand, undefined);
     expect(catalog!.get(definition.type)).toBe(definition);
     expect(converters!.toFormulaValue({ type: cellType, value: 'ignored' })).toBe(42);
@@ -3288,7 +3543,7 @@ it('guards setup contributions retained by a Sheet plugin after assembly', () =>
   const RemoveQueryCommand = defineSheetCommand<void>('test.runtimeQuery.remove');
   const RuntimeQuery = defineSheetQuery<void, number>('test.runtimeQuery');
   const RuntimeCapability = defineSheetRuntimeCapability<number>('test.runtimeCapability');
-  let runtime: SheetPluginSetupContext['runtime'] | null = null;
+  let runtime: SheetViewSetupContext['runtime'] | null = null;
   let transfers: SheetFormatTransferRegistry | null = null;
   let moves: SheetRangeMoveRegistry | null = null;
   let reorders: SheetRangeReorderRegistry | null = null;
@@ -3297,10 +3552,12 @@ it('guards setup contributions retained by a Sheet plugin after assembly', () =>
   let disposeTransfer: (() => void) | undefined;
   let disposeQuery: (() => void) | undefined;
   @Injectable()
-  class RetainedContributionPlugin extends SheetPlugin<null> {
-    public static readonly symbol = Symbol.for('RetainedContributionPlugin');
-    public constructor() { super({ key: new PluginKey('RetainedContributionPlugin'), state: null }); }
-    public configure(context: SheetPluginSetupContext): void {
+  class RetainedContributionView extends SheetView {
+    public static readonly symbol = Symbol.for('RetainedContributionView');
+    public constructor() {
+      super(new PluginKey('RetainedContributionView'));
+    }
+    public configure(context: SheetViewSetupContext): void {
       runtime = context.runtime;
       transfers = context.container.resolve(SheetFormatTransferRegistry.symbol);
       moves = context.container.resolve(SheetRangeMoveRegistry.symbol);
@@ -3309,51 +3566,67 @@ it('guards setup contributions retained by a Sheet plugin after assembly', () =>
       highlights = context.container.resolve(SheetHighlightRegistry.symbol);
     }
     public registerCommands(commands: SheetCommandBus): void {
-      commands.register(RegisterTransferCommand, () => new LocalActionCommand(RegisterTransferCommand.id, () => {
-        disposeTransfer = transfers!.register({ id: 'test.transfer' });
-      }));
-      commands.register(RemoveTransferCommand, () =>
-        new LocalActionCommand(RemoveTransferCommand.id, () => disposeTransfer?.()));
-      commands.register(RegisterQueryCommand, () =>
-        new LocalActionCommand(RegisterQueryCommand.id, () => {
-          disposeQuery = runtime!.queries.register(RuntimeQuery, () => 7);
-        }));
-      commands.register(RemoveQueryCommand, () =>
-        new LocalActionCommand(RemoveQueryCommand.id, () => disposeQuery?.()));
+      commands.register(
+        RegisterTransferCommand,
+        () =>
+          new LocalActionCommand(RegisterTransferCommand.id, () => {
+            disposeTransfer = transfers!.register({ id: 'test.transfer' });
+          }),
+      );
+      commands.register(
+        RemoveTransferCommand,
+        () => new LocalActionCommand(RemoveTransferCommand.id, () => disposeTransfer?.()),
+      );
+      commands.register(
+        RegisterQueryCommand,
+        () =>
+          new LocalActionCommand(RegisterQueryCommand.id, () => {
+            disposeQuery = runtime!.queries.register(RuntimeQuery, () => 7);
+          }),
+      );
+      commands.register(
+        RemoveQueryCommand,
+        () => new LocalActionCommand(RemoveQueryCommand.id, () => disposeQuery?.()),
+      );
     }
-    public registerState() { return { key: this.key, state: null }; }
-    public getPluginConfig(): null { return null; }
-    public apply(): null { return null; }
-    public render(): null { return null; }
   }
 
   const editor = createSheetEditor({
-    sheetState: createSheetState({ size: 2 }), adapters: createHeadlessAdapters(),
-    plugins: [RetainedContributionPlugin],
+    sheetState: createSheetState({ size: 2 }),
+    adapters: createHeadlessAdapters(),
+    viewExtensions: [RetainedContributionView],
   });
   try {
     expect(() => transfers!.register({ id: 'test.direct' })).toThrow('editor.commands.run');
     expect(() => moves!.destroy()).toThrow('editor.commands.run');
     expect(() => reorders!.destroy()).toThrow('editor.commands.run');
     expect(() => structures!.destroy()).toThrow('editor.commands.run');
-    expect(() => runtime!.interaction.reducers.register({ type: 'test.direct', reduce: (state) => state }))
-      .toThrow('editor.commands.run');
-    expect(() => runtime!.interaction.pipelineSteps.register({ kind: 'test.direct', execute: () => void 0 }))
-      .toThrow('editor.commands.run');
-    expect(() => runtime!.render.strategies.addStrategy(Symbol('test.direct'), testStrategy))
-      .toThrow('editor.commands.run');
+    expect(() => runtime!.interaction.reducers.register({ type: 'test.direct', reduce: (state) => state })).toThrow(
+      'editor.commands.run',
+    );
+    expect(() => runtime!.interaction.pipelineSteps.register({ kind: 'test.direct', execute: () => void 0 })).toThrow(
+      'editor.commands.run',
+    );
+    expect(() => runtime!.render.strategies.addStrategy(Symbol('test.direct'), testStrategy)).toThrow(
+      'editor.commands.run',
+    );
     expect(() => runtime!.render.strategies.setViewScale(2)).toThrow('editor.commands.run');
-    expect(() => runtime!.input.cursorRules.register({
-      kind: CursorRuleKind.Type, cellType: 'test.direct', cursor: CursorToken.Pointer,
-    })).toThrow('editor.commands.run');
-    expect(() => highlights!.register({ key: 'test.direct', getHighlights: () => [] }))
-      .toThrow('editor.commands.run');
-    expect(() => highlights!.setEnabled('sheet.formatPainter.source', false))
-      .toThrow('editor.commands.run');
+    expect(() =>
+      runtime!.input.cursorRules.register({
+        kind: CursorRuleKind.Type,
+        cellType: 'test.direct',
+        cursor: CursorToken.Pointer,
+      }),
+    ).toThrow('editor.commands.run');
+    expect(() => highlights!.register({ key: 'test.direct', getHighlights: () => [] })).toThrow('editor.commands.run');
+    expect(() => highlights!.setEnabled('sheet.formatPainter.source', false)).toThrow('editor.commands.run');
     expect(() => runtime!.queries.register(RuntimeQuery, () => 7)).toThrow('editor.commands.run');
-    expect(() => runtime!.observations.register(thirdPartyStatusObservation, {
-      getSnapshot: () => 1, subscribe: () => () => void 0,
-    })).toThrow('editor.commands.run');
+    expect(() =>
+      runtime!.observations.register(thirdPartyStatusObservation, {
+        getSnapshot: () => 1,
+        subscribe: () => () => void 0,
+      }),
+    ).toThrow('editor.commands.run');
     expect(() => runtime!.extensions.register(RuntimeCapability, 7)).toThrow('editor.commands.run');
     expect(() => runtime!.queries.destroy()).toThrow('editor.commands.run');
     expect(() => runtime!.observations.destroy()).toThrow('editor.commands.run');

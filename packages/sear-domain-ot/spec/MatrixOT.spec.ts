@@ -1,7 +1,6 @@
 import { CSRMatrix } from '@searsuite/sear-domain-matrix';
 import { DenseMatrixOTSnapshot } from '../src/DenseMatrixOTSnapshot';
 import {
-  BaseOT,
   OTTransformPriority,
   type OTOperation,
   MatrixOT,

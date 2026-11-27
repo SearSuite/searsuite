@@ -6,19 +6,17 @@ import {
   assertCellExtensionWrite,
   type CellCommitStrategyDefinition,
 } from '@searsuite/sear-domain-cell-types';
-import { SheetRenderCoordinatorManager } from '@searsuite/sear-render-registry';
+
 import {
   CellDisplayTextRegistry,
   type CellDisplayContext,
   type CellDisplayData,
   type CellDisplayTextProvider,
 } from './CellDisplayTextRegistry';
-import { CellRenderDefinition } from './CellRenderDefinition';
-import { type CellRendererDefinition } from './CellRendererDefinition';
 import { CellTypeDefinition } from './CellTypeDefinition';
 
 /**
- * Workbook catalog of available persisted cell types and render-only cell roles.
+ * Editor-local catalog of persisted cell types and their semantic capabilities.
  *
  * Registering a definition installs all of its capabilities atomically into
  * the specialised registries; disposing it restores the definition it replaced.
@@ -27,23 +25,21 @@ import { CellTypeDefinition } from './CellTypeDefinition';
 export class CellTypeCatalog {
   readonly #commitStrategies: CellCommitStrategyRegistry;
   readonly #displayTexts: CellDisplayTextRegistry;
-  readonly #renderCoordinator: SheetRenderCoordinatorManager;
   readonly #clipboardCodecs: CellClipboardCodecRegistry;
   readonly #formatCodecs: CellFormatTransferRegistry | undefined;
 
   /** DI token for resolving the workbook cell type catalog. */
   public static readonly symbol = Symbol.for('CellTypeCatalog');
 
-  readonly #definitions = new Map<string | symbol, CellRenderDefinition>();
+  readonly #definitions = new Map<string | symbol, CellTypeDefinition>();
   readonly #disposers = new Map<string | symbol, () => void>();
   readonly #capabilities = new Map<
-    CellRenderDefinition,
+    CellTypeDefinition,
     {
       commitStrategies: readonly CellCommitStrategyDefinition[];
       displayTextProvider: CellDisplayTextProvider | undefined;
       clipboardCodec: ReturnType<CellTypeDefinition['createClipboardCodec']>;
       formatCodec: ReturnType<CellTypeDefinition['createFormatTransferCodec']>;
-      renderer: CellRendererDefinition;
     }
   >();
 
@@ -56,27 +52,24 @@ export class CellTypeCatalog {
     container.register(CellTypeCatalog.symbol, CellTypeCatalog, Scope.Singleton);
   }
 
-  /** Creates a catalog over the specialised commit, display-text and renderer registries. */
+  /** Creates a catalog over the commit, display-text, clipboard and format registries. */
   constructor(
     @Inject(CellCommitStrategyRegistry.symbol)
     commitStrategies: CellCommitStrategyRegistry,
     @Inject(CellDisplayTextRegistry.symbol)
     displayTexts: CellDisplayTextRegistry,
-    @Inject(SheetRenderCoordinatorManager.symbol)
-    renderCoordinator: SheetRenderCoordinatorManager,
     @Inject(CellClipboardCodecRegistry.symbol)
     clipboardCodecs: CellClipboardCodecRegistry,
     @Inject(CellFormatTransferRegistry.symbol) formatCodecs?: CellFormatTransferRegistry,
   ) {
     this.#commitStrategies = commitStrategies;
     this.#displayTexts = displayTexts;
-    this.#renderCoordinator = renderCoordinator;
     this.#clipboardCodecs = clipboardCodecs;
     this.#formatCodecs = formatCodecs;
   }
 
   /** Registers a definition atomically and returns a disposer that restores the previous definition. */
-  register(definition: CellRenderDefinition): () => void {
+  register(definition: CellTypeDefinition): () => void {
     assertCellExtensionWrite(this);
     const type = definition.type;
     const previous = this.#definitions.get(type);
@@ -87,7 +80,6 @@ export class CellTypeCatalog {
       displayTextProvider: definition instanceof CellTypeDefinition ? definition.createDisplayTextProvider() : void 0,
       clipboardCodec: definition instanceof CellTypeDefinition ? definition.createClipboardCodec() : void 0,
       formatCodec: definition instanceof CellTypeDefinition ? definition.createFormatTransferCodec() : void 0,
-      renderer: definition.createRenderer(),
     };
     this.#capabilities.set(definition, capabilities);
 
@@ -98,9 +90,6 @@ export class CellTypeCatalog {
       capabilities.formatCodec && this.#formatCodecs?.register(capabilities.formatCodec),
       capabilities.clipboardCodec && this.#clipboardCodecs.register(capabilities.clipboardCodec),
       capabilities.displayTextProvider && this.#displayTexts.register(capabilities.displayTextProvider),
-      definition instanceof CellTypeDefinition &&
-        this.#renderCoordinator.registerStoredValueValidator(type, definition.isStoredValue.bind(definition)),
-      capabilities.renderer.register(this.#renderCoordinator),
     ].filter((disposer): disposer is () => void => Boolean(disposer));
     Object.freeze(definition);
 
@@ -128,12 +117,12 @@ export class CellTypeCatalog {
   }
 
   /** Returns the registered definition for a type key. */
-  get(type: string | symbol): CellRenderDefinition | undefined {
+  get(type: string | symbol): CellTypeDefinition | undefined {
     return this.#definitions.get(type);
   }
 
   /** Returns all registered definitions in insertion order. */
-  getAll(): readonly CellRenderDefinition[] {
+  getAll(): readonly CellTypeDefinition[] {
     return [...this.#definitions.values()];
   }
 

@@ -1,5 +1,1 @@
-export {
-  type DocInteractionRuntime,
-  type DocPointerDragHandlers,
-  type DocPointerInput,
-} from '@searsuite/sear-assembly-doc';
+export { type DocInteractionRuntime, type DocPointerDragHandlers, type DocPointerInput } from './DocViewCapabilities';

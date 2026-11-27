@@ -1,9 +1,14 @@
-import { defineSheetCommand, LocalActionCommand, type SheetCommandBus, type SheetCommandResult } from '@searsuite/sear-assembly-commands';
-import { Pipeline } from '@searsuite/sear-assembly-core';
+import {
+  defineSheetCommand,
+  LocalActionCommand,
+  type SheetCommandBus,
+  type SheetCommandResult,
+} from '@searsuite/sear-assembly-commands';
+
 import { Plugin, PluginKey, type PluginExtension } from '@searsuite/sear-assembly-plugin';
 import { Transaction } from '@searsuite/sear-domain-transaction';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
-import { type CellProperties } from '@searsuite/sear-render-registry';
+
 import {
   SheetClipboardCodecSymbol,
   SheetClipboardDataSourceSymbol,
@@ -74,10 +79,7 @@ const pluginKey = new PluginKey('SheetClipboard');
 
 /** Default sheet clipboard plugin. System clipboard I/O remains a host-owned SheetClipboardPort. */
 @Injectable()
-export class SheetClipboardPlugin
-  extends Plugin<unknown, CellProperties, Record<string, never>>
-  implements PluginExtension<SheetCommandBus>
-{
+export class SheetClipboardPlugin extends Plugin<Record<string, never>> implements PluginExtension<SheetCommandBus> {
   readonly #source: SheetClipboardDataSource;
   readonly #codec: SheetClipboardCodec;
 
@@ -99,8 +101,10 @@ export class SheetClipboardPlugin
   public registerCommands(commands: SheetCommandBus): void {
     commands.register(CopyRangeCommand, (input) => new CopyRangeSheetCommand(this.#source, this.#codec, input));
     commands.register(CutRangeCommand, (input) => new CutRangeSheetCommand(this.#source, this.#codec, input));
-    commands.register(CancelCutRangeCommand, () =>
-      new LocalActionCommand(CancelCutRangeCommand.id, () => this.#source.cutSession?.cancel()));
+    commands.register(
+      CancelCutRangeCommand,
+      () => new LocalActionCommand(CancelCutRangeCommand.id, () => this.#source.cutSession?.cancel()),
+    );
     commands.register(PasteRangeCommand, (input) => new PasteRangeSheetCommand(this.#source, this.#codec, input));
   }
 
@@ -110,13 +114,5 @@ export class SheetClipboardPlugin
 
   public apply(state: Record<string, never>, _transaction: Transaction): Record<string, never> {
     return state;
-  }
-
-  public getPluginConfig(): null {
-    return null;
-  }
-
-  public render(): [] {
-    return [];
   }
 }

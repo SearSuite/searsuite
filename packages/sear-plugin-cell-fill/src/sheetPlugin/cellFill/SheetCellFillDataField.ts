@@ -1,4 +1,5 @@
-import { type DataEngine, SheetDataFieldNamespace } from '@searsuite/sear-render-engine';
+import { SheetDataFieldNamespace } from '@searsuite/sear-domain-sheet';
+import { type DataEngine } from '@searsuite/sear-domain-state';
 import { type CellFillMatrix } from '../../CellFillMatrix';
 
 /** DataEngine field owned by SheetCellFillPlugin. */

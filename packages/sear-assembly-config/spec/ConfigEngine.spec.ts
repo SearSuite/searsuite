@@ -1,42 +1,37 @@
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
 
-import {
-  ConfigEngine,
-  ConfigUnit,
-  defaultDocConfig,
-  defaultSheetConfig,
-} from '../src';
+import { ConfigEngine, ConfigUnit, defaultDocConfig, defaultSheetConfig } from '../src';
 
 describe('ConfigEngine', () => {
   it('registers and retrieves isolated plugin configurations', () => {
     const engine = new ConfigEngine();
     const key = new PluginKey('first');
 
-    engine.registerPluginConfig(key, { enabled: true, nested: { width: 100 } });
+    engine.registerConfig(key, { enabled: true, nested: { width: 100 } });
 
-    expect(engine.getPluginConfig<{ enabled: boolean; nested: { width: number } }>(key)).toMatchObject({
+    expect(engine.getConfig<{ enabled: boolean; nested: { width: number } }>(key)).toMatchObject({
       enabled: true,
       nested: { width: 100 },
     });
-    expect(engine.getPluginConfig(new PluginKey('missing'))).toBe(void 0);
-    expect(() => engine.registerPluginConfig(key, { enabled: false })).toThrow('already exists');
+    expect(engine.getConfig(new PluginKey('missing'))).toBe(void 0);
+    expect(() => engine.registerConfig(key, { enabled: false })).toThrow('already exists');
   });
 
   it('accepts plain string config keys at the runtime boundary', () => {
     const engine = new ConfigEngine();
 
-    engine.registerPluginConfig('plain-key', { enabled: true });
+    engine.registerConfig('plain-key', { enabled: true });
 
-    expect(engine.getPluginConfig<{ enabled: boolean }>('plain-key')).toMatchObject({ enabled: true });
-    expect(() => engine.registerPluginConfig('plain-key', { enabled: false })).toThrow(
+    expect(engine.getConfig<{ enabled: boolean }>('plain-key')).toMatchObject({ enabled: true });
+    expect(() => engine.registerConfig('plain-key', { enabled: false })).toThrow(
       'Configuration for plugin "plain-key" already exists.',
     );
   });
 
   it('merges registered plugin configuration values', () => {
     const engine = new ConfigEngine();
-    engine.registerPluginConfig(new PluginKey('first'), { shared: 'first', a: 1 });
-    engine.registerPluginConfig(new PluginKey('second'), { shared: 'second', b: 2 });
+    engine.registerConfig(new PluginKey('first'), { shared: 'first', a: 1 });
+    engine.registerConfig(new PluginKey('second'), { shared: 'second', b: 2 });
 
     expect(engine.getCombinedConfig<{ shared: string; a: number; b: number }>()).toMatchObject({
       shared: 'second',
@@ -48,7 +43,7 @@ describe('ConfigEngine', () => {
   it('rejects a missing plugin key at the runtime boundary', () => {
     const engine = new ConfigEngine();
 
-    expect(() => engine.registerPluginConfig(null as unknown as PluginKey, { enabled: true })).toThrow(
+    expect(() => engine.registerConfig(null as unknown as PluginKey, { enabled: true })).toThrow(
       'Plugin name cannot be empty.',
     );
   });
@@ -134,8 +129,8 @@ describe('ConfigEngine', () => {
   it('reacts to top-level plugin configuration mutations', () => {
     const engine = new ConfigEngine();
     const key = new PluginKey('reactive');
-    engine.registerPluginConfig(key, { enabled: true });
-    const config = engine.getPluginConfig<{ enabled: boolean }>(key);
+    engine.registerConfig(key, { enabled: true });
+    const config = engine.getConfig<{ enabled: boolean }>(key);
     if (!config) throw new Error('plugin config missing');
 
     config.enabled = false;
@@ -147,23 +142,33 @@ describe('ConfigEngine', () => {
     const defaults = { nested: { width: 100 } };
     const engine = new ConfigEngine(defaults);
     const pluginConfig = { nested: { enabled: true } };
-    engine.registerPluginConfig('plugin', pluginConfig);
-    const retained = engine.getPluginConfig<typeof pluginConfig>('plugin')!;
+    engine.registerConfig('plugin', pluginConfig);
+    const retained = engine.getConfig<typeof pluginConfig>('plugin')!;
     let executing = false;
     engine.enforceCommandBoundary(() => executing);
 
-    expect(() => { (engine as unknown as { defaultConfigOverrides: object }).defaultConfigOverrides = { nested: { width: 900 } }; }).toThrow();
+    expect(() => {
+      (engine as unknown as { defaultConfigOverrides: object }).defaultConfigOverrides = { nested: { width: 900 } };
+    }).toThrow();
     expect(engine.getDefaultConfig().nested.width).toBe(100);
 
-    expect(() => { defaults.nested.width = 200; }).toThrow();
-    expect(() => { pluginConfig.nested.enabled = false; }).toThrow();
-    expect(() => { retained.nested.enabled = false; }).toThrow();
+    expect(() => {
+      defaults.nested.width = 200;
+    }).toThrow();
+    expect(() => {
+      pluginConfig.nested.enabled = false;
+    }).toThrow();
+    expect(() => {
+      retained.nested.enabled = false;
+    }).toThrow();
     expect(() => engine.updateDefaultConfigOverrides({ nested: { width: 200 } })).toThrow('editor.commands.run');
     executing = true;
     engine.updateDefaultConfigOverrides({ nested: { width: 200 } });
     executing = false;
     expect(engine.getDefaultConfig().nested.width).toBe(200);
-    expect(() => { engine.getDefaultConfig().nested.width = 300; }).toThrow();
+    expect(() => {
+      engine.getDefaultConfig().nested.width = 300;
+    }).toThrow();
   });
 
   it('rejects writes when a retained engine has a forged command guard', () => {

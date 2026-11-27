@@ -1,4 +1,4 @@
-import { Pipeline } from '@searsuite/sear-assembly-core';
+import { Pipeline } from '@searsuite/sear-assembly-plugin';
 import type { SheetCommand, SheetCommandContext } from '@searsuite/sear-assembly-commands';
 import type { IFormulaStatusProvider } from '@searsuite/sear-domain-formula-engine';
 import {
@@ -13,10 +13,7 @@ export class FormulaCellStatusQueryCommand implements SheetCommand<FormulaCellSt
 
   public readonly id = GetFormulaCellStatusCommand.id;
 
-  public constructor(
-    provider: IFormulaStatusProvider,
-    input: FormulaCellStatusCommandInput,
-  ) {
+  public constructor(provider: IFormulaStatusProvider, input: FormulaCellStatusCommandInput) {
     this.#provider = provider;
     this.#input = input;
   }

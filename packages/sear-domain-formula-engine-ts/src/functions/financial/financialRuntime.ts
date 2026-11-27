@@ -13,11 +13,21 @@ import {
 import { isFormulaText } from '@searsuite/sear-foundation-utils';
 import { dateSerialArg, isFormulaErrorValue } from '../dateTime/shared/dateTimeFunctionUtils';
 import { excelDatePartsFromSerial } from '../dateTime/shared/dateTimeUtils';
-import { collectFinancialCashFlows, collectFinancialDateSerials, collectFinancialScheduleRates, collectIrrCashFlows, collectNpvCashFlows, futureValue, payment, periodicNpv, readFinancialNumber } from './cashFlow';
+import {
+  collectFinancialCashFlows,
+  collectFinancialDateSerials,
+  collectFinancialScheduleRates,
+  collectIrrCashFlows,
+  collectNpvCashFlows,
+  futureValue,
+  payment,
+  periodicNpv,
+  readFinancialNumber,
+} from './cashFlow';
 import { solveRateRoot } from './rateRoot';
 import { bondDuration, bondPrice } from './bondPricing';
 import { shortFirstCouponPrice } from './oddFirstPrice';
-import { couponAmount, normalizeCouponFrequency, resolveCouponSchedule, resolveOddFirstCouponSchedule } from './couponSchedule';
+import { normalizeCouponFrequency, resolveCouponSchedule, resolveOddFirstCouponSchedule } from './couponSchedule';
 import { oddLastPrice, oddLastYield } from './oddLastPrice';
 import {
   financialDayCountDays,
@@ -59,9 +69,8 @@ function removeIntegerRoundoff(value: number | FormulaError): number | FormulaEr
 export function makeFinancialFunction(name: string, evaluate: FinancialEvaluator, maxArgs?: number): FormulaFunction {
   return {
     name,
-    evaluate: (args, context) => maxArgs !== undefined && args.length > maxArgs
-      ? valueError()
-      : evaluate(args, context),
+    evaluate: (args, context) =>
+      maxArgs !== undefined && args.length > maxArgs ? valueError() : evaluate(args, context),
   };
 }
 
@@ -73,8 +82,9 @@ function number(args: FormulaArg[], index: number, context: EvalContext, fallbac
 }
 
 function isDirectNonNumericCashFlow(arg: FormulaArg | undefined): boolean {
-  return arg?.kind === 'value' &&
-    (arg.sourceKind === FormulaNodeKind.String || arg.sourceKind === FormulaNodeKind.Boolean);
+  return (
+    arg?.kind === 'value' && (arg.sourceKind === FormulaNodeKind.String || arg.sourceKind === FormulaNodeKind.Boolean)
+  );
 }
 
 function bondRedemption(args: FormulaArg[], index: number, context: EvalContext): number | FormulaError {
@@ -89,7 +99,12 @@ function integer(args: FormulaArg[], index: number, context: EvalContext, fallba
   return isFormulaErrorValue(result) ? result : Math.trunc(result);
 }
 
-function date(args: FormulaArg[], index: number, context: EvalContext, rejectBooleanLiteral = false): number | FormulaError {
+function date(
+  args: FormulaArg[],
+  index: number,
+  context: EvalContext,
+  rejectBooleanLiteral = false,
+): number | FormulaError {
   const arg = args[index];
   return dateSerialArg(args, index, context, {
     rejectBoolean: rejectBooleanLiteral && arg?.kind === 'value' && arg.sourceKind === FormulaNodeKind.Boolean,
@@ -99,8 +114,7 @@ function date(args: FormulaArg[], index: number, context: EvalContext, rejectBoo
 function oddBondDate(args: FormulaArg[], index: number, context: EvalContext): number | FormulaError {
   const arg = args[index];
   const referenced = resolveConditionalReference(arg, context);
-  if (referenced && !isFormulaErrorValue(referenced) && typeof readArg(arg, context) === 'boolean')
-    return valueError();
+  if (referenced && !isFormulaErrorValue(referenced) && typeof readArg(arg, context) === 'boolean') return valueError();
   return date(args, index, context);
 }
 
@@ -145,8 +159,13 @@ function financialInputCount(arg: FormulaArg | undefined, context: EvalContext):
     const range = arg.reference;
     return (range.endRow - range.startRow + 1) * (range.endCol - range.startCol + 1);
   }
-  if (arg.kind === 'expression' || arg.kind === 'value' ||
-    arg.kind === FormulaNodeKind.Cell || arg.kind === FormulaNodeKind.WorkbookCell) return 1;
+  if (
+    arg.kind === 'expression' ||
+    arg.kind === 'value' ||
+    arg.kind === FormulaNodeKind.Cell ||
+    arg.kind === FormulaNodeKind.WorkbookCell
+  )
+    return 1;
   if (arg.kind === FormulaNodeKind.Range || arg.kind === FormulaNodeKind.WorkbookRange) {
     return (Math.abs(arg.end[0] - arg.start[0]) + 1) * (Math.abs(arg.end[1] - arg.start[1]) + 1);
   }
@@ -155,13 +174,20 @@ function financialInputCount(arg: FormulaArg | undefined, context: EvalContext):
 
 function hasTextInFinancialRange(arg: FormulaArg | undefined, context: EvalContext): boolean {
   const reference = resolveConditionalReference(arg, context);
-  if (!reference || isFormulaErrorValue(reference) ||
-    (reference.startRow === reference.endRow && reference.startCol === reference.endCol)) return false;
+  if (
+    !reference ||
+    isFormulaErrorValue(reference) ||
+    (reference.startRow === reference.endRow && reference.startCol === reference.endCol)
+  )
+    return false;
   const inputs = collectValues(arg, context);
-  return Array.isArray(inputs) && inputs.some((value) => {
-    const text = isFormulaText(value) ? value.value : value;
-    return typeof text === 'string' && text.trim() !== '';
-  });
+  return (
+    Array.isArray(inputs) &&
+    inputs.some((value) => {
+      const text = isFormulaText(value) ? value.value : value;
+      return typeof text === 'string' && text.trim() !== '';
+    })
+  );
 }
 
 function sameLength(left: readonly number[], right: readonly number[]): boolean {
@@ -198,8 +224,14 @@ function rateRoot(cashFlows: readonly number[], initialGuess: number): number | 
     0,
   );
   // WPS stops when the default guess's first Newton step leaves the rate domain.
-  if (initialGuess === 0.1 && typeof firstValue === 'number' && Number.isFinite(firstSlope) && firstSlope !== 0 &&
-    initialGuess - firstValue / firstSlope <= -1) return numberError();
+  if (
+    initialGuess === 0.1 &&
+    typeof firstValue === 'number' &&
+    Number.isFinite(firstSlope) &&
+    firstSlope !== 0 &&
+    initialGuess - firstValue / firstSlope <= -1
+  )
+    return numberError();
   const maxIterations = 20 + Math.ceil(Math.log2(Math.max(1, Math.abs(initialGuess))));
   return solveFinancialRoot(
     (rate) => cashFlowNpv(rate, scaledCashFlows) as number,
@@ -235,9 +267,7 @@ function xirrRoot(cashFlows: readonly number[], dates: readonly number[], initia
   if (cashFlows.length === 2) {
     const yearFraction = (dates[1] - dates[0]) / 365;
     if (!Number.isFinite(dates[0]) || !Number.isFinite(dates[1]) || !(yearFraction > 0)) return numberError();
-    const rate = Math.expm1(
-      (Math.log(Math.abs(cashFlows[1])) - Math.log(Math.abs(cashFlows[0]))) / yearFraction,
-    );
+    const rate = Math.expm1((Math.log(Math.abs(cashFlows[1])) - Math.log(Math.abs(cashFlows[0]))) / yearFraction);
     return Number.isFinite(rate) ? rate : numberError();
   }
   const scaledCashFlows = normalizeCashFlows(cashFlows);
@@ -360,11 +390,17 @@ function firstPeriodPrincipal(rate: number, periods: number, pv: number, fv: num
     return Number.isFinite(annuity) && annuity !== 0 && Number.isFinite(principal) ? principal : undefined;
   }
   const discount = Math.pow(1 + rate, -periods);
-  const principal = -(rate * (pv + fv)) * discount / (1 - discount);
+  const principal = (-(rate * (pv + fv)) * discount) / (1 - discount);
   return Number.isFinite(principal) ? principal : undefined;
 }
 
-function cumulativePeriodInterest(pmt: number, periods: number, period: number, type: number, logGrowth: number): number {
+function cumulativePeriodInterest(
+  pmt: number,
+  periods: number,
+  period: number,
+  type: number,
+  logGrowth: number,
+): number {
   if (type === 1 && period === 1) return 0;
   return -pmt * Math.expm1(-(periods - period + 1) * logGrowth);
 }
@@ -498,10 +534,10 @@ export const CUMIPMT = makeFinancialFunction('CUMIPMT', (args, context) => {
   const type = number(args, 5, context);
   const argumentError = firstError([rate, nper, pv, start, end, type]);
   if (argumentError) return argumentError;
-  if (rate <= 0 || nper <= 0 || pv <= 0 || start < 1 || end < start || end > nper ||
-    (type !== 0 && type !== 1)) return numberError();
+  if (rate <= 0 || nper <= 0 || pv <= 0 || start < 1 || end < start || end > nper || (type !== 0 && type !== 1))
+    return numberError();
   const logGrowth = Math.log1p(rate);
-  const pmt = -rate * pv / (-Math.expm1(-nper * logGrowth) * (1 + rate * type));
+  const pmt = (-rate * pv) / (-Math.expm1(-nper * logGrowth) * (1 + rate * type));
   if (!Number.isFinite(pmt)) return numberError();
   let total = 0;
   for (let period = Math.ceil(start); period <= end; period++) {
@@ -521,10 +557,10 @@ export const CUMPRINC = makeFinancialFunction('CUMPRINC', (args, context) => {
   const type = number(args, 5, context);
   const argumentError = firstError([rate, nper, pv, start, end, type]);
   if (argumentError) return argumentError;
-  if (rate <= 0 || nper <= 0 || pv <= 0 || start < 1 || end < start || end > nper ||
-    (type !== 0 && type !== 1)) return numberError();
+  if (rate <= 0 || nper <= 0 || pv <= 0 || start < 1 || end < start || end > nper || (type !== 0 && type !== 1))
+    return numberError();
   const logGrowth = Math.log1p(rate);
-  const pmt = -rate * pv / (-Math.expm1(-nper * logGrowth) * (1 + rate * type));
+  const pmt = (-rate * pv) / (-Math.expm1(-nper * logGrowth) * (1 + rate * type));
   if (!Number.isFinite(pmt)) return numberError();
   let total = 0;
   for (let period = Math.ceil(start); period <= end; period++) {
@@ -543,17 +579,25 @@ export const DB = makeFinancialFunction('DB', (args, context) => {
   const argumentError = firstError([cost, salvage, life, period, month]);
   if (argumentError) return argumentError;
   const monthCount = Math.trunc(month);
-  if (cost < 0 || salvage < 0 || life <= 0 || period < 1 ||
-    Math.trunc(period) > life + (monthCount < 12 ? 1 : 0) || monthCount < 1 || monthCount > 12)
+  if (
+    cost < 0 ||
+    salvage < 0 ||
+    life <= 0 ||
+    period < 1 ||
+    Math.trunc(period) > life + (monthCount < 12 ? 1 : 0) ||
+    monthCount < 1 ||
+    monthCount > 12
+  )
     return numberError();
   if (cost === 0) return 0;
   const rate = Math.round((1 - Math.pow(salvage / cost, 1 / life)) * 1000) / 1000;
   let book = cost;
   let depreciation = 0;
   for (let current = 1; current <= period; current++) {
-    depreciation = current === 1
-      ? (cost * rate * monthCount) / 12
-      : current > life && monthCount < 12
+    depreciation =
+      current === 1
+        ? (cost * rate * monthCount) / 12
+        : current > life && monthCount < 12
         ? (book * rate * (12 - monthCount)) / 12
         : Math.min(book * rate, Math.max(0, book - salvage));
     book -= depreciation;
@@ -575,12 +619,14 @@ export const DDB = makeFinancialFunction('DDB', (args, context) => {
 
 /** DISC: annualized discount rate for a discounted security. */
 export const DISC = makeFinancialFunction('DISC', (args, context) => {
-  const settlement = isFormulaArgumentKind(args[0], 'value') && args[0].sourceKind === FormulaNodeKind.Boolean
-    ? dateSerialArg(args, 0, context)
-    : date(args, 0, context);
-  const maturity = isFormulaArgumentKind(args[1], 'value') && args[1].sourceKind === FormulaNodeKind.Boolean
-    ? dateSerialArg(args, 1, context)
-    : date(args, 1, context);
+  const settlement =
+    isFormulaArgumentKind(args[0], 'value') && args[0].sourceKind === FormulaNodeKind.Boolean
+      ? dateSerialArg(args, 0, context)
+      : date(args, 0, context);
+  const maturity =
+    isFormulaArgumentKind(args[1], 'value') && args[1].sourceKind === FormulaNodeKind.Boolean
+      ? dateSerialArg(args, 1, context)
+      : date(args, 1, context);
   const price = number(args, 2, context);
   const redemption = number(args, 3, context, 100);
   const basisValue = basis(args, 4, context);
@@ -588,9 +634,7 @@ export const DISC = makeFinancialFunction('DISC', (args, context) => {
   if (argumentError) return argumentError;
   const fraction = financialYearFraction(settlement, maturity, basisValue);
   if (isFormulaErrorValue(fraction)) return fraction;
-  return fraction <= 0 || price <= 0 || redemption <= 0
-    ? numberError()
-    : (redemption - price) / redemption / fraction;
+  return fraction <= 0 || price <= 0 || redemption <= 0 ? numberError() : (redemption - price) / redemption / fraction;
 });
 
 /** DOLLARDE: converts a fractional dollar price to a decimal price. */
@@ -640,38 +684,46 @@ export const DURATION = makeFinancialFunction('DURATION', (args, context) => {
 });
 
 /** EFFECT: effective annual interest rate. */
-export const EFFECT = makeFinancialFunction('EFFECT', (args, context) => {
-  const nominal = number(args, 0, context);
-  const periods = integer(args, 1, context);
-  const argumentError = firstError([nominal, periods]);
-  if (argumentError) return argumentError;
-  if (nominal <= 0 || periods <= 0) return numberError();
-  const periodicRate = nominal / periods;
-  if (Number.isSafeInteger(periodicRate) && periodicRate > 0) {
-    const base = periodicRate + 1;
-    if (Number.isSafeInteger(base)) {
-      let growth = 1;
-      for (let period = 0; period < periods; period++) {
-        growth *= base;
-        if (!Number.isSafeInteger(growth)) break;
+export const EFFECT = makeFinancialFunction(
+  'EFFECT',
+  (args, context) => {
+    const nominal = number(args, 0, context);
+    const periods = integer(args, 1, context);
+    const argumentError = firstError([nominal, periods]);
+    if (argumentError) return argumentError;
+    if (nominal <= 0 || periods <= 0) return numberError();
+    const periodicRate = nominal / periods;
+    if (Number.isSafeInteger(periodicRate) && periodicRate > 0) {
+      const base = periodicRate + 1;
+      if (Number.isSafeInteger(base)) {
+        let growth = 1;
+        for (let period = 0; period < periods; period++) {
+          growth *= base;
+          if (!Number.isSafeInteger(growth)) break;
+        }
+        if (Number.isSafeInteger(growth)) return growth - 1;
       }
-      if (Number.isSafeInteger(growth)) return growth - 1;
     }
-  }
-  return Math.expm1(periods * Math.log1p(periodicRate));
-}, 2);
+    return Math.expm1(periods * Math.log1p(periodicRate));
+  },
+  2,
+);
 
 /** FV: future value of an annuity. */
-export const FV = makeFinancialFunction('FV', (args, context) => {
-  const rate = number(args, 0, context);
-  const nper = number(args, 1, context);
-  const pmt = number(args, 2, context);
-  const pv = number(args, 3, context, 0);
-  const type = number(args, 4, context, 0);
-  const argumentError = firstError([rate, nper, pmt, pv, type]);
-  if (argumentError) return argumentError;
-  return removeIntegerRoundoff(futureValue(rate, nper, pmt, pv, type === 0 ? 0 : 1));
-}, 5);
+export const FV = makeFinancialFunction(
+  'FV',
+  (args, context) => {
+    const rate = number(args, 0, context);
+    const nper = number(args, 1, context);
+    const pmt = number(args, 2, context);
+    const pv = number(args, 3, context, 0);
+    const type = number(args, 4, context, 0);
+    const argumentError = firstError([rate, nper, pmt, pv, type]);
+    if (argumentError) return argumentError;
+    return removeIntegerRoundoff(futureValue(rate, nper, pmt, pv, type === 0 ? 0 : 1));
+  },
+  5,
+);
 
 /** FVSCHEDULE: future value using a series of variable rates. */
 export const FVSCHEDULE = makeFinancialFunction('FVSCHEDULE', (args, context) => {
@@ -788,7 +840,7 @@ export const MIRR = makeFinancialFunction('MIRR', (args, context) => {
   if (Number.isFinite(result)) return result;
   const scale = cashFlows.reduce((largest, value) => Math.max(largest, Math.abs(value)), 0);
   const scaledPositiveFuture = cashFlows.reduce(
-    (sum, value, index) => sum + (value > 0 ? value / scale * Math.pow(1 + reinvest, last - index) : 0),
+    (sum, value, index) => sum + (value > 0 ? (value / scale) * Math.pow(1 + reinvest, last - index) : 0),
     0,
   );
   const scaledNegativePresent = cashFlows.reduce(
@@ -805,9 +857,7 @@ export const NOMINAL = makeFinancialFunction('NOMINAL', (args, context) => {
   const periods = integer(args, 1, context);
   const argumentError = firstError([effective, periods]);
   if (argumentError) return argumentError;
-  return effective > 0 && periods > 0
-    ? periods * Math.expm1(Math.log1p(effective) / periods)
-    : numberError();
+  return effective > 0 && periods > 0 ? periods * Math.expm1(Math.log1p(effective) / periods) : numberError();
 });
 
 /** NPER: number of periods for an annuity. */
@@ -826,10 +876,11 @@ export const NPER = makeFinancialFunction('NPER', (args, context) => {
   const numerator = pmt * factor - fv * rate;
   const denominator = pv * rate + pmt * factor;
   if (denominator === 0) return numberError();
-  const relativeDifference = -rate * (pv + fv) / denominator;
-  const logRatio = Number.isFinite(relativeDifference) && relativeDifference > -1
-    ? Math.log1p(relativeDifference)
-    : Math.log(numerator / denominator);
+  const relativeDifference = (-rate * (pv + fv)) / denominator;
+  const logRatio =
+    Number.isFinite(relativeDifference) && relativeDifference > -1
+      ? Math.log1p(relativeDifference)
+      : Math.log(numerator / denominator);
   const result = logRatio / Math.log1p(rate);
   if (numerator === denominator && Math.abs(result) < 1e-12) return 0;
   return Number.isFinite(result) ? result : numberError();
@@ -975,14 +1026,11 @@ export const PV = makeFinancialFunction('PV', (args, context) => {
   }
   if (!Number.isFinite(Math.pow(1 + rate, nper))) return numberError();
   const exponent = rate > -1 ? -nper * Math.log1p(rate) : Number.NaN;
-  const growth = rate > -1 && exponent <= 50
-    ? Math.expm1(exponent)
-    : Math.pow(1 + rate, -nper) - 1;
+  const growth = rate > -1 && exponent <= 50 ? Math.expm1(exponent) : Math.pow(1 + rate, -nper) - 1;
   const discount = growth + 1;
   if (!Number.isFinite(discount)) return numberError();
-  const presentValue = growth === -1
-    ? -pmt * (1 + rate * type) * (1 / rate)
-    : -fv * discount + (pmt * (1 + rate * type) * growth) / rate;
+  const presentValue =
+    growth === -1 ? -pmt * (1 + rate * type) * (1 / rate) : -fv * discount + (pmt * (1 + rate * type) * growth) / rate;
   return Number.isFinite(presentValue) ? presentValue : numberError();
 });
 
@@ -1016,16 +1064,18 @@ export const RECEIVED = makeFinancialFunction('RECEIVED', (args, context) => {
 });
 
 /** RRI: equivalent growth rate for an investment. */
-export const RRI = makeFinancialFunction('RRI', (args, context) => {
-  const nper = number(args, 0, context);
-  const pv = number(args, 1, context);
-  const fv = number(args, 2, context);
-  const argumentError = firstError([nper, pv, fv]);
-  if (argumentError) return argumentError;
-  return nper <= 0 || pv <= 0 || fv <= 0
-    ? numberError()
-    : Math.expm1((Math.log(fv) - Math.log(pv)) / nper);
-}, 3);
+export const RRI = makeFinancialFunction(
+  'RRI',
+  (args, context) => {
+    const nper = number(args, 0, context);
+    const pv = number(args, 1, context);
+    const fv = number(args, 2, context);
+    const argumentError = firstError([nper, pv, fv]);
+    if (argumentError) return argumentError;
+    return nper <= 0 || pv <= 0 || fv <= 0 ? numberError() : Math.expm1((Math.log(fv) - Math.log(pv)) / nper);
+  },
+  3,
+);
 
 /** SLN: straight-line depreciation. */
 export const SLN = makeFinancialFunction('SLN', (args, context) => {
@@ -1071,9 +1121,12 @@ export const TBILLPRICE = makeFinancialFunction('TBILLPRICE', (args, context) =>
   const days = maturity - settlement;
   const settlementDate = excelDatePartsFromSerial(settlement);
   const maturityDate = excelDatePartsFromSerial(maturity);
-  const fullCalendarYear = settlementDate && maturityDate &&
+  const fullCalendarYear =
+    settlementDate &&
+    maturityDate &&
     maturityDate.year === settlementDate.year + 1 &&
-    maturityDate.month === settlementDate.month && maturityDate.day === settlementDate.day;
+    maturityDate.month === settlementDate.month &&
+    maturityDate.day === settlementDate.day;
   const yearDays = fullCalendarYear ? financialDayCountDays(settlement, maturity, 0) : days;
   if (isFormulaErrorValue(yearDays)) return yearDays;
   const priceDays = fullCalendarYear ? yearDays + 1 : days;
@@ -1117,8 +1170,13 @@ export const XIRR = makeFinancialFunction('XIRR', (args, context) => {
   if (isFormulaErrorValue(dates)) {
     const dateReference = resolveConditionalReference(args[1], context);
     const dateValues = collectValues(args[1], context);
-    if (dateReference && !isFormulaErrorValue(dateReference) && Array.isArray(dateValues) &&
-      dateValues.some((value) => typeof value === 'boolean')) return numberError();
+    if (
+      dateReference &&
+      !isFormulaErrorValue(dateReference) &&
+      Array.isArray(dateValues) &&
+      dateValues.some((value) => typeof value === 'boolean')
+    )
+      return numberError();
     return dates.code === FormulaErrorCode.DivisionByZero || dates.code === FormulaErrorCode.NotAvailable
       ? valueError()
       : dates;
@@ -1131,18 +1189,23 @@ export const XNPV = makeFinancialFunction('XNPV', (args, context) => {
   const rate = number(args, 0, context);
   const cashFlows = values(args, 1, context);
   const dates = collectFinancialDateSerials(args[2], context);
-  if (hasTextInFinancialRange(args[1], context) || hasTextInFinancialRange(args[2], context))
-    return numberError();
+  if (hasTextInFinancialRange(args[1], context) || hasTextInFinancialRange(args[2], context)) return numberError();
   const argumentError = firstError([rate, cashFlows]);
   if (argumentError) return argumentError;
   if (isFormulaErrorValue(dates)) {
     const dateReference = resolveConditionalReference(args[2], context);
     const dateValues = collectValues(args[2], context);
-    if (dateReference && !isFormulaErrorValue(dateReference) && Array.isArray(dateValues) &&
-      dateValues.length !== cashFlows.length && dateValues.some((value) => {
+    if (
+      dateReference &&
+      !isFormulaErrorValue(dateReference) &&
+      Array.isArray(dateValues) &&
+      dateValues.length !== cashFlows.length &&
+      dateValues.some((value) => {
         const text = isFormulaText(value) ? value.value : value;
         return typeof text === 'string' && text.trim() !== '' && !Number.isFinite(Number(text));
-      })) return numberError();
+      })
+    )
+      return numberError();
     if (dates.code === FormulaErrorCode.Reference || dates.code === FormulaErrorCode.Name) {
       const dateCount = financialInputCount(args[2], context);
       if (dateCount !== null && dateCount !== cashFlows.length) return numberError();
@@ -1168,9 +1231,7 @@ export const YIELD = makeFinancialFunction('YIELD', (args, context) => {
     const schedule = resolveCouponSchedule(settlement, maturity, frequencyValue, basisValue);
     if (isFormulaErrorValue(schedule)) return schedule;
     const remainingPeriods = schedule.couponsRemaining - 1 + schedule.daysToNext / schedule.daysInPeriod;
-    const annualYield = schedule.frequency * Math.expm1(
-      (Math.log(redemption) - Math.log(price)) / remainingPeriods,
-    );
+    const annualYield = schedule.frequency * Math.expm1((Math.log(redemption) - Math.log(price)) / remainingPeriods);
     return Number.isFinite(annualYield) ? annualYield : numberError();
   }
   return solveFinancialRoot(
@@ -1194,9 +1255,7 @@ export const YIELDDISC = makeFinancialFunction('YIELDDISC', (args, context) => {
   if (argumentError) return argumentError;
   const fraction = financialYearFraction(settlement, maturity, basisValue);
   if (isFormulaErrorValue(fraction)) return fraction;
-  return price <= 0 || redemption <= 0 || fraction <= 0
-    ? numberError()
-    : (redemption - price) / price / fraction;
+  return price <= 0 || redemption <= 0 || fraction <= 0 ? numberError() : (redemption - price) / price / fraction;
 });
 
 /** YIELDMAT: yield of a security paying interest at maturity. */
@@ -1220,7 +1279,10 @@ export const YIELDMAT = makeFinancialFunction('YIELDMAT', (args, context) => {
 });
 
 function oddPrice(
-  args: FormulaArg[], context: EvalContext, first: boolean, allowNegativeYield = false,
+  args: FormulaArg[],
+  context: EvalContext,
+  first: boolean,
+  allowNegativeYield = false,
 ): number | FormulaError {
   if (args.length < (first ? 8 : 7) || args.length > (first ? 9 : 8)) return valueError();
   const settlement = first ? oddBondDate(args, 0, context) : date(args, 0, context);
@@ -1233,13 +1295,20 @@ function oddPrice(
   const frequencyValue = frequency(args, first ? 7 : 6, context);
   const basisValue = basis(args, first ? 8 : 7, context);
   const argumentError = firstError([
-    settlement, maturity, issueOrLast, firstOrLast, rate, yieldRate, redemption, frequencyValue, basisValue,
+    settlement,
+    maturity,
+    issueOrLast,
+    firstOrLast,
+    rate,
+    yieldRate,
+    redemption,
+    frequencyValue,
+    basisValue,
   ]);
   if (argumentError) return argumentError;
-  if (settlement >= maturity || rate < 0 || yieldRate < 0 && !allowNegativeYield || redemption <= 0)
+  if (settlement >= maturity || rate < 0 || (yieldRate < 0 && !allowNegativeYield) || redemption <= 0)
     return numberError();
-  if (first && (issueOrLast > settlement || settlement >= firstOrLast || firstOrLast >= maturity))
-    return numberError();
+  if (first && (issueOrLast > settlement || settlement >= firstOrLast || firstOrLast >= maturity)) return numberError();
   if (first) {
     const schedule = resolveOddFirstCouponSchedule(settlement, maturity, firstOrLast, frequencyValue, basisValue);
     if (isFormulaErrorValue(schedule)) return schedule;

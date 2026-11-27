@@ -2,7 +2,7 @@ import { PositionRect } from '@searsuite/sear-foundation-rect';
 import { type Schema } from '@searsuite/sear-domain-doc-schema';
 import { RenderContext } from '@searsuite/sear-render-context';
 import {
-  GenerationalDirtyTracker,
+  FrameDirtyTracker,
   RenderNode,
   TextNode,
   type ClipRegion,
@@ -159,9 +159,9 @@ export class EmbeddedEditorRenderNode<T extends NodeProperties = NodeProperties>
   }
 
   #markInvalidation(invalidation: SheetEditorInvalidation): void {
-    let dirtyTracker: GenerationalDirtyTracker;
+    let dirtyTracker: FrameDirtyTracker;
     try {
-      dirtyTracker = this.resolveRuntime<GenerationalDirtyTracker>(GenerationalDirtyTracker.symbol);
+      dirtyTracker = this.resolveRuntime<FrameDirtyTracker>(FrameDirtyTracker.symbol);
     } catch (_error) {
       return;
     }

@@ -1,6 +1,6 @@
 import { DocCommandBus, defineDocCommand } from '@searsuite/sear-assembly-commands';
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
-import { ReflowDocTransaction } from '@searsuite/sear-domain-commands';
+import { DocTransaction } from '@searsuite/sear-domain-commands';
 import {
   buildInlineTextRangePatchPlan,
   applyInlineTextStylePropertyMutation,
@@ -8,11 +8,9 @@ import {
   type RichTextInlineStyle,
   type RichTextInlineStyleContribution,
 } from '@searsuite/sear-domain-doc';
-import { type RichTextRunRenderContribution } from '@searsuite/sear-render-node';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { type DocKeyboardHandlerRegistrationContext } from '../../plugin/DocPluginContracts';
 import { InlineTextStylePluginBase } from '../InlineTextStylePluginBase';
-import { DocContentRenderPluginKey } from '../../plugin/DocFeaturePluginKeys';
+
 import { createDocCommand } from '../../plugin/DocPluginCommandUtils';
 
 /** Persisted style key owned by the bold text-style plugin. */
@@ -38,7 +36,7 @@ export class BoldTextStylePlugin extends InlineTextStylePluginBase {
   public static readonly symbol = Symbol.for('BoldTextStylePlugin');
 
   public constructor() {
-    super(new PluginKey('DocBoldTextStyle'), createBoldContribution(), createBoldRenderContribution());
+    super(new PluginKey('DocBoldTextStyle'), createBoldContribution());
   }
 
   public override registerCommands(commands: DocCommandBus): void {
@@ -46,19 +44,13 @@ export class BoldTextStylePlugin extends InlineTextStylePluginBase {
     commands.register(ToggleDocBoldCommand, this.#createToggleBoldCommand.bind(this));
   }
 
-  public override registerKeyboardHandlers({ bindings, commands }: DocKeyboardHandlerRegistrationContext): void {
-    bindings.registerKeyboardHandlers({
-      onToggleBold: () => void commands.run(ToggleDocBoldCommand, void 0),
-    });
-  }
-
   #createSetBoldCommand(input: SetDocBoldInput) {
     const bold = normalizeBold(input?.bold);
-    return createDocCommand(SetDocBoldCommand.id, DocContentRenderPluginKey, () => this.#createBoldTransaction(bold));
+    return createDocCommand(SetDocBoldCommand.id, () => this.#createBoldTransaction(bold));
   }
 
   #createToggleBoldCommand() {
-    return createDocCommand(ToggleDocBoldCommand.id, DocContentRenderPluginKey, () => {
+    return createDocCommand(ToggleDocBoldCommand.id, () => {
       const runtime = this.requireRuntime();
       const state = runtime.document.input.getState();
       const patches = buildInlineTextRangePatchPlan(state.pendingDoc, state.docSelection, () => ({}));
@@ -79,7 +71,7 @@ export class BoldTextStylePlugin extends InlineTextStylePluginBase {
           bold,
           (attrs) => mutation.apply({ attrs, value: bold }),
         ),
-      new ReflowDocTransaction(),
+      new DocTransaction(),
     );
   }
 }
@@ -93,22 +85,8 @@ export function createBoldContribution(): RichTextInlineStyleContribution {
   };
 }
 
-/** Creates the render-layer bold contribution. */
-export function createBoldRenderContribution(): RichTextRunRenderContribution {
-  return {
-    key: `text.${BoldTextStyleKey.Bold}`,
-    resolveFont: ({ font, style }) => resolveBoldFont(font, style),
-  };
-}
-
 function readBold(input: { readonly attrs: Record<string, unknown> }): RichTextInlineStyle | undefined {
   return isBold(readTextStyleAttrs(input.attrs)) ? { [BoldTextStyleKey.Bold]: true } : void 0;
-}
-
-function resolveBoldFont(font: string, style: Readonly<Record<string, unknown>> | undefined): string {
-  if (style?.[BoldTextStyleKey.Bold] !== true) return font;
-  const weightPattern = /^(?:normal|bold|bolder|lighter|[1-9]00)(\s+)/i;
-  return weightPattern.test(font) ? font.replace(weightPattern, 'bold$1') : `bold ${font}`;
 }
 
 function normalizeBold(value: unknown): boolean | null {

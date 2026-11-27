@@ -1,3 +1,4 @@
+import { type SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
 import { createMatrixFormatTransfer, type SheetFormatTransferRegistry } from '@searsuite/sear-assembly-plugin';
 import { SheetRangeMoveRegistry, SheetRangeReorderRegistry } from '@searsuite/sear-assembly-plugin';
 import { createMatrixRangeMoveOperations, hasMatrixRangeMoveConflict } from '@searsuite/sear-domain-matrix';
@@ -30,9 +31,8 @@ import {
 } from '@searsuite/sear-domain-ot';
 import { type Transaction } from '@searsuite/sear-domain-transaction';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-render-engine';
-import { type Node } from '@searsuite/sear-render-node';
-import { type CellProperties, SheetCellVisualReaderRegistry } from '@searsuite/sear-render-registry';
+import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-domain-sheet';
+
 import { CellFormatMatrix } from '../../CellFormatMatrix';
 import { registerSheetCellFormatCommand } from './SheetCellFormatCommands';
 import { SheetCellFormatFieldKey } from './SheetCellFormatDataField';
@@ -43,8 +43,18 @@ const pluginKey = new PluginKey('SheetCellFormatPlugin');
 
 /** Plugin owning per-cell number formats, their commands, OT, rendering projection, and export. */
 @Injectable()
-export class SheetCellFormatPlugin extends Plugin<unknown, CellProperties, SheetCellFormatPluginState> {
-  public override readonly warnOnDuplicateDepth = false;
+export class SheetCellFormatPlugin extends Plugin<SheetCellFormatPluginState> {
+  public registerCellStyles(registry: SheetCellStyleRegistry): void {
+    registry.register({
+      id: 'sheet.cell-format',
+      properties: ['format'],
+      read: (row, column) => {
+        const format = this.getState().cellFormats.getItem(row, column);
+        return format == null ? {} : { format };
+      },
+    });
+  }
+
   public override readonly transactionOT = {
     ownerId: 'sheet.cellFormat',
     definition: MatrixTransactionOT,
@@ -106,17 +116,6 @@ export class SheetCellFormatPlugin extends Plugin<unknown, CellProperties, Sheet
           return format === null ? null : { ...format };
         },
       };
-    });
-  }
-
-  public registerCellVisualReaders(registry: SheetCellVisualReaderRegistry): void {
-    registry.register({
-      id: 'sheet.cell-format',
-      properties: ['format'],
-      read: ({ rowIndex, columnIndex }) => {
-        const format = this.getState().cellFormats.getItem(rowIndex, columnIndex);
-        return format === null ? {} : { format };
-      },
     });
   }
 
@@ -185,14 +184,6 @@ export class SheetCellFormatPlugin extends Plugin<unknown, CellProperties, Sheet
     if (operations.length === 0) return null;
     MatrixOT.apply(state.cellFormats, operations);
     return state;
-  }
-
-  public getPluginConfig(): null {
-    return null;
-  }
-
-  public render(): Node<CellProperties>[] {
-    return [];
   }
 }
 

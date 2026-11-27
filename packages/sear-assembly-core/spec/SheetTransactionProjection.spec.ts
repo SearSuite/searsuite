@@ -1,6 +1,6 @@
-import { projectSheetTransaction } from '../src/SheetTransactionProjection';
+import { projectSheetTransaction } from '@searsuite/sear-assembly-sheet-kernel';
 import { PluginKey, type PluginManager } from '@searsuite/sear-assembly-plugin';
-import { type CellProperties } from '@searsuite/sear-render-registry';
+
 import { createTransaction, TRANSACTION_ORIGIN_META_KEY, TransactionOrigin } from '@searsuite/sear-domain-transaction';
 it('preserves origins, skips empty/self contributions and rejects cross-owner writes', () => {
   const owner = new PluginKey('owner'),
@@ -12,7 +12,7 @@ it('preserves origins, skips empty/self contributions and rejects cross-owner wr
   ]);
   const manager = {
     forEach: (visit: Function) => visit({ key: owner, projectTransaction: project }),
-  } as unknown as PluginManager<unknown, CellProperties>;
+  } as unknown as PluginManager;
   const source = createTransaction(root, [], { [TRANSACTION_ORIGIN_META_KEY]: TransactionOrigin.Remote });
   const result = projectSheetTransaction(manager, source, () => ({ value: 1 }));
   expect(result).toHaveLength(1);

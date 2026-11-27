@@ -1,11 +1,11 @@
+import { SheetHistoryKeyboardView } from '@searsuite/sear-render';
+import { type SheetLifecycleContext } from '@searsuite/sear-assembly-core';
 import {
   Pipeline,
   PipelineStepKind,
   SheetInteractionStore,
   type SheetInteractionState,
-  type SheetLifecycleContext,
-  type SearCoreSheet,
-} from '@searsuite/sear-assembly-core';
+} from '@searsuite/sear-assembly-plugin';
 import {
   defineSheetCommand,
   PipelineExecutionCommand,
@@ -24,7 +24,6 @@ import { TRANSACTION_ORIGIN_META_KEY, type Transaction, TransactionOrigin } from
 import { type Platform } from '@searsuite/sear-foundation-platform';
 import { ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 import { KeyboardRouter, type KeyboardRouterHandlers } from '@searsuite/sear-render-input';
-import { type CellProperties } from '@searsuite/sear-render-registry';
 
 import {
   NoopSheetExternalHistory,
@@ -45,8 +44,8 @@ class TestKeyboardRouter extends KeyboardRouter {
   }
 }
 
-class MatrixOwnerPlugin extends Plugin<SearCoreSheet, CellProperties, null> {
-  public override readonly warnOnDuplicateDepth = false;
+class MatrixOwnerPlugin extends Plugin<null> {
+  public readonly warnOnDuplicateDepth = false;
   public override readonly transactionOT = {
     ownerId: 'test.history-owner',
     definition: MatrixTransactionOT,
@@ -62,12 +61,6 @@ class MatrixOwnerPlugin extends Plugin<SearCoreSheet, CellProperties, null> {
   public registerState() {
     return { key: this.key, state: null };
   }
-  public getPluginConfig(): null {
-    return null;
-  }
-  public render(): null {
-    return null;
-  }
 }
 
 interface HistoryHarness {
@@ -75,7 +68,7 @@ interface HistoryHarness {
   readonly observations: ObservationRegistry;
   readonly history: SheetHistoryPlugin;
   readonly keyboard: TestKeyboardRouter;
-  readonly plugins: PluginManager<SearCoreSheet, CellProperties>;
+  readonly plugins: PluginManager;
   readonly ownerKey: PluginKey;
   readonly executePipeline: jest.Mock<void, [Pipeline]>;
   readonly warn: jest.Mock;
@@ -84,7 +77,7 @@ interface HistoryHarness {
 
 function createHarness(options: { withAdapter?: boolean } = {}): HistoryHarness {
   const ownerKey = new PluginKey('HistoryOwner');
-  const plugins = new PluginManager<SearCoreSheet, CellProperties>();
+  const plugins = new PluginManager();
   if (options.withAdapter !== false) plugins.registerPlugin(new MatrixOwnerPlugin(ownerKey));
   const keyboard = new TestKeyboardRouter();
   const interactionState: SheetInteractionState = {
@@ -116,10 +109,11 @@ function createHarness(options: { withAdapter?: boolean } = {}): HistoryHarness 
     },
     applyEffect: () => void 0,
   });
-  const history = new SheetHistoryPlugin(plugins, interaction, keyboard, platform, commands, new NoopSheetExternalHistory());
+  const history = new SheetHistoryPlugin(plugins, interaction, platform, commands, new NoopSheetExternalHistory());
   history.registerCommands(commands);
   history.registerObservations(observations);
-  history.start({} as SheetLifecycleContext);
+  history.start();
+  new SheetHistoryKeyboardView(keyboard, commands).initializeView();
   return {
     commands,
     observations,
@@ -196,8 +190,9 @@ describe('SheetHistoryPlugin', () => {
 
     expect(harness.history.getStatus().canUndo).toBe(true);
     harness.commands.run(UndoSheetCommand, void 0);
-    expect(harness.executePipeline.mock.calls.at(-1)?.[0].steps[0]?.transaction?.operations[0])
-      .toEqual(updateCell(0, null, 'value'));
+    expect(harness.executePipeline.mock.calls.at(-1)?.[0].steps[0]?.transaction?.operations[0]).toEqual(
+      updateCell(0, null, 'value'),
+    );
   });
 
   it('does not expose history mutation helpers through a retained plugin reference', () => {
@@ -219,7 +214,7 @@ describe('SheetHistoryPlugin', () => {
   it('does not duplicate history when retained subscription fields are forged', () => {
     const harness = createHarness();
     Object.assign(harness.history, { disposeCommandListener: null, disposeInteractionListener: null });
-    harness.history.start({} as SheetLifecycleContext);
+    harness.history.start();
     const edit = registerEditCommand(harness, 'test.historyRetainedStart', [
       createSheetTransaction(harness.ownerKey, [updateCell(0, 'value', null)]),
     ]);
@@ -276,43 +271,58 @@ describe('SheetHistoryPlugin', () => {
 
   it('groups adjacent cut and paste commits into one undo and redo entry', () => {
     const harness = createHarness();
-    const cut = registerGroupedEditCommand(harness, 'test.groupedCut',
+    const cut = registerGroupedEditCommand(
+      harness,
+      'test.groupedCut',
       createSheetTransaction(harness.ownerKey, [updateCell(0, null, 'source')]),
-      { id: 'cut-1', phase: 'begin' });
-    const paste = registerGroupedEditCommand(harness, 'test.groupedPaste',
+      { id: 'cut-1', phase: 'begin' },
+    );
+    const paste = registerGroupedEditCommand(
+      harness,
+      'test.groupedPaste',
       createSheetTransaction(harness.ownerKey, [updateCell(1, 'source', null)]),
-      { id: 'cut-1', phase: 'end' });
+      { id: 'cut-1', phase: 'end' },
+    );
 
     harness.commands.run(cut, void 0);
     harness.commands.run(paste, void 0);
     harness.commands.run(UndoSheetCommand, void 0);
-    expect(harness.executePipeline.mock.calls.at(-1)?.[0].steps.map((step) => step.transaction?.operations[0]))
-      .toEqual([updateCell(1, null, 'source'), updateCell(0, 'source', null)]);
+    expect(harness.executePipeline.mock.calls.at(-1)?.[0].steps.map((step) => step.transaction?.operations[0])).toEqual(
+      [updateCell(1, null, 'source'), updateCell(0, 'source', null)],
+    );
     expect(harness.history.getStatus()).toEqual({ canUndo: false, canRedo: true });
 
     harness.commands.run(RedoSheetCommand, void 0);
-    expect(harness.executePipeline.mock.calls.at(-1)?.[0].steps.map((step) => step.transaction?.operations[0]))
-      .toEqual([updateCell(0, null, 'source'), updateCell(1, 'source', null)]);
+    expect(harness.executePipeline.mock.calls.at(-1)?.[0].steps.map((step) => step.transaction?.operations[0])).toEqual(
+      [updateCell(0, null, 'source'), updateCell(1, 'source', null)],
+    );
   });
 
   it('keeps a cut separate when another edit commits before its paste', () => {
     const harness = createHarness();
-    const cut = registerGroupedEditCommand(harness, 'test.interruptedCut',
+    const cut = registerGroupedEditCommand(
+      harness,
+      'test.interruptedCut',
       createSheetTransaction(harness.ownerKey, [updateCell(0, null, 'source')]),
-      { id: 'cut-2', phase: 'begin' });
+      { id: 'cut-2', phase: 'begin' },
+    );
     const unrelated = registerEditCommand(harness, 'test.interveningEdit', [
       createSheetTransaction(harness.ownerKey, [updateCell(2, 'other', null)]),
     ]);
-    const paste = registerGroupedEditCommand(harness, 'test.interruptedPaste',
+    const paste = registerGroupedEditCommand(
+      harness,
+      'test.interruptedPaste',
       createSheetTransaction(harness.ownerKey, [updateCell(1, 'source', null)]),
-      { id: 'cut-2', phase: 'end' });
+      { id: 'cut-2', phase: 'end' },
+    );
 
     harness.commands.run(cut, void 0);
     harness.commands.run(unrelated, void 0);
     harness.commands.run(paste, void 0);
     harness.commands.run(UndoSheetCommand, void 0);
-    expect(harness.executePipeline.mock.calls.at(-1)?.[0].steps.map((step) => step.transaction?.operations[0]))
-      .toEqual([updateCell(1, null, 'source')]);
+    expect(harness.executePipeline.mock.calls.at(-1)?.[0].steps.map((step) => step.transaction?.operations[0])).toEqual(
+      [updateCell(1, null, 'source')],
+    );
     expect(harness.history.getStatus().canUndo).toBe(true);
   });
 

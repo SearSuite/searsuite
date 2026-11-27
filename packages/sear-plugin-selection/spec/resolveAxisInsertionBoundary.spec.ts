@@ -1,5 +1,5 @@
 import { RowShapeDimensionsCSRMatrix } from '@searsuite/sear-domain-matrix';
-import { resolveAxisInsertionBoundary } from '../src/resolveAxisInsertionBoundary';
+import { resolveAxisInsertionBoundary } from '@searsuite/sear-render';
 
 describe('axis insertion boundaries', () => {
   it('uses half-cell edges with nonuniform dimensions and includes outer boundaries', () => {

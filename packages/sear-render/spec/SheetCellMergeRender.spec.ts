@@ -1,5 +1,5 @@
 import { SheetCellMergeRender } from '../src/sheet/SheetCellMergeRender';
-import { SheetDataFieldNamespace, SheetDataMatrixFieldKey } from '@searsuite/sear-render-engine';
+import { SheetDataFieldNamespace, SheetDataMatrixFieldKey } from '@searsuite/sear-domain-sheet';
 import { SheetColumnSizesFieldKey, SheetRowSizesFieldKey } from '@searsuite/sear-plugin-resize';
 import { SheetCellMergeFieldKey } from '@searsuite/sear-plugin-cell-merge';
 import { FormulaCell, type SheetCellVisualReaderRegistry } from '@searsuite/sear-render-registry';
@@ -10,7 +10,9 @@ describe('SheetCellMergeRender', () => {
     const provider = { getFormulaResult: jest.fn(() => 2) };
     const createCellContext = jest.fn((row: number, col: number) => ({ row, col, formulaResultProvider: provider }));
     const create = jest.fn((data, rect, properties, context) => new FormulaCell(data, rect, properties, context));
-    const plugin = new SheetCellMergeRender({ readVisual: () => ({ properties: {}, layers: [] }) } as unknown as SheetCellVisualReaderRegistry);
+    const plugin = new SheetCellMergeRender({
+      readVisual: () => ({ properties: {}, layers: [] }),
+    } as unknown as SheetCellVisualReaderRegistry);
     const rowSizes = {
       shape: [1, 2],
       getDimensionLeftBoundaryByIndex: (index: number) => index * 24,
@@ -38,7 +40,7 @@ describe('SheetCellMergeRender', () => {
         readDataViewField: (namespace: string, key: string) =>
           namespace === SheetDataFieldNamespace ? fields.get(key) : null,
       }),
-      configEngine: { getPluginConfig: () => ({ defaultBorderColor: '#ddd' }) },
+      configEngine: { getConfig: () => ({ defaultBorderColor: '#ddd' }) },
       renderEngine: { renderCoordinatorManager: { create, createCellContext } },
     };
 

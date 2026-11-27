@@ -1,12 +1,17 @@
 import { type DocNodeId, resolveDocNodeId, type RichDocNode } from '@searsuite/sear-domain-doc';
-import { DocTransactionRenderOperationType } from '@searsuite/sear-domain-commands';
 import { RichDocOTActionName, type RichDocOTOperation } from '@searsuite/sear-domain-ot';
 import { type Transaction } from '@searsuite/sear-domain-transaction';
-import { DocInputTransactionMeta } from './DocInputPlugin';
+import { DocInputTransactionMeta } from '@searsuite/sear-assembly-doc';
+
+/** Layout work selected by the presentation consumer after a document commit. */
+export enum DocRenderOperationType {
+  Reflow = 'reflow',
+  Repaint = 'repaint',
+}
 
 /** Render-facing operation derived from a RichDoc OT operation. */
 export interface DocRenderOperation {
-  readonly type: DocTransactionRenderOperationType;
+  readonly type: DocRenderOperationType;
   readonly ot: RichDocOTOperation;
 }
 
@@ -20,9 +25,13 @@ export type DocRenderDirtyBlockIds = ReadonlySet<DocNodeId> | null;
 export function collectDocRenderOperations(transactions: readonly Transaction[]): DocRenderOperations {
   const renderOperations: DocRenderOperation[] = [];
   for (const transaction of transactions) {
-    const type = transaction.getMeta<DocTransactionRenderOperationType>(DocInputTransactionMeta.RenderOperation);
+    const changedStyles = transaction.getMeta<readonly string[]>(DocInputTransactionMeta.ChangedInlineStyles);
+    const type =
+      changedStyles?.length && changedStyles.every((key) => key === 'color')
+        ? DocRenderOperationType.Repaint
+        : DocRenderOperationType.Reflow;
     for (const operation of transaction.operations) {
-      const renderOperation = createDocRenderOperation(operation, type ?? DocTransactionRenderOperationType.Reflow);
+      const renderOperation = createDocRenderOperation(operation, type ?? DocRenderOperationType.Reflow);
       if (!renderOperation) return null;
       renderOperations.push(renderOperation);
     }
@@ -38,7 +47,7 @@ export function collectDocReflowBlockIds(
   if (renderOperations === null) return null;
   const blockIds = new Set<DocNodeId>();
   for (const operation of renderOperations) {
-    if (operation.type !== DocTransactionRenderOperationType.Reflow) continue;
+    if (operation.type !== DocRenderOperationType.Reflow) continue;
     if (isTopLevelStructureOperation(operation.ot)) return null;
     const blockId = resolveOperationBlockId(operation.ot, document);
     if (!blockId) return null;
@@ -55,17 +64,14 @@ export function collectDocRepaintBlockIds(
   const blockIds = new Set<DocNodeId>();
   if (renderOperations === null) return blockIds;
   for (const operation of renderOperations) {
-    if (operation.type !== DocTransactionRenderOperationType.Repaint) continue;
+    if (operation.type !== DocRenderOperationType.Repaint) continue;
     const blockId = resolveOperationBlockId(operation.ot, document);
     if (blockId) blockIds.add(blockId);
   }
   return blockIds;
 }
 
-function createDocRenderOperation(
-  operation: unknown,
-  type: DocTransactionRenderOperationType,
-): DocRenderOperation | null {
+function createDocRenderOperation(operation: unknown, type: DocRenderOperationType): DocRenderOperation | null {
   if (!isRichDocOperation(operation)) return null;
   return { type, ot: operation };
 }

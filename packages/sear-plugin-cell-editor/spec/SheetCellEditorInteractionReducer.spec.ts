@@ -1,5 +1,5 @@
 import { registerSheetCellEditorInteractionReducers } from '../src/SheetCellEditorInteractionReducer';
-import { SheetInteractionReducerRegistry } from '@searsuite/sear-assembly-core';
+import { SheetInteractionReducerRegistry } from '@searsuite/sear-assembly-plugin';
 import { SheetCellEditorInteractionName } from '../src/SheetCellEditorPipelineNames';
 
 describe('SheetCellEditorInteractionReducer', () => {

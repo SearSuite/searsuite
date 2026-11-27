@@ -43,7 +43,6 @@
   "dependencies": {
     "@searsuite/sear-domain-format": "workspace:*",
     "@searsuite/sear-domain-formula-engine": "workspace:*",
-    "@searsuite/sear-domain-ot": "workspace:*",
     "@searsuite/sear-foundation-di": "workspace:*",
     "@searsuite/sear-foundation-error": "workspace:*",
     "@searsuite/sear-foundation-platform": "workspace:*",

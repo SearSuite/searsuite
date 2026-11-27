@@ -1,15 +1,13 @@
 import type {
-  SheetEditInput,
   SheetDocumentNode,
   SheetEmbeddedEditorContext,
-  SheetInlineStyleUpdate,
   SheetPointerInput,
   SheetPointerHit,
   SheetRenderUpdate,
   SheetCompositionState,
   SheetCursorState,
-  SheetTextSelection,
 } from './SheetEditorTypes';
+import type { SheetEditInput, SheetInlineStyleUpdate, SheetTextSelection } from '@searsuite/sear-assembly-doc';
 import type { RenderContext } from '@searsuite/sear-render-context';
 import type { ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 
@@ -60,7 +58,10 @@ export interface SheetEmbeddedEditor {
   measureUnwrapped?(document: readonly SheetDocumentNode[], font: string): { width: number; height: number };
   initialize(context: SheetEmbeddedEditorContext): void;
   createRenderSession(context: SheetEmbeddedEditorContext): SheetRenderSession;
-  createEditSession(context: SheetEmbeddedEditorContext): SheetEditSession;
+  createEditSession(
+    context: SheetEmbeddedEditorContext,
+    model?: import('@searsuite/sear-assembly-doc').DocEditModel,
+  ): SheetEditSession;
   /** Restricts runtime teardown to the owning Sheet editor when supported. */
   bindTeardownToken?(token: object): void;
   dispose(ownerToken?: object): void;

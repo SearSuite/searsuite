@@ -1,35 +1,59 @@
 import {
-  Plugin, PluginKey, SessionStateRegistry, SessionStateRestorePhase, defineSessionState,
+  Plugin,
+  PluginKey,
+  SessionStateRegistry,
+  SessionStateRestorePhase,
+  defineSessionState,
   type PluginDocumentStateContribution,
 } from '@searsuite/sear-assembly-plugin';
 import { SheetCommandBus, SheetQueryRegistry } from '@searsuite/sear-assembly-commands';
 import { type SheetDisplayedValueChanges } from '@searsuite/sear-domain-cell-types';
 import { deserializeSparseMatrix, serializeSparseMatrix } from '@searsuite/sear-domain-matrix';
 import {
-  MatrixOT, MatrixOTActionName, MatrixTransactionOT, MatrixTransactionOTRelation,
-  isMatrixStructureOperation, isUpdateCellOperation, type Operation,
+  MatrixOT,
+  MatrixOTActionName,
+  MatrixTransactionOT,
+  MatrixTransactionOTRelation,
+  isMatrixStructureOperation,
+  isUpdateCellOperation,
+  type Operation,
 } from '@searsuite/sear-domain-ot';
-import { TRANSACTION_ORIGIN_META_KEY, Transaction, TransactionOrigin } from '@searsuite/sear-domain-transaction';
+import { Transaction } from '@searsuite/sear-domain-transaction';
 import { Injectable } from '@searsuite/sear-foundation-di';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { type Platform } from '@searsuite/sear-foundation-platform';
-import { SheetDataFieldNamespace, SheetRowVisibilityFieldKey, type SheetRowVisibility } from '@searsuite/sear-render-engine';
-import { CellVisualIconShape } from '@searsuite/sear-render-node';
-import { type CellProperties, type SheetCellVisualReaderRegistry } from '@searsuite/sear-render-registry';
+import {
+  SheetDataFieldNamespace,
+  SheetRowVisibilityFieldKey,
+  type SheetRowVisibility,
+} from '@searsuite/sear-domain-sheet';
+
 import { SheetFilterMatrix, cloneSheetFilterDefinition } from '../../SheetFilterMatrix';
-import { registerSheetFilterCommands, registerSheetFilterQueries, type SheetFilterCommandSource } from '../../SheetFilterCommands';
+import {
+  registerSheetFilterCommands,
+  registerSheetFilterQueries,
+  type SheetFilterCommandSource,
+} from '../../SheetFilterCommands';
 import { evaluateSheetFilter } from '../../evaluateSheetFilter';
 import { type SheetFilterDefinition } from '../../SheetFilterTypes';
 import { projectSheetFilterDefinition } from '../../projectSheetFilterDefinition';
 
 /** Persisted state owned by the filter plugin. */
-export interface SheetFilterPluginState { readonly filters: SheetFilterMatrix }
+export interface SheetFilterPluginState {
+  readonly filters: SheetFilterMatrix;
+}
 /** Host-neutral dependencies supplied by a Sheet composition root. */
-export interface SheetFilterDependencies extends Omit<SheetFilterCommandSource,
-  'target' | 'readMatrix' | 'readActiveDefinition' | 'readPrivateDefinition' |
-  'setPrivateDefinition' | 'normalizeSearch'> {
+export interface SheetFilterDependencies
+  extends Omit<
+    SheetFilterCommandSource,
+    | 'target'
+    | 'readMatrix'
+    | 'readActiveDefinition'
+    | 'readPrivateDefinition'
+    | 'setPrivateDefinition'
+    | 'normalizeSearch'
+  > {
   readonly dataTarget?: PluginKey;
-  readonly requestRenderAll?: () => void;
   readonly invalidateVisibilityAggregates?: () => void;
   readonly readColor: (row: number, column: number, property: 'fill' | 'textColor') => string | null;
   readonly parseDate?: (value: unknown) => number | null;
@@ -39,36 +63,49 @@ export interface SheetFilterDependencies extends Omit<SheetFilterCommandSource,
 
 const key = new PluginKey('SheetFilterPlugin');
 /** Session-state contribution for a private filter view. */
-export const SheetFilterViewSessionStateDefinition = defineSessionState<SheetFilterDefinition | null>('sheet.filter.view');
+export const SheetFilterViewSessionStateDefinition = defineSessionState<SheetFilterDefinition | null>(
+  'sheet.filter.view',
+);
 
 /** Owns persisted filter rules and a derived, editor-local row visibility view. */
 @Injectable()
-export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilterPluginState> implements SheetRowVisibility {
+export class SheetFilterPlugin extends Plugin<SheetFilterPluginState> implements SheetRowVisibility {
   readonly #dependencies: SheetFilterDependencies;
 
   public static readonly symbol = Symbol.for('SheetFilterPlugin');
   public static readonly pluginKey = key;
-  public static readonly documentState: PluginDocumentStateContribution<SheetFilterPluginState, SheetFilterPluginState> = {
+  public static readonly documentState: PluginDocumentStateContribution<
+    SheetFilterPluginState,
+    SheetFilterPluginState
+  > = {
     key: 'sheet.filters',
     capture: (state) => ({ filters: state.filters.clone() }),
     codec: {
       key: 'sheet.filters',
-      serialize: (state) => state.filters ? serializeSparseMatrix(state.filters) : undefined,
+      serialize: (state) => (state.filters ? serializeSparseMatrix(state.filters) : undefined),
       deserialize: (payload, path) => ({
-        filters: deserializeSparseMatrix<SheetFilterDefinition | null, SheetFilterMatrix>(payload, SheetFilterMatrix, path),
+        filters: deserializeSparseMatrix<SheetFilterDefinition | null, SheetFilterMatrix>(
+          payload,
+          SheetFilterMatrix,
+          path,
+        ),
       }),
     },
   };
-
-  public override readonly warnOnDuplicateDepth = false;
   public override readonly transactionOT = {
-    ownerId: 'sheet.filter', definition: MatrixTransactionOT,
-    relations: [MatrixTransactionOTRelation], collaborative: true,
+    ownerId: 'sheet.filter',
+    definition: MatrixTransactionOT,
+    relations: [MatrixTransactionOTRelation],
+    collaborative: true,
   };
   public override readonly documentState = SheetFilterPlugin.documentState;
   public override interestedIn = [
-    MatrixOTActionName.UpdateCell, MatrixOTActionName.RowInsert, MatrixOTActionName.RowDelete,
-    MatrixOTActionName.RowMove, MatrixOTActionName.ColInsert, MatrixOTActionName.ColDelete,
+    MatrixOTActionName.UpdateCell,
+    MatrixOTActionName.RowInsert,
+    MatrixOTActionName.RowDelete,
+    MatrixOTActionName.RowMove,
+    MatrixOTActionName.ColInsert,
+    MatrixOTActionName.ColDelete,
     MatrixOTActionName.ColMove,
   ];
   #revision = 0;
@@ -86,32 +123,81 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
     this.#dependencies = dependencies;
     const owner = this;
     this.#visibilityView = Object.freeze({
-      get version() { return owner.version; },
-      get active() { return owner.active; },
-      isRowFiltered(row: number) { return owner.isRowFiltered(row); },
+      get version() {
+        return owner.version;
+      },
+      get active() {
+        return owner.active;
+      },
+      isRowFiltered(row: number) {
+        return owner.isRowFiltered(row);
+      },
     });
     this.#currentDefinition = state.filters.getItem(0, 0);
     this.#disposeValueChanges = dependencies.displayedValueChanges?.subscribe(() => this.#invalidate());
   }
 
-  public get version(): number { return this.#revision; }
-  public get active(): boolean { return ((this.#privateDefinition ?? this.#currentDefinition)?.rules.length ?? 0) > 0; }
+  public isHeaderCell(row: number, column: number): boolean {
+    const definition = this.#privateDefinition ?? this.#currentDefinition;
+    return (
+      !!definition &&
+      row === definition.range.start[0] &&
+      column >= definition.range.start[1] &&
+      column <= definition.range.end[1]
+    );
+  }
+
+  public override onTransactionCommitted(transaction: Transaction): void {
+    if (this.#commandBus && !this.#commandBus.isExecuting())
+      throw new SearError('Sheet filter changes must run through editor.commands.run(...).');
+    const structure = transaction.operations.filter(isMatrixStructureOperation);
+    if (transaction.pluginKey === key) {
+      this.#privateDefinition = null;
+      this.#invalidate(this.getState().filters.getItem(0, 0));
+      this.#dependencies.invalidateVisibilityAggregates?.();
+      return;
+    }
+    if (structure.length) this.#invalidate(this.getState().filters.getItem(0, 0));
+    else if (transaction.operations.some(isUpdateCellOperation)) this.#invalidate();
+    if (this.#privateDefinition && structure.length) {
+      let projected: SheetFilterDefinition | null = this.#privateDefinition;
+      for (const operation of structure)
+        projected = projected ? projectSheetFilterDefinition(projected, operation) : null;
+      this.#setPrivateDefinition(projected);
+    }
+  }
+
+  public get version(): number {
+    return this.#revision;
+  }
+  public get active(): boolean {
+    return ((this.#privateDefinition ?? this.#currentDefinition)?.rules.length ?? 0) > 0;
+  }
 
   public isRowFiltered(row: number): boolean {
     const definition = this.#privateDefinition ?? this.#currentDefinition;
-    if (!definition || definition.rules.length === 0 || row < definition.range.start[0] ||
-      row > definition.range.end[0] || (definition.firstRowIsHeader && row === definition.range.start[0])) return false;
+    if (
+      !definition ||
+      definition.rules.length === 0 ||
+      row < definition.range.start[0] ||
+      row > definition.range.end[0] ||
+      (definition.firstRowIsHeader && row === definition.range.start[0])
+    )
+      return false;
     this.#prepareSparseCandidates(definition);
     if (this.#candidateRows && !this.#candidateRows.has(row)) return this.#blankFiltered;
     const cached = this.#rowResults.get(row);
     if (cached !== undefined) return cached;
-    const filtered = definition.rules.some(({ column, predicate }) => !evaluateSheetFilter(
-      predicate,
-      this.#dependencies.readValue(row, column),
-      (property) => this.#dependencies.readColor(row, column, property),
-      this.#dependencies.platform,
-      this.#dependencies.parseDate,
-    ));
+    const filtered = definition.rules.some(
+      ({ column, predicate }) =>
+        !evaluateSheetFilter(
+          predicate,
+          this.#dependencies.readValue(row, column),
+          (property) => this.#dependencies.readColor(row, column, property),
+          this.#dependencies.platform,
+          this.#dependencies.parseDate,
+        ),
+    );
     if (this.#rowResults.size >= 4096) this.#rowResults.clear();
     this.#rowResults.set(row, filtered);
     return filtered;
@@ -129,31 +215,11 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
     registerSheetFilterQueries(queries, this.#commandSource());
   }
 
-  public registerCellVisualReaders(registry: SheetCellVisualReaderRegistry): void {
-    registry.registerConditional({
-      id: 'sheet.filter.header',
-      properties: ['contentInsetEnd'],
-      read: ({ rowIndex, columnIndex }) => {
-        const definition = this.#privateDefinition ?? this.#currentDefinition;
-        if (!definition || rowIndex !== definition.range.start[0] ||
-          columnIndex < definition.range.start[1] || columnIndex > definition.range.end[1]) return [];
-        return [{
-          id: 'sheet.filter.header', priority: 0,
-          properties: { contentInsetEnd: 22 },
-          layers: [{
-            slot: 'filter.header.arrow', x: 0.8, y: 0, width: 0.2, height: 1,
-            icon: { shape: CellVisualIconShape.Down, color: '#526477' },
-          }],
-        }];
-      },
-    });
-  }
-
   public registerSessionState(registry: SessionStateRegistry): void {
     this.registerOwnedSessionState(registry, () => {
       registry.register(SheetFilterViewSessionStateDefinition, {
         restorePhase: SessionStateRestorePhase.BeforeInitialize,
-        capture: () => this.#privateDefinition ? cloneSheetFilterDefinition(this.#privateDefinition) : undefined,
+        capture: () => (this.#privateDefinition ? cloneSheetFilterDefinition(this.#privateDefinition) : undefined),
         restore: (definition) => {
           SessionStateRegistry.prototype.assertRestorationOpen.call(registry);
           this.#setPrivateDefinition(definition ?? null);
@@ -163,10 +229,19 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
   }
 
   public registerState() {
-    return { key: this.key, state: this.getState(), dataEngine: { dataView: [
-      { viewKey: SheetDataFieldNamespace, fieldKey: SheetRowVisibilityFieldKey,
-        select: (): SheetRowVisibility => this.#visibilityView },
-    ] } };
+    return {
+      key: this.key,
+      state: this.getState(),
+      dataEngine: {
+        dataView: [
+          {
+            viewKey: SheetDataFieldNamespace,
+            fieldKey: SheetRowVisibilityFieldKey,
+            select: (): SheetRowVisibility => this.#visibilityView,
+          },
+        ],
+      },
+    };
   }
 
   public apply(state: SheetFilterPluginState, transaction: Transaction): SheetFilterPluginState | null {
@@ -189,49 +264,10 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
     return changed ? state : null;
   }
 
-  public dispose(): void { this.assertRuntimeWriteAllowed(); this.#disposeValueChanges?.(); this.#rowResults.clear(); }
-  public getPluginConfig(): null { return null; }
-  public render(): [] { return []; }
-
-  public onTransactionCommitted(transaction: Transaction): void {
-    if (this.#commandBus && !this.#commandBus.isExecuting()) {
-      throw new SearError('Sheet filter changes must run through editor.commands.run(...).');
-    }
-    const structure = transaction.operations.filter(isMatrixStructureOperation);
-    if (transaction.pluginKey === key) {
-      this.#privateDefinition = null;
-      this.#invalidate(this.getState().filters.getItem(0, 0));
-      this.#dependencies.invalidateVisibilityAggregates?.();
-      if (transaction.getMeta<TransactionOrigin>(TRANSACTION_ORIGIN_META_KEY) === TransactionOrigin.History)
-        this.#dependencies.requestRenderAll?.();
-      return;
-    }
-    if (structure.length) this.#invalidate(this.getState().filters.getItem(0, 0));
-    else if (transaction.operations.some(isUpdateCellOperation)) this.#invalidate();
-    if (this.#privateDefinition) {
-      if (structure.length) {
-        let projected: SheetFilterDefinition | null = this.#privateDefinition;
-        for (const operation of structure) {
-          projected = projected ? projectSheetFilterDefinition(projected, operation) : null;
-        }
-        this.#setPrivateDefinition(projected);
-        this.#dependencies.requestRenderAll?.();
-        return;
-      }
-    }
-    const definition = this.#privateDefinition ?? this.#currentDefinition;
-    if (!definition?.rules.length) return;
-    const readsColor = definition.rules.some(({ predicate }) => predicate.kind === 'color');
-    if (readsColor) {
-      if (transaction.operations.some((operation) => isUpdateCellOperation(operation)))
-        this.#dependencies.requestRenderAll?.();
-      return;
-    }
-    if (transaction.pluginKey !== this.#dependencies.dataTarget) return;
-    const columns = new Set(definition.rules.map((rule) => rule.column));
-    if (transaction.operations.some((operation) => isUpdateCellOperation(operation) &&
-      operation.p[0] >= definition.range.start[0] && operation.p[0] <= definition.range.end[0] &&
-      columns.has(operation.p[1]))) this.#dependencies.requestRenderAll?.();
+  public dispose(): void {
+    this.assertRuntimeWriteAllowed();
+    this.#disposeValueChanges?.();
+    this.#rowResults.clear();
   }
 
   #invalidate(definition?: SheetFilterDefinition | null): void {
@@ -254,9 +290,10 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
     for (const { column } of definition.rules) {
       this.#dependencies.forEachStoredInRange(first, column, definition.range.end[0], (row) => candidates.add(row));
     }
-    this.#blankFiltered = definition.rules.some(({ predicate }) => !evaluateSheetFilter(
-      predicate, null, () => null, this.#dependencies.platform, this.#dependencies.parseDate,
-    ));
+    this.#blankFiltered = definition.rules.some(
+      ({ predicate }) =>
+        !evaluateSheetFilter(predicate, null, () => null, this.#dependencies.platform, this.#dependencies.parseDate),
+    );
     this.#candidateRows = candidates;
   }
 
@@ -268,21 +305,22 @@ export class SheetFilterPlugin extends Plugin<unknown, CellProperties, SheetFilt
         const definition = this.#privateDefinition ?? this.getState().filters.getItem(0, 0);
         return definition ? cloneSheetFilterDefinition(definition) : null;
       },
-      readPrivateDefinition: () => this.#privateDefinition ? cloneSheetFilterDefinition(this.#privateDefinition) : null,
+      readPrivateDefinition: () =>
+        this.#privateDefinition ? cloneSheetFilterDefinition(this.#privateDefinition) : null,
       setPrivateDefinition: (definition) => this.#setPrivateDefinition(definition),
       readShape: this.#dependencies.readShape,
       readValue: this.#dependencies.readValue,
       ...(this.#dependencies.readDisplayValue ? { readDisplayValue: this.#dependencies.readDisplayValue } : {}),
-      matchesPredicate: (row, column, predicate) => evaluateSheetFilter(
-        predicate,
-        row === null ? null : this.#dependencies.readValue(row, column),
-        (property) => row === null ? null : this.#dependencies.readColor(row, column, property),
-        this.#dependencies.platform,
-        this.#dependencies.parseDate,
-      ),
+      matchesPredicate: (row, column, predicate) =>
+        evaluateSheetFilter(
+          predicate,
+          row === null ? null : this.#dependencies.readValue(row, column),
+          (property) => (row === null ? null : this.#dependencies.readColor(row, column, property)),
+          this.#dependencies.platform,
+          this.#dependencies.parseDate,
+        ),
       normalizeSearch: (value) => this.#dependencies.platform.toLowerCase(value),
       forEachStoredInRange: this.#dependencies.forEachStoredInRange,
-      ...(this.#dependencies.renderKeys ? { renderKeys: this.#dependencies.renderKeys } : {}),
     };
   }
 }

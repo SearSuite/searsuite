@@ -1,14 +1,7 @@
 import { Inject } from '@searsuite/sear-foundation-di';
 import { HexColor } from '@searsuite/sear-foundation-utils';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
-import {
-  SceneGraph,
-  Node,
-  Tree,
-  DirtyTree,
-  NodeProperties,
-  GenerationalDirtyTracker,
-} from '@searsuite/sear-render-node';
+import { SceneGraph, Node, Tree, NodeProperties, FrameDirtyTracker } from '@searsuite/sear-render-node';
 import { RenderContext } from '@searsuite/sear-render-context';
 import { ScrollManagerState, createDefaultScrollManagerState, ScrollManager } from '@searsuite/sear-render-scroll';
 import { RenderCoordinatorManager } from '@searsuite/sear-render-registry';
@@ -54,8 +47,8 @@ export abstract class RenderStrategy<T extends NodeProperties> {
     public readonly renderCoordinatorManager: RenderCoordinatorManager,
     @Inject(SceneGraph.symbol) public readonly stage: SceneGraph<T>,
     @Inject(Tree.symbol) public readonly tree: Tree<PositionRect<HexColor>>,
-    @Inject(GenerationalDirtyTracker.symbol)
-    public readonly dirtyTree: GenerationalDirtyTracker,
+    @Inject(FrameDirtyTracker.symbol)
+    public readonly dirtyTree: FrameDirtyTracker,
   ) {
     // Every strategy reacts to the same scroll stream and decides how to redraw.
     this.scrollManager.subscribeScroll(this.handleScroll.bind(this));

@@ -1,8 +1,8 @@
 /** BIN2DEC converts binary to decimal. Example: =BIN2DEC("1100100") returns 100. */
 import { engineeringFunction } from '../shared/functionFactory';
-import { numeric, text } from '../shared/arguments';
-import { isFormulaError, numberError } from '../shared/errors';
-import { formatSignedRadix, parseSignedRadix } from '../shared/radix';
+import { text } from '../shared/arguments';
+import { isFormulaError } from '../shared/errors';
+import { parseSignedRadix } from '../shared/radix';
 export const BIN2DEC = engineeringFunction({
   name: 'BIN2DEC',
   summary: 'Converts binary to decimal.',

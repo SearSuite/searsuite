@@ -1,5 +1,5 @@
 import { FormulaParser } from '@searsuite/sear-domain-formula-engine-ts';
-import { findNestedAggregateFormulaName } from '../src/sheet/findNestedAggregateFormulaName';
+import { findNestedAggregateFormulaName } from '@searsuite/sear-assembly-sheet-kernel';
 
 describe('findNestedAggregateFormulaName', () => {
   const parser = new FormulaParser();

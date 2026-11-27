@@ -1,4 +1,4 @@
-import { Pipeline } from '@searsuite/sear-assembly-core';
+import { Pipeline } from '@searsuite/sear-assembly-plugin';
 import { CommandExecutionPhase } from '@searsuite/sear-foundation-common';
 
 import {

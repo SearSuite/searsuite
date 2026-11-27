@@ -1,12 +1,12 @@
 /** @jest-environment node */
 
 import { createHeadlessEditor } from '../src';
+import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
 import {
   createEmptySheetDocumentState,
-  ExportSheetStateCommand,
   serializeSheetDocumentState,
   deserializeSheetDocumentState,
-} from '@searsuite/sear-assembly-setup';
+} from '@searsuite/sear-assembly-sheet-state';
 import {
   SetDataValidationRuleCommand,
   RemoveDataValidationRuleCommand,
@@ -23,7 +23,7 @@ import {
   DropdownError,
   DropdownMode,
 } from '@searsuite/sear-plugin-dropdown';
-import { ReadSheetCellDataQuery } from '@searsuite/sear-render-engine';
+import { ReadSheetCellDataQuery } from '@searsuite/sear-domain-sheet';
 import { UndoSheetCommand, RedoSheetCommand } from '@searsuite/sear-plugin-history';
 import { GetFormulaCellStatusCommand, waitForFormulaIdle } from '@searsuite/sear-plugin-formula';
 const cell = { row: 0, column: 0 },
@@ -38,7 +38,12 @@ it('shares validation-owned rules with atomic cell history, CSV values, formulas
       rule: {
         condition: {
           kind: DataValidationKind.Dropdown,
-          options: [{ label: 'Pending', color: '#ffeecc' }, { label: 'Done' }, { label: 'A,B' }, { label: ' say "yes" ' }],
+          options: [
+            { label: 'Pending', color: '#ffeecc' },
+            { label: 'Done' },
+            { label: 'A,B' },
+            { label: ' say "yes" ' },
+          ],
           dropdownMode: DataValidationDropdownMode.Single,
         },
         inputPolicy: DataValidationInputPolicy.Reject,

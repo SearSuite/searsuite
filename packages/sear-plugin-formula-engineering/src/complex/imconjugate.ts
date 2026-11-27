@@ -1,6 +1,6 @@
 /** IMCONJUGATE returns the complex conjugate. Example: =IMCONJUGATE("3+4i") returns a 3-4i. */
 import { engineeringFunction } from '../shared/functionFactory';
-import { unaryComplex, operations } from '../shared/complexOperations';
+import { unaryComplex } from '../shared/complexOperations';
 import { complex } from '../shared/complex';
 const reciprocal = (z: Parameters<typeof complex.divide>[1]) =>
   complex.divide({ ...z, real: 1, imaginary: 0 }, z) as typeof z;

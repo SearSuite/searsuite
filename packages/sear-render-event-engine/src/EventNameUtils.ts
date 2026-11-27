@@ -42,7 +42,7 @@ export function normalizeEventKey(eventKey: string): string {
  * Derives the plugin handler method name for a given event key.
  * e.g. `mousedown` / `mouseDown` → `onMouseDown`
  */
-export function getPluginHandlerName(eventKey: string): string {
+export function getViewHandlerName(eventKey: string): string {
   const normalized = normalizeEventKey(eventKey);
   return `on${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
 }

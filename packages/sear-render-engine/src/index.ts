@@ -30,36 +30,6 @@
 
 export { RenderContextFactory } from './RenderContextFactory';
 
-export {
-  DataEngine,
-  DataViewFieldDuplicateError,
-  type DataEngineRegistrationOptions,
-  type DataEngineViewFieldSelector,
-  type DataEngineViewFieldRegistration,
-} from './DataEngine';
-export { SheetDataEngine } from './SheetDataEngine';
-export { type SheetDataPluginState, SheetDataPlugin } from './sheetPlugin/data/SheetDataPlugin';
-export {
-  readSheetColumnHiddenOriginalSizes,
-  readSheetColumnSizes,
-  readSheetRowHiddenOriginalSizes,
-  readSheetRowSizes,
-  readSheetRawRowSizes,
-  SheetColumnHiddenOriginalSizesFieldKey,
-  SheetColumnSizesFieldKey,
-  SheetRowHiddenOriginalSizesFieldKey,
-  SheetRowSizesFieldKey,
-} from './SheetResizeDataFields';
-export { SheetRowVisibilityFieldKey, readSheetRowVisibility, type SheetRowVisibility, VisibleRowDimensions } from './SheetRowVisibility';
-export { readSheetDataMatrix, SheetDataMatrixFieldKey } from './sheetPlugin/data/SheetDataMatrixField';
-export { ReadSheetCellDataQuery } from './sheetPlugin/data/ReadSheetCellDataQuery';
-export { type SheetCellDataReader } from './sheetPlugin/data/SheetCellDataReader';
-export { type SheetDataQueryRegistry } from './sheetPlugin/data/SheetDataQueryRegistry';
-export { registerReadSheetCellDataQuery } from './sheetPlugin/data/registerReadSheetCellDataQuery';
-export { SheetDataFieldNamespace } from './SheetDataView';
-export { createInvertibleProjectedOperations, readDenseColumn, readDenseRow } from './SheetMatrixProjectionOperations';
-
 export { RenderEngine } from './RenderEngine';
-export { SheetMatrix, type CellMatrixElement } from './SheetMatrices';
 export { DocRenderEngine, type DocRenderViewport } from './DocRenderEngine';
 export { SheetRenderEngine } from './SheetRenderEngine';

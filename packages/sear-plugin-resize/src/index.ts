@@ -31,12 +31,7 @@ export {
   type SheetUnhideColumnsInput,
   type SheetUnhideRowsInput,
 } from './SheetResizeDimensionCommands';
-export {
-  registerSheetResizeDragCommands,
-  registerSheetResizeCommands,
-  type SheetResizeDragCommandController,
-} from './SheetResizeCommandRegistration';
-export { SheetResizePlugin, type SheetResizeDimensions, type SheetResizeProjectedCells } from './sheetResize/SheetResizePlugin';
+export { SheetResizePlugin, type SheetResizeDimensions } from './sheetResize/SheetResizePlugin';
 export {
   readSheetColumnHiddenOriginalSizes,
   readSheetColumnSizes,
@@ -46,13 +41,4 @@ export {
   SheetColumnSizesFieldKey,
   SheetRowHiddenOriginalSizesFieldKey,
   SheetRowSizesFieldKey,
-} from '@searsuite/sear-render-engine';
-export {
-  BeginSheetResizeDragCommand,
-  EndSheetResizeDragCommand,
-  UpdateSheetResizeDragCommand,
-  type SheetBeginResizeDragInput,
-  type SheetResizeAxis,
-  type SheetResizeDragInitialSize,
-  type SheetUpdateResizeDragInput,
-} from './SheetResizeCommands';
+} from '@searsuite/sear-domain-sheet';

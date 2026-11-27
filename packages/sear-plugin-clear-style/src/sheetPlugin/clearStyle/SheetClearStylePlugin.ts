@@ -1,19 +1,19 @@
 import { createSheetTransaction, type SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import { Pipeline } from '@searsuite/sear-assembly-core';
+import { Pipeline } from '@searsuite/sear-assembly-plugin';
 import { Plugin, PluginKey } from '@searsuite/sear-assembly-plugin';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { type CellProperties } from '@searsuite/sear-render-registry';
+
 import { ClearRangeStylesCommand } from '../../ClearRangeStylesCommand';
 import { type SheetClearStyleOptions } from '../../SheetClearStyleOptions';
 import { normalizeClearStyleRange } from '../../normalizeClearStyleRange';
 
 /** Composes owner-defined format clearing; owns no persisted document or session state. */
 @Injectable()
-export class SheetClearStylePlugin extends Plugin<unknown, CellProperties, null> {
+export class SheetClearStylePlugin extends Plugin<null> {
   readonly #options: SheetClearStyleOptions;
 
   public static readonly symbol = Symbol.for('SheetClearStylePlugin');
-  public override readonly warnOnDuplicateDepth = false;
+  public readonly warnOnDuplicateDepth = false;
 
   public constructor(options: SheetClearStyleOptions) {
     super({ key: new PluginKey('SheetClearStylePlugin'), state: null });
@@ -39,13 +39,7 @@ export class SheetClearStylePlugin extends Plugin<unknown, CellProperties, null>
   public registerState() {
     return { key: this.key, state: null, dataEngine: { enabled: false } };
   }
-  public getPluginConfig(): null {
-    return null;
-  }
   public apply(): null {
-    return null;
-  }
-  public render(): null {
     return null;
   }
 }

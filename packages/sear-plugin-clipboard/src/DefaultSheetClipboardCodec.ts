@@ -1,5 +1,5 @@
 import { type SheetRangeBounds } from '@searsuite/sear-assembly-commands';
-import { CellClipboardCodecRegistry, type CellMatrixElement } from '@searsuite/sear-domain-cell-types';
+import { CellClipboardCodecRegistry } from '@searsuite/sear-domain-cell-types';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import {
   SHEET_CLIPBOARD_PAYLOAD_VERSION,
@@ -25,13 +25,21 @@ export class DefaultSheetClipboardCodec implements SheetClipboardCodec {
     this.#cellCodecs = cellCodecs;
   }
 
-  public encode(range: SheetRangeBounds, source: SheetClipboardDataSource, visibleRowsOnly = false): SheetClipboardPayload {
+  public encode(
+    range: SheetRangeBounds,
+    source: SheetClipboardDataSource,
+    visibleRowsOnly = false,
+  ): SheetClipboardPayload {
     const sourceRows: number[] = [];
     for (let row = range.start[0]; row <= range.end[0]; row++) {
       if (!visibleRowsOnly || source.isRowVisible?.(row) !== false) sourceRows.push(row);
     }
     if (sourceRows.length === 0) {
-      throw new SheetClipboardError(SheetClipboardErrorCode.NoVisibleRows, 'Clipboard selection contains no visible rows.', { range });
+      throw new SheetClipboardError(
+        SheetClipboardErrorCode.NoVisibleRows,
+        'Clipboard selection contains no visible rows.',
+        { range },
+      );
     }
     const compacted = sourceRows.length !== range.end[0] - range.start[0] + 1;
     const rows: SheetClipboardRow[] = [];
@@ -68,27 +76,42 @@ export class DefaultSheetClipboardCodec implements SheetClipboardCodec {
         formats,
         ...(source.captureOwnerFormats
           ? compacted
-            ? { ownerFormatsByRow: sourceRows.map((row) => source.captureOwnerFormats!({
-                start: [row, range.start[1]], end: [row, range.end[1]],
-              })) }
+            ? {
+                ownerFormatsByRow: sourceRows.map((row) =>
+                  source.captureOwnerFormats!({
+                    start: [row, range.start[1]],
+                    end: [row, range.end[1]],
+                  }),
+                ),
+              }
             : { ownerFormats: source.captureOwnerFormats(range) }
           : {}),
         ...(source.captureOwnerData
           ? compacted
-            ? { ownerDataByRow: sourceRows.map((row) => source.captureOwnerData!({
-                start: [row, range.start[1]], end: [row, range.end[1]],
-              })) }
+            ? {
+                ownerDataByRow: sourceRows.map((row) =>
+                  source.captureOwnerData!({
+                    start: [row, range.start[1]],
+                    end: [row, range.end[1]],
+                  }),
+                ),
+              }
             : { ownerData: source.captureOwnerData(range) }
           : {}),
         ...(source.captureMergedRanges
-          ? { merges: compacted
-              ? sourceRows.flatMap((row, compactedRow) => source.captureMergedRanges!({
-                  start: [row, range.start[1]], end: [row, range.end[1]],
-                }).map((merge) => ({
-                  start: [compactedRow, merge.start[1]] as const,
-                  end: [compactedRow, merge.end[1]] as const,
-                })))
-              : source.captureMergedRanges(range) }
+          ? {
+              merges: compacted
+                ? sourceRows.flatMap((row, compactedRow) =>
+                    source.captureMergedRanges!({
+                      start: [row, range.start[1]],
+                      end: [row, range.end[1]],
+                    }).map((merge) => ({
+                      start: [compactedRow, merge.start[1]] as const,
+                      end: [compactedRow, merge.end[1]] as const,
+                    })),
+                  )
+                : source.captureMergedRanges(range),
+            }
           : {}),
       },
     };
@@ -103,21 +126,24 @@ export class DefaultSheetClipboardCodec implements SheetClipboardCodec {
       Array.isArray(structured.rows)
     ) {
       const source = normalizePoint(structured.source) ?? context.target;
-      const sourceRows = Array.isArray(structured.sourceRows) &&
+      const sourceRows =
+        Array.isArray(structured.sourceRows) &&
         structured.sourceRows.length === structured.rows.length &&
         structured.sourceRows.every((row) => Number.isInteger(row) && row >= 0)
-        ? structured.sourceRows
-        : undefined;
-      const ownerFormatsByRow = Array.isArray(structured.ownerFormatsByRow) &&
+          ? structured.sourceRows
+          : undefined;
+      const ownerFormatsByRow =
+        Array.isArray(structured.ownerFormatsByRow) &&
         structured.ownerFormatsByRow.length === structured.rows.length &&
         structured.ownerFormatsByRow.every(Array.isArray)
-        ? structured.ownerFormatsByRow
-        : undefined;
-      const ownerDataByRow = Array.isArray(structured.ownerDataByRow) &&
+          ? structured.ownerFormatsByRow
+          : undefined;
+      const ownerDataByRow =
+        Array.isArray(structured.ownerDataByRow) &&
         structured.ownerDataByRow.length === structured.rows.length &&
         structured.ownerDataByRow.every(Array.isArray)
-        ? structured.ownerDataByRow
-        : undefined;
+          ? structured.ownerDataByRow
+          : undefined;
       const ownerDataInstances = ownerDataByRow
         ? ownerDataByRow.map((captured, rowIndex) => ({
             offset: [rowIndex, 0] as const,
@@ -125,23 +151,33 @@ export class DefaultSheetClipboardCodec implements SheetClipboardCodec {
             captured,
           }))
         : Array.isArray(structured.ownerData)
-          ? [{
+        ? [
+            {
               offset: [0, 0] as const,
               size: [structured.rows.length, structured.rows[0]?.length ?? 0] as const,
               captured: structured.ownerData,
-            }]
-          : undefined;
+            },
+          ]
+        : undefined;
       const columnDelta = structured.isCut ? 0 : context.target[1] - source[1];
-      const rows = context.valuesOnly && Array.isArray(structured.valueRows) &&
-        structured.valueRows.length === structured.rows.length && structured.valueRows.every(Array.isArray)
-        ? structured.valueRows : structured.rows;
+      const rows =
+        context.valuesOnly &&
+        Array.isArray(structured.valueRows) &&
+        structured.valueRows.length === structured.rows.length &&
+        structured.valueRows.every(Array.isArray)
+          ? structured.valueRows
+          : structured.rows;
       return {
         rows: rows.map((row, rowIndex) =>
           row.map((cell: SheetClipboardRow[number]) =>
-            cell ? this.#cellCodecs.decode(cell, {
-              rowDelta: structured.isCut ? 0 : context.target[0] + rowIndex - (sourceRows?.[rowIndex] ?? source[0] + rowIndex),
-              columnDelta,
-            }) : null,
+            cell
+              ? this.#cellCodecs.decode(cell, {
+                  rowDelta: structured.isCut
+                    ? 0
+                    : context.target[0] + rowIndex - (sourceRows?.[rowIndex] ?? source[0] + rowIndex),
+                  columnDelta,
+                })
+              : null,
           ),
         ),
         formats: structured.formats,

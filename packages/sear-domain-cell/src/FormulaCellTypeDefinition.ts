@@ -1,8 +1,8 @@
 import { CellType, FormulaCellCommitStrategy, formatCellNumber } from '@searsuite/sear-domain-cell-types';
-import { FormulaCell, formatFormulaValue } from '@searsuite/sear-render-registry';
+import { formatFormulaValue } from '@searsuite/sear-domain-cell-types';
 
 import { type CellDisplayTextProvider } from './CellDisplayTextRegistry';
-import { defineCellRenderer } from './CellRendererDefinition';
+
 import { CellTypeDefinition } from './CellTypeDefinition';
 import { createFormulaCellClipboardCodec } from './FormulaCellClipboardCodec';
 
@@ -29,15 +29,13 @@ export class FormulaCellTypeDefinition extends CellTypeDefinition {
         const rows = Array.isArray(result) ? result : null;
         const firstRow = rows && Array.isArray(rows[0]) ? rows[0] : rows;
         const value = firstRow ? firstRow[0] : result;
-        return typeof value === 'number' ? formatCellNumber(value, _cell.format, context.cellFormatLocale) : formatFormulaValue(value);
+        return typeof value === 'number'
+          ? formatCellNumber(value, _cell.format, context.cellFormatLocale)
+          : formatFormulaValue(value);
       },
     };
   }
   override createClipboardCodec() {
     return createFormulaCellClipboardCodec();
-  }
-  /** Creates the renderer definition for formula cells. */
-  override createRenderer() {
-    return defineCellRenderer(this.type, FormulaCell);
   }
 }

@@ -1,6 +1,7 @@
 import { SearError } from '@searsuite/sear-foundation-error';
 import { LocalActionCommand, type SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import { SearCoreSheet, runOutsideCommandExecution } from '@searsuite/sear-assembly-core';
+
+import { runOutsideCommandExecution } from '@searsuite/sear-assembly-plugin';
 import { type CellFormatLocale, ICellFormatLocaleProvider } from '@searsuite/sear-domain-cell-types';
 import {
   Plugin,
@@ -19,8 +20,7 @@ import { Transaction } from '@searsuite/sear-domain-transaction';
 import { Container, Inject, Injectable, Scope } from '@searsuite/sear-foundation-di';
 import { type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 import { RecalcScheduler } from '@searsuite/sear-plugin-formula';
-import { Node } from '@searsuite/sear-render-node';
-import { type CellProperties } from '@searsuite/sear-render-registry';
+
 import {
   registerBuiltInSheetI18nLocales,
   SheetI18nLocaleRegistry,
@@ -43,10 +43,7 @@ export const SheetI18nSessionStateDefinition = defineSessionState<SheetI18nState
 
 /** Editor-local i18n plugin for built-in English and Chinese locale services. */
 @Injectable()
-export class SheetI18nPlugin
-  extends Plugin<SearCoreSheet, CellProperties, null>
-  implements IFormulaLocaleProvider, ICellFormatLocaleProvider
-{
+export class SheetI18nPlugin extends Plugin<null> implements IFormulaLocaleProvider, ICellFormatLocaleProvider {
   readonly #locales: SheetI18nLocaleRegistry;
 
   /** DI token for resolving SheetI18nPlugin. */
@@ -103,7 +100,9 @@ export class SheetI18nPlugin
     commands.register(ToggleSheetLocaleCommand, function createToggleSheetLocaleCommand() {
       return new LocalActionCommand(ToggleSheetLocaleCommand.id, function toggleSheetLocale(): void {
         plugin.#applyLocale(
-          plugin.#locale === SheetI18nBuiltInLocale.English ? SheetI18nBuiltInLocale.Chinese : SheetI18nBuiltInLocale.English,
+          plugin.#locale === SheetI18nBuiltInLocale.English
+            ? SheetI18nBuiltInLocale.Chinese
+            : SheetI18nBuiltInLocale.English,
         );
       });
     });
@@ -114,8 +113,11 @@ export class SheetI18nPlugin
     if (!this.#commands) throw new SearError('Sheet i18n commands must be registered before sealing locales.');
     if (this.#runtimeWritesSealed) throw new SearError('Sheet i18n runtime writes are already sealed.');
     const commands = this.#commands;
-    SheetI18nLocaleRegistry.prototype.enforceCommandBoundary.call(this.#locales, commands.isExecuting.bind(commands),
-      (id) => commands.run(UnregisterSheetI18nLocaleCommand, id));
+    SheetI18nLocaleRegistry.prototype.enforceCommandBoundary.call(
+      this.#locales,
+      commands.isExecuting.bind(commands),
+      (id) => commands.run(UnregisterSheetI18nLocaleCommand, id),
+    );
     this.#runtimeWritesSealed = true;
   }
 
@@ -207,19 +209,9 @@ export class SheetI18nPlugin
     return { key: this.key, state: this.getState(), dataEngine: { enabled: false } };
   }
 
-  /** Returns the plugin config. */
-  public getPluginConfig(): null {
-    return null;
-  }
-
   /** Applies no document mutations because i18n is local runtime state. */
   public apply(state: null, _transaction: Transaction): null {
     return state;
-  }
-
-  /** This plugin renders no scene nodes. */
-  public render(): Node<CellProperties>[] {
-    return [];
   }
 
   #subscribe(listener: (state: SheetI18nState) => void): () => void {

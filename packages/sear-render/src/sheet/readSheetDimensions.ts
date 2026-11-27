@@ -1,1 +1,1 @@
-export { readSheetColumnSizes, readSheetRowSizes } from '@searsuite/sear-render-engine';
+export { readSheetColumnSizes, readSheetRowSizes } from '@searsuite/sear-domain-sheet';

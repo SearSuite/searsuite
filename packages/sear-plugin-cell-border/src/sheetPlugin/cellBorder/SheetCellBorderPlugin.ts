@@ -17,18 +17,17 @@ import { createCellBorderOperation } from '../../CellBorderProjection';
 import { Plugin, PluginKey, type PluginDocumentStateContribution } from '@searsuite/sear-assembly-plugin';
 import { deserializeSparseMatrix, serializeSparseMatrix } from '@searsuite/sear-domain-matrix';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { Node } from '@searsuite/sear-render-node';
+
 import { Transaction } from '@searsuite/sear-domain-transaction';
-import { CellProperties } from '@searsuite/sear-render-registry';
-import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-render-engine';
+
+import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-domain-sheet';
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
 import { CellBorderMatrix } from '../../CellBorderMatrix';
 import { type SheetCellBorder } from '../../SheetCellBorder';
 import { registerCellBorderCommands } from '../../SheetCellBorderCommands';
 import { registerCellBorderQueries } from '../../SheetCellBorderQueries';
 import { type SheetQueryRegistry } from '@searsuite/sear-assembly-commands';
-import { type SearCoreSheet } from '@searsuite/sear-assembly-core';
-import { renderCellBorders } from '../../renderCellBorders';
+
 import { SheetCellBorderFieldKey } from '../../SheetCellBorderDataField';
 
 /** State owned by SheetCellBorderPlugin. */
@@ -41,11 +40,7 @@ const pluginKey = new PluginKey('SheetCellBorderPlugin');
 
 /** Plugin that owns cell border data, commands, structural projections, and export. */
 @Injectable()
-export class SheetCellBorderPlugin extends Plugin<SearCoreSheet, CellProperties, SheetCellBorderPluginState> {
-  /** Border nodes are painted after base cells and merged-cell backgrounds. */
-  public override readonly depth = 2;
-  /** Multiple extension layers may share the same depth. */
-  public override readonly warnOnDuplicateDepth = false;
+export class SheetCellBorderPlugin extends Plugin<SheetCellBorderPluginState> {
   /** Border transactions share the registered MatrixOT algebra. */
   public override readonly transactionOT = {
     ownerId: 'sheet.cellBorder',
@@ -165,15 +160,5 @@ export class SheetCellBorderPlugin extends Plugin<SearCoreSheet, CellProperties,
     if (operations.length === 0) return pluginState;
     MatrixOT.apply(pluginState.cellBorders, operations);
     return pluginState;
-  }
-
-  /** Cell-border data has no render-time configuration. */
-  public getPluginConfig(): null {
-    return null;
-  }
-
-  /** Contributes custom strokes without teaching the grid about border state. */
-  public render(core: SearCoreSheet): Node<CellProperties>[] {
-    return renderCellBorders(core, this.getState().cellBorders);
   }
 }

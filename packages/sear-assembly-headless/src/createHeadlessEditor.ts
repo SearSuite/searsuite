@@ -1,133 +1,86 @@
 import {
-  createSheetEditor,
-  type SheetEditor,
-  type SheetEditorAdapters,
-  type SheetEditorConfiguration,
-} from '@searsuite/sear-assembly-setup';
+  createSheetKernelEditor,
+  type SheetKernelConfiguration,
+  type SheetRuntimeAdapters,
+} from '@searsuite/sear-assembly-sheet-kernel';
+import { type SheetEditor } from '@searsuite/sear-assembly-commands';
 import {
-  createWorkbookEditor,
+  createWorkbookRuntime,
   type WorkbookEditor,
-  type WorkbookEditorConfiguration,
-} from '@searsuite/sear-assembly-workbook';
+  type WorkbookRuntimeConfiguration,
+} from '@searsuite/sear-assembly-workbook-kernel';
 import { NodePlatform, NodeWebServiceClient } from '@searsuite/sear-node-adapters';
-import {
-  HeadlessHitRenderContext,
-  HeadlessOffScreenRenderContext,
-  HeadlessRenderContext,
-} from '@searsuite/sear-render-context';
-import { HeadlessScroller } from '@searsuite/sear-render-scroll';
-import { RenderContextTextShaper } from '@searsuite/sear-render-metrics';
-import { HeadlessEventRegistrar } from '@searsuite/sear-render-event-engine';
-import { HeadlessKeyboardRouter, HeadlessPointerCapture, HeadlessTextInput } from '@searsuite/sear-render-input';
-import { HeadlessCursorEngine } from '@searsuite/sear-render-cursor';
-import { HeadlessCollabTransport } from '@searsuite/sear-plugin-collab';
-import { HeadlessToolbar } from '@searsuite/sear-assembly-plugin';
-import { NodeXmlDocumentParser } from './NodeXmlDocumentParser';
-import { NodeXmlXPathEngine } from './NodeXmlXPathEngine';
-import { createHeadlessFunctionRegistry } from './HeadlessFunctionRegistry';
 import {
   IFormulaDateSystemProvider,
   IFormulaIterationSettingsProvider,
   type FormulaDateSystem,
   type FormulaIterationSettings,
 } from '@searsuite/sear-domain-formula-engine';
+import { HeadlessCollabTransport } from '@searsuite/sear-plugin-collab';
+import { NodeXmlDocumentParser } from './NodeXmlDocumentParser';
+import { NodeXmlXPathEngine } from './NodeXmlXPathEngine';
+import { createHeadlessFunctionRegistry } from './HeadlessFunctionRegistry';
 
-/** Sheet editor options for hosts that do not provide platform adapters. */
-export type HeadlessEditorOptions = Omit<SheetEditorConfiguration, 'adapters'> & {
-  /** Optional host wall-clock source for volatile formulas. */
-  currentDateTime?: () => number;
-  dateSystem?: FormulaDateSystem;
-  iteration?: FormulaIterationSettings;
-};
+/** Node-owned clock and calculation settings shared by Sheet and Workbook hosts. */
+export interface HeadlessCalculationOptions {
+  readonly currentDateTime?: () => number;
+  readonly dateSystem?: FormulaDateSystem;
+  readonly iteration?: FormulaIterationSettings;
+}
 
-/** Workbook editor options for hosts that do not provide platform adapters. */
-export type HeadlessWorkbookEditorOptions = Omit<WorkbookEditorConfiguration, 'adapters'> & {
-  /** Optional host wall-clock source for volatile formulas. */
-  currentDateTime?: () => number;
-  dateSystem?: FormulaDateSystem;
-  iteration?: FormulaIterationSettings;
-};
-
-/** Public editor returned by the headless assembly helper. */
+/** Business-only Sheet options with Node host services supplied by this assembly. */
+export type HeadlessEditorOptions = Omit<SheetKernelConfiguration, 'adapters'> & HeadlessCalculationOptions;
+/** Business-only Workbook options with Node host services supplied by this assembly. */
+export type HeadlessWorkbookEditorOptions = Omit<WorkbookRuntimeConfiguration, 'adapters'> & HeadlessCalculationOptions;
+/** The neutral Sheet business facade returned by the Node assembly. */
 export type HeadlessEditor = SheetEditor;
-
-/** Public workbook editor returned by the headless assembly helper. */
+/** The neutral Workbook business facade returned by the Node assembly. */
 export type HeadlessWorkbookEditor = WorkbookEditor;
 
-/**
- * Creates a sheet editor backed entirely by headless adapters.
- * @param options - Sheet editor configuration excluding adapter overrides.
- * @returns A sheet editor suitable for tests, servers, or non-UI hosts.
- */
-export function createHeadlessEditor(options: HeadlessEditorOptions): HeadlessEditor;
-export function createHeadlessEditor(options: HeadlessWorkbookEditorOptions): HeadlessWorkbookEditor;
-export function createHeadlessEditor(
-  options: HeadlessEditorOptions | HeadlessWorkbookEditorOptions,
-): HeadlessEditor | HeadlessWorkbookEditor {
-  const { currentDateTime, dateSystem, iteration, ...configuration } = options;
-  const adapters = createHeadlessAdapters(currentDateTime, dateSystem, iteration);
-  if ('documentState' in configuration) {
-    return createWorkbookEditor({ ...configuration, adapters });
-  }
-  return createSheetEditor({ ...(configuration as Omit<SheetEditorConfiguration, 'adapters'>), adapters });
+/** Creates a Sheet business kernel without allocating a scene, renderer or native input adapter. */
+export function createHeadlessEditor(options: HeadlessEditorOptions): HeadlessEditor {
+  const { currentDateTime, dateSystem, iteration, ...business } = options;
+  return createSheetKernelEditor({
+    ...business,
+    adapters: createNodeRuntimeAdapters({
+      ...(currentDateTime ? { currentDateTime } : {}),
+      ...(dateSystem === undefined ? {} : { dateSystem }),
+      ...(iteration ? { iteration } : {}),
+    }),
+  });
 }
 
-/**
- * Creates a workbook editor backed entirely by platform-neutral headless adapters.
- *
- * Use this assembly for server-side processing, deterministic tests, and hosts that
- * provide their own visual presentation. The returned editor exposes the same typed
- * command, observation, capability, document, and sheet facades as the visual assembly.
- *
- * @param options - Workbook configuration excluding platform adapter construction.
- * @returns An isolated workbook editor that owns its plugins and runtime services.
- */
+/** Creates a Workbook whose mounted Sheets use business kernels directly. */
 export function createHeadlessWorkbookEditor(options: HeadlessWorkbookEditorOptions): HeadlessWorkbookEditor {
-  const { currentDateTime, dateSystem, iteration, ...configuration } = options;
-  return createWorkbookEditor({ ...configuration, adapters: createHeadlessAdapters(currentDateTime, dateSystem, iteration) });
+  const { currentDateTime, dateSystem, iteration, ...business } = options;
+  return createWorkbookRuntime({
+    ...business,
+    adapters: createNodeRuntimeAdapters({
+      ...(currentDateTime ? { currentDateTime } : {}),
+      ...(dateSystem === undefined ? {} : { dateSystem }),
+      ...(iteration ? { iteration } : {}),
+    }),
+  });
 }
 
-function createHeadlessAdapters(
-  currentDateTime?: () => number,
-  dateSystem?: FormulaDateSystem,
-  iteration?: FormulaIterationSettings,
-): SheetEditorAdapters {
+function createNodeRuntimeAdapters(options: HeadlessCalculationOptions): SheetRuntimeAdapters {
   class ClockedNodePlatform extends NodePlatform {
-    public currentDateTime(): number {
-      return currentDateTime?.() ?? super.currentDateTime();
+    public override currentDateTime(): number {
+      return options.currentDateTime?.() ?? super.currentDateTime();
     }
   }
   return {
-    ...(dateSystem === undefined && iteration === undefined ? {} : {
-      registerEnvironment(container) {
-        if (dateSystem !== undefined) {
-          container.registerInstance(IFormulaDateSystemProvider.symbol, { getDateSystem: () => dateSystem });
-        }
-        if (iteration !== undefined) {
-          container.registerInstance(IFormulaIterationSettingsProvider.symbol, { getSettings: () => iteration });
-        }
-      },
-    }),
-    platform: currentDateTime ? ClockedNodePlatform : NodePlatform,
-    createTextShaper: (renderContext) => new RenderContextTextShaper(renderContext),
+    platform: options.currentDateTime ? ClockedNodePlatform : NodePlatform,
+    collabTransport: HeadlessCollabTransport,
     createFunctionRegistry: createHeadlessFunctionRegistry,
     xmlDocumentParser: NodeXmlDocumentParser,
     xmlXPathEngine: NodeXmlXPathEngine,
     webServiceClient: NodeWebServiceClient,
-    createRenderContexts() {
-      return {
-        renderContext: new HeadlessRenderContext(),
-        offScreenRenderContext: new HeadlessOffScreenRenderContext(),
-        hitRenderContext: new HeadlessHitRenderContext(),
-      };
+    registerEnvironment(container) {
+      if (options.dateSystem !== undefined)
+        container.registerInstance(IFormulaDateSystemProvider.symbol, { getDateSystem: () => options.dateSystem });
+      if (options.iteration !== undefined)
+        container.registerInstance(IFormulaIterationSettingsProvider.symbol, { getSettings: () => options.iteration });
     },
-    scroller: HeadlessScroller,
-    eventRegistrar: HeadlessEventRegistrar,
-    textInput: HeadlessTextInput,
-    keyboardRouter: HeadlessKeyboardRouter,
-    pointerCapture: HeadlessPointerCapture,
-    cursorEngine: HeadlessCursorEngine,
-    collabTransport: HeadlessCollabTransport,
-    toolbar: HeadlessToolbar,
   };
 }

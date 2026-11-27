@@ -1,4 +1,4 @@
-import { TextInputKind, type TextInputEvent } from '@searsuite/sear-render-input';
+import { TextInputKind, type TextInputEvent } from '@searsuite/sear-domain-commands';
 import { DocInputBindingRegistry } from '../src/doc/DocInputBindingRegistry';
 
 describe('DocInputBindingRegistry text stream', () => {
@@ -49,7 +49,10 @@ describe('DocInputBindingRegistry text stream', () => {
     const dispatch = registry.createTextHandlers();
     let executing = false;
     let tearingDown = false;
-    registry.enforceCommandBoundary(() => executing, () => tearingDown);
+    registry.enforceCommandBoundary(
+      () => executing,
+      () => tearingDown,
+    );
 
     handlers.onDelete = replacement;
     dispatch.onDelete?.();

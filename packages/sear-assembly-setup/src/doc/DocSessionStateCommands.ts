@@ -1,11 +1,5 @@
-import { Pipeline } from '@searsuite/sear-assembly-core';
-import {
-  defineDocCommand,
-  type DocCommandContext,
-  type DocCommandResult,
-  type DocEditorCommand,
-  type DocCommandBus,
-} from '@searsuite/sear-assembly-commands';
+import { Pipeline } from '@searsuite/sear-assembly-plugin';
+import { defineDocCommand, type DocCommandContext, type DocCommandResult, type DocEditorCommand, type DocCommandBus } from '@searsuite/sear-assembly-commands';
 import { type SessionStateRegistry } from '@searsuite/sear-assembly-plugin';
 
 import { type DocSessionState } from './DocEditorContracts';

@@ -1,3 +1,4 @@
+import { type DocView, type DocViewImplementation } from './DocViewContracts';
 import { DocCommandBus } from '@searsuite/sear-assembly-commands';
 import { type IncrementalRenderPolicyLimitsConfig } from '@searsuite/sear-assembly-config';
 import { type DocPlugin, type DocPluginImplementation } from '@searsuite/sear-assembly-doc';
@@ -110,6 +111,9 @@ export interface DocEditorConfiguration {
   defaultPlugins?: readonly DocPluginImplementation<DocPlugin<unknown>>[] | false;
   /** Document plugins installed after the default editing and rendering features. */
   plugins?: DocPluginImplementation<DocPlugin<unknown>>[];
+  /** Presentation extensions selected independently of state plugins. */
+  defaultViews?: readonly DocViewImplementation<DocView>[] | false;
+  viewExtensions?: readonly DocViewImplementation<DocView>[];
 }
 
 /** Public standalone document editor API returned by `createDocEditor()`. */

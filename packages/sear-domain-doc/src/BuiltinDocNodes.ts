@@ -1,4 +1,4 @@
-import { DocNodeRegistry, DocNodeRole, type DocNodeDefinition } from './DocNodeRegistry';
+import { DocNodeRole, type DocNodeDefinition } from './DocNodeRegistry';
 import { ParagraphNode } from './ParagraphNode';
 import { TableCellNode } from './TableCellNode';
 import { TableNode } from './TableNode';

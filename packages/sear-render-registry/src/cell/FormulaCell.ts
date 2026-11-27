@@ -19,7 +19,7 @@
 
 import { FixBoxNode, TextNode, Node } from '@searsuite/sear-render-node';
 import { Cell, CellProperties } from '../Cell';
-import { formatFormulaValue } from './DisplayTextUtils';
+import { formatFormulaValue } from '@searsuite/sear-domain-cell-types';
 import {
   CellType,
   formatCellNumberDisplay,
@@ -104,8 +104,9 @@ export class FormulaCell extends Cell<CellProperties<string>> {
 
   #getEffectiveFormat(): unknown {
     const { row, col, formulaResultProvider } = this.context;
-    return this.properties.format ?? (
-      row === void 0 || col === void 0 ? void 0 : formulaResultProvider?.getFormulaResultFormat?.(row, col)
+    return (
+      this.properties.format ??
+      (row === void 0 || col === void 0 ? void 0 : formulaResultProvider?.getFormulaResultFormat?.(row, col))
     );
   }
 
@@ -121,7 +122,10 @@ export class FormulaCell extends Cell<CellProperties<string>> {
 
   #readHyperlink(): boolean {
     const { row, col, formulaRichResultProvider } = this.context;
-    return row !== undefined && col !== undefined
-      && formulaRichResultProvider?.getFormulaRichResult(row, col)?.kind === 'hyperlink';
+    return (
+      row !== undefined &&
+      col !== undefined &&
+      formulaRichResultProvider?.getFormulaRichResult(row, col)?.kind === 'hyperlink'
+    );
   }
 }

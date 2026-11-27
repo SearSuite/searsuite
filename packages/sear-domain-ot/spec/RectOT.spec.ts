@@ -1,5 +1,3 @@
-import { type InsertColOTOperation } from '../src/InsertColOTOperation';
-import { type InsertRowOTOperation } from '../src/InsertRowOTOperation';
 import { RectOT, type UpdateRectOTOperation } from '../src/RectOT';
 import { Rect } from '@searsuite/sear-foundation-rect';
 

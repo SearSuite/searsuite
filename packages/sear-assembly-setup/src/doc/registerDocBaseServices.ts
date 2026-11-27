@@ -1,25 +1,10 @@
 import { SearError } from '@searsuite/sear-foundation-error';
-import {
-  DocCompositionManager,
-  DocCursorManager,
-  DocInputPlugin,
-  PipelineStepExecutorRegistry,
-  SearCoreDoc,
-} from '@searsuite/sear-assembly-core';
-import {
-  ConfigEngine,
-  defaultDocConfig,
-  type DocConfig,
-  type EditorDefaultConfigOverrides,
-} from '@searsuite/sear-assembly-config';
+import { DocCompositionManager, DocCursorManager, SearCoreDoc } from '@searsuite/sear-assembly-core';
+import { DocInputPlugin } from '@searsuite/sear-assembly-doc';
+import { PipelineStepExecutorRegistry } from '@searsuite/sear-assembly-plugin';
+import { ConfigEngine, defaultDocConfig, type DocConfig, type EditorDefaultConfigOverrides } from '@searsuite/sear-assembly-config';
 import { PluginManager, SessionStateRegistry } from '@searsuite/sear-assembly-plugin';
-import {
-  DocNodeRegistry,
-  RichTextInlineStyleRegistry,
-  RichTextLineBoxRegistry,
-  RichTextBlockFlowRegistry,
-  type RichTextParagraphLayoutDefaults,
-} from '@searsuite/sear-domain-doc';
+import { DocNodeRegistry, RichTextInlineStyleRegistry, RichTextLineBoxRegistry, RichTextBlockFlowRegistry, type RichTextParagraphLayoutDefaults } from '@searsuite/sear-domain-doc';
 import { DocLayoutEngine } from '@searsuite/sear-domain-editor';
 import { type Container, Scope } from '@searsuite/sear-foundation-di';
 import { Platform } from '@searsuite/sear-foundation-platform';
@@ -27,24 +12,8 @@ import { PositionRect } from '@searsuite/sear-foundation-rect';
 import { DataStorage, MapDataStorageFactory } from '@searsuite/sear-foundation-storage';
 import { TextShaper } from '@searsuite/sear-render-metrics';
 import { ObservationRegistry, SubscriptionManager } from '@searsuite/sear-foundation-subscription';
-import {
-  Container as RenderContainer,
-  DirtyTree,
-  GenerationalDirtyTracker,
-  HitColorRegistry,
-  QuadTreeFactory,
-  SceneGraph,
-  Tree,
-  BlockManager,
-  RichTextLineRenderer,
-  RichTextRunRenderRegistry,
-  RichTextRunRenderer,
-  type Node,
-  type NodeProperties,
-  type RenderNodeKey,
-  type RichTextRenderNodeProperties,
-} from '@searsuite/sear-render-node';
-import { EventEngine } from '@searsuite/sear-render-event-engine';
+import { Container as RenderContainer, DirtyTree, FrameDirtyTracker, HitColorRegistry, QuadTreeFactory, SceneGraph, Tree, BlockManager, RichTextLineRenderer, RichTextRunRenderRegistry, RichTextRunRenderer, type Node, type NodeProperties, type RenderNodeKey, type RichTextRenderNodeProperties } from '@searsuite/sear-render-node';
+import { EventEngine, ViewExtensionRegistry } from '@searsuite/sear-render-event-engine';
 import { DocRenderEngine } from '@searsuite/sear-render-engine';
 import { RenderCoordinatorManager } from '@searsuite/sear-render-registry';
 import { type DocEditorAdapters, type DocEditorViewport } from './createDocEditor';
@@ -74,6 +43,7 @@ export function registerDocBaseServices(
   _viewport: DocEditorViewport,
   defaultConfigOverrides?: EditorDefaultConfigOverrides<DocConfig>,
 ): DocBaseServices {
+  container.register(ViewExtensionRegistry.symbol, ViewExtensionRegistry, Scope.Singleton);
   const configEngine = new ConfigEngine(defaultDocConfig, defaultConfigOverrides);
   container.registerInstance(ConfigEngine.symbol, configEngine);
   container.registerFactory(
@@ -87,8 +57,8 @@ export function registerDocBaseServices(
     Scope.Singleton,
   );
   container.registerFactory(
-    GenerationalDirtyTracker.symbol,
-    () => new GenerationalDirtyTracker(container.resolve(DirtyTree.symbol)),
+    FrameDirtyTracker.symbol,
+    () => new FrameDirtyTracker(container.resolve(DirtyTree.symbol)),
     Scope.Singleton,
   );
   container.registerFactory<DataStorage<RenderNodeKey, RenderContainer>>(
@@ -158,7 +128,7 @@ export function registerDocBaseServices(
   container.register(Platform.symbol, adapters.platform, Scope.Singleton);
   container.registerFactory(
     SearCoreDoc.pluginManagerSymbol,
-    () => container.resolve<PluginManager<SearCoreDoc, NodeProperties>>(PluginManager.symbol),
+    () => container.resolve<PluginManager>(PluginManager.symbol),
     Scope.Singleton,
   );
   container.registerFactory(

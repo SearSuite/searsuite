@@ -1,3 +1,4 @@
+import { type SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
 import { createMatrixFormatTransfer, type SheetFormatTransferRegistry } from '@searsuite/sear-assembly-plugin';
 import { SheetRangeMoveRegistry, SheetRangeReorderRegistry } from '@searsuite/sear-assembly-plugin';
 import {
@@ -25,10 +26,10 @@ import {
 import { Plugin, PluginKey, type PluginDocumentStateContribution } from '@searsuite/sear-assembly-plugin';
 import { deserializeSparseMatrix, serializeSparseMatrix, type CSRMatrix } from '@searsuite/sear-domain-matrix';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { Node } from '@searsuite/sear-render-node';
+
 import { Transaction } from '@searsuite/sear-domain-transaction';
-import { CellProperties, SheetCellVisualReaderRegistry } from '@searsuite/sear-render-registry';
-import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-render-engine';
+
+import { createInvertibleProjectedOperations, SheetDataFieldNamespace } from '@searsuite/sear-domain-sheet';
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
 import { CellFillMatrix, type SheetCellFill } from '../../CellFillMatrix';
 import { registerSheetCellFillCommand } from './SheetCellFillCommands';
@@ -44,9 +45,18 @@ const pluginKey = new PluginKey('SheetCellFillPlugin');
 
 /** Plugin that owns cell fill data, commands, structural projections, and export. */
 @Injectable()
-export class SheetCellFillPlugin extends Plugin<unknown, CellProperties, SheetCellFillPluginState> {
-  /** Fill state is data-only and does not use render-depth diagnostics. */
-  public override readonly warnOnDuplicateDepth = false;
+export class SheetCellFillPlugin extends Plugin<SheetCellFillPluginState> {
+  public registerCellStyles(registry: SheetCellStyleRegistry): void {
+    registry.register({
+      id: 'sheet.cell-fill',
+      properties: ['fill'],
+      read: (row, column) => {
+        const fill = this.getState().cellFills.getItem(row, column);
+        return fill == null ? {} : { fill };
+      },
+    });
+  }
+
   /** Fill transactions share the registered MatrixOT algebra. */
   public override readonly transactionOT = {
     ownerId: 'sheet.cellFill',
@@ -101,19 +111,6 @@ export class SheetCellFillPlugin extends Plugin<unknown, CellProperties, SheetCe
       getRowCount: () => plugin.getState().cellFills.shape[0],
       getColumnCount: () => plugin.getState().cellFills.shape[1],
       readCellFill: (row, column) => plugin.getState().cellFills.getItem(row, column),
-    });
-  }
-
-  /** Contributes explicit fill colors to the shared Sheet cell visual pipeline. */
-  public registerCellVisualReaders(registry: SheetCellVisualReaderRegistry): void {
-    const plugin = this;
-    registry.register({
-      id: 'sheet.cell-fill',
-      properties: ['fill'],
-      read({ rowIndex, columnIndex }) {
-        const fill = plugin.getState().cellFills.getItem(rowIndex, columnIndex);
-        return fill == null ? {} : { fill };
-      },
     });
   }
 
@@ -178,16 +175,6 @@ export class SheetCellFillPlugin extends Plugin<unknown, CellProperties, SheetCe
     if (operations.length === 0) return null;
     MatrixOT.apply(pluginState.cellFills, operations);
     return pluginState;
-  }
-
-  /** Cell-fill data has no render-time configuration. */
-  public getPluginConfig(): null {
-    return null;
-  }
-
-  /** Cell-fill data contributes through grid cell properties, not scene nodes. */
-  public render(): Node<CellProperties>[] {
-    return [];
   }
 }
 

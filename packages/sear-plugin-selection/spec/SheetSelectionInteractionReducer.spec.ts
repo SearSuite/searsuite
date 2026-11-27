@@ -1,4 +1,4 @@
-import { SheetInteractionReducerRegistry } from '@searsuite/sear-assembly-core';
+import { SheetInteractionReducerRegistry } from '@searsuite/sear-assembly-plugin';
 import { registerSheetSelectionInteractionReducers } from '../src/SheetSelectionInteractionReducer';
 import { SheetSelectionInteractionName } from '../src/SheetSelectionPipelineNames';
 

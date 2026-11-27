@@ -44,7 +44,7 @@ export class SheetRendererRegistry<
    * @param input - Cell instance to render.
    * @returns Scene node or nodes produced by the renderer.
    */
-  override render<T extends CellProperties>(input: Cell<T>): Node<RegistryProperties> | Node<RegistryProperties>[] {
+  render<T extends CellProperties>(input: Cell<T>): Node<RegistryProperties> | Node<RegistryProperties>[] {
     const type = input.data.type;
     const rendererFn = this.#rendererMap.get(type);
     if (!rendererFn) {

@@ -61,8 +61,8 @@ jest.mock('@searsuite/sear-render-node', () => {
     }
   }
 
-  class GenerationalDirtyTracker {
-    static symbol = Symbol.for('GenerationalDirtyTracker');
+  class FrameDirtyTracker {
+    static symbol = Symbol.for('FrameDirtyTracker');
 
     query() {
       return [];
@@ -101,7 +101,7 @@ jest.mock('@searsuite/sear-render-node', () => {
   return {
     SceneGraph,
     Tree,
-    GenerationalDirtyTracker,
+    FrameDirtyTracker,
     DirtyTree,
     Node,
     FixBoxNode,

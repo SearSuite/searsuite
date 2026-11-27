@@ -1,3 +1,4 @@
+import { type SheetEmbeddedEditorPlugin, type SheetEmbeddedEditorPluginContext } from '@searsuite/sear-assembly-doc';
 import { createHeadlessEditor } from '@searsuite/sear-assembly-headless';
 import { NodePlatform } from '@searsuite/sear-node-adapters';
 import { ReadDropdownCellQuery, PickDropdownOptionCommand, DropdownMode } from '@searsuite/sear-plugin-dropdown';
@@ -17,24 +18,25 @@ import {
 import {
   createDocEditor,
   createSheetEditor,
-  SheetPlugin,
   type DocEditorConfiguration,
   type SheetEditorConfiguration,
 } from '@searsuite/sear-assembly-setup';
+import { SheetPlugin } from '@searsuite/sear-assembly-commands';
 import {
   ExportWorkbookStateCommand,
-  WorkbookPlugin,
-  createWorkbookEditor,
-  defineWorkbookCommand,
-  defineWorkbookRuntimeCapability,
   deserializeWorkbookDocumentState,
   serializeWorkbookDocumentState,
+} from '@searsuite/sear-assembly-workbook-kernel';
+import { createWorkbookEditor, type WorkbookEditorConfiguration } from '@searsuite/sear-assembly-workbook';
+import {
+  WorkbookPlugin,
+  defineWorkbookCommand,
+  defineWorkbookRuntimeCapability,
   type WorkbookCommandBus,
-  type WorkbookEditorConfiguration,
   type WorkbookPluginContext,
   type WorkbookPluginImplementation,
   type WorkbookRuntimeExtensionRegistry,
-} from '@searsuite/sear-assembly-workbook';
+} from '@searsuite/sear-assembly-workbook-kernel';
 import { type CollaborationContributorRegistry } from '@searsuite/sear-domain-collaboration';
 import {
   OTTransformPriority,
@@ -49,10 +51,7 @@ import { FormulaWebServiceDefinition, type EvalContext } from '@searsuite/sear-d
 import { ENCODEURL, FILTERXML, WEBSERVICE, FormulaWebServiceCache } from '@searsuite/sear-domain-formula-engine-ts';
 import { type CollaborationChannel } from '@searsuite/sear-plugin-collab';
 import { DocumentStateCodecRegistry } from '@searsuite/sear-plugin-export';
-import {
-  SheetCellVisualReaderRegistry,
-  type SheetCellVisualReaderRegistrationContext,
-} from '@searsuite/sear-render-registry';
+import { type SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
 import {
   defineStateObservation,
   type ObservationRegistry,
@@ -136,26 +135,15 @@ class ExternalCollaborativeSheetPlugin extends SheetPlugin<number> {
     );
   }
 
-  public render(): null {
-    return null;
-  }
-
-  public getPluginConfig(): null {
-    return null;
-  }
-
   public registerState() {
     return { key: this.key, state: this.getState(), dataEngine: { enabled: false } };
   }
 
-  public registerCellVisualReaders(
-    registry: SheetCellVisualReaderRegistry,
-    _context: SheetCellVisualReaderRegistrationContext,
-  ): void {
+  public registerCellStyles(registry: SheetCellStyleRegistry): void {
     registry.register({
-      id: 'external.cell-visual',
-      properties: ['strokeWidth'],
-      read: () => ({ strokeWidth: 1 }),
+      id: 'external.cell-style',
+      properties: ['stroke'],
+      read: () => ({ stroke: '#336699' }),
     });
   }
 }
@@ -275,3 +263,19 @@ function dropdownConsumer(editor: ReturnType<typeof createSheetEditor>) {
   return DropdownMode.Multiple;
 }
 void dropdownConsumer;
+
+const embeddedPolicy: SheetEmbeddedEditorPlugin = {
+  key: 'consumer.embedded-policy',
+  transformInput(input, context) {
+    const document = context.document;
+    void document;
+    return input;
+  },
+};
+void embeddedPolicy;
+type WithoutKeys<T, Forbidden extends PropertyKey> = Extract<Forbidden, keyof T> extends never ? true : never;
+const embeddedContextIsNeutral: WithoutKeys<SheetEmbeddedEditorPluginContext, 'editor' | 'core' | 'renderContext'> =
+  true;
+const embeddedPolicyIsSemantic: WithoutKeys<SheetEmbeddedEditorPlugin, 'onRender' | 'render' | 'onMouseDown'> = true;
+void embeddedContextIsNeutral;
+void embeddedPolicyIsSemantic;

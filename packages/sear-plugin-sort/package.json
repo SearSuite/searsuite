@@ -23,7 +23,6 @@
   },
   "dependencies": {
     "@searsuite/sear-assembly-commands": "workspace:*",
-    "@searsuite/sear-assembly-core": "workspace:*",
     "@searsuite/sear-assembly-plugin": "workspace:*",
     "@searsuite/sear-domain-cell-types": "workspace:*",
     "@searsuite/sear-domain-matrix": "workspace:*",
@@ -31,8 +30,7 @@
     "@searsuite/sear-foundation-common": "workspace:*",
     "@searsuite/sear-foundation-di": "workspace:*",
     "@searsuite/sear-foundation-error": "workspace:*",
-    "@searsuite/sear-foundation-platform": "workspace:*",
-    "@searsuite/sear-render-registry": "workspace:*"
+    "@searsuite/sear-foundation-platform": "workspace:*"
   },
   "exports": {
     ".": {

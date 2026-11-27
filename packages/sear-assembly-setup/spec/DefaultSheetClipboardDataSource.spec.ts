@@ -1,19 +1,19 @@
 import { SheetQueryRegistry } from '@searsuite/sear-assembly-commands';
-import { SheetClipboardTransferRegistry, SheetFormatTransferRegistry, SheetRangeMoveRegistry } from '@searsuite/sear-assembly-plugin';
-import { SheetClipboardCutSession, SheetClipboardSheetIdentity } from '@searsuite/sear-plugin-clipboard';
 import {
-  SheetDataEngine,
-  SheetDataFieldNamespace,
-  SheetDataMatrixFieldKey,
-  SheetDataPlugin,
-  SheetMatrix,
-} from '@searsuite/sear-render-engine';
+  SheetClipboardTransferRegistry,
+  SheetFormatTransferRegistry,
+  SheetRangeMoveRegistry,
+} from '@searsuite/sear-assembly-plugin';
+import { SheetClipboardCutSession, SheetClipboardSheetIdentity } from '@searsuite/sear-plugin-clipboard';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
+import { SheetDataFieldNamespace, SheetDataMatrixFieldKey, SheetMatrix } from '@searsuite/sear-domain-sheet';
+import { SheetDataEngine } from '@searsuite/sear-domain-sheet';
 import { GetSelection } from '@searsuite/sear-plugin-selection';
 import { CellMergeMatrix, SheetCellMergeFieldKey, SheetCellMergePlugin } from '@searsuite/sear-plugin-cell-merge';
 import { NodePlatform as HeadlessPlatform } from '@searsuite/sear-node-adapters';
 import { SheetCellInputValidationRegistry } from '@searsuite/sear-domain-cell-types';
 
-import { DefaultSheetClipboardDataSource } from '../src/sheet/DefaultSheetClipboardDataSource';
+import { DefaultSheetClipboardDataSource } from '@searsuite/sear-assembly-sheet-kernel';
 
 describe('DefaultSheetClipboardDataSource', () => {
   it('projects selection, shape, values, empty cells, and missing state', () => {
@@ -61,7 +61,8 @@ describe('DefaultSheetClipboardDataSource', () => {
     expect(source.readCell(0, 0)).toBeNull();
     expect(source.validatePasteCell(0, 0, { type: 'string', value: 'A'.repeat(32767) }).reject).toBe(false);
     expect(source.validatePasteCell(0, 0, { type: 'string', value: 'A'.repeat(32768) })).toMatchObject({
-      reject: true, message: 'A cell can contain at most 32767 characters.',
+      reject: true,
+      message: 'A cell can contain at most 32767 characters.',
     });
   });
 

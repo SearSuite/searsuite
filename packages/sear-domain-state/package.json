@@ -21,7 +21,9 @@
     "compile": "tsc -p tsconfig.build.json",
     "prepublishOnly": "pnpm run build"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@searsuite/sear-foundation-error": "workspace:*"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

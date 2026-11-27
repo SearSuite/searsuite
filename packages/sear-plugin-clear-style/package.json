@@ -23,11 +23,9 @@
   },
   "dependencies": {
     "@searsuite/sear-assembly-commands": "workspace:*",
-    "@searsuite/sear-assembly-core": "workspace:*",
     "@searsuite/sear-assembly-plugin": "workspace:*",
     "@searsuite/sear-foundation-di": "workspace:*",
-    "@searsuite/sear-foundation-error": "workspace:*",
-    "@searsuite/sear-render-registry": "workspace:*"
+    "@searsuite/sear-foundation-error": "workspace:*"
   },
   "exports": {
     ".": {

@@ -21,9 +21,9 @@ describe('SheetViewportResizeController', () => {
         render: jest.fn(),
       },
       configEngine: { getDefaultConfig: () => ({ devicePixelRatio: 2 }) },
-      pluginManager: {
+      getViewExtensions: () => ({
         forEach: (callback: (value: typeof plugin) => void) => callback(plugin),
-      },
+      }),
       eventEngine: { renderImmediate: jest.fn() },
       getStage: jest.fn(() => stage),
     };
@@ -62,12 +62,12 @@ describe('SheetViewportResizeController', () => {
         render: jest.fn(),
       },
       configEngine: { getDefaultConfig: () => ({ devicePixelRatio: 1 }) },
-      pluginManager: {
+      getViewExtensions: () => ({
         forEach: (callback: (plugin: typeof rendered | typeof nonRendered) => void) => {
           callback(rendered);
           callback(nonRendered);
         },
-      },
+      }),
       eventEngine: { renderImmediate: jest.fn() },
       getStage: jest.fn(() => stage),
     };

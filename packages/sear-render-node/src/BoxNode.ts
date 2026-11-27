@@ -1,5 +1,5 @@
 import { SearError } from '@searsuite/sear-foundation-error';
-import { Node } from './Node';
+
 import { LayoutNode } from './LayoutNode';
 import { RenderContext } from '@searsuite/sear-render-context';
 import { NodeProperties } from './types';

@@ -1,3 +1,4 @@
+import { type CellVisualIconShape } from '@searsuite/sear-domain-cell-types';
 import { type PositionRectProps } from '@searsuite/sear-foundation-rect';
 import { type HexColor } from '@searsuite/sear-foundation-utils';
 import { type SheetHorizontalAlignment, type SheetVerticalAlignment } from '@searsuite/sear-domain-cell-types';
@@ -7,21 +8,6 @@ export type RenderNodeKey = string;
 
 /** Color key used only by hit-canvas rendering and pixel-to-node lookup. */
 export type HitColorKey = HexColor;
-
-export const CellVisualIconShape = {
-  Up: 'up',
-  Right: 'right',
-  Down: 'down',
-  Circle: 'circle',
-  Diamond: 'diamond',
-  Triangle: 'triangle',
-  Flag: 'flag',
-  Star: 'star',
-  Bar: 'bar',
-  Check: 'check',
-  Cross: 'cross',
-} as const;
-export type CellVisualIconShape = (typeof CellVisualIconShape)[keyof typeof CellVisualIconShape];
 
 /** Primitive shapes available to feature-contributed cell layers. */
 export const CellVisualLayerShape = { Rectangle: 'rectangle', TopLeftTriangle: 'topLeftTriangle' } as const;

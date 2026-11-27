@@ -1,7 +1,7 @@
 import { SheetCommandBus, SheetQueryRegistry } from '@searsuite/sear-assembly-commands';
-import { SheetDataPlugin } from '@searsuite/sear-render-engine';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
 import { MatrixOTActionName } from '@searsuite/sear-domain-ot';
-import { createTransaction, Transaction } from '@searsuite/sear-domain-transaction';
+import { createTransaction } from '@searsuite/sear-domain-transaction';
 import {
   CellMergeMatrix,
   AnalyzeMergeCellsQuery,
@@ -168,13 +168,19 @@ describe('@searsuite/sear-plugin-cell-merge', () => {
     structure.addOperation([{ p: [2], [MatrixOTActionName.RowInsert]: [null, null, null] } as never]);
     plugin.apply(state, structure);
 
-    expect(state.cellMerges.findRange(3, 1)?.shape).toEqual([[1, 1], [3, 1]]);
+    expect(state.cellMerges.findRange(3, 1)?.shape).toEqual([
+      [1, 1],
+      [3, 1],
+    ]);
     expect(state.cellMerges.findRange(4, 1)).toBeNull();
 
     const inverse = createTransaction({ key: 'sheet.data' });
     inverse.addOperation([{ p: [2], [MatrixOTActionName.RowDelete]: [null, null, null] } as never]);
     plugin.apply(state, inverse);
-    expect(state.cellMerges.findRange(2, 1)?.shape).toEqual([[1, 1], [2, 1]]);
+    expect(state.cellMerges.findRange(2, 1)?.shape).toEqual([
+      [1, 1],
+      [2, 1],
+    ]);
     expect(state.cellMerges.findRange(3, 1)).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import { FormulaDateSystem, type IFormulaDateSystemProvider } from '@searsuite/sear-domain-formula-engine';
-import { parseSheetFilterDate } from '../src/sheet/runtimePlugin/filter/parseSheetFilterDate';
+import { parseSheetFilterDate } from '@searsuite/sear-assembly-sheet-kernel';
 
 describe('Sheet filter date adapter', () => {
   it('converts ISO dates to the configured workbook serial system', () => {

@@ -1,20 +1,19 @@
+import { ViewExtensionBase } from '@searsuite/sear-render-event-engine';
 import { Injectable, Inject } from '@searsuite/sear-foundation-di';
 import { SearCoreSheet } from '@searsuite/sear-assembly-core';
-import { PluginKey, Plugin } from '@searsuite/sear-assembly-plugin';
+import { PluginKey } from '@searsuite/sear-assembly-plugin';
 import { EventWithOffsetAndTarget } from '@searsuite/sear-render-event-engine';
 
-import { SheetCornerPlugin } from './corner/SheetCornerPlugin';
-import { SheetColumnLabelPlugin } from './SheetColumnLabel';
+import { SheetCornerView } from './corner/SheetCornerView';
+import { SheetColumnLabelView } from './SheetColumnLabel';
 
-import { SheetRowNumberPlugin } from './SheetRowNumber';
+import { SheetRowNumberView } from './SheetRowNumber';
 import { SheetGridRender } from './SheetGridRender';
 
-import { MatrixOTActionName } from '@searsuite/sear-domain-ot';
-import { Transaction } from '@searsuite/sear-domain-transaction';
 import { CellProperties } from '@searsuite/sear-render-registry';
 import { DashedLineNode, Node } from '@searsuite/sear-render-node';
 import { readSheetFreeze } from '@searsuite/sear-plugin-freeze';
-import { readSheetColumnSizes, readSheetRowSizes } from '@searsuite/sear-render-engine';
+import { readSheetColumnSizes, readSheetRowSizes } from '@searsuite/sear-domain-sheet';
 
 type SheetGridState = Record<string, never>;
 
@@ -22,56 +21,30 @@ const key = new PluginKey('SheetGrid');
 
 /** Composite plugin that assembles sheet chrome, body grid, and merged-cell nodes. */
 @Injectable()
-export class SheetGridPlugin extends Plugin<SearCoreSheet, CellProperties, SheetGridState> {
-  #sheetCornerPlugin: SheetCornerPlugin;
-  #sheetColumnLabelPlugin: SheetColumnLabelPlugin;
-  #sheetRowNumberPlugin: SheetRowNumberPlugin;
+export class SheetGridView extends ViewExtensionBase<SearCoreSheet, CellProperties> {
+  #sheetCornerPlugin: SheetCornerView;
+  #sheetColumnLabelPlugin: SheetColumnLabelView;
+  #sheetRowNumberPlugin: SheetRowNumberView;
   #sheetGridRender: SheetGridRender;
 
-  /** Composite grid configuration is delegated to child render plugins. */
-  public getPluginConfig(searCore: SearCoreSheet): null {
-    return null;
-  }
-
-  /** Rebuilds grid geometry when sheet data or dimensions change. */
-  public override interestedIn: string[] = [
-    MatrixOTActionName.UpdateCell,
-    MatrixOTActionName.ResizeRow,
-    MatrixOTActionName.ResizeCol,
-    MatrixOTActionName.RowInsert,
-    MatrixOTActionName.RowDelete,
-    MatrixOTActionName.RowMove,
-    MatrixOTActionName.ColInsert,
-    MatrixOTActionName.ColDelete,
-    MatrixOTActionName.ColMove,
-  ];
-
   /** DI token for resolving the composite sheet grid plugin. */
-  public static readonly symbol: symbol = Symbol.for('SheetGridPlugin');
+  public static readonly symbol: symbol = Symbol.for('SheetGridView');
 
   /** Constructs the grid plugin from its child sheet render plugins. */
   constructor(
-    @Inject(SheetCornerPlugin.symbol)
-    sheetCornerPlugin: SheetCornerPlugin,
-    @Inject(SheetColumnLabelPlugin.symbol)
-    sheetColumnLabelPlugin: SheetColumnLabelPlugin,
-    @Inject(SheetRowNumberPlugin.symbol)
-    sheetRowNumberPlugin: SheetRowNumberPlugin,
+    @Inject(SheetCornerView.symbol)
+    sheetCornerPlugin: SheetCornerView,
+    @Inject(SheetColumnLabelView.symbol)
+    sheetColumnLabelPlugin: SheetColumnLabelView,
+    @Inject(SheetRowNumberView.symbol)
+    sheetRowNumberPlugin: SheetRowNumberView,
     @Inject(SheetGridRender.symbol) sheetGridRender: SheetGridRender,
   ) {
-    super({
-      key: key,
-      state: {},
-    });
+    super(key);
     this.#sheetCornerPlugin = sheetCornerPlugin;
     this.#sheetColumnLabelPlugin = sheetColumnLabelPlugin;
     this.#sheetRowNumberPlugin = sheetRowNumberPlugin;
     this.#sheetGridRender = sheetGridRender;
-  }
-
-  /** Registers only the composite grid state; merged ranges have their own plugin owner. */
-  public override registerState() {
-    return { key: this.key, state: this.getState() };
   }
 
   /** Registers configuration contributed by every child sheet render plugin. */
@@ -89,25 +62,6 @@ export class SheetGridPlugin extends Plugin<SearCoreSheet, CellProperties, Sheet
     this.#sheetGridRender.onDblClick(earCore, event);
   }
 
-  /** Keeps composite state unchanged when data transactions cause a re-render. */
-  public override apply(pluginState: SheetGridState, transaction: Transaction) {
-    const shouldRerender = transaction.operations.some((operation) =>
-      [
-        MatrixOTActionName.UpdateCell,
-        MatrixOTActionName.ResizeRow,
-        MatrixOTActionName.ResizeCol,
-        MatrixOTActionName.RowInsert,
-        MatrixOTActionName.RowDelete,
-        MatrixOTActionName.RowMove,
-        MatrixOTActionName.ColInsert,
-        MatrixOTActionName.ColDelete,
-        MatrixOTActionName.ColMove,
-      ].some((action) => action in operation),
-    );
-    if (shouldRerender) return pluginState;
-    return null;
-  }
-
   /**
    * Renders sheet chrome and body layers in the order expected by the scene graph.
    * @param searCore - Sheet core containing data and render services.
@@ -115,7 +69,7 @@ export class SheetGridPlugin extends Plugin<SearCoreSheet, CellProperties, Sheet
    */
   public render(searCore: SearCoreSheet): Node<CellProperties>[] {
     const conrnerNodes = this.#sheetCornerPlugin.render(searCore);
-    const conrnerConfig = this.#sheetCornerPlugin.getPluginConfig(searCore);
+    const conrnerConfig = this.#sheetCornerPlugin.getConfig(searCore);
     const { width, height } = conrnerConfig;
 
     const columnLabelNodes = this.#sheetColumnLabelPlugin.render(searCore, {

@@ -25,5 +25,4 @@ export interface SheetDropdownOptions {
     column: number,
     value: number | boolean,
   ): Transaction;
-  /** Commits active editing before pointer activation; false leaves the edit active. */ beforeOpen?(): boolean;
 }

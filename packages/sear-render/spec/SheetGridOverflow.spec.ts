@@ -1,12 +1,11 @@
-import { SheetGridOverflowPlugin } from '../src/sheet/SheetGridOverflow';
-
-describe('SheetGridOverflowPlugin', () => {
-  it('keeps placeholder state and config inert until overflow rendering exists', () => {
-    const plugin = new SheetGridOverflowPlugin();
-
-    expect(plugin.apply(null, { operations: [] } as never)).toBeNull();
-    expect(plugin.registerState()).toEqual({ key: plugin.key, state: plugin.getState() });
-    expect(plugin.getPluginConfig({} as never)).toBeNull();
-    expect(plugin.render({} as never)).toEqual([]);
+import { ViewExtensionRole } from '@searsuite/sear-render-event-engine';
+import { SheetGridOverflowView } from '../src/sheet/SheetGridOverflow';
+describe('SheetGridOverflowView', () => {
+  it('reserves a presentation identity without owning document state', () => {
+    const view = new SheetGridOverflowView();
+    expect(view[ViewExtensionRole]).toBe(true);
+    expect(view.registerConfig()).toEqual([]);
+    expect('apply' in view).toBe(false);
+    expect('registerState' in view).toBe(false);
   });
 });

@@ -1,19 +1,10 @@
-import { type NodeProperties } from '@searsuite/sear-render-node';
 import { type Transaction } from '@searsuite/sear-domain-transaction';
 
 import { Plugin, PluginKey } from '../src';
 
-class MockPlugin extends Plugin<object, NodeProperties, { enabled: boolean }> {
+class MockPlugin extends Plugin<{ enabled: boolean }> {
   public apply(state: { enabled: boolean }, _transaction: Transaction) {
     return { ...state };
-  }
-
-  public render() {
-    return null;
-  }
-
-  public getPluginConfig() {
-    return {};
   }
 
   public registerState() {

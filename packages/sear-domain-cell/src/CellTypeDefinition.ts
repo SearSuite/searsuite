@@ -4,13 +4,11 @@ import {
   type CellCommitStrategyDefinition,
 } from '@searsuite/sear-domain-cell-types';
 import { type CellDisplayTextProvider } from './CellDisplayTextRegistry';
-import { type CellRendererDefinition } from './CellRendererDefinition';
-import { CellRenderDefinition } from './CellRenderDefinition';
 
 /** A persisted spreadsheet cell type and all behaviours associated with it. */
-export abstract class CellTypeDefinition extends CellRenderDefinition {
+export abstract class CellTypeDefinition {
   /** Persisted cell type identifier stored on sheet cell data. */
-  abstract override readonly type: string;
+  abstract readonly type: string;
 
   /** Creates commit strategies associated with this cell type. */
   createCommitStrategies(): readonly CellCommitStrategyDefinition[] {
@@ -36,7 +34,4 @@ export abstract class CellTypeDefinition extends CellRenderDefinition {
   isStoredValue(_cell: { value?: unknown; formula?: unknown }): boolean {
     return true;
   }
-
-  /** Creates the renderer definition associated with this cell type. */
-  abstract override createRenderer(): CellRendererDefinition;
 }

@@ -67,7 +67,7 @@ export class ConfigEngine<TConfig extends object = any> {
    * @param pluginKey Stable key that owns the configuration.
    * @param pluginConfig Plugin config
    */
-  public registerPluginConfig<T extends object>(pluginKey: ConfigKey, pluginConfig: T): void {
+  public registerConfig<T extends object>(pluginKey: ConfigKey, pluginConfig: T): void {
     this.#assertCommandWrite();
     if (!pluginKey) {
       throw new SearError('Plugin name cannot be empty.');
@@ -100,7 +100,7 @@ export class ConfigEngine<TConfig extends object = any> {
    * @param pluginKey Stable key whose configuration should be returned.
    * @returns Plugin configuration
    */
-  public getPluginConfig<T extends object>(pluginKey: ConfigKey): (ConfigUnit<T> & T) | undefined {
+  public getConfig<T extends object>(pluginKey: ConfigKey): (ConfigUnit<T> & T) | undefined {
     return this.#config.get(pluginKey) as (ConfigUnit<T> & T) | undefined;
   }
 }
