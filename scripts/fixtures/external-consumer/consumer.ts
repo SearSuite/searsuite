@@ -1,13 +1,11 @@
-import { type SheetEmbeddedEditorPlugin, type SheetEmbeddedEditorPluginContext } from '@searsuite/sear-assembly-doc';
-import { createHeadlessEditor } from '@searsuite/sear-assembly-headless';
-import { NodePlatform } from '@searsuite/sear-node-adapters';
-import { ReadDropdownCellQuery, PickDropdownOptionCommand, DropdownMode } from '@searsuite/sear-plugin-dropdown';
+import { SheetPlugin } from '@searsuite/sear-assembly-commands';
 import {
-  InsertCheckboxesCommand,
-  ToggleCheckboxesCommand,
-  ReadCheckboxRangeQuery,
-  CheckboxRemovalMode,
-} from '@searsuite/sear-plugin-checkbox';
+  InsertDocTextCommand,
+  type SheetEmbeddedEditorPlugin,
+  type SheetEmbeddedEditorPluginContext,
+} from '@searsuite/sear-assembly-doc';
+import { DocCommitObservation, ReadDocDocumentQuery, ReadDocTextQuery } from '@searsuite/sear-assembly-doc-kernel';
+import { createHeadlessDocEditor, createHeadlessEditor } from '@searsuite/sear-assembly-headless';
 import {
   PluginKey,
   SessionStateRestorePhase,
@@ -21,23 +19,23 @@ import {
   type DocEditorConfiguration,
   type SheetEditorConfiguration,
 } from '@searsuite/sear-assembly-setup';
-import { SheetPlugin } from '@searsuite/sear-assembly-commands';
-import {
-  ExportWorkbookStateCommand,
-  deserializeWorkbookDocumentState,
-  serializeWorkbookDocumentState,
-} from '@searsuite/sear-assembly-workbook-kernel';
 import { createWorkbookEditor, type WorkbookEditorConfiguration } from '@searsuite/sear-assembly-workbook';
 import {
+  ExportWorkbookStateCommand,
   WorkbookPlugin,
   defineWorkbookCommand,
   defineWorkbookRuntimeCapability,
+  deserializeWorkbookDocumentState,
+  serializeWorkbookDocumentState,
   type WorkbookCommandBus,
   type WorkbookPluginContext,
   type WorkbookPluginImplementation,
   type WorkbookRuntimeExtensionRegistry,
 } from '@searsuite/sear-assembly-workbook-kernel';
+import { type SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
 import { type CollaborationContributorRegistry } from '@searsuite/sear-domain-collaboration';
+import { FormulaWebServiceDefinition, type EvalContext } from '@searsuite/sear-domain-formula-engine';
+import { ENCODEURL, FILTERXML, FormulaWebServiceCache, WEBSERVICE } from '@searsuite/sear-domain-formula-engine-ts';
 import {
   OTTransformPriority,
   type OTEncodedValue,
@@ -47,16 +45,21 @@ import {
 } from '@searsuite/sear-domain-ot';
 import { type Transaction } from '@searsuite/sear-domain-transaction';
 import { Injectable } from '@searsuite/sear-foundation-di';
-import { FormulaWebServiceDefinition, type EvalContext } from '@searsuite/sear-domain-formula-engine';
-import { ENCODEURL, FILTERXML, WEBSERVICE, FormulaWebServiceCache } from '@searsuite/sear-domain-formula-engine-ts';
-import { type CollaborationChannel } from '@searsuite/sear-plugin-collab';
-import { DocumentStateCodecRegistry } from '@searsuite/sear-plugin-export';
-import { type SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
 import {
   defineStateObservation,
   type ObservationRegistry,
   type StateObservationSource,
 } from '@searsuite/sear-foundation-subscription';
+import { NodePlatform } from '@searsuite/sear-node-adapters';
+import {
+  CheckboxRemovalMode,
+  InsertCheckboxesCommand,
+  ReadCheckboxRangeQuery,
+  ToggleCheckboxesCommand,
+} from '@searsuite/sear-plugin-checkbox';
+import { type CollaborationChannel } from '@searsuite/sear-plugin-collab';
+import { DropdownMode, PickDropdownOptionCommand, ReadDropdownCellQuery } from '@searsuite/sear-plugin-dropdown';
+import { DocumentStateCodecRegistry } from '@searsuite/sear-plugin-export';
 
 const IncrementCommand = defineWorkbookCommand<void, number>('external.consumer.increment');
 const CountObservation = defineStateObservation<number>('external.consumer.count');
@@ -279,3 +282,15 @@ const embeddedContextIsNeutral: WithoutKeys<SheetEmbeddedEditorPluginContext, 'e
 const embeddedPolicyIsSemantic: WithoutKeys<SheetEmbeddedEditorPlugin, 'onRender' | 'render' | 'onMouseDown'> = true;
 void embeddedContextIsNeutral;
 void embeddedPolicyIsSemantic;
+
+const independentDoc = createHeadlessDocEditor({ documentState: { document: [] } });
+independentDoc.commands.run(InsertDocTextCommand, { text: 'Independent' });
+const independentDocText: string = independentDoc.queries.run(ReadDocTextQuery, undefined);
+const independentDocDocument = independentDoc.queries.run(ReadDocDocumentQuery, undefined).document;
+const unsubscribeDoc = independentDoc.observations.subscribe(DocCommitObservation, (commit) => {
+  void commit.revision;
+});
+void independentDocText;
+void independentDocDocument;
+unsubscribeDoc();
+independentDoc.destroy();

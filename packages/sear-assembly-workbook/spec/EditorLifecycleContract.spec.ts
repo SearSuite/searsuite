@@ -1,42 +1,50 @@
-import { SheetMatrix } from '@searsuite/sear-domain-sheet';
-import { AlignmentMatrix, VerticalAlignmentMatrix } from '@searsuite/sear-plugin-alignment';
-import { CellFillMatrix } from '@searsuite/sear-plugin-cell-fill';
-import { CellHighlightMatrix } from '@searsuite/sear-plugin-cell-highlight';
-import { DuplicateMatrix } from '@searsuite/sear-plugin-duplicate';
-import { CellFormatMatrix } from '@searsuite/sear-plugin-cell-format';
-import { CellMergeMatrix } from '@searsuite/sear-plugin-cell-merge';
-import { ClearRangeContentsCommand } from '@searsuite/sear-assembly-commands';
-import { SelectRangeCommand } from '@searsuite/sear-plugin-selection';
-import { HandleDocumentInputCommand, IsCellEditingQuery } from '@searsuite/sear-plugin-cell-editor';
-import { PluginKey, type PluginStateRegistration } from '@searsuite/sear-assembly-plugin';
-import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
+import { ClearRangeContentsCommand, SheetPlugin, SheetRuntimeCapability } from '@searsuite/sear-assembly-commands';
+import { DocPlugin, DocRuntimeCapability } from '@searsuite/sear-assembly-doc';
+import { HeadlessToolbar, PluginKey, type PluginStateRegistration } from '@searsuite/sear-assembly-plugin';
 import {
   createDocEditor,
   createSheetEditor,
   type DocEditor,
   type SheetEditorAdapters,
 } from '@searsuite/sear-assembly-setup';
-import { DocRuntimeCapability, DocPlugin } from '@searsuite/sear-assembly-doc';
+import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
 import { type SheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
-import { SheetRuntimeCapability, SheetPlugin } from '@searsuite/sear-assembly-commands';
-import { ParagraphNode, TextNode } from '@searsuite/sear-domain-doc';
-import { CellType } from '@searsuite/sear-domain-cell-types';
-import { ColumnShapeDimensionsCSRMatrix, CSRMatrix, RowShapeDimensionsCSRMatrix } from '@searsuite/sear-domain-matrix';
-import { createWorkbookDocumentState } from '@searsuite/sear-domain-workbook';
-import { NodePlatform as HeadlessPlatform } from '@searsuite/sear-node-adapters';
-import { Container, Injectable } from '@searsuite/sear-foundation-di';
 import {
-  CollabTransport,
+  ActivateWorkbookSheetCommand,
+  AddWorkbookSheetCommand,
+  ConnectWorkbookCollaborationCommand,
+  DisconnectWorkbookCollaborationCommand,
+  RenameWorkbookSheetCommand,
+  WorkbookCollaborationCapability,
+  WorkbookFormulaPlugin,
+  WorkbookHistoryStatusObservation,
+  WorkbookPlugin,
+  WorkbookRuntimeCapability,
+} from '@searsuite/sear-assembly-workbook-kernel';
+import { CellType } from '@searsuite/sear-domain-cell-types';
+import { ParagraphNode, TextNode } from '@searsuite/sear-domain-doc';
+import { ColumnShapeDimensionsCSRMatrix, CSRMatrix, RowShapeDimensionsCSRMatrix } from '@searsuite/sear-domain-matrix';
+import { SheetMatrix } from '@searsuite/sear-domain-sheet';
+import { createWorkbookDocumentState } from '@searsuite/sear-domain-workbook';
+import { Container, Injectable } from '@searsuite/sear-foundation-di';
+import { NodePlatform as HeadlessPlatform } from '@searsuite/sear-node-adapters';
+import { AlignmentMatrix, VerticalAlignmentMatrix } from '@searsuite/sear-plugin-alignment';
+import { HandleDocumentInputCommand, IsCellEditingQuery } from '@searsuite/sear-plugin-cell-editor';
+import { CellFillMatrix } from '@searsuite/sear-plugin-cell-fill';
+import { CellFormatMatrix } from '@searsuite/sear-plugin-cell-format';
+import { CellHighlightMatrix } from '@searsuite/sear-plugin-cell-highlight';
+import { CellMergeMatrix } from '@searsuite/sear-plugin-cell-merge';
+import {
   CollaborationChannelBinding,
   CollaborationConnectionState,
   CollaborationProtocolVersion,
+  CollabTransport,
   HeadlessCollabTransport,
   type CollaborationClientMessage,
   type CollaborationServerMessage,
   type CollaborationTransportConnectOptions,
 } from '@searsuite/sear-plugin-collab';
-import { SheetHistoryStatusObservation } from '@searsuite/sear-plugin-history';
-import { UndoSheetCommand } from '@searsuite/sear-plugin-history';
+import { DuplicateMatrix } from '@searsuite/sear-plugin-duplicate';
 import {
   ApplyFormatPainterCommand,
   CancelFormatPainterCommand,
@@ -44,26 +52,14 @@ import {
   FormatPainterObservation,
   StartFormatPainterCommand,
 } from '@searsuite/sear-plugin-format-painter';
-import { HeadlessToolbar } from '@searsuite/sear-assembly-plugin';
-import { HeadlessRenderContext } from '@searsuite/sear-render-context';
-import { type EventWithOffset } from '@searsuite/sear-render-context';
+import { SheetHistoryStatusObservation, UndoSheetCommand } from '@searsuite/sear-plugin-history';
+import { SelectRangeCommand } from '@searsuite/sear-plugin-selection';
+import { HeadlessRenderContext, type EventWithOffset } from '@searsuite/sear-render-context';
 import { HeadlessCursorEngine } from '@searsuite/sear-render-cursor';
 import { HeadlessEventRegistrar } from '@searsuite/sear-render-event-engine';
 import { HeadlessKeyboardRouter, HeadlessPointerCapture, HeadlessTextInput } from '@searsuite/sear-render-input';
 import { HeadlessScroller } from '@searsuite/sear-render-scroll';
 import { createWorkbookEditor } from '../src';
-import {
-  ActivateWorkbookSheetCommand,
-  AddWorkbookSheetCommand,
-  RenameWorkbookSheetCommand,
-  WorkbookFormulaPlugin,
-  WorkbookCollaborationCapability,
-  ConnectWorkbookCollaborationCommand,
-  DisconnectWorkbookCollaborationCommand,
-  WorkbookHistoryStatusObservation,
-  WorkbookPlugin,
-  WorkbookRuntimeCapability,
-} from '@searsuite/sear-assembly-workbook-kernel';
 import { runEditorLifecycleContract } from './support/EditorLifecycleContract';
 
 function createSheetState(): SheetDocumentState {
@@ -111,6 +107,7 @@ function createContractDocEditor(): DocEditor {
   return createDocEditor({
     documentState: { document: [paragraph] },
     adapters: {
+      eventRegistrar: HeadlessEventRegistrar,
       platform: HeadlessPlatform,
       createRenderContext: () => new HeadlessRenderContext(),
       textInput: HeadlessTextInput,
@@ -617,6 +614,7 @@ describe('editor initialization failure contract', () => {
         documentState: { document: [] },
         plugins: [FirstFailingDocPlugin, SecondFailingDocPlugin],
         adapters: {
+          eventRegistrar: HeadlessEventRegistrar,
           platform: HeadlessPlatform,
           createRenderContext: () => new HeadlessRenderContext(),
           textInput: HeadlessTextInput,

@@ -1,19 +1,18 @@
 import { SearError } from '@searsuite/sear-foundation-error';
-import { RenderContext } from '@searsuite/sear-render-context';
-import { FrameDirtyTracker, NodeProperties, Node, SceneGraph, Tree } from '@searsuite/sear-render-node';
 import { PositionRect } from '@searsuite/sear-foundation-rect';
+import { RenderContext } from '@searsuite/sear-render-context';
+import { FrameDirtyTracker, Node, NodeProperties, SceneGraph, Tree } from '@searsuite/sear-render-node';
 
-import { RenderStrategy } from './RenderStrategy';
+import { ConfigEngine } from '@searsuite/sear-assembly-config';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { HexColor } from '@searsuite/sear-foundation-utils';
 import { ScrollManager, type ScrollManagerState } from '@searsuite/sear-render-scroll';
+import { BlockRasterCopyPlan } from './BlockRasterCopyPlan';
 import { RasterCopyExecutor } from './RasterCopyExecutor';
 import { RasterCopyPlan } from './RasterCopyPlan';
-import { BlockRasterCopyPlan } from './BlockRasterCopyPlan';
+import { RenderStrategy } from './RenderStrategy';
 import { createViewportFrameCache, ViewportFrameCache } from './ViewportFrameCache';
 import { clearViewport, requiresViewportFrameRebuild } from './ViewportRenderHelpers';
-import { ConfigEngine } from '@searsuite/sear-assembly-config';
-import { RenderCoordinatorManager } from '@searsuite/sear-render-registry';
 
 /**
  * ScreenRenderStrategy handles rendering with an off-screen buffer to optimize scroll performance.
@@ -80,8 +79,6 @@ export class ScreenRenderStrategy<
     hitRenderContext: RenderContext,
     @Inject(ScrollManager.symbol) scrollManager: ScrollManager,
     @Inject(ConfigEngine.symbol) configEngine: ConfigEngine,
-    @Inject(RenderCoordinatorManager.symbol)
-    renderCoordinatorManager: RenderCoordinatorManager,
     @Inject(SceneGraph.symbol) stage: SceneGraph<NodeTypeProperties>,
     @Inject(Tree.symbol) tree: Tree<PositionRect<HexColor>>,
     @Inject(FrameDirtyTracker.symbol)
@@ -89,17 +86,7 @@ export class ScreenRenderStrategy<
     @Inject(RasterCopyExecutor.symbol)
     rasterCopyExecutor: RasterCopyExecutor,
   ) {
-    super(
-      renderContext,
-      offScreenRenderContext,
-      hitRenderContext,
-      scrollManager,
-      configEngine,
-      renderCoordinatorManager,
-      stage,
-      tree,
-      dirtyTree,
-    );
+    super(renderContext, offScreenRenderContext, hitRenderContext, scrollManager, configEngine, stage, tree, dirtyTree);
     this.#rasterCopyExecutor = rasterCopyExecutor;
   }
 

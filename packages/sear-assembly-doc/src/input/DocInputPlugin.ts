@@ -1,7 +1,20 @@
 import { Plugin, PluginKey } from '@searsuite/sear-assembly-plugin';
-import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { createTransaction, Transaction } from '@searsuite/sear-domain-transaction';
+import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 
+import {
+  deleteBackwardCommand,
+  DocTransaction,
+  inputCommand,
+  moveCursorCommand,
+  selectAllCommand,
+  splitParagraphCommand,
+  type DocCommand,
+  type DocCursorDirection,
+  type DocStep,
+} from '@searsuite/sear-domain-commands';
+import { cloneRichDocument, DocNodeRegistry, DocSelection, RichDocNode } from '@searsuite/sear-domain-doc';
+import { DocLayoutEngine, LayoutSnapshot, lockLayoutSnapshot } from '@searsuite/sear-domain-editor';
 import {
   RichDocOT,
   RichDocOTActionName,
@@ -10,24 +23,11 @@ import {
   type NodeSchema,
   type RichDocOTOperation,
 } from '@searsuite/sear-domain-ot';
-import { RichDocNode, DocSelection, DocNodeRegistry, cloneRichDocument } from '@searsuite/sear-domain-doc';
-import { DocLayoutEngine, LayoutSnapshot, lockLayoutSnapshot } from '@searsuite/sear-domain-editor';
-import {
-  DocTransaction,
-  type DocCommand,
-  type DocCursorDirection,
-  type DocStep,
-  inputCommand,
-  deleteBackwardCommand,
-  splitParagraphCommand,
-  selectAllCommand,
-  moveCursorCommand,
-} from '@searsuite/sear-domain-commands';
 
-import { adoptCommittedDocInputState } from './lockCommittedDocInputState';
+import { runOutsideCommandExecution } from '@searsuite/sear-assembly-plugin';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { Platform } from '@searsuite/sear-foundation-platform';
-import { runOutsideCommandExecution } from '@searsuite/sear-assembly-plugin';
+import { adoptCommittedDocInputState } from './lockCommittedDocInputState';
 
 /** Transaction metadata key containing selection mapping for DocInputPlugin. */
 export const DocInputTransactionMeta = {
@@ -68,6 +68,7 @@ export interface DocInputDispatchResult {
 /** Plugin that applies rich-document text input and cursor navigation commands. */
 @Injectable()
 export class DocInputPlugin extends Plugin<DocInputState> {
+  readonly #nodes: DocNodeRegistry;
   readonly #docLayoutEngine: DocLayoutEngine;
   readonly #platform: Platform | undefined;
 
@@ -93,6 +94,7 @@ export class DocInputPlugin extends Plugin<DocInputState> {
   constructor(
     @Inject(DocLayoutEngine.symbol)
     docLayoutEngine: DocLayoutEngine,
+    @Inject(DocNodeRegistry.symbol) nodes: DocNodeRegistry,
     @Inject(Platform.symbol)
     platform?: Platform,
   ) {
@@ -109,6 +111,7 @@ export class DocInputPlugin extends Plugin<DocInputState> {
     });
     this.#docLayoutEngine = docLayoutEngine;
     this.#platform = platform;
+    this.#nodes = nodes;
   }
 
   /** Binds the owning editor's command and commit boundary after initial state registration. */
@@ -151,7 +154,7 @@ export class DocInputPlugin extends Plugin<DocInputState> {
       } as NodeSchema;
       const newRoot = RichDocOT.apply(root, transaction.operations as never);
       nextState.pendingDoc = Array.isArray(newRoot.content)
-        ? newRoot.content.map((schema) => DocNodeRegistry.create(schema))
+        ? newRoot.content.map((schema) => this.#nodes.create(schema))
         : [];
     }
 
@@ -209,9 +212,7 @@ export class DocInputPlugin extends Plugin<DocInputState> {
   /** Replaces the current edit session document and selection. */
   public resetSession(doc: RichDocNode[], selection?: DocSelection): void {
     this.#assertDocumentRestorationOpen();
-    const pendingDoc = this.#stateCommitToken
-      ? cloneRichDocument(doc).map((node) => DocNodeRegistry.create(node))
-      : doc;
+    const pendingDoc = this.#stateCommitToken ? cloneRichDocument(doc).map((node) => this.#nodes.create(node)) : doc;
     const docSelection = selection ?? {
       anchor: { path: [0, 0], offset: 0 },
       head: { path: [0, 0], offset: 0 },
@@ -282,7 +283,7 @@ export class DocInputPlugin extends Plugin<DocInputState> {
 
   /** Builds a workspace transaction from a rich-document domain command. */
   public createTransaction(command: DocCommand, docTransaction: DocTransaction = new DocTransaction()): Transaction {
-    const tr = command(docTransaction, { ...this.getState(), lastSnapshot: this.#lastSnapshot });
+    const tr = command(docTransaction, { ...this.getState(), lastSnapshot: this.#lastSnapshot, nodes: this.#nodes });
     const transaction = createTransaction(this.pluginKey);
     transaction.addOperation(tr.steps.flatMap((s) => s.ops) as never);
     transaction.setMeta(

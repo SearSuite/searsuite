@@ -101,12 +101,13 @@
  * ```
  */
 
+export { CommandExecutionPhase } from '@searsuite/sear-foundation-common';
 export {
-  SheetCommandDispatcher,
-  type SheetCommand,
-  type SheetCommandContext,
-  type SheetCommandResult,
-} from './SheetCommand';
+  defineDocCommand,
+  type DocCommandDefinition,
+  type DocCommandDefinitionResult,
+  type DocCommandInput,
+} from './DocCommandDefinition';
 export {
   DocCommandBus,
   DocCommandDispatcher,
@@ -118,72 +119,10 @@ export {
   type DocCommandResult,
   type DocEditorCommand,
 } from './DocEditorCommand';
+export { extendSelection, type ExtendSelectionCommandInput } from './selection/ExtendSelectionCommand';
 export {
-  defineDocCommand,
-  type DocCommandDefinition,
-  type DocCommandDefinitionResult,
-  type DocCommandInput,
-} from './DocCommandDefinition';
-export {
-  SheetCommandBus,
-  type SheetCommandEvent,
-  type SheetCommandListener,
-  type SheetCommandFactory,
-} from './SheetCommandBus';
-export { SheetQueryRegistry, SheetQueryBus, type SheetQueryHandler } from './SheetQueryRegistry';
-export {
-  defineSheetQuery,
-  defineSheetReaderQuery,
-  type SheetQueryDefinition,
-  type SheetQueryInput,
-  type SheetQueryResult,
-} from './SheetQueryDefinition';
-export {
-  defineSheetCommand,
-  type SheetCommandDefinition,
-  type SheetCommandDefinitionResult,
-  type SheetCommandInput,
-} from './SheetCommandDefinition';
-export {
-  TransactionPipelineCommand,
-  PipelineExecutionCommand,
-  LocalActionCommand,
-  EffectCommand,
-  createSheetTransaction,
-} from './TransactionCommand';
-export {
-  ClearRangeContentsCommand,
-  InsertRowCommand,
-  MoveRowsCommand,
-  MoveColumnsCommand,
-  createMoveRowsOperations,
-  createMoveColumnsOperations,
-  type SheetMoveAxisInput,
-  DeleteRowCommand,
-  InsertColumnCommand,
-  DeleteColumnCommand,
-  registerSheetRangeCommands,
-  createClearRangeContentsOperations,
-  type SheetCellPoint,
-  type SheetRangeBounds,
-  type SheetRangeInput,
-  type SheetClearRangeContentsInput,
-  type SheetClearRangeContentsCommandDataSource,
-  type SheetRangeCommandDataSource,
-  registerSheetStructureCommands,
-  createInsertRowOperations,
-  createInsertColumnOperations,
-  createDeleteRowOperations,
-  createDeleteColumnOperations,
-  type SheetInsertRowsInput,
-  type SheetInsertColumnsInput,
-  type SheetDeleteRowsInput,
-  type SheetDeleteColumnsInput,
-  type SheetStructureCommandDataSource,
-} from './SheetOperationCommands';
-export {
-  moveSelection,
   SelectionMoveDirection,
+  moveSelection,
   type MoveSelectionCommandInput,
   type MoveSelectionCommandResult,
 } from './selection/MoveSelectionCommand';
@@ -192,15 +131,76 @@ export {
   type SelectRangeCommandInput,
   type SelectRangeCommandResult,
 } from './selection/SelectRangeCommand';
-export { extendSelection, type ExtendSelectionCommandInput } from './selection/ExtendSelectionCommand';
-export { CommandExecutionPhase } from '@searsuite/sear-foundation-common';
+export {
+  SheetCommandDispatcher,
+  type SheetCommand,
+  type SheetCommandContext,
+  type SheetCommandResult,
+} from './SheetCommand';
+export {
+  SheetCommandBus,
+  type SheetCommandEvent,
+  type SheetCommandFactory,
+  type SheetCommandListener,
+} from './SheetCommandBus';
+export {
+  defineSheetCommand,
+  type SheetCommandDefinition,
+  type SheetCommandDefinitionResult,
+  type SheetCommandInput,
+} from './SheetCommandDefinition';
+export {
+  ClearRangeContentsCommand,
+  DeleteColumnCommand,
+  DeleteRowCommand,
+  InsertColumnCommand,
+  InsertRowCommand,
+  MoveColumnsCommand,
+  MoveRowsCommand,
+  createClearRangeContentsOperations,
+  createDeleteColumnOperations,
+  createDeleteRowOperations,
+  createInsertColumnOperations,
+  createInsertRowOperations,
+  createMoveColumnsOperations,
+  createMoveRowsOperations,
+  registerSheetRangeCommands,
+  registerSheetStructureCommands,
+  type SheetCellPoint,
+  type SheetClearRangeContentsCommandDataSource,
+  type SheetClearRangeContentsInput,
+  type SheetDeleteColumnsInput,
+  type SheetDeleteRowsInput,
+  type SheetInsertColumnsInput,
+  type SheetInsertRowsInput,
+  type SheetMoveAxisInput,
+  type SheetRangeBounds,
+  type SheetRangeCommandDataSource,
+  type SheetRangeInput,
+  type SheetStructureCommandDataSource,
+} from './SheetOperationCommands';
 export { SheetAxisMoveBoundsError } from './sheetOperationCommands/SheetAxisMoveBoundsError';
+export {
+  defineSheetQuery,
+  defineSheetReaderQuery,
+  type SheetQueryDefinition,
+  type SheetQueryInput,
+  type SheetQueryResult,
+} from './SheetQueryDefinition';
+export { SheetQueryBus, SheetQueryRegistry, type SheetQueryHandler } from './SheetQueryRegistry';
+export {
+  EffectCommand,
+  LocalActionCommand,
+  PipelineExecutionCommand,
+  TransactionPipelineCommand,
+  createSheetTransaction,
+} from './TransactionCommand';
 
 export * from './SheetPluginContracts';
 export * from './SheetRuntimeExtensionRegistry';
 
-export * from './SheetStyleQueries';
 export { registerSheetPluginCellStyles, type SheetCellStyleRegistrar } from './SheetCellStyleRegistrar';
+export * from './SheetStyleQueries';
 
 export { SheetCommandEffectRegistry } from './SheetCommandEffectRegistry';
 
@@ -209,3 +209,16 @@ export * from './SheetDisplayedValueCommands';
 export * from './SheetCommandClient';
 
 export { type SheetEditor } from './SheetEditor';
+
+export { defineDocQuery, type DocQueryDefinition, type DocQueryInput, type DocQueryResult } from './DocQueryDefinition';
+export { DocQueryRegistry } from './DocQueryRegistry';
+export {
+  defineQuery,
+  defineReaderQuery,
+  type QueryDefinition,
+  type QueryInput,
+  type QueryResult,
+} from './QueryDefinition';
+export { QueryRegistry, type QueryHandler } from './QueryRegistry';
+
+export { DocCommandEffectRegistry } from './DocCommandEffectRegistry';

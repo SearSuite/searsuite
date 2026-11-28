@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-plugin-sheet-demo",
   "description": "Provides an optional, complete example of a Sheet state-owning plugin.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

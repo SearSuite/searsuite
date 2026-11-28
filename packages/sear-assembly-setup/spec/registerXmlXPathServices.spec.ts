@@ -1,3 +1,4 @@
+import { registerSheetBaseServices } from '@searsuite/sear-assembly-sheet-kernel';
 import { Container, Injectable } from '@searsuite/sear-foundation-di';
 import {
   XmlDocumentParser,
@@ -7,7 +8,6 @@ import {
   type XmlXPathOptions,
 } from '@searsuite/sear-foundation-platform';
 import { NodePlatform as HeadlessPlatform } from '@searsuite/sear-node-adapters';
-import { registerEditorBaseServices } from '../src/sheet/registerEditorBaseServices';
 
 @Injectable()
 class TestXmlDocumentParser extends XmlDocumentParser {
@@ -26,15 +26,11 @@ class TestXmlXPathEngine extends XmlXPathEngine {
 describe('XML/XPath service registration', () => {
   it('composes the host-provided parser and XPath engine through DI', () => {
     const container = new Container();
-    registerEditorBaseServices(
-      container,
-      {
-        platform: HeadlessPlatform,
-        xmlDocumentParser: TestXmlDocumentParser,
-        xmlXPathEngine: TestXmlXPathEngine,
-      },
-      { width: 800, height: 600 },
-    );
+    registerSheetBaseServices(container, {
+      platform: HeadlessPlatform,
+      xmlDocumentParser: TestXmlDocumentParser,
+      xmlXPathEngine: TestXmlXPathEngine,
+    });
 
     expect(container.resolve(XmlDocumentParser.symbol)).toBeInstanceOf(TestXmlDocumentParser);
     expect(container.resolve(XmlXPathEngine.symbol)).toBeInstanceOf(TestXmlXPathEngine);

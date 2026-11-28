@@ -1,10 +1,9 @@
-import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
+import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { PositionRect, type PositionRectProps } from '@searsuite/sear-foundation-rect';
 import { type HexColor } from '@searsuite/sear-foundation-utils';
 import { RenderContext } from '@searsuite/sear-render-context';
-import { SceneGraph, type Node, type NodeProperties } from '@searsuite/sear-render-node';
-import { RenderCoordinatorManager } from '@searsuite/sear-render-registry';
+import { type Node, type NodeProperties, SceneGraph } from '@searsuite/sear-render-node';
 import { ScrollManager } from '@searsuite/sear-render-scroll';
 import {
   type BlockRasterCopyPlan,
@@ -35,7 +34,7 @@ export interface DocRenderViewport {
  * dirty marks, viewport resizing, and ordered strategy dispatch.
  */
 @Injectable()
-export class DocRenderEngine extends RenderEngine<NodeProperties, RenderCoordinatorManager> {
+export class DocRenderEngine extends RenderEngine<NodeProperties> {
   readonly #stage: SceneGraph<NodeProperties>;
   readonly #screenRenderStrategy: ScreenRenderStrategy<NodeProperties>;
   readonly #dirtyRenderStrategy: DirtyRenderStrategy<NodeProperties>;
@@ -58,8 +57,6 @@ export class DocRenderEngine extends RenderEngine<NodeProperties, RenderCoordina
     @Inject(ScrollManager.symbol) scrollManager: ScrollManager,
     @Inject(RenderContext.symbol) renderContext: RenderContext,
     @Inject(ConfigEngine.symbol) configEngine: ConfigEngine,
-    @Inject(RenderCoordinatorManager.symbol)
-    renderCoordinatorManager: RenderCoordinatorManager,
     @Inject(SceneGraph.symbol) stage: SceneGraph<NodeProperties>,
     @Inject(RenderStrategyManager.symbol)
     renderStrategyManager: RenderStrategyManager<NodeProperties>,
@@ -72,7 +69,7 @@ export class DocRenderEngine extends RenderEngine<NodeProperties, RenderCoordina
     @Inject(OverlayRenderStrategy.symbol)
     overlayRenderStrategy: OverlayRenderStrategy<NodeProperties>,
   ) {
-    super(scrollManager, renderContext, configEngine, renderCoordinatorManager, renderStrategyManager);
+    super(scrollManager, renderContext, configEngine, renderStrategyManager);
     this.#stage = stage;
     this.#screenRenderStrategy = screenRenderStrategy;
     this.#dirtyRenderStrategy = dirtyRenderStrategy;

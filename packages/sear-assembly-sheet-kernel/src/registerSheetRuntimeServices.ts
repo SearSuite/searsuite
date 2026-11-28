@@ -1,26 +1,27 @@
-import { SheetCommandEffectRegistry } from '@searsuite/sear-assembly-commands';
-import { SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
+import { SheetCommandBus, SheetCommandEffectRegistry, SheetQueryRegistry } from '@searsuite/sear-assembly-commands';
 import {
+  PluginManager,
   SheetRangeMoveRegistry,
   SheetRangeReorderRegistry,
   SheetStructureMoveRegistry,
 } from '@searsuite/sear-assembly-plugin';
-import { SheetCommandBus, SheetQueryRegistry } from '@searsuite/sear-assembly-commands';
-import { createDefaultCellFormatLocaleProvider, ICellFormatLocaleProvider } from '@searsuite/sear-domain-cell-types';
+import {
+  createDefaultCellFormatLocaleProvider,
+  ICellFormatLocaleProvider,
+  SheetCellStyleRegistry,
+} from '@searsuite/sear-domain-cell-types';
 import { type Container, Scope } from '@searsuite/sear-foundation-di';
-import { FileDownload, UnavailableFileDownload, Platform } from '@searsuite/sear-foundation-platform';
+import { FileDownload, Platform, UnavailableFileDownload } from '@searsuite/sear-foundation-platform';
 import { ObservationRegistry } from '@searsuite/sear-foundation-subscription';
-import { PluginManager } from '@searsuite/sear-assembly-plugin';
 
 import { UserInteractionService } from '@searsuite/sear-foundation-user-interaction';
-import { type SheetRuntimeAdapters } from './SheetKernelContracts';
 import {
   InMemorySheetClipboard,
   SheetClipboard,
   SheetClipboardCutSession,
   SheetClipboardSheetIdentity,
 } from '@searsuite/sear-plugin-clipboard';
-import { NoopSheetExternalHistory, SheetExternalHistory } from '@searsuite/sear-plugin-history';
+import { type SheetRuntimeAdapters } from './SheetKernelContracts';
 
 /** Registers command, query, clipboard and state-owner runtime services. */
 export function registerSheetRuntimeServices(container: Container, adapters: SheetRuntimeAdapters) {
@@ -46,8 +47,6 @@ export function registerSheetRuntimeServices(container: Container, adapters: She
       SheetClipboardSheetIdentity.symbol,
       new SheetClipboardSheetIdentity(container.resolve<Platform>(Platform.symbol).createId('sheet-clipboard-source')),
     );
-  if (!container.hasBinding(SheetExternalHistory.symbol))
-    container.registerInstance(SheetExternalHistory.symbol, new NoopSheetExternalHistory());
   container.register(SheetQueryRegistry.symbol, SheetQueryRegistry, Scope.Singleton);
   container.register(ObservationRegistry.symbol, ObservationRegistry, Scope.Singleton);
   container.registerFactory(

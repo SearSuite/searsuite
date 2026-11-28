@@ -163,6 +163,26 @@
 
 export { registerDefaultDependencies } from './registerDefaultDependencies';
 
+export { PublishSheetDisplayedValueChangesCommand } from '@searsuite/sear-assembly-commands';
+export {
+  CaptureDocSessionStateCommand,
+  DefaultDocFeaturePlugins,
+  DocDocumentObservation,
+  DocInlineStyleObservation,
+  ExportDocStateCommand,
+  UpdateDocDefaultConfigCommand,
+  registerDefaultDocFeatures,
+  registerDocConfigCommands,
+  registerDocDocumentObservation,
+  registerDocFeaturePlugins,
+  registerDocInlineStyleObservation,
+  registerDocSessionStateCommands,
+  registerDocStateSnapshotCommands,
+  type CaptureDocSessionStateCommandResult,
+  type DocInlineStyleState,
+  type DocInlineStyleStatus,
+  type ExportDocStateCommandResult,
+} from '@searsuite/sear-assembly-doc-kernel';
 export {
   SessionStateError,
   SessionStateErrorCode,
@@ -174,52 +194,33 @@ export {
   type SessionStateDefinition,
   type SessionStateSnapshot,
 } from '@searsuite/sear-assembly-plugin';
-export { DefaultDocFeaturePlugins } from './doc/DefaultDocFeaturePlugins';
-export { DocInputBindingRegistry } from './doc/DocInputBindingRegistry';
-export { DocCaretState } from './doc/DocCaretState';
-export { createSheetEditor, type SheetEditorAdapters, type SheetEditorConfiguration } from './sheet/createSheetEditor';
+export {
+  RichTextBlockNode,
+  RichTextRunNode,
+  ViewportOverlayNode,
+  createRichTextRunRect,
+  type RichTextInlineStyle,
+  type RichTextRenderLine,
+  type RichTextRenderNodeProperties,
+} from '@searsuite/sear-render-node';
 export {
   createDocEditor,
+  type DocDocumentState,
   type DocEditor,
   type DocEditorAdapters,
   type DocEditorChange,
   type DocEditorConfiguration,
   type DocEditorContentRect,
-  type DocDocumentState,
-  type DocSessionState,
   type DocEditorViewport,
+  type DocSessionState,
 } from './doc/createDocEditor';
-export { registerDocBaseServices, type DocBaseServices } from './doc/registerDocBaseServices';
-export { registerDocRuntime, type DocRuntime } from './doc/registerDocRuntime';
-export { registerDefaultDocFeatures, registerDocFeaturePlugins } from './doc/registerDefaultDocFeatures';
+export { DocCaretState } from './doc/DocCaretState';
+export { DocInputBindingRegistry } from './doc/DocInputBindingRegistry';
 export {
   DocRenderLayoutService,
   type DocRenderLayout,
   type DocVirtualLayoutSummaryListener,
 } from './doc/DocRenderLayoutService';
-export { type DocVirtualLayoutSummary } from './doc/DocVirtualLayoutStore';
-export {
-  RichTextBlockNode,
-  ViewportOverlayNode,
-  RichTextRunNode,
-  createRichTextRunRect,
-  type RichTextInlineStyle,
-  type RichTextRenderNodeProperties,
-  type RichTextRenderLine,
-} from '@searsuite/sear-render-node';
-export {
-  ApplyViewportScrollCommand,
-  ScrollViewportToCommand,
-  ResizeSheetViewportCommand,
-  SheetViewportSessionStateDefinition,
-  registerSheetViewportCommands,
-  registerSheetViewportSessionState,
-  type SheetScrollInput,
-  type SheetScrollToInput,
-  type SheetViewportSessionState,
-} from './sheet/SheetViewportCommands';
-export { PublishSheetDisplayedValueChangesCommand } from '@searsuite/sear-assembly-commands';
-export { UpdateDocDefaultConfigCommand, registerDocConfigCommands } from './doc/DocConfigCommands';
 export {
   ApplyDocViewportScrollCommand,
   DocViewportObservation,
@@ -229,36 +230,34 @@ export {
   ScrollDocViewportToCommand,
   registerDocViewportCommands,
   registerDocViewportState,
-  type DocViewportSessionState,
   type DocViewportScrollInput,
+  type DocViewportSessionState,
 } from './doc/DocViewportCommands';
-export { DocDocumentObservation, registerDocDocumentObservation } from './doc/DocStateObservations';
+export { type DocVirtualLayoutSummary } from './doc/DocVirtualLayoutStore';
+export { registerDocBaseServices, type DocBaseServices } from './doc/registerDocBaseServices';
+export { registerDocRuntime, type DocRuntime } from './doc/registerDocRuntime';
+export { createSheetEditor, type SheetEditorAdapters, type SheetEditorConfiguration } from './sheet/createSheetEditor';
 export {
-  DocInlineStyleObservation,
-  registerDocInlineStyleObservation,
-  type DocInlineStyleState,
-  type DocInlineStyleStatus,
-} from './doc/DocInlineStyleObservations';
-export {
-  CaptureDocSessionStateCommand,
-  registerDocSessionStateCommands,
-  type CaptureDocSessionStateCommandResult,
-} from './doc/DocSessionStateCommands';
-export {
-  ExportDocStateCommand,
-  registerDocStateSnapshotCommands,
-  type ExportDocStateCommandResult,
-} from './doc/DocStateSnapshotCommands';
+  ApplyViewportScrollCommand,
+  ResizeSheetViewportCommand,
+  ScrollViewportToCommand,
+  SheetViewportSessionStateDefinition,
+  registerSheetViewportCommands,
+  registerSheetViewportSessionState,
+  type SheetScrollInput,
+  type SheetScrollToInput,
+  type SheetViewportSessionState,
+} from './sheet/SheetViewportCommands';
 
 export {
   SheetViewCapability,
-  type SheetViewSetupRuntime,
   type SheetViewRuntime,
   type SheetViewRuntimeContext,
+  type SheetViewSetupRuntime,
 } from './sheet/SheetViewContracts';
 
-export * from './doc/DocViewContracts';
 export * from './doc/DocViewCapabilities';
+export * from './doc/DocViewContracts';
 
 export * from './doc/DefaultDocViews';
 
@@ -269,5 +268,5 @@ export {
   type SheetViewSetupContext,
 } from './sheet/SheetViewContracts';
 
-export * from './doc/DocViewKeys';
 export * from './doc/DocViewCommands';
+export * from './doc/DocViewKeys';

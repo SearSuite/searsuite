@@ -1,24 +1,26 @@
-import { ScrollManagerState } from '@searsuite/sear-render-scroll';
+import { ConfigEngine } from '@searsuite/sear-assembly-config';
 import { DimensionsCSRMatrix } from '@searsuite/sear-domain-matrix';
 import { MatrixOTOperation } from '@searsuite/sear-domain-ot';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
-import { Node } from '@searsuite/sear-render-node';
-import { ScreenRenderStrategy } from '@searsuite/sear-render-strategy';
-import { StickyRenderStrategy } from '@searsuite/sear-render-strategy';
-import { ScrollManager } from '@searsuite/sear-render-scroll';
 import { RenderContext } from '@searsuite/sear-render-context';
-import { ConfigEngine } from '@searsuite/sear-assembly-config';
-import { RenderStrategyManager, DirtyRenderStrategy } from '@searsuite/sear-render-strategy';
+import { Node } from '@searsuite/sear-render-node';
 import {
-  RenderCoordinatorManager,
   CellProperties,
+  RenderCoordinatorManager,
   SheetRenderCoordinatorManager,
 } from '@searsuite/sear-render-registry';
-import { OverlayRenderStrategy } from '@searsuite/sear-render-strategy';
+import { ScrollManager, ScrollManagerState } from '@searsuite/sear-render-scroll';
+import {
+  DirtyRenderStrategy,
+  OverlayRenderStrategy,
+  RenderStrategyManager,
+  ScreenRenderStrategy,
+  StickyRenderStrategy,
+} from '@searsuite/sear-render-strategy';
 
-import { RenderEngine } from './RenderEngine';
 import { PositionRect } from '@searsuite/sear-foundation-rect';
 import { HexColor } from '@searsuite/sear-foundation-utils';
+import { RenderEngine } from './RenderEngine';
 
 interface ISheetViewPluginState {
   colShapeState: DimensionsCSRMatrix;
@@ -35,7 +37,7 @@ interface ISheetViewPluginState {
  * through the configured render contexts.
  */
 @Injectable()
-export class SheetRenderEngine extends RenderEngine<CellProperties, SheetRenderCoordinatorManager> {
+export class SheetRenderEngine extends RenderEngine<CellProperties> {
   readonly #offScreenRenderContext: RenderContext;
   readonly #hitRenderContext: RenderContext;
   readonly #screenRenderStrategy: ScreenRenderStrategy<CellProperties>;
@@ -65,7 +67,7 @@ export class SheetRenderEngine extends RenderEngine<CellProperties, SheetRenderC
     @Inject(OverlayRenderStrategy.symbol)
     overlayRenderStrategy: OverlayRenderStrategy<CellProperties>,
   ) {
-    super(scrollManager, renderContext, configEngine, renderCoordinatorManager, renderStrategyManager);
+    super(scrollManager, renderContext, configEngine, renderStrategyManager);
     this.#offScreenRenderContext = offScreenRenderContext;
     this.#hitRenderContext = hitRenderContext;
     this.#screenRenderStrategy = screenRenderStrategy;

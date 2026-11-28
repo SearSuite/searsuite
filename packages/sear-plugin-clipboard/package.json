@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-plugin-clipboard",
   "description": "Provides Sheet copy, paste, traversal, and clipboard serialization.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

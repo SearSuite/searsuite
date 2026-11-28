@@ -1,19 +1,22 @@
-import { type DocView, type DocViewImplementation } from './DocViewContracts';
 import { DocCommandBus } from '@searsuite/sear-assembly-commands';
 import { type IncrementalRenderPolicyLimitsConfig } from '@searsuite/sear-assembly-config';
-import { type DocPlugin, type DocPluginImplementation } from '@searsuite/sear-assembly-doc';
+import {
+  type DocPlugin,
+  type DocPluginImplementation,
+  type DocRuntimeCapabilityReader,
+} from '@searsuite/sear-assembly-doc';
+import { type DocDocumentState, type DocKernelEditor, type DocSessionState } from '@searsuite/sear-assembly-doc-kernel';
 import { type RichDocNode } from '@searsuite/sear-domain-doc';
 import { type DocVerticalAlign } from '@searsuite/sear-domain-editor';
 import { type Container } from '@searsuite/sear-foundation-di';
 import { Platform } from '@searsuite/sear-foundation-platform';
 import { type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
-import { type SessionStateSnapshot } from '@searsuite/sear-assembly-plugin';
 import { RenderContext } from '@searsuite/sear-render-context';
-import { type TextShaper } from '@searsuite/sear-render-metrics';
 import { type EventRegistrar } from '@searsuite/sear-render-event-engine';
 import { KeyboardRouter, PointerCapture, TextInput } from '@searsuite/sear-render-input';
+import { type TextShaper } from '@searsuite/sear-render-metrics';
 import { Scroller, type ScrollPublisher } from '@searsuite/sear-render-scroll';
-import { type DocRuntimeCapabilityReader } from '@searsuite/sear-assembly-doc';
+import { type DocView, type DocViewImplementation } from './DocViewContracts';
 
 /** Constructor contract for DI-registered adapter implementations. */
 export type InjectableImplementation<T> = new (...args: never[]) => T;
@@ -34,22 +37,7 @@ export interface DocEditorContentRect extends DocEditorViewport {
   y: number;
 }
 
-/** Snapshot delivered when the document content changes. */
-export interface DocEditorChange {
-  /** Cloned rich-document content after the change. */
-  readonly document: RichDocNode[];
-  /** Plain-text view using one newline between paragraphs. */
-  readonly text: string;
-}
-
-/** Document-owned rich content eligible for future ExportPlugin serialization. */
-export interface DocDocumentState {
-  /** Rich-document tree owned by this editor document. */
-  readonly document: RichDocNode[];
-}
-
-/** Opaque in-memory contributor snapshot retained while remounting a document editor. */
-export type DocSessionState = SessionStateSnapshot;
+export type { DocDocumentState, DocEditorChange, DocSessionState } from '@searsuite/sear-assembly-doc-kernel';
 
 /** Platform-specific services required to assemble a standalone document editor. */
 export interface DocEditorAdapters {
@@ -61,8 +49,8 @@ export interface DocEditorAdapters {
   createTextShaper?(renderContext: RenderContext): TextShaper;
   /** Optional host scroller adapter for wheel/touch viewport scrolling. */
   scroller?: InjectableImplementation<Scroller & { getPublisher(): ScrollPublisher }>;
-  /** Optional host event registrar; defaults to a headless registrar when omitted. */
-  eventRegistrar?: InjectableImplementation<EventRegistrar>;
+  /** Host event registrar selected explicitly by the visual host. */
+  eventRegistrar: InjectableImplementation<EventRegistrar>;
   /** Text input adapter for printable text, paste/cut, and IME composition. */
   textInput: InjectableImplementation<TextInput>;
   /** Keyboard router for action keys such as arrows, backspace, enter, and select-all. */
@@ -117,7 +105,7 @@ export interface DocEditorConfiguration {
 }
 
 /** Public standalone document editor API returned by `createDocEditor()`. */
-export interface DocEditor {
+export interface DocEditor extends DocKernelEditor {
   /** The supported command entry point for document user and program actions. */
   readonly commands: DocCommandBus;
   /** Typed editor-local state and event observations exposed to the host. */

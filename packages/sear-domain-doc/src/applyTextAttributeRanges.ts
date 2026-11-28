@@ -1,6 +1,6 @@
 import { DocNodeRegistry } from './DocNodeRegistry';
-import { isTextNode } from './RichDocNodeGuards';
 import { type RichDocNode } from './RichDocNode';
+import { isTextNode } from './RichDocNodeGuards';
 import { type NodeSchema, type Schema, type TextSchema } from './RichDocSchema';
 
 /** Attributes merged into a text node for one presentation range. */
@@ -20,12 +20,13 @@ export interface TextAttributeRange<TAttributes extends TextAttributePatch = Tex
 export function applyTextAttributeRanges(
   doc: RichDocNode[],
   ranges: readonly TextAttributeRange[],
+  nodes = new DocNodeRegistry(),
 ): RichDocNode[] {
   let documentOffset = 0;
 
   return doc.map(function applyTextAttributeParagraph(paragraph) {
     const content = (paragraph.content as RichDocNode[]).flatMap(function applyTextAttributeNode(node) {
-      if (!isTextNode(node)) return [cloneNode(node)];
+      if (!isTextNode(node)) return [cloneNode(node, nodes)];
 
       const text = node.text ?? '';
       const textStart = documentOffset;
@@ -47,12 +48,12 @@ export function applyTextAttributeRanges(
           return range.start <= textStart + start && range.end >= textStart + end;
         });
         const schema: TextSchema = {
-          type: DocNodeRegistry.requireDefaultTextType(),
+          type: nodes.requireDefaultTextType(),
           text: text.slice(start, end),
           attrs: activeRange ? mergeTextNodeAttrs(node.attrs, activeRange.attrs) : { ...node.attrs },
         };
         if (preserveTextNodeId && node.id) schema.id = node.id;
-        return DocNodeRegistry.create(schema);
+        return nodes.create(schema);
       });
     });
 
@@ -63,28 +64,25 @@ export function applyTextAttributeRanges(
       content: content as Schema[],
     };
     if (paragraph.id) schema.id = paragraph.id;
-    return DocNodeRegistry.create(schema);
+    return nodes.create(schema);
   });
 }
 
-function mergeTextNodeAttrs(
-  attrs: Record<string, unknown>,
-  patch: TextAttributePatch,
-): Record<string, unknown> {
+function mergeTextNodeAttrs(attrs: Record<string, unknown>, patch: TextAttributePatch): Record<string, unknown> {
   return {
     ...attrs,
     ...patch,
   };
 }
 
-function cloneNode(node: RichDocNode): RichDocNode {
+function cloneNode(node: RichDocNode, nodes: DocNodeRegistry): RichDocNode {
   const schema: NodeSchema = {
     type: node.type,
     attrs: { ...node.attrs },
-    content: (node.content as RichDocNode[]).map(cloneNode) as Schema[],
+    content: (node.content as RichDocNode[]).map((child) => cloneNode(child, nodes)) as Schema[],
   };
   if (node.id) schema.id = node.id;
-  return DocNodeRegistry.create(schema);
+  return nodes.create(schema);
 }
 
 function compareNumericPoint(left: number, right: number): number {

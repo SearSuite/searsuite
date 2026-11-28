@@ -1,24 +1,30 @@
 import { type SheetEditor } from '@searsuite/sear-assembly-commands';
 import { type SheetDocumentState, type SheetSessionState } from '@searsuite/sear-assembly-sheet-state';
-import { type SheetViewImplementation } from './SheetViewContracts';
 import { type FileDownload } from '@searsuite/sear-foundation-platform';
+import { type SheetViewImplementation } from './SheetViewContracts';
 
 import { type Container } from '@searsuite/sear-foundation-di';
-import { type Platform, WebServiceClient, XmlDocumentParser, XmlXPathEngine, XmlXPathEvaluator } from '@searsuite/sear-foundation-platform';
+import {
+  type Platform,
+  WebServiceClient,
+  XmlDocumentParser,
+  XmlXPathEngine,
+  XmlXPathEvaluator,
+} from '@searsuite/sear-foundation-platform';
 import { type UserInteractionService } from '@searsuite/sear-foundation-user-interaction';
 
 import { type CollabTransport } from '@searsuite/sear-plugin-collab';
 
+import { type SheetPlugin, type SheetPluginImplementation } from '@searsuite/sear-assembly-commands';
 import { type SearFormulaBar, type SearToolbar } from '@searsuite/sear-assembly-plugin';
 import { type SheetClipboard } from '@searsuite/sear-plugin-clipboard';
 import { type RenderContext } from '@searsuite/sear-render-context';
-import { type TextShaper } from '@searsuite/sear-render-metrics';
-import { type SheetEmbeddedEditor } from '@searsuite/sear-sheet-editor-contract';
 import { type CursorEngine } from '@searsuite/sear-render-cursor';
 import { type EventRegistrar } from '@searsuite/sear-render-event-engine';
 import { type KeyboardRouter, type PointerCapture, type TextInput } from '@searsuite/sear-render-input';
+import { type TextShaper } from '@searsuite/sear-render-metrics';
 import { type Scroller, type ScrollPublisher } from '@searsuite/sear-render-scroll';
-import { type SheetPlugin, type SheetPluginImplementation } from '@searsuite/sear-assembly-commands';
+import { type SheetEmbeddedEditor } from '@searsuite/sear-sheet-editor-contract';
 
 import { type IFunctionRegistry } from '@searsuite/sear-domain-formula-engine';
 
@@ -41,8 +47,9 @@ export interface SheetEditorAdapters {
   keyboardRouter: InjectableImplementation<KeyboardRouter>;
   pointerCapture: InjectableImplementation<PointerCapture>;
   cursorEngine: InjectableImplementation<CursorEngine>;
-  collabTransport: InjectableImplementation<CollabTransport>;
-  toolbar: InjectableImplementation<SearToolbar>;
+  collabTransport?: InjectableImplementation<CollabTransport>;
+  /** Optional host toolbar; omit it when the host has no toolbar surface. */
+  toolbar?: InjectableImplementation<SearToolbar>;
   /** Optional formula input surface supplied by the host. */
   formulaBar?: InjectableImplementation<SearFormulaBar>;
   /** Optional host file-save capability; existing environment bindings take precedence. The editor owns newly created adapters. */

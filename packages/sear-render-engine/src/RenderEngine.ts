@@ -1,12 +1,11 @@
-import { Inject } from '@searsuite/sear-foundation-di';
-import { ScrollManager } from '@searsuite/sear-render-scroll';
-import { Node, NodeProperties } from '@searsuite/sear-render-node';
-import { RenderContext } from '@searsuite/sear-render-context';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
-import { RenderStrategyManager } from '@searsuite/sear-render-strategy';
-import { RenderCoordinatorManager } from '@searsuite/sear-render-registry';
+import { Inject } from '@searsuite/sear-foundation-di';
 import { PositionRect } from '@searsuite/sear-foundation-rect';
 import { HexColor } from '@searsuite/sear-foundation-utils';
+import { RenderContext } from '@searsuite/sear-render-context';
+import { Node, NodeProperties } from '@searsuite/sear-render-node';
+import { ScrollManager } from '@searsuite/sear-render-scroll';
+import { RenderStrategyManager } from '@searsuite/sear-render-strategy';
 
 // import { Renderer } from "./renderer";
 
@@ -18,7 +17,7 @@ import { HexColor } from '@searsuite/sear-foundation-utils';
  * affected regions, resize the target, or invalidate cached pixels before the
  * next render. The abstract class does not select a browser drawing API.
  */
-export abstract class RenderEngine<NodeType extends NodeProperties, RenderCoordinatorManagerType> {
+export abstract class RenderEngine<NodeType extends NodeProperties> {
   /** DI token for resolving RenderEngine. */
   public static readonly symbol: symbol = Symbol.for('RenderEngine');
 
@@ -27,8 +26,6 @@ export abstract class RenderEngine<NodeType extends NodeProperties, RenderCoordi
     @Inject(ScrollManager.symbol) public readonly scrollManager: ScrollManager,
     @Inject(RenderContext.symbol) public readonly renderContext: RenderContext,
     @Inject(ConfigEngine.symbol) public readonly configEngine: ConfigEngine,
-    @Inject(RenderCoordinatorManager.symbol)
-    public readonly renderCoordinatorManager: RenderCoordinatorManagerType,
     @Inject(RenderStrategyManager.symbol)
     public readonly renderStrategyManager: RenderStrategyManager<NodeType>,
   ) {}

@@ -1,20 +1,28 @@
-import { DocCommandBus } from '@searsuite/sear-assembly-commands';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
 import { PluginManager } from '@searsuite/sear-assembly-plugin';
 import { type Container, Scope } from '@searsuite/sear-foundation-di';
-import { Platform } from '@searsuite/sear-foundation-platform';
 import { CoordinateTransformer, RenderContext } from '@searsuite/sear-render-context';
-import { EventEngine, EventRegistrar, HeadlessEventRegistrar } from '@searsuite/sear-render-event-engine';
+import { DocRenderEngine, RenderEngine } from '@searsuite/sear-render-engine';
+import { EventEngine, EventRegistrar } from '@searsuite/sear-render-event-engine';
 import { KeyboardRouter, PointerCapture, TextInput } from '@searsuite/sear-render-input';
 import { type NodeProperties } from '@searsuite/sear-render-node';
-import { DocRenderEngine, RenderEngine } from '@searsuite/sear-render-engine';
 import { Scroller, ScrollManager, type ScrollPublisher } from '@searsuite/sear-render-scroll';
-import { DirtyRenderStrategy, EventRenderStrategy, HitRenderStrategy, IncrementalRenderPolicy, OverlayRenderStrategy, RasterCopyExecutor, RenderStrategyManager, ScreenRenderStrategy, StickyRenderStrategy } from '@searsuite/sear-render-strategy';
+import {
+  DirtyRenderStrategy,
+  EventRenderStrategy,
+  HitRenderStrategy,
+  IncrementalRenderPolicy,
+  OverlayRenderStrategy,
+  RasterCopyExecutor,
+  RenderStrategyManager,
+  ScreenRenderStrategy,
+  StickyRenderStrategy,
+} from '@searsuite/sear-render-strategy';
 
 import { RenderContextTextShaper, TextMeasurementManager, TextShaper } from '@searsuite/sear-render-metrics';
 import { type DocEditorAdapters, type DocEditorViewport } from './createDocEditor';
-import { DocVirtualLayoutStore } from './DocVirtualLayoutStore';
 import { createDocFontDescriptor } from './createDocFontDescriptor';
+import { DocVirtualLayoutStore } from './DocVirtualLayoutStore';
 
 /** Runtime services assembled after Doc base services and host environment values are available. */
 export interface DocRuntime {
@@ -30,7 +38,7 @@ export interface DocRuntime {
   readonly renderEngine: DocRenderEngine;
   /** Event pipeline and hit-testing facade for document interactions. */
   readonly eventEngine: EventEngine<NodeProperties>;
-  /** Event registrar selected by the host or the headless fallback. */
+  /** Event registrar selected explicitly by the visual host. */
   readonly eventRegistrar: EventRegistrar;
   /** Document plugin manager populated by feature registration. */
   readonly pluginManager: PluginManager;
@@ -98,14 +106,8 @@ export function registerDocRuntime(
   );
   container.register(EventRenderStrategy.symbol, EventRenderStrategy, Scope.Singleton);
   container.register(HitRenderStrategy.symbol, HitRenderStrategy, Scope.Singleton);
-  container.register(EventRegistrar.symbol, adapters.eventRegistrar ?? HeadlessEventRegistrar, Scope.Singleton);
+  container.register(EventRegistrar.symbol, adapters.eventRegistrar, Scope.Singleton);
   container.register(EventEngine.symbol, EventEngine, Scope.Singleton);
-  container.register(DocCommandBus.symbol, DocCommandBus, Scope.Singleton);
-  container.registerFactory(
-    PluginManager.symbol,
-    () => new PluginManager(container.resolve<Platform>(Platform.symbol)),
-    Scope.Singleton,
-  );
 
   const eventEngine = container.resolve<EventEngine<NodeProperties>>(EventEngine.symbol);
   const eventRegistrar = container.resolve<EventRegistrar>(EventRegistrar.symbol);

@@ -1,11 +1,10 @@
-import { Inject } from '@searsuite/sear-foundation-di';
-import { HexColor } from '@searsuite/sear-foundation-utils';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
-import { SceneGraph, Node, Tree, NodeProperties, FrameDirtyTracker } from '@searsuite/sear-render-node';
-import { RenderContext } from '@searsuite/sear-render-context';
-import { ScrollManagerState, createDefaultScrollManagerState, ScrollManager } from '@searsuite/sear-render-scroll';
-import { RenderCoordinatorManager } from '@searsuite/sear-render-registry';
+import { Inject } from '@searsuite/sear-foundation-di';
 import { PositionRect } from '@searsuite/sear-foundation-rect';
+import { HexColor } from '@searsuite/sear-foundation-utils';
+import { RenderContext } from '@searsuite/sear-render-context';
+import { FrameDirtyTracker, Node, NodeProperties, SceneGraph, Tree } from '@searsuite/sear-render-node';
+import { createDefaultScrollManagerState, ScrollManager, ScrollManagerState } from '@searsuite/sear-render-scroll';
 
 /**
  * Base abstraction for all render strategies.
@@ -43,8 +42,6 @@ export abstract class RenderStrategy<T extends NodeProperties> {
 
     @Inject(ScrollManager.symbol) public readonly scrollManager: ScrollManager,
     @Inject(ConfigEngine.symbol) configEngine: ConfigEngine,
-    @Inject(RenderCoordinatorManager.symbol)
-    public readonly renderCoordinatorManager: RenderCoordinatorManager,
     @Inject(SceneGraph.symbol) public readonly stage: SceneGraph<T>,
     @Inject(Tree.symbol) public readonly tree: Tree<PositionRect<HexColor>>,
     @Inject(FrameDirtyTracker.symbol)

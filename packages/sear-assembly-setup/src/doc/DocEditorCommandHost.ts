@@ -1,24 +1,20 @@
-import { DocCommandBus } from '@searsuite/sear-assembly-commands';
-import { SearCoreDoc } from '@searsuite/sear-assembly-core';
-import { TextInput } from '@searsuite/sear-render-input';
-
-import { DocViewRuntimeCapability } from './DocViewCapabilities';
+import { DocCommandEffectRegistry } from '@searsuite/sear-assembly-commands';
 import { DocRuntimeExtensionRegistry } from '@searsuite/sear-assembly-doc';
+import { TextInput } from '@searsuite/sear-render-input';
+import { DocViewRuntimeCapability } from './DocViewCapabilities';
 
-/** Binds the command bus to document Core mutations and host adapter effects. */
+/** Attaches optional host effect consumers without replacing the business command executor. */
 export function bindDocEditorCommandHost(input: {
-  readonly commands: DocCommandBus;
-  readonly searCoreDoc: SearCoreDoc;
+  readonly effects: DocCommandEffectRegistry;
   readonly textInput: TextInput;
   readonly extensions: DocRuntimeExtensionRegistry;
-}): void {
-  input.commands.bind({
-    executePipeline(pipeline): void {
-      input.searCoreDoc.executePipeline(pipeline);
-    },
-    applyEffect(effect): void {
-      if (effect.type === 'focus-document') input.textInput.refocus();
-      if (effect.type === 'reset-caret-blink') input.extensions.get(DocViewRuntimeCapability.CaretState)?.reset();
-    },
-  });
+}): () => void {
+  const disposeFocus = input.effects.register('focus-document', () => input.textInput.refocus());
+  const disposeCaret = input.effects.register('reset-caret-blink', () =>
+    input.extensions.get(DocViewRuntimeCapability.CaretState)?.reset(),
+  );
+  return () => {
+    disposeCaret();
+    disposeFocus();
+  };
 }

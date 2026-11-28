@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-render-coord",
   "description": "Converts between document, viewport, screen, and host-view coordinates.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

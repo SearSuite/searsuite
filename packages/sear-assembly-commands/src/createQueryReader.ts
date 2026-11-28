@@ -1,10 +1,10 @@
-import { cloneSessionStateValue } from '@searsuite/sear-assembly-plugin';
+import { cloneSessionStateValue, runOutsideCommandExecution } from '@searsuite/sear-assembly-plugin';
 import { SearError } from '@searsuite/sear-foundation-error';
 
 /** Keeps a live reader while detaching every value delivered to its caller. */
-export function createSheetQueryReader<Result>(reader: Result): Result {
+export function createQueryReader<Result>(reader: Result): Result {
   if (reader === null || typeof reader !== 'object') {
-    throw new SearError('Sheet reader queries must return a reader object.');
+    throw new SearError('Reader queries must return a reader object.');
   }
 
   const facade: Record<PropertyKey, unknown> = Object.create(null);
@@ -19,13 +19,15 @@ export function createSheetQueryReader<Result>(reader: Result): Result {
         configurable: false,
         enumerable: descriptor?.enumerable ?? false,
         get(): unknown {
-          const value = Reflect.get(reader, key, reader);
+          const value = runOutsideCommandExecution(() => Reflect.get(reader, key, reader));
           if (typeof value !== 'function') return cloneSessionStateValue(value);
           return (...args: unknown[]) => {
-            const safeArgs = args.map((arg) => typeof arg === 'function'
-              ? (...values: unknown[]) => arg(...values.map((item) => cloneSessionStateValue(item)))
-              : arg);
-            return cloneSessionStateValue(value.apply(reader, safeArgs));
+            const safeArgs = args.map((arg) =>
+              typeof arg === 'function'
+                ? (...values: unknown[]) => arg(...values.map((item) => cloneSessionStateValue(item)))
+                : arg,
+            );
+            return runOutsideCommandExecution(() => cloneSessionStateValue(value.apply(reader, safeArgs)));
           };
         },
       });

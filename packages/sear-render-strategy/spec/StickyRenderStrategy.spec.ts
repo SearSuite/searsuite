@@ -1,8 +1,8 @@
-import './testSetup';
-import { StickyRenderStrategy } from '../src/StickyRenderStrategy';
 import { type Node, type NodeProperties } from '@searsuite/sear-render-node';
 import { type ScrollManagerState } from '@searsuite/sear-render-scroll';
+import { StickyRenderStrategy } from '../src/StickyRenderStrategy';
 import { createDirtyTracker, createRenderContext, createScrollManager, createTree } from './testFactories';
+import './testSetup';
 
 class TestStickyRenderStrategy extends StickyRenderStrategy<NodeProperties> {
   setScrollState(scrollState: ScrollManagerState): void {
@@ -25,7 +25,6 @@ describe('StickyRenderStrategy', () => {
       createRenderContext(),
       createRenderContext(),
       createScrollManager(200, 100),
-      {},
       {},
       {},
       createTree(1000, 800),

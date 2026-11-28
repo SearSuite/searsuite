@@ -1,5 +1,5 @@
-import { type ConfigEngine, type DocConfig, type EditorDefaultConfigOverrides } from '@searsuite/sear-assembly-config';
 import { defineDocCommand, type DocCommandBus, type DocEditorCommand } from '@searsuite/sear-assembly-commands';
+import { type ConfigEngine, type DocConfig, type EditorDefaultConfigOverrides } from '@searsuite/sear-assembly-config';
 import { Pipeline } from '@searsuite/sear-assembly-plugin';
 
 /** Updates editor-local Doc defaults without changing document state. */

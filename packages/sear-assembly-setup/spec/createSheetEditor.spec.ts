@@ -1,14 +1,102 @@
-import { SheetKernel } from '@searsuite/sear-assembly-sheet-kernel';
-import { SheetView, type SheetViewSetupContext, type SheetViewRuntimeContext } from '../src/sheet/SheetViewContracts';
-import { SheetSelectionView, SheetCellEditorView } from '@searsuite/sear-render';
 import { SheetViewCapability } from '@searsuite/sear-assembly-setup';
+import { SheetKernel } from '@searsuite/sear-assembly-sheet-kernel';
+import { SheetCellEditorView, SheetSelectionView } from '@searsuite/sear-render';
+import { SheetView, type SheetViewRuntimeContext, type SheetViewSetupContext } from '../src/sheet/SheetViewContracts';
 
-import { UserInteractionService } from '@searsuite/sear-foundation-user-interaction';
+import {
+  ClearRangeContentsCommand,
+  defineSheetCommand,
+  defineSheetQuery,
+  defineSheetRuntimeCapability,
+  DeleteRowCommand,
+  LocalActionCommand,
+  MoveColumnsCommand,
+  MoveRowsCommand,
+  SheetPlugin,
+  type SheetCommandBus,
+  type SheetPluginSetupContext,
+} from '@searsuite/sear-assembly-commands';
 import { SearCoreSheet, SheetLifecycleCoordinator } from '@searsuite/sear-assembly-core';
-import { SheetMatrix } from '@searsuite/sear-domain-sheet';
-import { PipelineStepKind, runInsideCommandExecution, SheetInteractionStore } from '@searsuite/sear-assembly-plugin';
-import { AlignmentMatrix, SheetHorizontalAlignment, VerticalAlignmentMatrix } from '@searsuite/sear-plugin-alignment';
+import {
+  defineSessionState,
+  HeadlessToolbar,
+  PluginKey,
+  PluginManager,
+  readSessionState,
+  runInsideCommandExecution,
+  SearToolbar,
+  SessionStateRegistry,
+  SessionStateRestorePhase,
+  SheetFormatTransferRegistry,
+  SheetInteractionStore,
+  SheetRangeMoveRegistry,
+  SheetRangeMoveStatus,
+  SheetRangeReorderRegistry,
+  SheetStructureMoveRegistry,
+} from '@searsuite/sear-assembly-plugin';
+import {
+  CaptureSheetSessionStateCommand,
+  ExportSheetStateCommand,
+  UnregisterSheetInputValidatorCommand,
+  UpdateSheetDefaultConfigCommand,
+} from '@searsuite/sear-assembly-sheet-kernel';
+import { type SheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
+import { WebKeyboardRouter, WebTextInput } from '@searsuite/sear-browser-adapters';
+import { CellDisplayTextRegistry, CellTypeCatalog, CellTypeDefinition } from '@searsuite/sear-domain-cell';
+import {
+  CellCommitStrategyRegistry,
+  CellType,
+  SheetCellInputValidationRegistry,
+  SheetDisplayedValueChanges,
+} from '@searsuite/sear-domain-cell-types';
+import {
+  FormulaAddInServiceDefinition,
+  FormulaCalculationTraceEventType,
+  IAggregationCache,
+  IDependencyGraph,
+  IFormulaExternalServiceProvider,
+  IFormulaTextServiceProvider,
+  IFunctionRegistry,
+} from '@searsuite/sear-domain-formula-engine';
+import { cellKey } from '@searsuite/sear-domain-formula-engine-ts';
+import { ColumnShapeDimensionsCSRMatrix, CSRMatrix, RowShapeDimensionsCSRMatrix } from '@searsuite/sear-domain-matrix';
+import { ReadSheetCellDataQuery, SheetMatrix } from '@searsuite/sear-domain-sheet';
+import { DataEngine } from '@searsuite/sear-domain-state';
+import { Container, Injectable } from '@searsuite/sear-foundation-di';
+import { Platform, type PlatformFrameRequestCallback } from '@searsuite/sear-foundation-platform';
+import { Rect } from '@searsuite/sear-foundation-rect';
+import { DataStorage } from '@searsuite/sear-foundation-storage';
+import { defineStateObservation, type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
+import { UserInteractionService } from '@searsuite/sear-foundation-user-interaction';
+import { NodePlatform as HeadlessPlatform } from '@searsuite/sear-node-adapters';
+import {
+  AlignmentMatrix,
+  SetRangeAlignmentCommand,
+  SheetHorizontalAlignment,
+  VerticalAlignmentMatrix,
+} from '@searsuite/sear-plugin-alignment';
+import {
+  CellBorderMatrix,
+  ReadSheetCellBorderQuery,
+  SetRangeCellBorderCommand,
+  SheetBorderLineStyle,
+  SheetBorderPreset,
+} from '@searsuite/sear-plugin-cell-border';
+import {
+  AcceptFormulaSuggestionCommand,
+  BeginCellEditCommand,
+  CancelCellEditCommand,
+  CommitCellEditCommand,
+  FormulaInputAssistObservation,
+  HandleDocumentInputCommand,
+  SetFormulaBarDraftCommand,
+  SheetCellEditorPlugin,
+  SheetFormulaBarObservation,
+  StartFormulaBarEditCommand,
+  UpdateCellEditorDocumentSelectionCommand,
+} from '@searsuite/sear-plugin-cell-editor';
 import { CellFillMatrix } from '@searsuite/sear-plugin-cell-fill';
+import { CellFormatMatrix } from '@searsuite/sear-plugin-cell-format';
 import {
   AddCellHighlightRuleCommand,
   CellHighlightKind,
@@ -19,6 +107,18 @@ import {
   ReadCellHighlightRulesQuery,
   UpdateCellHighlightRuleCommand,
 } from '@searsuite/sear-plugin-cell-highlight';
+import { CellMergeMatrix, ToggleMergeCellsCommand } from '@searsuite/sear-plugin-cell-merge';
+import { CheckboxCellType, InsertCheckboxesCommand, ReadCheckboxRangeQuery } from '@searsuite/sear-plugin-checkbox';
+import { SheetClipboard, type SheetClipboardPayload } from '@searsuite/sear-plugin-clipboard';
+import {
+  ApplyRemoteOperationsCommand,
+  CollaborationChannel,
+  CollaborationChannelBinding,
+  CollaborationConnectionState,
+  ConnectSheetCollaborationCommand,
+  DisconnectSheetCollaborationCommand,
+  HeadlessCollabTransport,
+} from '@searsuite/sear-plugin-collab';
 import {
   DataValidationEvaluatorRegistry,
   DataValidationEvaluatorRegistryCapability,
@@ -31,51 +131,8 @@ import {
   SheetDataValidationPlugin,
 } from '@searsuite/sear-plugin-data-validation';
 import { PickDropdownOptionCommand, ReadDropdownCellQuery } from '@searsuite/sear-plugin-dropdown';
-import {
-  CellBorderMatrix,
-  SetRangeCellBorderCommand,
-  ReadSheetCellBorderQuery,
-  SheetBorderPreset,
-  SheetBorderLineStyle,
-} from '@searsuite/sear-plugin-cell-border';
-import { SheetHeaderHighlightView } from '@searsuite/sear-render';
 import { DuplicateMatrix } from '@searsuite/sear-plugin-duplicate';
-import { CellFormatMatrix } from '@searsuite/sear-plugin-cell-format';
-import { CellMergeMatrix, ToggleMergeCellsCommand } from '@searsuite/sear-plugin-cell-merge';
-import { CheckboxCellType, InsertCheckboxesCommand, ReadCheckboxRangeQuery } from '@searsuite/sear-plugin-checkbox';
-import { FixedRowMatrix, SetSheetRowsFixedCommand } from '@searsuite/sear-plugin-fixed-row';
-import { SheetSortDirection, SortSheetRangeCommand } from '@searsuite/sear-plugin-sort';
-import {
-  PluginKey,
-  PluginManager,
-  SessionStateRegistry,
-  SessionStateRestorePhase,
-  defineSessionState,
-  readSessionState,
-  SheetRangeMoveStatus,
-  SheetFormatTransferRegistry,
-  SheetRangeMoveRegistry,
-  SheetRangeReorderRegistry,
-  SheetStructureMoveRegistry,
-} from '@searsuite/sear-assembly-plugin';
-import {
-  ClearRangeContentsCommand,
-  DeleteRowCommand,
-  defineSheetCommand,
-  defineSheetQuery,
-  LocalActionCommand,
-  MoveRowsCommand,
-  MoveColumnsCommand,
-  type SheetCommandBus,
-} from '@searsuite/sear-assembly-commands';
-import {
-  CellType,
-  SheetCellInputValidationRegistry,
-  SheetDisplayedValueChanges,
-} from '@searsuite/sear-domain-cell-types';
-import { CellCommitStrategyRegistry } from '@searsuite/sear-domain-cell-types';
-import { CellDisplayTextRegistry, CellTypeCatalog, CellTypeDefinition } from '@searsuite/sear-domain-cell';
-import { SheetCellVisualReaderRegistry, SheetRenderCoordinatorManager } from '@searsuite/sear-render-registry';
+import { SheetFilterPlugin } from '@searsuite/sear-plugin-filter';
 import {
   FindSheetMatchesQuery,
   FindSheetMatchPageQuery,
@@ -83,43 +140,54 @@ import {
   ReplaceAllSheetMatchesCommand,
   SheetFindReplacePlugin,
 } from '@searsuite/sear-plugin-find-replace';
-import { SheetFilterPlugin } from '@searsuite/sear-plugin-filter';
-import { DataEngine } from '@searsuite/sear-domain-state';
-import { ReadSheetCellDataQuery } from '@searsuite/sear-domain-sheet';
-import { SheetClipboard, type SheetClipboardPayload } from '@searsuite/sear-plugin-clipboard';
+import { FixedRowMatrix, SetSheetRowsFixedCommand } from '@searsuite/sear-plugin-fixed-row';
 import {
   FormatPainterMode,
   FormatPainterObservation,
   SheetFormatPainterPlugin,
   StartFormatPainterCommand,
 } from '@searsuite/sear-plugin-format-painter';
-import { cellKey } from '@searsuite/sear-domain-formula-engine-ts';
 import {
-  FormulaAddInServiceDefinition,
-  FormulaCalculationTraceEventType,
-  IAggregationCache,
-  IDependencyGraph,
-  IFormulaExternalServiceProvider,
-  IFormulaTextServiceProvider,
-  IFunctionRegistry,
-} from '@searsuite/sear-domain-formula-engine';
-import { SetRangeAlignmentCommand } from '@searsuite/sear-plugin-alignment';
-import { Injectable, Container } from '@searsuite/sear-foundation-di';
-import { DataStorage } from '@searsuite/sear-foundation-storage';
-import { Platform, type PlatformFrameRequestCallback } from '@searsuite/sear-foundation-platform';
-import { NodePlatform as HeadlessPlatform } from '@searsuite/sear-node-adapters';
-import { ColumnShapeDimensionsCSRMatrix, CSRMatrix, RowShapeDimensionsCSRMatrix } from '@searsuite/sear-domain-matrix';
-import { Rect } from '@searsuite/sear-foundation-rect';
-import { defineStateObservation, type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
+  CellFormulaValueConverterRegistry,
+  FormulaCalculationTraceBus,
+  FormulaResultProviderRegistry,
+  FormulaResultStore,
+  FormulaRichResultProviderRegistry,
+  FormulaSourceProviderRegistry,
+  FormulaValuePublisher,
+  RecalcScheduler,
+  SheetFormulaPlugin,
+} from '@searsuite/sear-plugin-formula';
+import { RedoSheetCommand, SheetHistoryStatusObservation, UndoSheetCommand } from '@searsuite/sear-plugin-history';
+import { ResizeSheetRowsCommand } from '@searsuite/sear-plugin-resize';
 import {
-  ApplyRemoteOperationsCommand,
-  CollaborationChannel,
-  CollaborationChannelBinding,
-  CollaborationConnectionState,
-  ConnectSheetCollaborationCommand,
-  DisconnectSheetCollaborationCommand,
-  HeadlessCollabTransport,
-} from '@searsuite/sear-plugin-collab';
+  AnalyzeSheetRangeMove,
+  EnsureSelectionVisibleCommand,
+  GetActiveCell,
+  GetSheetRangeMoveConflict,
+  MoveSheetRangeCommand,
+  SelectRangeCommand,
+  SheetSelectionPlugin,
+  SheetSelectionSessionStateDefinition,
+} from '@searsuite/sear-plugin-selection';
+import { SheetSortDirection, SortSheetRangeCommand } from '@searsuite/sear-plugin-sort';
+import {
+  BeginSheetResizeDragCommand,
+  HandleSheetRangeDragCommand,
+  RequestCellEditorRenderCommand,
+  SetSheetZoomCommand,
+  SheetHeaderHighlightView,
+  SheetHighlightRegistry,
+  SheetRangeDrag,
+  SheetRangeDragAction,
+  SheetZoomSessionStateDefinition,
+  SheetZoomView,
+} from '@searsuite/sear-render';
+import {
+  HeadlessHitRenderContext,
+  HeadlessOffScreenRenderContext,
+  HeadlessRenderContext,
+} from '@searsuite/sear-render-context';
 import {
   CursorEngine,
   CursorRegistry,
@@ -131,80 +199,28 @@ import { EventEngine, HeadlessEventRegistrar } from '@searsuite/sear-render-even
 import {
   HeadlessKeyboardRouter,
   HeadlessPointerCapture,
-  PointerCapture,
-  type PointerCaptureHandlers,
-  type KeyboardRouterHandlers,
-  KeyboardRouter,
   HeadlessTextInput,
+  KeyboardRouter,
+  PointerCapture,
+  type KeyboardRouterHandlers,
+  type PointerCaptureHandlers,
 } from '@searsuite/sear-render-input';
-import { WebTextInput, WebKeyboardRouter } from '@searsuite/sear-browser-adapters';
-import { CellRegion, type CellProperties } from '@searsuite/sear-render-registry';
+import { RenderContextTextShaper, TextShaper } from '@searsuite/sear-render-metrics';
 import {
-  HeadlessHitRenderContext,
-  HeadlessOffScreenRenderContext,
-  HeadlessRenderContext,
-} from '@searsuite/sear-render-context';
+  CellRegion,
+  SheetCellVisualReaderRegistry,
+  SheetRenderCoordinatorManager,
+  type CellProperties,
+} from '@searsuite/sear-render-registry';
 import { HeadlessScroller } from '@searsuite/sear-render-scroll';
 import { OverlayRenderStrategy, RenderStrategyManager, type RenderStrategy } from '@searsuite/sear-render-strategy';
-import { HeadlessToolbar, SearToolbar } from '@searsuite/sear-assembly-plugin';
-import {
-  CellFormulaValueConverterRegistry,
-  FormulaCalculationTraceBus,
-  FormulaValuePublisher,
-  FormulaResultProviderRegistry,
-  FormulaResultStore,
-  FormulaRichResultProviderRegistry,
-  FormulaSourceProviderRegistry,
-  RecalcScheduler,
-  SheetFormulaPlugin,
-} from '@searsuite/sear-plugin-formula';
-import { RedoSheetCommand, SheetHistoryStatusObservation, UndoSheetCommand } from '@searsuite/sear-plugin-history';
-import { SetSheetZoomCommand } from '@searsuite/sear-render';
-import { SheetZoomView, SheetZoomSessionStateDefinition } from '@searsuite/sear-render';
-import {
-  EnsureSelectionVisibleCommand,
-  GetActiveCell,
-  MoveSheetRangeCommand,
-  GetSheetRangeMoveConflict,
-  AnalyzeSheetRangeMove,
-  SelectRangeCommand,
-  SheetSelectionPlugin,
-  SheetSelectionSessionStateDefinition,
-} from '@searsuite/sear-plugin-selection';
-import { SheetHighlightRegistry } from '@searsuite/sear-render';
-import { HandleSheetRangeDragCommand, SheetRangeDragAction } from '@searsuite/sear-render';
-import { SheetRangeDrag } from '@searsuite/sear-render';
-import {
-  BeginCellEditCommand,
-  CancelCellEditCommand,
-  CommitCellEditCommand,
-  HandleDocumentInputCommand,
-  AcceptFormulaSuggestionCommand,
-  FormulaInputAssistObservation,
-  SheetFormulaBarObservation,
-  StartFormulaBarEditCommand,
-  SetFormulaBarDraftCommand,
-  SheetCellEditorPlugin,
-  UpdateCellEditorDocumentSelectionCommand,
-} from '@searsuite/sear-plugin-cell-editor';
-import { RequestCellEditorRenderCommand } from '@searsuite/sear-render';
-import { ResizeSheetRowsCommand } from '@searsuite/sear-plugin-resize';
-import { BeginSheetResizeDragCommand } from '@searsuite/sear-render';
-import { SheetPlugin, type SheetPluginSetupContext } from '@searsuite/sear-assembly-commands';
-import { defineSheetRuntimeCapability } from '@searsuite/sear-assembly-commands';
+import { FakeSheetEmbeddedEditor, SheetEmbeddedEditor } from '@searsuite/sear-sheet-editor-contract';
 import { createSheetEditor } from '../src/sheet/createSheetEditor';
-import { type SheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
 import {
   ApplyViewportScrollCommand,
   ScrollViewportToCommand,
   SheetViewportSessionStateDefinition,
 } from '../src/sheet/SheetViewportCommands';
-import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
-import { UpdateSheetDefaultConfigCommand } from '@searsuite/sear-assembly-sheet-kernel';
-import { UnregisterSheetInputValidatorCommand } from '@searsuite/sear-assembly-sheet-kernel';
-import { CaptureSheetSessionStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
-import { FakeSheetEmbeddedEditor, SheetEmbeddedEditor } from '@searsuite/sear-sheet-editor-contract';
-import { RenderContextTextShaper, TextShaper } from '@searsuite/sear-render-metrics';
 
 const strategyPluginKey = new PluginKey('StrategyView');
 const testStrategyToken = Symbol('TestStrategy');
@@ -406,6 +422,28 @@ class RangeMovePlatform extends HeadlessPlatform {
 }
 
 describe('createSheetEditor', () => {
+  it('omits toolbar and collaboration services when the host does not select them', () => {
+    const { toolbar: _toolbar, collabTransport: _transport, ...adapters } = createHeadlessAdapters();
+    let container: Container | undefined;
+    const editor = createSheetEditor({
+      sheetState: createSheetState(),
+      adapters: {
+        ...adapters,
+        registerEnvironment: (value) => {
+          container = value;
+        },
+      },
+    });
+    try {
+      expect(container!.hasBinding(SearToolbar.symbol)).toBe(false);
+      expect(editor.services.get(SheetViewCapability.Toolbar)).toBeUndefined();
+      expect(editor.services.get(SheetViewCapability.Collaboration)).toBeUndefined();
+      expect(editor.commands.getRegisteredCommandIds().some((id) => id.includes('collaboration'))).toBe(false);
+    } finally {
+      editor.destroy();
+    }
+  });
+
   it('BUG-014/015 routes clipboard shortcuts after editing and spreads external TSV over cells', async () => {
     @Injectable()
     class TestClipboard extends SheetClipboard {

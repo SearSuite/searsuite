@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-sheet-editor-contract",
   "description": "Defines Sheet-facing embedded rich-text editor contracts and test fakes.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-domain-editor",
   "description": "Defines editor-local queries, observations, services, and lifecycle contracts.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

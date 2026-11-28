@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-assembly-core",
   "description": "Stages and commits transactions in the Sheet and Doc runtimes.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [
@@ -24,13 +24,12 @@
   "dependencies": {
     "@searsuite/sear-assembly-config": "workspace:*",
     "@searsuite/sear-assembly-doc": "workspace:*",
+    "@searsuite/sear-assembly-doc-kernel": "workspace:*",
     "@searsuite/sear-assembly-plugin": "workspace:*",
     "@searsuite/sear-assembly-sheet-kernel": "workspace:*",
-    "@searsuite/sear-assembly-sheet-state": "workspace:*",
     "@searsuite/sear-domain-doc": "workspace:*",
     "@searsuite/sear-domain-doc-schema": "workspace:*",
     "@searsuite/sear-domain-editor": "workspace:*",
-    "@searsuite/sear-domain-matrix": "workspace:*",
     "@searsuite/sear-domain-ot": "workspace:*",
     "@searsuite/sear-domain-sheet": "workspace:*",
     "@searsuite/sear-domain-transaction": "workspace:*",

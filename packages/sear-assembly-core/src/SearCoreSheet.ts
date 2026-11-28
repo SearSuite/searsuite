@@ -1,8 +1,11 @@
-import { Injectable, Inject } from '@searsuite/sear-foundation-di';
-import { PluginKey, PluginManager, Pipeline, SearContractViolationError } from '@searsuite/sear-assembly-plugin';
-import { SheetKernel, type SheetCommitSnapshot } from '@searsuite/sear-assembly-sheet-kernel';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
+import { Pipeline, PluginKey, PluginManager, SearContractViolationError } from '@searsuite/sear-assembly-plugin';
+import { SheetKernel, type SheetCommitSnapshot } from '@searsuite/sear-assembly-sheet-kernel';
 import { type SheetDataEngine } from '@searsuite/sear-domain-sheet';
+import { type Transaction } from '@searsuite/sear-domain-transaction';
+import { Inject, Injectable } from '@searsuite/sear-foundation-di';
+import { Platform } from '@searsuite/sear-foundation-platform';
+import { RenderEngine, SheetRenderEngine } from '@searsuite/sear-render-engine';
 import {
   EventEngine,
   getViewHandlerName,
@@ -11,11 +14,8 @@ import {
   type ViewExtension,
 } from '@searsuite/sear-render-event-engine';
 import { SceneGraph } from '@searsuite/sear-render-node';
-import { RenderEngine } from '@searsuite/sear-render-engine';
-import { type CellProperties, type SheetRenderCoordinatorManager } from '@searsuite/sear-render-registry';
+import { type CellProperties } from '@searsuite/sear-render-registry';
 import { ScrollManager } from '@searsuite/sear-render-scroll';
-import { Platform } from '@searsuite/sear-foundation-platform';
-import { type Transaction } from '@searsuite/sear-domain-transaction';
 import { SheetLifecycleCoordinator } from './SheetLifecycleCoordinator';
 import { SheetViewRuntime } from './SheetViewRuntime';
 
@@ -26,7 +26,7 @@ export class SearCoreSheet {
   public readonly dataEngine: SheetDataEngine;
   public readonly pluginManager: PluginManager;
   public readonly configEngine: ConfigEngine;
-  public readonly renderEngine: RenderEngine<CellProperties, SheetRenderCoordinatorManager>;
+  public readonly renderEngine: SheetRenderEngine;
   public readonly eventEngine: EventEngine<CellProperties>;
   readonly #kernel: SheetKernel;
   readonly #stage: SceneGraph<CellProperties>;
@@ -41,7 +41,7 @@ export class SearCoreSheet {
   constructor(
     @Inject(SceneGraph.symbol) stage: SceneGraph<CellProperties>,
     @Inject(SheetKernel.symbol) kernel: SheetKernel,
-    @Inject(RenderEngine.symbol) render: RenderEngine<CellProperties, SheetRenderCoordinatorManager>,
+    @Inject(RenderEngine.symbol) render: SheetRenderEngine,
     @Inject(EventEngine.symbol) events: EventEngine<CellProperties>,
     @Inject(SheetLifecycleCoordinator.symbol) lifecycle: SheetLifecycleCoordinator,
     @Inject(Platform.symbol) platform: Platform,
@@ -77,8 +77,13 @@ export class SearCoreSheet {
   /** Reserves presentation and state teardown for the owning editor. */
   public enforceTeardownBoundary(token: object): void {
     if (this.#teardownToken) throw new SearContractViolationError('Sheet teardown boundary is already installed.');
-    this.#teardownToken = token;
+    this.enforceViewTeardownBoundary(token);
     this.#kernel.enforceTeardownBoundary(token);
+  }
+  /** Reserves view teardown without changing ownership of the attached business kernel. */
+  public enforceViewTeardownBoundary(token: object): void {
+    if (this.#teardownToken) throw new SearContractViolationError('Sheet teardown boundary is already installed.');
+    this.#teardownToken = token;
     ScrollManager.prototype.enforceTeardownBoundary.call(this.renderEngine.scrollManager, token);
   }
   /** Reads the latest state publication metadata. */
@@ -142,9 +147,16 @@ export class SearCoreSheet {
     if (this.#destroyed) return;
     if (this.#teardownToken && token !== this.#teardownToken)
       throw new SearContractViolationError('Sheet presentation destruction requires its editor owner.');
+    this.destroyView(token);
+    this.#kernel.destroy(token);
+  }
+  /** Releases native adapters and subscriptions while retaining the business runtime. */
+  public destroyView(token?: object): void {
+    if (this.#destroyed) return;
+    if (this.#teardownToken && token !== this.#teardownToken)
+      throw new SearContractViolationError('Sheet presentation destruction requires its editor owner.');
     this.#destroyed = true;
     this.beginTeardown(token);
-    this.#kernel.destroy(token);
     this.eventEngine.destroy(token);
     this.#lifecycle.destroy();
     this.renderEngine.scrollManager.destroy(token);

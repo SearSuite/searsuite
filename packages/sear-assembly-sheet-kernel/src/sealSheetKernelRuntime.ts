@@ -1,47 +1,47 @@
-import { CellDisplayTextRegistry } from '@searsuite/sear-domain-cell';
-import { type Container } from '@searsuite/sear-foundation-di';
+import {
+  SheetCommandBus,
+  SheetCommandEffectRegistry,
+  SheetQueryRegistry,
+  type SheetPluginSetupRuntime,
+} from '@searsuite/sear-assembly-commands';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
 import {
   EditorLifecycleStack,
-  cloneSessionStateValue,
   RuntimeCapabilityRegistry,
-  SheetFormatTransferRegistry,
+  SearContractViolationError,
   SheetClipboardTransferRegistry,
+  SheetFormatTransferRegistry,
   SheetRangeMoveRegistry,
   SheetRangeReorderRegistry,
   SheetStructureMoveRegistry,
+  cloneSessionStateValue,
   sealSheetContributionWrites,
 } from '@searsuite/sear-assembly-plugin';
+import { CellDisplayTextRegistry } from '@searsuite/sear-domain-cell';
 import {
-  SheetCommandBus,
-  SheetQueryRegistry,
-  SheetCommandEffectRegistry,
-  type SheetPluginSetupRuntime,
-} from '@searsuite/sear-assembly-commands';
-import {
-  CellCommitStrategyRegistry,
   CellClipboardCodecRegistry,
+  CellCommitStrategyRegistry,
   CellFormatTransferRegistry,
   SheetCellInputValidationRegistry,
-  SheetDisplayedValueChanges,
   SheetCellStyleRegistry,
+  SheetDisplayedValueChanges,
   SheetRulePriorityRegistry,
   sealCellExtensionWrites,
 } from '@searsuite/sear-domain-cell-types';
+import { type Container } from '@searsuite/sear-foundation-di';
 import { ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 import {
+  ApplySheetCollaborationEventCommand,
   CollaborationChannel,
   CollaborationChannelBinding,
-  ApplySheetCollaborationEventCommand,
 } from '@searsuite/sear-plugin-collab';
 import {
+  CellFormulaValueConverterRegistry,
   FormulaRegistryOwnership,
   SheetFormulaPlugin,
-  CellFormulaValueConverterRegistry,
 } from '@searsuite/sear-plugin-formula';
 import { UnregisterSheetInputValidatorCommand } from './SheetInputValidationCommands';
 import { sealSheetPluginTeardownWrites } from './sealSheetPluginTeardownWrites';
-import { SearContractViolationError } from '@searsuite/sear-assembly-plugin';
 
 /** Seals editor-owned business registries and grants teardown authority only to the editor owner. */
 export function sealSheetKernelRuntime(
@@ -58,8 +58,10 @@ export function sealSheetKernelRuntime(
     if (!tearingDown && !commands.isExecuting())
       throw new SearContractViolationError('Sheet extensions must change through editor.commands.run(...).');
   };
-  const binding = container.resolve<CollaborationChannelBinding>(CollaborationChannelBinding.symbol);
-  if (binding.owner === 'editor')
+  const binding = container.hasBinding(CollaborationChannelBinding.symbol)
+    ? container.resolve<CollaborationChannelBinding>(CollaborationChannelBinding.symbol)
+    : undefined;
+  if (binding?.owner === 'editor')
     CollaborationChannel.prototype.enforceCommandBoundary.call(
       binding.channel,
       assertWrite,

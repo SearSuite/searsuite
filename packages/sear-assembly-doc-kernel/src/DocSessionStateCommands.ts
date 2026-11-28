@@ -1,8 +1,13 @@
-import { Pipeline } from '@searsuite/sear-assembly-plugin';
-import { defineDocCommand, type DocCommandContext, type DocCommandResult, type DocEditorCommand, type DocCommandBus } from '@searsuite/sear-assembly-commands';
-import { type SessionStateRegistry } from '@searsuite/sear-assembly-plugin';
+import {
+  defineDocCommand,
+  type DocCommandBus,
+  type DocCommandContext,
+  type DocCommandResult,
+  type DocEditorCommand,
+} from '@searsuite/sear-assembly-commands';
+import { Pipeline, type SessionStateRegistry } from '@searsuite/sear-assembly-plugin';
 
-import { type DocSessionState } from './DocEditorContracts';
+import { type DocSessionState } from './DocKernelContracts';
 
 /** Result of capturing editor-local state for an in-memory document remount. */
 export interface CaptureDocSessionStateCommandResult extends DocCommandResult {

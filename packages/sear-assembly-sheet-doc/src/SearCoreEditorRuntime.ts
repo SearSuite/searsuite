@@ -1,17 +1,25 @@
-import { ViewExtensionRegistry } from '@searsuite/sear-render-event-engine';
-import { SearError } from '@searsuite/sear-foundation-error';
 import {
   DocCompositionManager,
   DocCursorManager,
+  DocEditorLayout,
   type DocPreparedEditorRenderLayout,
-  SearCoreDoc,
 } from '@searsuite/sear-assembly-core';
-import { DocInputPlugin } from '@searsuite/sear-assembly-doc';
-import { PipelineStepExecutorRegistry } from '@searsuite/sear-assembly-plugin';
-import { PluginManager } from '@searsuite/sear-assembly-plugin';
 import {
-  DocNodeRegistry,
+  createBoldContribution,
+  createFontFamilyContribution,
+  createFontSizeContribution,
+  createItalicContribution,
+  createStrikethroughContribution,
+  createTextColorContribution,
+  createUnderlineContribution,
+  SheetClipboardPlugin,
+  SheetEmbeddedEditorPluginRegistry,
+  SheetFormulaReferencePlugin,
+  type SheetEmbeddedEditorPluginContext,
+} from '@searsuite/sear-assembly-doc';
+import {
   createDefaultRichTextLineBoxContribution,
+  DocNodeRegistry,
   registerParagraphDocNode,
   registerTextDocNode,
   RichTextBlockFlowRegistry,
@@ -19,58 +27,41 @@ import {
   RichTextLineBoxRegistry,
   type DocSelection,
 } from '@searsuite/sear-domain-doc';
+import { DocLayoutEngine } from '@searsuite/sear-domain-editor';
+import { SearError } from '@searsuite/sear-foundation-error';
+import { PositionRect } from '@searsuite/sear-foundation-rect';
+import { RenderContext } from '@searsuite/sear-render-context';
+import { createFontDescriptor, RenderContextTextShaper } from '@searsuite/sear-render-metrics';
 import {
-  createBoldContribution,
-  createFontFamilyContribution,
-  createFontSizeContribution,
-  createItalicContribution,
-  createUnderlineContribution,
-  createStrikethroughContribution,
-  createTextColorContribution,
-} from '@searsuite/sear-assembly-doc';
-import {
+  BlockManager,
   createBoldRenderContribution,
   createFontFamilyRenderContribution,
   createFontSizeRenderContribution,
   createItalicRenderContribution,
-  createUnderlineRenderContribution,
   createStrikethroughRenderContribution,
   createTextColorRenderContribution,
-} from '@searsuite/sear-render-node';
-import { DocLayoutEngine } from '@searsuite/sear-domain-editor';
-import { PositionRect } from '@searsuite/sear-foundation-rect';
-import { RenderContext } from '@searsuite/sear-render-context';
-import {
-  BlockManager,
+  createUnderlineRenderContribution,
   RichTextCaretNode,
   RichTextCompositionNode,
   RichTextContentNode,
   RichTextLineRenderer,
-  RichTextRunRenderRegistry,
   RichTextRunRenderer,
+  RichTextRunRenderRegistry,
   RichTextSelectionNode,
 } from '@searsuite/sear-render-node';
-import { createFontDescriptor, RenderContextTextShaper } from '@searsuite/sear-render-metrics';
-import type { SheetEditorRect, SheetEmbeddedEditorContext, SheetDocument } from '@searsuite/sear-sheet-editor-contract';
+import type { SheetDocument, SheetEditorRect, SheetEmbeddedEditorContext } from '@searsuite/sear-sheet-editor-contract';
+import { cloneSheetDocument, lockSheetDocumentSnapshot } from './DocumentSnapshotBoundary';
 import { defaultEmbeddedDocConfig } from './embeddedDocConfig';
-import type { SearCoreEditorAdapterOptions } from './SearCoreEditorAdapterOptions';
-import {
-  SheetEmbeddedEditorPluginRegistry,
-  type SheetEmbeddedEditorPluginContext,
-  SheetClipboardPlugin,
-  SheetFormulaReferencePlugin,
-} from '@searsuite/sear-assembly-doc';
-import { SheetEmbeddedEditorViewRegistry } from './embeddedView/SheetEmbeddedEditorViewRegistry';
-import { type SheetEmbeddedEditorViewContext } from './embeddedView/SheetEmbeddedEditorView';
 import { SheetCellContextView } from './embeddedView/cellContext/SheetCellContextView';
 import { SheetOverflowView } from './embeddedView/overflow/SheetOverflowView';
-import { cloneSheetDocument, lockSheetDocumentSnapshot } from './DocumentSnapshotBoundary';
+import { type SheetEmbeddedEditorViewContext } from './embeddedView/SheetEmbeddedEditorView';
+import { SheetEmbeddedEditorViewRegistry } from './embeddedView/SheetEmbeddedEditorViewRegistry';
 import { lockSheetEmbeddedEditorContext } from './lockSheetEmbeddedEditorContext';
+import type { SearCoreEditorAdapterOptions } from './SearCoreEditorAdapterOptions';
 
-/** Minimal Doc runtime owned by one Sheet adapter instance. */
+/** Presentation-only Doc layout and drawing resources owned by one Sheet adapter. */
 export class SearCoreEditorRuntime {
-  public readonly core: SearCoreDoc;
-  public readonly input: DocInputPlugin;
+  public readonly layout: DocEditorLayout;
   public readonly cursor: DocCursorManager;
   public readonly composition: DocCompositionManager;
   public readonly inlineStyles: RichTextInlineStyleRegistry;
@@ -148,32 +139,17 @@ export class SearCoreEditorRuntime {
     this.cursor = new DocCursorManager();
     this.composition = new DocCompositionManager(textShaper);
     const layout = new DocLayoutEngine(new RichTextBlockFlowRegistry());
-    const pluginManager = new PluginManager();
-    this.input = new DocInputPlugin(layout);
-    this.core = new SearCoreDoc(
-      blockManager,
-      this.cursor,
-      this.composition,
-      layout,
-      pluginManager,
-      new PipelineStepExecutorRegistry(),
-      {},
-      new ViewExtensionRegistry(),
-    );
-    this.core.registerPlugin(this.input);
-    this.core.initialize();
+    this.layout = new DocEditorLayout(blockManager, this.cursor, this.composition, layout, nodes);
+    this.layout.enforceTeardownBoundary(this.#teardownToken);
     if (context.isCommandExecuting) this.enforceCommandBoundary(context.isCommandExecuting);
-    this.input.sealSessionRestoration();
-    this.core.start();
   }
 
   /** Binds embedded plugin and document writes to the owning Sheet command bus. */
   public enforceCommandBoundary(isCommandExecuting: () => boolean): void {
     if (this.#isCommandExecuting) throw new SearError('Sheet embedded runtime command boundary is already installed.');
     this.#isCommandExecuting = isCommandExecuting;
-    SearCoreDoc.prototype.enforceCommandBoundary.call(this.core, isCommandExecuting);
-    SearCoreDoc.prototype.enforceTeardownBoundary.call(this.core, this.#teardownToken);
-    BlockManager.prototype.enforceCommandBoundary.call(this.core.blockManager, isCommandExecuting);
+    DocEditorLayout.prototype.enforceCommandBoundary.call(this.layout, isCommandExecuting);
+    BlockManager.prototype.enforceCommandBoundary.call(this.layout.blockManager, isCommandExecuting);
     DocCursorManager.prototype.enforceCommandBoundary.call(this.cursor, isCommandExecuting, this.#teardownToken);
     DocCompositionManager.prototype.enforceCommandBoundary.call(
       this.composition,
@@ -206,9 +182,9 @@ export class SearCoreEditorRuntime {
 
   public measureUnwrapped(document: SheetDocument, font: string): { width: number; height: number } {
     this.#assertLive();
-    const blocks = this.core.blockManager.createDetached();
+    const blocks = this.layout.blockManager.createDetached();
     blocks.setBaseFont(font);
-    for (const node of this.core.materializeSnapshot(document)) blocks.add(node);
+    for (const node of this.layout.materializeSnapshot(document)) blocks.add(node);
     return blocks.getUnwrappedSize();
   }
 
@@ -223,8 +199,8 @@ export class SearCoreEditorRuntime {
     this.#assertLive();
     return this.#withFont(renderContext, font, () =>
       this.#withFont(this.#measurementContext, font, () =>
-        this.core.prepareEditorRenderLayout({
-          document: this.core.materializeSnapshot(document),
+        this.layout.prepareEditorRenderLayout({
+          document: this.layout.materializeSnapshot(document),
           selection,
           origin: context.geometry.cellRect,
           minWidth: context.geometry.cellRect.width,
@@ -328,7 +304,7 @@ export class SearCoreEditorRuntime {
     this.#destroyed = true;
     this.sheetViews.dispose(this.#teardownToken);
     this.sheetPlugins.dispose(this.#teardownToken);
-    this.core.destroy(this.#teardownToken);
+    this.layout.destroy(this.#teardownToken);
     this.cursor.clearCursor(this.#teardownToken);
     this.composition.clear(this.#teardownToken);
   }

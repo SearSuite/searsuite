@@ -1,9 +1,9 @@
-import { DirtyRegionCollector } from '../src/DirtyRegionCollector';
-import './testSetup';
-import { DirtyRenderStrategy } from '../src/DirtyRenderStrategy';
 import { type Node, type NodeProperties } from '@searsuite/sear-render-node';
 import { type ScrollManagerState } from '@searsuite/sear-render-scroll';
+import { DirtyRegionCollector } from '../src/DirtyRegionCollector';
+import { DirtyRenderStrategy } from '../src/DirtyRenderStrategy';
 import { createDirtyTracker, createRenderContext, createScrollManager, createTree } from './testFactories';
+import './testSetup';
 
 class TestDirtyRenderStrategy extends DirtyRenderStrategy<NodeProperties> {
   setStates(previous: ScrollManagerState, current: ScrollManagerState): void {
@@ -27,7 +27,6 @@ describe('DirtyRenderStrategy', () => {
       createRenderContext(),
       createRenderContext(),
       createScrollManager(),
-      {},
       {},
       {},
       createTree(),
@@ -131,7 +130,6 @@ describe('DirtyRenderStrategy', () => {
   });
 
   it('normalizes duplicate, collinear, and degenerate union-boundary geometry', () => {
-
     const originalGet = Map.prototype.get;
     try {
       Map.prototype.get = function getPossiblyMissingNextPoint(key) {
@@ -141,9 +139,9 @@ describe('DirtyRenderStrategy', () => {
         return originalGet.call(this, key);
       };
 
-      expect(DirtyRegionCollector.traceUnionBoundary({ x1: 0, y1: 0, x2: 1, y2: 1 }, { x1: 0, y1: 0, x2: 1, y2: 1 })).toEqual([
-        [0, 0],
-      ]);
+      expect(
+        DirtyRegionCollector.traceUnionBoundary({ x1: 0, y1: 0, x2: 1, y2: 1 }, { x1: 0, y1: 0, x2: 1, y2: 1 }),
+      ).toEqual([[0, 0]]);
     } finally {
       Map.prototype.get = originalGet;
     }
@@ -178,13 +176,17 @@ describe('DirtyRenderStrategy', () => {
       [0, 0],
       [1, 1],
     ]);
-    expect(DirtyRegionCollector.traceUnionBoundary({ x1: 0, y1: 0, x2: 0, y2: 1 }, { x1: 0, y1: 0, x2: 0, y2: 1 })).toEqual([
+    expect(
+      DirtyRegionCollector.traceUnionBoundary({ x1: 0, y1: 0, x2: 0, y2: 1 }, { x1: 0, y1: 0, x2: 0, y2: 1 }),
+    ).toEqual([
       [0, 0],
       [0, 0],
       [0, 1],
       [0, 1],
     ]);
-    expect(DirtyRegionCollector.traceUnionBoundary({ x1: 2, y1: 0, x2: 0, y2: 1 }, { x1: 2, y1: 0, x2: 0, y2: 1 })).toEqual([
+    expect(
+      DirtyRegionCollector.traceUnionBoundary({ x1: 2, y1: 0, x2: 0, y2: 1 }, { x1: 2, y1: 0, x2: 0, y2: 1 }),
+    ).toEqual([
       [2, 0],
       [0, 0],
       [0, 1],

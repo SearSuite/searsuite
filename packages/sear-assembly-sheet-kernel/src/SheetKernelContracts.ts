@@ -1,18 +1,18 @@
+import { type SheetEditor, type SheetPlugin, type SheetPluginImplementation } from '@searsuite/sear-assembly-commands';
+import { type SheetDocumentState, type SheetSessionState } from '@searsuite/sear-assembly-sheet-state';
+import { type IFunctionRegistry } from '@searsuite/sear-domain-formula-engine';
+import { type Container } from '@searsuite/sear-foundation-di';
 import {
-  type Platform,
   type FileDownload,
+  type Platform,
   type WebServiceClient,
   type XmlDocumentParser,
   type XmlXPathEngine,
   type XmlXPathEvaluator,
 } from '@searsuite/sear-foundation-platform';
 import { type UserInteractionService } from '@searsuite/sear-foundation-user-interaction';
-import { type Container } from '@searsuite/sear-foundation-di';
-import { type IFunctionRegistry } from '@searsuite/sear-domain-formula-engine';
-import { type CollabTransport } from '@searsuite/sear-plugin-collab';
 import { type SheetClipboard } from '@searsuite/sear-plugin-clipboard';
-import { type SheetPlugin, type SheetPluginImplementation, type SheetEditor } from '@searsuite/sear-assembly-commands';
-import { type SheetDocumentState, type SheetSessionState } from '@searsuite/sear-assembly-sheet-state';
+import { type CollabTransport } from '@searsuite/sear-plugin-collab';
 
 /** Constructor registered in an editor-local service container. */
 export type RuntimeServiceImplementation<Service> = new (...args: never[]) => Service;
@@ -20,7 +20,7 @@ export type RuntimeServiceImplementation<Service> = new (...args: never[]) => Se
 /** Host services required by the Sheet business runtime. */
 export interface SheetRuntimeAdapters {
   readonly platform: RuntimeServiceImplementation<Platform>;
-  readonly collabTransport: RuntimeServiceImplementation<CollabTransport>;
+  readonly collabTransport?: RuntimeServiceImplementation<CollabTransport>;
   readonly clipboard?: RuntimeServiceImplementation<SheetClipboard>;
   readonly fileDownload?: RuntimeServiceImplementation<FileDownload>;
   readonly userInteraction?: RuntimeServiceImplementation<UserInteractionService>;

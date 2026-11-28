@@ -1,4 +1,3 @@
-import { createSheetKernelEditor } from '@searsuite/sear-assembly-sheet-kernel';
 import { type SheetCommandClient } from '@searsuite/sear-assembly-commands';
 import {
   cloneSessionStateValue,
@@ -9,17 +8,32 @@ import {
 } from '@searsuite/sear-assembly-plugin';
 import {
   CaptureSheetSessionStateCommand,
+  createSheetKernelEditor,
   ExportSheetStateCommand,
   SheetClipboardWorkbookBridgeSymbol,
   type SheetClipboardWorkbookBridge,
 } from '@searsuite/sear-assembly-sheet-kernel';
 
 import { type SheetEditor } from '@searsuite/sear-assembly-commands';
+import { SearContractViolationError } from '@searsuite/sear-assembly-plugin';
 import {
+  lockCommittedSheetState,
+  serializeSheetDocumentState,
   type SheetDocumentState,
   type SheetSessionState,
-  serializeSheetDocumentState,
 } from '@searsuite/sear-assembly-sheet-state';
+import {
+  FormulaAddInServiceDefinition,
+  IFormulaExternalServiceProvider,
+  IFormulaTextServiceProvider,
+  IFunctionRegistry,
+} from '@searsuite/sear-domain-formula-engine';
+import {
+  FormulaExternalServiceRegistry,
+  FormulaTextServiceRegistry,
+  FunctionRegistry,
+  UnavailableFormulaAddInService,
+} from '@searsuite/sear-domain-formula-engine-ts';
 import {
   addWorkbookSheet,
   getWorkbookSheetDescriptor,
@@ -35,60 +49,45 @@ import {
 } from '@searsuite/sear-domain-workbook';
 import { Container, Scope } from '@searsuite/sear-foundation-di';
 import { SearError } from '@searsuite/sear-foundation-error';
-import { lockCommittedSheetState } from '@searsuite/sear-assembly-sheet-state';
-import { SearContractViolationError } from '@searsuite/sear-assembly-plugin';
-import { Platform } from '@searsuite/sear-foundation-platform';
+import {
+  Platform,
+  UnavailableWebServiceClient,
+  UnavailableXmlDocumentParser,
+  UnavailableXmlXPathEngine,
+  WebServiceClient,
+  XmlDocumentParser,
+  XmlXPathEngine,
+  XmlXPathEvaluator,
+} from '@searsuite/sear-foundation-platform';
 import { ObservationRegistry } from '@searsuite/sear-foundation-subscription';
+import { CommitCellEditCommand, IsCellEditingQuery } from '@searsuite/sear-plugin-cell-editor';
+import { SheetClipboardCutSession, SheetClipboardSheetIdentity } from '@searsuite/sear-plugin-clipboard';
+import { SheetFormatPainterSession } from '@searsuite/sear-plugin-format-painter';
+import { FormulaRegistryOwnership } from '@searsuite/sear-plugin-formula';
+import { SheetExternalHistory } from '@searsuite/sear-plugin-history';
 import { WorkbookCommandBus } from './WorkbookCommandBus';
 import { defineWorkbookCommand } from './WorkbookCommandDefinition';
 import {
-  UnregisterWorkbookFormulaFunctionCommand,
-  UnregisterWorkbookFormulaExternalServiceCommand,
-  UnregisterWorkbookFormulaTextServiceCommand,
-} from './WorkbookFormulaCommands';
-import { FormulaRegistryOwnership } from '@searsuite/sear-plugin-formula';
-import { SheetFormatPainterSession } from '@searsuite/sear-plugin-format-painter';
-import { SheetClipboardCutSession, SheetClipboardSheetIdentity } from '@searsuite/sear-plugin-clipboard';
-import { CommitCellEditCommand, IsCellEditingQuery } from '@searsuite/sear-plugin-cell-editor';
-
-interface CommitClipboardMoveInput {
-  readonly cutId: string;
-  readonly sourceId: WorkbookSheetId;
-  readonly targetId: WorkbookSheetId;
-  readonly targetAfter: SheetDocumentState;
-}
-
-const CommitClipboardMoveCommand = defineWorkbookCommand<CommitClipboardMoveInput, WorkbookCommandResult>(
-  'workbook.clipboard.commitMove',
-);
-import {
+  registerDefaultWorkbookCommands,
   type ActivateWorkbookSheetCommandInput,
   type AddWorkbookSheetCommandInput,
   type HideWorkbookSheetCommandInput,
   type MoveWorkbookSheetCommandInput,
   type RemoveWorkbookSheetCommandInput,
   type RenameWorkbookSheetCommandInput,
-  registerDefaultWorkbookCommands,
   type UnhideWorkbookSheetCommandInput,
   type WorkbookCommandController,
   type WorkbookCommandResult,
 } from './WorkbookCommands';
-import {
-  RedoWorkbookCommand,
-  UndoWorkbookCommand,
-  WorkbookHistoryPlugin,
-} from './workbookPlugin/history/WorkbookHistoryPlugin';
-import { SheetExternalHistory } from '@searsuite/sear-plugin-history';
-import { WorkbookFormulaReferencePickPlugin } from './workbookPlugin/formulaReferencePick/WorkbookFormulaReferencePickPlugin';
-import { WorkbookFormulaCrossSheetHighlightPlugin } from './workbookPlugin/formulaHighlight/WorkbookFormulaCrossSheetHighlightPlugin';
-import { WorkbookFormulaObjectsPlugin } from './workbookPlugin/formulaObjects/WorkbookFormulaObjectsPlugin';
-import { renameWorkbookFormulaObjectsSheet } from './WorkbookFormulaObjects';
-import {
-  WorkbookCollaborationPlugin,
-  WorkbookCollaborationTransportFactory,
-} from './workbookPlugin/collaboration/WorkbookCollaborationPlugin';
-import { WorkbookActiveSheetEditorObservation, type WorkbookActiveSheetEditorSnapshot } from './WorkbookObservations';
+import { type WorkbookDocumentApi } from './WorkbookDocumentApi';
 import { WorkbookDocumentStateObservation } from './WorkbookDocumentObservation';
+import {
+  UnregisterWorkbookFormulaExternalServiceCommand,
+  UnregisterWorkbookFormulaFunctionCommand,
+  UnregisterWorkbookFormulaTextServiceCommand,
+} from './WorkbookFormulaCommands';
+import { renameWorkbookFormulaObjectsSheet } from './WorkbookFormulaObjects';
+import { WorkbookActiveSheetEditorObservation, type WorkbookActiveSheetEditorSnapshot } from './WorkbookObservations';
 import {
   registerWorkbookPluginCapabilities,
   registerWorkbookPluginCommands,
@@ -102,15 +101,6 @@ import {
   type WorkbookPluginRuntime,
   type WorkbookPluginServiceContext,
 } from './WorkbookPluginContracts';
-import { firstVisibleSheetId, WorkbookSessionStore } from './WorkbookSessionState';
-import { registerWorkbookStateCommands } from './WorkbookStateCommands';
-import {
-  WorkbookHistoryAction,
-  WorkbookTransaction,
-  type WorkbookTransactionCommittedEvent,
-  type WorkbookTransactionState,
-} from './WorkbookTransaction';
-import { WorkbookRuntimeCapability, WorkbookRuntimeExtensionRegistry } from './WorkbookRuntimeExtensionRegistry';
 import {
   type WorkbookEditor,
   type WorkbookRuntimeConfiguration,
@@ -121,31 +111,41 @@ import {
   type WorkbookSheetStateCapture,
   type WorkbookSheetStateCaptureInput,
 } from './WorkbookRuntimeContracts';
-import { type WorkbookDocumentApi } from './WorkbookDocumentApi';
+import { WorkbookRuntimeCapability, WorkbookRuntimeExtensionRegistry } from './WorkbookRuntimeExtensionRegistry';
+import { firstVisibleSheetId, WorkbookSessionStore } from './WorkbookSessionState';
 import { type WorkbookSheetsApi } from './WorkbookSheetsApi';
+import { registerWorkbookStateCommands } from './WorkbookStateCommands';
+import {
+  WorkbookHistoryAction,
+  WorkbookTransaction,
+  type WorkbookTransactionCommittedEvent,
+  type WorkbookTransactionState,
+} from './WorkbookTransaction';
 import { cloneWorkbookEditorDocumentState } from './cloneWorkbookEditorDocumentState';
 import { sealWorkbookPluginTeardownWrites } from './sealWorkbookPluginTeardownWrites';
 import {
-  IFormulaTextServiceProvider,
-  IFormulaExternalServiceProvider,
-  IFunctionRegistry,
-  FormulaAddInServiceDefinition,
-} from '@searsuite/sear-domain-formula-engine';
+  WorkbookCollaborationPlugin,
+  WorkbookCollaborationTransportFactory,
+} from './workbookPlugin/collaboration/WorkbookCollaborationPlugin';
+import { WorkbookFormulaCrossSheetHighlightPlugin } from './workbookPlugin/formulaHighlight/WorkbookFormulaCrossSheetHighlightPlugin';
+import { WorkbookFormulaObjectsPlugin } from './workbookPlugin/formulaObjects/WorkbookFormulaObjectsPlugin';
+import { WorkbookFormulaReferencePickPlugin } from './workbookPlugin/formulaReferencePick/WorkbookFormulaReferencePickPlugin';
 import {
-  FormulaExternalServiceRegistry,
-  FormulaTextServiceRegistry,
-  FunctionRegistry,
-  UnavailableFormulaAddInService,
-} from '@searsuite/sear-domain-formula-engine-ts';
-import {
-  UnavailableWebServiceClient,
-  WebServiceClient,
-  UnavailableXmlDocumentParser,
-  UnavailableXmlXPathEngine,
-  XmlDocumentParser,
-  XmlXPathEngine,
-  XmlXPathEvaluator,
-} from '@searsuite/sear-foundation-platform';
+  RedoWorkbookCommand,
+  UndoWorkbookCommand,
+  WorkbookHistoryPlugin,
+} from './workbookPlugin/history/WorkbookHistoryPlugin';
+
+interface CommitClipboardMoveInput {
+  readonly cutId: string;
+  readonly sourceId: WorkbookSheetId;
+  readonly targetId: WorkbookSheetId;
+  readonly targetAfter: SheetDocumentState;
+}
+
+const CommitClipboardMoveCommand = defineWorkbookCommand<CommitClipboardMoveInput, WorkbookCommandResult>(
+  'workbook.clipboard.commitMove',
+);
 
 /**
  * Creates a Workbook editor with an isolated DI container and plugin graph.
@@ -201,9 +201,11 @@ export function createWorkbookRuntime(configuration: WorkbookRuntimeConfiguratio
     () => new WorkbookCommandBus(configuration.warn ? { warn: configuration.warn } : {}),
     Scope.Singleton,
   );
-  container.registerInstance(WorkbookCollaborationTransportFactory.symbol, {
-    create: () => new configuration.adapters.collabTransport(),
-  });
+  const collaborationTransport = configuration.adapters.collabTransport;
+  if (collaborationTransport)
+    container.registerInstance(WorkbookCollaborationTransportFactory.symbol, {
+      create: () => new collaborationTransport(),
+    });
   container.register(ObservationRegistry.symbol, ObservationRegistry, Scope.Singleton);
   container.register(SessionStateRegistry.symbol, SessionStateRegistry, Scope.Singleton);
   container.registerFactory(
@@ -230,7 +232,7 @@ export function createWorkbookRuntime(configuration: WorkbookRuntimeConfiguratio
   try {
     const pluginImplementations = [
       WorkbookHistoryPlugin,
-      WorkbookCollaborationPlugin,
+      ...(collaborationTransport ? [WorkbookCollaborationPlugin] : []),
       WorkbookFormulaCrossSheetHighlightPlugin,
       WorkbookFormulaReferencePickPlugin,
       WorkbookFormulaObjectsPlugin,

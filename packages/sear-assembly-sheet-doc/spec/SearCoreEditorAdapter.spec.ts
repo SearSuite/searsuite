@@ -1,15 +1,12 @@
-import { HeadlessRenderContext } from '@searsuite/sear-render-context';
-import { defineStateObservation } from '@searsuite/sear-foundation-subscription';
+import type { SheetEmbeddedEditorPlugin, SheetEmbeddedEditorPluginContext } from '@searsuite/sear-assembly-doc';
 import {
   BoldTextStyleKey,
   ItalicTextStyleKey,
-  UnderlineTextStyleKey,
   StrikethroughTextStyleKey,
+  UnderlineTextStyleKey,
 } from '@searsuite/sear-assembly-doc';
-import { createSheetEmbeddedSearCoreEditor } from '../src';
-import type { SheetEmbeddedEditorPlugin, SheetEmbeddedEditorPluginContext } from '@searsuite/sear-assembly-doc';
-import type { SheetEmbeddedEditorView } from '../src';
-import { SearCoreEditorRuntime } from '../src/SearCoreEditorRuntime';
+import { defineStateObservation } from '@searsuite/sear-foundation-subscription';
+import { HeadlessRenderContext } from '@searsuite/sear-render-context';
 import {
   SheetEmbeddedEditHistoryObservation,
   SheetEmbeddedInlineStyleObservation,
@@ -17,6 +14,9 @@ import {
   type SheetEmbeddedEditorContext,
   type SheetEmbeddedInlineStyleState,
 } from '@searsuite/sear-sheet-editor-contract';
+import type { SheetEmbeddedEditorView } from '../src';
+import { createSheetEmbeddedSearCoreEditor } from '../src';
+import { SearCoreEditorRuntime } from '../src/SearCoreEditorRuntime';
 
 class RecordingRenderContext extends HeadlessRenderContext {
   public readonly fonts: string[] = [];
@@ -128,30 +128,30 @@ describe('SearCoreEditorAdapter', () => {
     const context = createContext(new RecordingRenderContext(), document);
     const runtime = new SearCoreEditorRuntime(context, {});
     const bypass = jest.fn();
-    runtime.core.enforceCommandBoundary = bypass;
-    runtime.core.pluginManager.enforceWriteBoundary = bypass;
+    runtime.layout.enforceCommandBoundary = bypass;
     runtime.sheetPlugins.enforceWriteBoundary = bypass;
     runtime.inlineStyles.enforceWriteBoundary = bypass;
     runtime.runRenderRegistry.enforceWriteBoundary = bypass;
     runtime.lineBoxes.enforceWriteBoundary = bypass;
-    runtime.core.blockManager.enforceCommandBoundary = bypass;
+    runtime.layout.blockManager.enforceCommandBoundary = bypass;
     runtime.cursor.enforceCommandBoundary = bypass;
     runtime.composition.enforceCommandBoundary = bypass;
 
     SearCoreEditorRuntime.prototype.enforceCommandBoundary.call(runtime, () => false);
     try {
       expect(bypass).not.toHaveBeenCalled();
-      expect(() => runtime.core.pluginManager.unregisterPlugin(runtime.input.key)).toThrow('owning runtime');
+      expect('core' in runtime).toBe(false);
+      expect('input' in runtime).toBe(false);
       expect(() => runtime.sheetPlugins.register({ key: 'test.late' })).toThrow('editor.commands.run');
       expect(() => runtime.inlineStyles.register({ key: 'test.late' })).toThrow('editor.commands.run');
       expect(() => runtime.lineBoxes.register({ key: 'test.late', resolve: (input) => input.lineBox })).toThrow(
         'editor.commands.run',
       );
       expect(() => runtime.runRenderRegistry.register({ key: 'test.late' })).toThrow('editor.commands.run');
-      expect(() => runtime.core.blockManager.clear()).toThrow('editor.commands.run');
+      expect(() => runtime.layout.blockManager.clear()).toThrow('editor.commands.run');
       expect(() => runtime.cursor.setCursor({ x: 0, y: 0, height: 1, visible: true })).toThrow('editor.commands.run');
       expect(() => runtime.composition.setText('forged')).toThrow('editor.commands.run');
-      expect(() => runtime.core.destroy()).toThrow('editor owner');
+      expect(() => runtime.layout.destroy()).toThrow('editor owner');
     } finally {
       runtime.destroy();
     }

@@ -1,5 +1,54 @@
 # @searsuite/sear-render
 
+## 0.0.3
+
+### Patch Changes
+
+- Separate document and spreadsheet business kernels from presentation.
+
+  Add the independent document kernel and Headless document entry, share business assembly between visual and Headless hosts, isolate editor-local node registrations, and make collaboration and toolbars optional. Embedded document presentation shares the pure layout service without creating a second business runtime.
+
+  Breaking changes: document node registration is editor-local; visual documents require an event registrar; Core document snapshot load/export APIs are replaced by business commands and queries. Update dependent packages to consume the same contracts.
+
+- Updated dependencies
+  - @searsuite/sear-assembly-commands@0.0.3
+  - @searsuite/sear-assembly-config@0.0.3
+  - @searsuite/sear-assembly-core@0.0.3
+  - @searsuite/sear-assembly-doc@0.0.3
+  - @searsuite/sear-assembly-plugin@0.0.3
+  - @searsuite/sear-domain-cell@0.0.3
+  - @searsuite/sear-domain-cell-types@0.0.3
+  - @searsuite/sear-domain-commands@0.0.3
+  - @searsuite/sear-domain-doc@0.0.3
+  - @searsuite/sear-domain-formula-engine@0.0.3
+  - @searsuite/sear-domain-formula-engine-ts@0.0.3
+  - @searsuite/sear-domain-sheet@0.0.3
+  - @searsuite/sear-plugin-alignment@0.0.3
+  - @searsuite/sear-plugin-cell-border@0.0.3
+  - @searsuite/sear-plugin-cell-editor@0.0.3
+  - @searsuite/sear-plugin-cell-format@0.0.3
+  - @searsuite/sear-plugin-cell-merge@0.0.3
+  - @searsuite/sear-plugin-checkbox@0.0.3
+  - @searsuite/sear-plugin-data-validation@0.0.3
+  - @searsuite/sear-plugin-dropdown@0.0.3
+  - @searsuite/sear-plugin-filter@0.0.3
+  - @searsuite/sear-plugin-fixed-row@0.0.3
+  - @searsuite/sear-plugin-formula@0.0.3
+  - @searsuite/sear-plugin-freeze@0.0.3
+  - @searsuite/sear-plugin-history@0.0.3
+  - @searsuite/sear-plugin-resize@0.0.3
+  - @searsuite/sear-plugin-selection@0.0.3
+  - @searsuite/sear-render-context@0.0.3
+  - @searsuite/sear-render-coord@0.0.3
+  - @searsuite/sear-render-cursor@0.0.3
+  - @searsuite/sear-render-event-engine@0.0.3
+  - @searsuite/sear-render-input@0.0.3
+  - @searsuite/sear-render-metrics@0.0.3
+  - @searsuite/sear-render-node@0.0.3
+  - @searsuite/sear-render-registry@0.0.3
+  - @searsuite/sear-render-scroll@0.0.3
+  - @searsuite/sear-sheet-editor-contract@0.0.3
+
 ## 0.0.2
 
 ### Patch Changes

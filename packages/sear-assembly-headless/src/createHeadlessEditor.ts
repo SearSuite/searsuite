@@ -1,25 +1,25 @@
+import { type SheetEditor } from '@searsuite/sear-assembly-commands';
 import {
   createSheetKernelEditor,
   type SheetKernelConfiguration,
   type SheetRuntimeAdapters,
 } from '@searsuite/sear-assembly-sheet-kernel';
-import { type SheetEditor } from '@searsuite/sear-assembly-commands';
 import {
   createWorkbookRuntime,
   type WorkbookEditor,
   type WorkbookRuntimeConfiguration,
 } from '@searsuite/sear-assembly-workbook-kernel';
-import { NodePlatform, NodeWebServiceClient } from '@searsuite/sear-node-adapters';
 import {
   IFormulaDateSystemProvider,
   IFormulaIterationSettingsProvider,
   type FormulaDateSystem,
   type FormulaIterationSettings,
 } from '@searsuite/sear-domain-formula-engine';
-import { HeadlessCollabTransport } from '@searsuite/sear-plugin-collab';
+import { NodePlatform, NodeWebServiceClient } from '@searsuite/sear-node-adapters';
+import { type CollabTransport } from '@searsuite/sear-plugin-collab';
+import { createHeadlessFunctionRegistry } from './HeadlessFunctionRegistry';
 import { NodeXmlDocumentParser } from './NodeXmlDocumentParser';
 import { NodeXmlXPathEngine } from './NodeXmlXPathEngine';
-import { createHeadlessFunctionRegistry } from './HeadlessFunctionRegistry';
 
 /** Node-owned clock and calculation settings shared by Sheet and Workbook hosts. */
 export interface HeadlessCalculationOptions {
@@ -28,10 +28,15 @@ export interface HeadlessCalculationOptions {
   readonly iteration?: FormulaIterationSettings;
 }
 
+/** Optional Node host capabilities; omitted collaboration installs no channel or transport. */
+export interface HeadlessHostOptions extends HeadlessCalculationOptions {
+  readonly collabTransport?: new (...args: never[]) => CollabTransport;
+}
+
 /** Business-only Sheet options with Node host services supplied by this assembly. */
-export type HeadlessEditorOptions = Omit<SheetKernelConfiguration, 'adapters'> & HeadlessCalculationOptions;
+export type HeadlessEditorOptions = Omit<SheetKernelConfiguration, 'adapters'> & HeadlessHostOptions;
 /** Business-only Workbook options with Node host services supplied by this assembly. */
-export type HeadlessWorkbookEditorOptions = Omit<WorkbookRuntimeConfiguration, 'adapters'> & HeadlessCalculationOptions;
+export type HeadlessWorkbookEditorOptions = Omit<WorkbookRuntimeConfiguration, 'adapters'> & HeadlessHostOptions;
 /** The neutral Sheet business facade returned by the Node assembly. */
 export type HeadlessEditor = SheetEditor;
 /** The neutral Workbook business facade returned by the Node assembly. */
@@ -39,31 +44,33 @@ export type HeadlessWorkbookEditor = WorkbookEditor;
 
 /** Creates a Sheet business kernel without allocating a scene, renderer or native input adapter. */
 export function createHeadlessEditor(options: HeadlessEditorOptions): HeadlessEditor {
-  const { currentDateTime, dateSystem, iteration, ...business } = options;
+  const { currentDateTime, dateSystem, iteration, collabTransport, ...business } = options;
   return createSheetKernelEditor({
     ...business,
     adapters: createNodeRuntimeAdapters({
       ...(currentDateTime ? { currentDateTime } : {}),
       ...(dateSystem === undefined ? {} : { dateSystem }),
       ...(iteration ? { iteration } : {}),
+      ...(collabTransport ? { collabTransport } : {}),
     }),
   });
 }
 
 /** Creates a Workbook whose mounted Sheets use business kernels directly. */
 export function createHeadlessWorkbookEditor(options: HeadlessWorkbookEditorOptions): HeadlessWorkbookEditor {
-  const { currentDateTime, dateSystem, iteration, ...business } = options;
+  const { currentDateTime, dateSystem, iteration, collabTransport, ...business } = options;
   return createWorkbookRuntime({
     ...business,
     adapters: createNodeRuntimeAdapters({
       ...(currentDateTime ? { currentDateTime } : {}),
       ...(dateSystem === undefined ? {} : { dateSystem }),
       ...(iteration ? { iteration } : {}),
+      ...(collabTransport ? { collabTransport } : {}),
     }),
   });
 }
 
-function createNodeRuntimeAdapters(options: HeadlessCalculationOptions): SheetRuntimeAdapters {
+function createNodeRuntimeAdapters(options: HeadlessHostOptions): SheetRuntimeAdapters {
   class ClockedNodePlatform extends NodePlatform {
     public override currentDateTime(): number {
       return options.currentDateTime?.() ?? super.currentDateTime();
@@ -71,7 +78,7 @@ function createNodeRuntimeAdapters(options: HeadlessCalculationOptions): SheetRu
   }
   return {
     platform: options.currentDateTime ? ClockedNodePlatform : NodePlatform,
-    collabTransport: HeadlessCollabTransport,
+    ...(options.collabTransport ? { collabTransport: options.collabTransport } : {}),
     createFunctionRegistry: createHeadlessFunctionRegistry,
     xmlDocumentParser: NodeXmlDocumentParser,
     xmlXPathEngine: NodeXmlXPathEngine,

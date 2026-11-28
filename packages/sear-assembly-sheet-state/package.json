@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-assembly-sheet-state",
   "description": "Composes Sheet document snapshots and codecs without presentation services.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [
@@ -26,7 +26,6 @@
     "@searsuite/sear-domain-matrix": "workspace:*",
     "@searsuite/sear-domain-sheet": "workspace:*",
     "@searsuite/sear-foundation-error": "workspace:*",
-    "@searsuite/sear-foundation-rect": "workspace:*",
     "@searsuite/sear-plugin-alignment": "workspace:*",
     "@searsuite/sear-plugin-cell-border": "workspace:*",
     "@searsuite/sear-plugin-cell-fill": "workspace:*",

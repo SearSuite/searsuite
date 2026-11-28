@@ -1,30 +1,30 @@
-import { SearError } from '@searsuite/sear-foundation-error';
 import {
   DocEditModel,
   type SheetEditInput,
-  type SheetTextSelection,
   type SheetInlineStyleUpdate,
+  type SheetTextSelection,
 } from '@searsuite/sear-assembly-doc';
 import {
-  type RichDocNode,
   type DocSelection,
   getDocumentOffset,
   paraText,
   resolveTextContent,
+  type RichDocNode,
 } from '@searsuite/sear-domain-doc';
 import { type Schema } from '@searsuite/sear-domain-doc-schema';
+import { SearError } from '@searsuite/sear-foundation-error';
 import {
-  type SheetEditSession,
+  type SheetCompositionState,
+  type SheetCursorState,
   type SheetEditRenderOptions,
+  type SheetEditSession,
   type SheetEmbeddedEditorContext,
   type SheetPointerInput,
   type SheetRenderUpdate,
-  type SheetCursorState,
-  type SheetCompositionState,
 } from '@searsuite/sear-sheet-editor-contract';
-import { createSheetUpdate } from './SheetEditorUpdate';
+import { createDocumentEndSelection, toDocSelection } from './DocumentBoundary';
 import { SearCoreEditorRuntime } from './SearCoreEditorRuntime';
-import { toDocSelection, createDocumentEndSelection } from './DocumentBoundary';
+import { createSheetUpdate } from './SheetEditorUpdate';
 
 /** Renders and hit-tests an edit model owned independently of the view. */
 export class SearCoreEditSession implements SheetEditSession {
@@ -129,7 +129,7 @@ export class SearCoreEditSession implements SheetEditSession {
     this.#assertCommand();
     const point = this.#context.geometry.toLocalPoint(input.point);
     const layout = this.#prepare();
-    const position = this.#runtime.core.resolveCursorFromPoint(point.x, point.y, layout.snapshot);
+    const position = this.#runtime.layout.resolveCursorFromPoint(point.x, point.y, layout.snapshot);
     if (input.type === 'pointerDown') {
       if ((input.clickCount ?? 1) >= 2) {
         const document = this.getDocument() as RichDocNode[],

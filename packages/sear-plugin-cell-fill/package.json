@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-plugin-cell-fill",
   "description": "Adds sparse Sheet fill state, commands, visual projections, collaboration, and export.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

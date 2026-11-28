@@ -1,4 +1,5 @@
 const roots = [
+  '@searsuite/sear-assembly-doc-kernel',
   '@searsuite/sear-assembly-sheet-kernel',
   '@searsuite/sear-assembly-workbook-kernel',
   '@searsuite/sear-assembly-headless',

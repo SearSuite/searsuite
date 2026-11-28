@@ -1,22 +1,9 @@
 /** Transactional Sheet composition independent of presentation.
  * @packageDocumentation
  */
-export { SheetKernel, type SheetKernelPublication } from './SheetKernel';
-export { type SheetCommitSnapshot } from './SheetCommitSnapshot';
+export * from './createSheetKernelEditor';
+export * from './createSheetPluginSetupRuntime';
 export * from './DefaultSheetClipboardDataSource';
-export * from './SheetClipboardWorkbookBridge';
-export * from './SheetCommitObservation';
-export * from './SheetConfigCommands';
-export * from './SheetFormulaPriority';
-export * from './SheetFormulaSchedulerDataSource';
-export * from './SheetInputValidationCommands';
-export * from './SheetKernelContracts';
-export * from './SheetOwnerLifecycle';
-export * from './SheetRangeCommands';
-export * from './SheetSessionStateCommands';
-export * from './SheetStateSnapshotCommands';
-export * from './SheetStructureCommands';
-export * from './SheetTransactionProjection';
 export * from './findNestedAggregateFormulaName';
 export * from './registerDefaultSheetFeatures';
 export * from './registerSheetBaseServices';
@@ -41,8 +28,23 @@ export * from './runtimePlugin/history/registerSheetHistoryPlugin';
 export * from './runtimePlugin/interaction/registerSheetEditingFeatures';
 export * from './runtimePlugin/postFormulaInteraction/registerSheetPostFormulaFeatures';
 export * from './runtimePlugin/sort/createSheetSortValueReader';
-export * from './sealSheetPluginTeardownWrites';
-export * from './SheetKernelContributions';
-export * from './createSheetKernelEditor';
-export * from './createSheetPluginSetupRuntime';
 export * from './sealSheetKernelRuntime';
+export * from './sealSheetPluginTeardownWrites';
+export * from './SheetClipboardWorkbookBridge';
+export * from './SheetCommitObservation';
+export { type SheetCommitSnapshot } from './SheetCommitSnapshot';
+export * from './SheetConfigCommands';
+export * from './SheetFormulaPriority';
+export * from './SheetFormulaSchedulerDataSource';
+export * from './SheetInputValidationCommands';
+export { SheetKernel, type SheetKernelPublication } from './SheetKernel';
+export * from './SheetKernelContracts';
+export * from './SheetKernelContributions';
+export * from './SheetOwnerLifecycle';
+export * from './SheetRangeCommands';
+export * from './SheetSessionStateCommands';
+export * from './SheetStateSnapshotCommands';
+export * from './SheetStructureCommands';
+export * from './SheetTransactionProjection';
+
+export { prepareSheetKernel } from './SheetKernelAssembly';

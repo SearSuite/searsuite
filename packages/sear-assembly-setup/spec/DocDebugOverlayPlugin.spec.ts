@@ -1,7 +1,5 @@
-import { DocDebugOverlayView } from '../src/doc/runtimePlugin/debugOverlay/DocDebugOverlayView';
-import { createDocEditor } from '../src/doc/createDocEditor';
-import { defaultDocConfig } from '@searsuite/sear-assembly-config';
-import { ConfigEngine } from '@searsuite/sear-assembly-config';
+import { ConfigEngine, defaultDocConfig } from '@searsuite/sear-assembly-config';
+import { WebKeyboardRouter } from '@searsuite/sear-browser-adapters';
 import {
   DocNodeRegistry,
   ParagraphNode,
@@ -11,12 +9,14 @@ import {
   type RichDocNode,
 } from '@searsuite/sear-domain-doc';
 import { Container } from '@searsuite/sear-foundation-di';
-import { NodePlatform as HeadlessPlatform } from '@searsuite/sear-node-adapters';
 import { PositionRect } from '@searsuite/sear-foundation-rect';
+import { NodePlatform as HeadlessPlatform } from '@searsuite/sear-node-adapters';
 import { HeadlessRenderContext } from '@searsuite/sear-render-context';
+import { HeadlessEventRegistrar } from '@searsuite/sear-render-event-engine';
 import { HeadlessKeyboardRouter, HeadlessPointerCapture, HeadlessTextInput } from '@searsuite/sear-render-input';
-import { WebKeyboardRouter } from '@searsuite/sear-browser-adapters';
 import { Tree } from '@searsuite/sear-render-node';
+import { createDocEditor } from '../src/doc/createDocEditor';
+import { DocDebugOverlayView } from '../src/doc/runtimePlugin/debugOverlay/DocDebugOverlayView';
 
 let container: Container;
 
@@ -202,6 +202,7 @@ describe('DocDebugOverlayView', () => {
       viewport: { width: 400, height: 300 },
       documentState: { document: createRichDocument('Hello World') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new MeasuredHeadlessRenderContext();
@@ -227,6 +228,7 @@ describe('DocDebugOverlayView', () => {
       viewport: { width: 400, height: 300 },
       documentState: { document: createRichDocument('Hello World') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new MeasuredHeadlessRenderContext();

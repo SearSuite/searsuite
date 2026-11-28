@@ -7,11 +7,19 @@
 export {
   createHeadlessEditor,
   createHeadlessWorkbookEditor,
+  type HeadlessCalculationOptions,
   type HeadlessEditor,
   type HeadlessEditorOptions,
+  type HeadlessHostOptions,
   type HeadlessWorkbookEditor,
   type HeadlessWorkbookEditorOptions,
 } from './createHeadlessEditor';
-export { NodeXmlXPathEvaluator } from './NodeXmlXPathEvaluator';
 export { NodeXmlDocumentParser } from './NodeXmlDocumentParser';
 export { NodeXmlXPathEngine } from './NodeXmlXPathEngine';
+export { NodeXmlXPathEvaluator } from './NodeXmlXPathEvaluator';
+
+export {
+  createHeadlessDocEditor,
+  type HeadlessDocEditor,
+  type HeadlessDocEditorOptions,
+} from './createHeadlessDocEditor';

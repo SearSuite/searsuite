@@ -8,7 +8,7 @@ SearSuite's underlying architecture supports AI-assisted editing, allowing peopl
 
 ## Get started with SearSuite
 
-SearSuite provides TypeScript modules for building spreadsheet experiences that people and AI agents can edit together. Use the published 0.0.2 packages to run a Sheet, a multi-Sheet Workbook or a Node.js Headless editor. The browser examples share one application adapter file.
+SearSuite provides TypeScript modules for building spreadsheet experiences that people and AI agents can edit together. Use the published 0.0.3 packages to run a Sheet, a multi-Sheet Workbook or a Node.js Headless editor. The browser examples share one application adapter file.
 
 <a id="choose-editor"></a>
 
@@ -31,20 +31,20 @@ npm create vite@6 my-searsuite-app -- --template vanilla-ts
 cd my-searsuite-app
 npm install
 npm install \
-  @searsuite/sear-assembly-setup@0.0.2 \
-  @searsuite/sear-assembly-workbook@0.0.2 \
-  @searsuite/sear-assembly-workbook-kernel@0.0.2 \
-  @searsuite/sear-assembly-sheet-state@0.0.2 \
-  @searsuite/sear-assembly-sheet-kernel@0.0.2 \
+  @searsuite/sear-assembly-setup@0.0.3 \
+  @searsuite/sear-assembly-workbook@0.0.3 \
+  @searsuite/sear-assembly-workbook-kernel@0.0.3 \
+  @searsuite/sear-assembly-sheet-state@0.0.3 \
+  @searsuite/sear-assembly-sheet-kernel@0.0.3 \
   @searsuite/sear-domain-workbook@0.0.2 \
-  @searsuite/sear-browser-adapters@0.0.2 \
-  @searsuite/sear-plugin-web-toolbar@0.0.2 \
-  @searsuite/sear-plugin-web-sheet-tabbar@0.0.2 \
-  @searsuite/sear-assembly-sheet-doc@0.0.2 \
-  @searsuite/sear-render-scroll@0.0.2
+  @searsuite/sear-browser-adapters@0.0.3 \
+  @searsuite/sear-plugin-web-toolbar@0.0.3 \
+  @searsuite/sear-plugin-web-sheet-tabbar@0.0.3 \
+  @searsuite/sear-assembly-sheet-doc@0.0.3 \
+  @searsuite/sear-render-scroll@0.0.3
 ```
 
-For an existing application, run only the package install command in its project directory. Keep all example dependencies pinned to the tested `0.0.2` release set. A newer source checkout does not change packages already installed from npm.
+For an existing application, run only the package install command in its project directory. Keep all example dependencies pinned to the tested `0.0.3` release set. A newer source checkout does not change packages already installed from npm.
 
 <a id="create-page"></a>
 
@@ -336,7 +336,7 @@ Headless can run independently of the browser application. In a new directory, i
 mkdir searsuite-headless
 cd searsuite-headless
 npm init -y
-npm install @searsuite/sear-assembly-headless@0.0.2 @searsuite/sear-assembly-sheet-state@0.0.2 @searsuite/sear-assembly-sheet-kernel@0.0.2 @searsuite/sear-plugin-formula@0.0.2
+npm install @searsuite/sear-assembly-headless@0.0.3 @searsuite/sear-assembly-sheet-state@0.0.3 @searsuite/sear-assembly-sheet-kernel@0.0.3 @searsuite/sear-plugin-formula@0.0.3
 ```
 
 Create `headless.mjs`, then run `node headless.mjs`:

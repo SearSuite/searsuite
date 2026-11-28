@@ -1,21 +1,28 @@
-import { ViewExtensionBase } from '@searsuite/sear-render-event-engine';
-import { DocCursorManager, SearCoreDoc } from '@searsuite/sear-assembly-core';
-import { DocInputPlugin } from '@searsuite/sear-assembly-doc';
-import { DocCommandBus } from '@searsuite/sear-assembly-commands';
+import { DocCommandBus, type DocQueryRegistry } from '@searsuite/sear-assembly-commands';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
+import { DocCursorManager, SearCoreDoc } from '@searsuite/sear-assembly-core';
+import { defineDocRuntimeCapability, DocInputPlugin, DocRuntimeExtensionRegistry } from '@searsuite/sear-assembly-doc';
 import { type PluginManager, type SessionStateRegistry } from '@searsuite/sear-assembly-plugin';
-import { DocNodeRegistry, RichTextInlineStyleRegistry, RichTextLineBoxRegistry, RichTextBlockFlowRegistry } from '@searsuite/sear-domain-doc';
+import {
+  DocNodeRegistry,
+  RichTextBlockFlowRegistry,
+  RichTextInlineStyleRegistry,
+  RichTextLineBoxRegistry,
+} from '@searsuite/sear-domain-doc';
 import { DocLayoutEngine, type DocBlockRenderDebugSnapshot } from '@searsuite/sear-domain-editor';
 import { type Container } from '@searsuite/sear-foundation-di';
 import { Platform } from '@searsuite/sear-foundation-platform';
-import { RenderContext } from '@searsuite/sear-render-context';
-import { EventEngine, EventRegistrar } from '@searsuite/sear-render-event-engine';
-import { TextInput, KeyboardRouter, PointerCapture, type KeyboardRouterHandlers } from '@searsuite/sear-render-input';
-import { TextShaper } from '@searsuite/sear-render-metrics';
-import { RichTextRunRenderRegistry, type NodeProperties, type RichTextRunRenderContribution } from '@searsuite/sear-render-node';
-import { ScrollManager } from '@searsuite/sear-render-scroll';
 import { type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
-import { defineDocRuntimeCapability, DocRuntimeExtensionRegistry } from '@searsuite/sear-assembly-doc';
+import { RenderContext } from '@searsuite/sear-render-context';
+import { EventEngine, EventRegistrar, ViewExtensionBase } from '@searsuite/sear-render-event-engine';
+import { KeyboardRouter, PointerCapture, TextInput, type KeyboardRouterHandlers } from '@searsuite/sear-render-input';
+import { TextShaper } from '@searsuite/sear-render-metrics';
+import {
+  RichTextRunRenderRegistry,
+  type NodeProperties,
+  type RichTextRunRenderContribution,
+} from '@searsuite/sear-render-node';
+import { ScrollManager } from '@searsuite/sear-render-scroll';
 import { type DocInputBindingRegistryCapability } from './DocViewCapabilities';
 
 /** Render phase reported by virtual document layout instrumentation. */
@@ -77,6 +84,7 @@ export interface DocViewRuntime {
   readonly platform: Platform;
   /** Command bus exposed by the document editor instance. */
   readonly commands: DocCommandBus;
+  readonly queries: DocQueryRegistry;
   /** Typed state and event observations owned by this editor instance. */
   readonly observations: ObservationRegistry;
   /** Local remount state contributed by built-in and third-party plugins. */

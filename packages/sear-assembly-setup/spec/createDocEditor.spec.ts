@@ -1,34 +1,3 @@
-import { DocView, type DocViewSetupContext, type DocViewRuntimeContext } from '../src/doc/DocViewContracts';
-import { createDocEditor } from '../src/doc/createDocEditor';
-import { DocCaretState } from '../src/doc/DocCaretState';
-import { DocInputAdapterLifecycle } from '../src/doc/DocInputAdapterLifecycle';
-import { DocRenderCoordinator } from '../src/doc/DocRenderCoordinator';
-import { DocViewportEnvironment } from '../src/doc/DocViewportEnvironment';
-import {
-  DocPlugin,
-  defineDocRuntimeCapability,
-  type DocPluginRuntime,
-  type DocPluginSetupContext,
-} from '@searsuite/sear-assembly-doc';
-import { type DocInteractionRuntime } from '../src/doc/DocInteractionRuntime';
-import { DocViewCapability } from '../src/doc/DocViewContracts';
-import { DocViewRuntimeCapability } from '../src/doc/DocViewCapabilities';
-import { DocContentView, DocDebugOverlayView } from '../src/doc/DefaultDocViews';
-import { type DocInputBindingRegistryCapability } from '@searsuite/sear-assembly-setup';
-import {
-  DeleteDocBackwardCommand,
-  ClearDocCompositionCommand,
-  InsertDocTextCommand,
-  LoadDocumentCommand,
-  MoveDocCursorCommand,
-  SelectAllDocCommand,
-  SetDocCompositionCommand,
-  SetDocSelectionCommand,
-} from '@searsuite/sear-assembly-doc';
-import { RenderDocCommand } from '@searsuite/sear-assembly-setup';
-import { DocCompositionManager, DocCursorManager, SearCoreDoc } from '@searsuite/sear-assembly-core';
-import { DocInputPlugin } from '@searsuite/sear-assembly-doc';
-import { Pipeline } from '@searsuite/sear-assembly-plugin';
 import {
   CommandExecutionPhase,
   DocCommandBus,
@@ -36,6 +5,49 @@ import {
   type DocCommandResult,
 } from '@searsuite/sear-assembly-commands';
 import {
+  DocCompositionManager,
+  DocCursorManager,
+  DocRenderOperationType,
+  SearCoreDoc,
+} from '@searsuite/sear-assembly-core';
+import {
+  ClearDocCompositionCommand,
+  DeleteDocBackwardCommand,
+  DocHistoryStatusObservation,
+  DocInputPlugin,
+  DocPlugin,
+  DocSelectionObservation,
+  DocSelectionSessionStateDefinition,
+  HistoryPlugin,
+  InsertDocTableCommand,
+  InsertDocTextCommand,
+  LoadDocumentCommand,
+  MoveDocCursorCommand,
+  RedoDocCommand,
+  SelectAllDocCommand,
+  SelectionPlugin,
+  SetDocBoldCommand,
+  SetDocCompositionCommand,
+  SetDocFontFamilyCommand,
+  SetDocFontSizeCommand,
+  SetDocItalicCommand,
+  SetDocLineSpacingCommand,
+  SetDocParagraphSpacingAfterCommand,
+  SetDocSelectionCommand,
+  SetDocStrikethroughCommand,
+  SetDocTextColorCommand,
+  SetDocUnderlineCommand,
+  ToggleDocBoldCommand,
+  ToggleDocItalicCommand,
+  ToggleDocStrikethroughCommand,
+  ToggleDocUnderlineCommand,
+  UndoDocCommand,
+  defineDocRuntimeCapability,
+  type DocPluginRuntime,
+  type DocPluginSetupContext,
+} from '@searsuite/sear-assembly-doc';
+import {
+  Pipeline,
   PluginKey,
   PluginManager,
   SessionStateRegistry,
@@ -43,31 +55,14 @@ import {
   defineSessionState,
   readSessionState,
 } from '@searsuite/sear-assembly-plugin';
-import { NodePlatform as HeadlessPlatform } from '@searsuite/sear-node-adapters';
-import { defineStateObservation } from '@searsuite/sear-foundation-subscription';
-import { HeadlessRenderContext } from '@searsuite/sear-render-context';
-import { EventEngine, EventRegistrar, type EventWithOffset } from '@searsuite/sear-render-event-engine';
 import {
-  HeadlessKeyboardRouter,
-  HeadlessPointerCapture,
-  HeadlessTextInput,
-  type KeyboardRouterHandlers,
-} from '@searsuite/sear-render-input';
+  DocCaretViewKey,
+  DocContentViewKey,
+  RenderDocCommand,
+  type DocInputBindingRegistryCapability,
+} from '@searsuite/sear-assembly-setup';
 import { WebKeyboardRouter } from '@searsuite/sear-browser-adapters';
-import { DocRenderEngine, RenderEngine } from '@searsuite/sear-render-engine';
-import { HitRenderStrategy, IncrementalRenderDecisionReason } from '@searsuite/sear-render-strategy';
-import { Scroller, ScrollManager, type ScrollPublisher, type ScrollManagerState } from '@searsuite/sear-render-scroll';
-import { Container, Injectable } from '@searsuite/sear-foundation-di';
-import { PositionRect } from '@searsuite/sear-foundation-rect';
-import { type HexColor } from '@searsuite/sear-foundation-utils';
-import {
-  ViewportOverlayNode,
-  SceneGraph,
-  Tree,
-  type RichTextRenderNodeProperties,
-  type Node,
-  type NodeProperties,
-} from '@searsuite/sear-render-node';
+import { DocTransaction } from '@searsuite/sear-domain-commands';
 import {
   DocNodeRegistry,
   ParagraphNode,
@@ -76,37 +71,63 @@ import {
   registerParagraphDocNode,
   registerTextDocNode,
   updateInlineTextStyleAttrs,
-  type RichTextInlineStyleRegistry,
   type RichDocNode,
+  type RichTextInlineStyleRegistry,
 } from '@searsuite/sear-domain-doc';
-import { DocTransaction } from '@searsuite/sear-domain-commands';
-import { DocRenderOperationType } from '@searsuite/sear-assembly-core';
-import { createTransaction, type Transaction } from '@searsuite/sear-domain-transaction';
+import { createTransaction } from '@searsuite/sear-domain-transaction';
+import { Container, Injectable } from '@searsuite/sear-foundation-di';
+import { PositionRect } from '@searsuite/sear-foundation-rect';
+import { defineStateObservation } from '@searsuite/sear-foundation-subscription';
+import { type HexColor } from '@searsuite/sear-foundation-utils';
+import { NodePlatform as HeadlessPlatform } from '@searsuite/sear-node-adapters';
+import { HeadlessRenderContext } from '@searsuite/sear-render-context';
+import { DocRenderEngine, RenderEngine } from '@searsuite/sear-render-engine';
 import {
-  SelectionPlugin,
-  DocHistoryStatusObservation,
-  HistoryPlugin,
-  DocSelectionObservation,
-  DocSelectionSessionStateDefinition,
-  SetDocFontFamilyCommand,
-  SetDocFontSizeCommand,
-  SetDocTextColorCommand,
-  SetDocBoldCommand,
-  ToggleDocBoldCommand,
-  SetDocItalicCommand,
-  ToggleDocItalicCommand,
-  SetDocUnderlineCommand,
-  ToggleDocUnderlineCommand,
-  SetDocStrikethroughCommand,
-  ToggleDocStrikethroughCommand,
-  SetDocLineSpacingCommand,
-  SetDocParagraphSpacingAfterCommand,
-  InsertDocTableCommand,
-  RedoDocCommand,
-  UndoDocCommand,
-} from '@searsuite/sear-assembly-doc';
-import { DocContentViewKey, DocCaretViewKey } from '@searsuite/sear-assembly-setup';
+  EventEngine,
+  EventRegistrar,
+  HeadlessEventRegistrar,
+  type EventWithOffset,
+} from '@searsuite/sear-render-event-engine';
+import {
+  HeadlessKeyboardRouter,
+  HeadlessPointerCapture,
+  HeadlessTextInput,
+  type KeyboardRouterHandlers,
+} from '@searsuite/sear-render-input';
+import {
+  SceneGraph,
+  Tree,
+  ViewportOverlayNode,
+  type Node,
+  type NodeProperties,
+  type RichTextRenderNodeProperties,
+} from '@searsuite/sear-render-node';
+import { ScrollManager, Scroller, type ScrollManagerState, type ScrollPublisher } from '@searsuite/sear-render-scroll';
+import { HitRenderStrategy, IncrementalRenderDecisionReason } from '@searsuite/sear-render-strategy';
+import { createDocEditor } from '../src/doc/createDocEditor';
+import { DocContentView, DocDebugOverlayView } from '../src/doc/DefaultDocViews';
+import { DocCaretState } from '../src/doc/DocCaretState';
+import { DocInputAdapterLifecycle } from '../src/doc/DocInputAdapterLifecycle';
+import { type DocInteractionRuntime } from '../src/doc/DocInteractionRuntime';
+import { DocRenderCoordinator } from '../src/doc/DocRenderCoordinator';
+import { DocViewRuntimeCapability } from '../src/doc/DocViewCapabilities';
+import {
+  DocView,
+  DocViewCapability,
+  type DocViewRuntimeContext,
+  type DocViewSetupContext,
+} from '../src/doc/DocViewContracts';
+import { DocViewportEnvironment } from '../src/doc/DocViewportEnvironment';
 
+import {
+  CaptureDocSessionStateCommand,
+  DocDocumentObservation,
+  DocInlineStyleObservation,
+  ExportDocStateCommand,
+  UpdateDocDefaultConfigCommand,
+  type DocInlineStyleState,
+} from '@searsuite/sear-assembly-doc-kernel';
+import { DocRenderLayoutService } from '../src/doc/DocRenderLayoutService';
 import {
   ApplyDocViewportScrollCommand,
   DocViewportObservation,
@@ -115,13 +136,7 @@ import {
   ResizeDocViewportCommand,
   ScrollDocViewportToCommand,
 } from '../src/doc/DocViewportCommands';
-import { DocRenderLayoutService } from '../src/doc/DocRenderLayoutService';
 import { DocVirtualLayoutStore } from '../src/doc/DocVirtualLayoutStore';
-import { DocDocumentObservation } from '../src/doc/DocStateObservations';
-import { DocInlineStyleObservation, type DocInlineStyleState } from '../src/doc/DocInlineStyleObservations';
-import { CaptureDocSessionStateCommand } from '../src/doc/DocSessionStateCommands';
-import { ExportDocStateCommand } from '../src/doc/DocStateSnapshotCommands';
-import { UpdateDocDefaultConfigCommand } from '../src/doc/DocConfigCommands';
 
 let container = new Container();
 
@@ -335,6 +350,7 @@ function noopViewportOverlayDraw(): void {}
 
 function createDefaultDocAdapters(registerEnvironment?: (editorContainer: Container) => void) {
   return {
+    eventRegistrar: HeadlessEventRegistrar,
     platform: HeadlessPlatform,
     createRenderContext() {
       return new MeasuredHeadlessRenderContext();
@@ -364,6 +380,7 @@ function createRecordingDocEditor(input: {
       ? { incrementalRenderPolicyLimits: input.incrementalRenderPolicyLimits }
       : {}),
     adapters: {
+      eventRegistrar: HeadlessEventRegistrar,
       platform: HeadlessPlatform,
       createRenderContext() {
         return renderContext;
@@ -460,6 +477,7 @@ describe('createDocEditor', () => {
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha', 'Beta') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new HeadlessRenderContext();
@@ -647,6 +665,7 @@ describe('createDocEditor', () => {
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new HeadlessRenderContext();
@@ -687,6 +706,7 @@ describe('createDocEditor', () => {
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: ResizableDocPlatform,
         scroller: PublishingDocScroller,
         createRenderContext() {
@@ -758,6 +778,7 @@ describe('createDocEditor', () => {
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new MeasuredHeadlessRenderContext();
@@ -791,6 +812,7 @@ describe('createDocEditor', () => {
       fontSize: 13,
       fontFamily: 'Test Sans',
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return renderContext;
@@ -832,6 +854,7 @@ describe('createDocEditor', () => {
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new HeadlessRenderContext();
@@ -917,6 +940,7 @@ describe('createDocEditor', () => {
       viewport: { width: 240, height: 90 },
       documentState: { document: createRichDocument(...paragraphs) },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new RecordingDocRenderContext();
@@ -959,6 +983,7 @@ describe('createDocEditor', () => {
       viewport: { width: 240, height: 90 },
       documentState: { document: createRichDocument(...paragraphs) },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return visibleContext;
@@ -993,6 +1018,7 @@ describe('createDocEditor', () => {
       viewport: { width: 20, height: 60 },
       documentState: { document: createRichDocument(...paragraphs) },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new MeasuredHeadlessRenderContext();
@@ -1029,6 +1055,7 @@ describe('createDocEditor', () => {
       viewport: { width: 240, height: 90 },
       documentState: { document: createRichDocument(...paragraphs) },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return visibleContext;
@@ -1088,6 +1115,7 @@ describe('createDocEditor', () => {
       viewport: { width: 10, height: 120 },
       documentState: { document: createRichDocument('abc', 'second', 'third') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return visibleContext;
@@ -1128,6 +1156,7 @@ describe('createDocEditor', () => {
         document: createRichDocument(...Array.from({ length: 80 }, (_, index) => `Paragraph ${index}`)),
       },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new MeasuredHeadlessRenderContext();
@@ -1159,6 +1188,7 @@ describe('createDocEditor', () => {
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new MeasuredHeadlessRenderContext();
@@ -1211,6 +1241,7 @@ describe('createDocEditor', () => {
         ],
       },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new HeadlessRenderContext();
@@ -1274,6 +1305,7 @@ describe('createDocEditor', () => {
         ],
       },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return renderContext;
@@ -1413,6 +1445,7 @@ describe('createDocEditor', () => {
       viewport: { width: 10, height: 120 },
       documentState: { document: createRichDocument('abc', 'second', 'third') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new MeasuredHeadlessRenderContext();
@@ -1565,6 +1598,7 @@ describe('createDocEditor', () => {
       viewport: { width: 320, height: 120 },
       documentState: { document: createRichDocument('first', 'second') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return renderContext;
@@ -1627,6 +1661,7 @@ describe('createDocEditor', () => {
         ),
       },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return renderContext;
@@ -1762,6 +1797,7 @@ describe('createDocEditor', () => {
       viewport: { width: 20, height: 24 },
       documentState: { document: createRichDocument('abcdefghijklmnopqrstuvwxyz', 'second wrapped paragraph') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new MeasuredHeadlessRenderContext();
@@ -1810,6 +1846,7 @@ describe('createDocEditor', () => {
       viewport: { width: 20, height: 24 },
       documentState: { document: createRichDocument('abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new MeasuredHeadlessRenderContext();
@@ -1843,6 +1880,7 @@ describe('createDocEditor', () => {
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha', 'Beta') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return visibleContext;
@@ -1883,6 +1921,7 @@ describe('createDocEditor', () => {
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha', 'Beta') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return visibleContext;
@@ -1926,6 +1965,7 @@ describe('createDocEditor', () => {
         document: createRichDocument(...Array.from({ length: 20 }, (_, index) => `Paragraph ${index}`)),
       },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return visibleContext;
@@ -2016,6 +2056,7 @@ describe('createDocEditor', () => {
       documentState: { document: createRichDocument('Alpha') },
       viewExtensions: [RenderNodeView],
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new MeasuredHeadlessRenderContext();
@@ -2089,6 +2130,7 @@ describe('createDocEditor', () => {
         documentState: { document: createRichDocument('Alpha') },
         plugins: [FirstCommandPlugin, DuplicateCommandPlugin],
         adapters: {
+          eventRegistrar: HeadlessEventRegistrar,
           platform: HeadlessPlatform,
           createRenderContext() {
             return new MeasuredHeadlessRenderContext();
@@ -2117,6 +2159,7 @@ describe('createDocEditor', () => {
       viewExtensions: [DocContentView, DocDebugOverlayView],
       defaultViews: false,
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new MeasuredHeadlessRenderContext();
@@ -2237,6 +2280,7 @@ describe('createDocEditor', () => {
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return renderContext;
@@ -2333,6 +2377,7 @@ describe('createDocEditor', () => {
       defaultPlugins: false,
       documentState: { document: createRichDocument('Alpha') },
       adapters: {
+        eventRegistrar: HeadlessEventRegistrar,
         platform: HeadlessPlatform,
         createRenderContext() {
           return new MeasuredHeadlessRenderContext();
@@ -2718,27 +2763,16 @@ describe('createDocEditor', () => {
         core = context.container.resolve<SearCoreDoc>(SearCoreDoc.symbol);
       }
     }
-    const bypassCommand = defineDocCommand<void>('test.loadDocSnapshotBypass');
     const editor = createDocEditor({
       viewport: { width: 320, height: 180 },
       documentState: { document: createRichDocument('Alpha') },
       viewExtensions: [RetainedCoreView],
       adapters: createDefaultDocAdapters(),
-      onCreated: ({ commands }) =>
-        commands.register(bypassCommand, () => ({
-          id: bypassCommand.id,
-          execute: () => {
-            const pipeline = new Pipeline(bypassCommand.id);
-            pipeline.addLocalAction(bypassCommand.id, () => {
-              core!.loadSnapshot(createRichDocument('Bypass'));
-            });
-            return { pipeline };
-          },
-        })),
     });
     try {
-      const before = core!.exportSnapshot();
-      expect(() => core!.loadSnapshot(createRichDocument('Bypass'))).toThrow('RichDocOT command transaction');
+      const before = editor.getDocument();
+      expect('loadSnapshot' in core!).toBe(false);
+      expect('exportSnapshot' in core!).toBe(false);
       expect(() => core!.requestDocRender(DocCaretViewKey)).toThrow('editor.commands.run');
       expect(() => core!.setDocRenderLayoutState(null)).toThrow('editor.commands.run');
       expect(() => core!.destroy()).toThrow('editor owner');
@@ -2767,11 +2801,10 @@ describe('createDocEditor', () => {
       expect(() => {
         (retainedLayout!.visibleBlocks as unknown[]).push({});
       }).toThrow();
-      expect(() => editor.commands.run(bypassCommand, void 0)).toThrow('RichDocOT command transaction');
-      expect(core!.exportSnapshot()).toEqual(before);
+      expect(editor.getDocument()).toEqual(before);
       const materialized = core!.materializeSnapshot(createRichDocument('Detached'));
-      expect(core!.exportSnapshot(materialized)).toEqual(createRichDocument('Detached'));
-      expect(core!.exportSnapshot()).toEqual(before);
+      expect(JSON.parse(JSON.stringify(materialized))).toEqual(createRichDocument('Detached'));
+      expect(editor.getDocument()).toEqual(before);
       expect(editor.getText()).toBe('Alpha');
     } finally {
       editor.destroy();

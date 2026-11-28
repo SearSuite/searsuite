@@ -1,7 +1,7 @@
-import './testSetup';
 import { FixBoxNode, type Node, type NodeProperties } from '@searsuite/sear-render-node';
 import { HitRenderStrategy } from '../src/HitRenderStrategy';
 import { createDirtyTracker, createRenderContext, createScrollManager, createTree } from './testFactories';
+import './testSetup';
 
 class TestHitRenderStrategy extends HitRenderStrategy<NodeProperties> {
   setScrollState(x: number | undefined, y: number | undefined): void {
@@ -47,7 +47,6 @@ describe('HitRenderStrategy', () => {
       createRenderContext(),
       hitRenderContext,
       createScrollManager(100, 80),
-      {},
       {},
       {},
       createTree(1000, 800),

@@ -33,3 +33,16 @@ test('terminates traversal when a malformed dependency graph contains a cycle', 
     [],
   );
 });
+test('rejects rendering reached through the independent document kernel', () => {
+  const doc = '@searsuite/sear-assembly-doc-kernel';
+  const render = '@searsuite/sear-render-metrics';
+  assert.deepEqual(
+    findKernelPresentationPaths(
+      new Map([
+        [doc, ['document-feature']],
+        ['document-feature', [render]],
+      ]),
+    ),
+    [[doc, 'document-feature', render]],
+  );
+});

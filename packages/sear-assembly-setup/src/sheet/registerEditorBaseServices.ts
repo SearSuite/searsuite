@@ -1,18 +1,26 @@
-import { registerSheetBaseServices } from '@searsuite/sear-assembly-sheet-kernel';
-import { ConfigEngine, type EditorDefaultConfigOverrides, type SheetConfig } from '@searsuite/sear-assembly-config';
+import { ConfigEngine } from '@searsuite/sear-assembly-config';
+import { DataEngine } from '@searsuite/sear-domain-state';
 
 import { SheetLifecycleCoordinator, SheetViewportResizeController } from '@searsuite/sear-assembly-core';
 
-import { type Container, Scope } from '@searsuite/sear-foundation-di';
+import { Scope, type Container } from '@searsuite/sear-foundation-di';
 
 import { PositionRect } from '@searsuite/sear-foundation-rect';
 import { DataStorage, MapDataStorageFactory } from '@searsuite/sear-foundation-storage';
 
-import { Container as RenderContainer, DirtyTree, FrameDirtyTracker, HitColorRegistry, QuadTreeFactory, SceneGraph, Tree, type RenderNodeKey } from '@searsuite/sear-render-node';
+import {
+  DirtyTree,
+  FrameDirtyTracker,
+  HitColorRegistry,
+  QuadTreeFactory,
+  Container as RenderContainer,
+  SceneGraph,
+  Tree,
+  type RenderNodeKey,
+} from '@searsuite/sear-render-node';
 
 import { SheetDataEngine } from '@searsuite/sear-domain-sheet';
 import { type CellProperties } from '@searsuite/sear-render-registry';
-import { type SheetEditorAdapters } from './SheetEditorContracts';
 
 /** Base service instances created before runtime adapters and plugins are wired. */
 export interface EditorBaseServices {
@@ -33,14 +41,10 @@ export interface EditorBaseServices {
  */
 export function registerEditorBaseServices(
   container: Container,
-  adapters: Pick<
-    SheetEditorAdapters,
-    'platform' | 'xmlDocumentParser' | 'xmlXPathEngine' | 'xmlXPathEvaluator' | 'webServiceClient'
-  >,
   viewport: { width: number; height: number },
-  defaultConfigOverrides: EditorDefaultConfigOverrides<SheetConfig> = {},
 ): EditorBaseServices {
-  const { configEngine, dataEngine } = registerSheetBaseServices(container, adapters, defaultConfigOverrides);
+  const configEngine = container.resolve<ConfigEngine>(ConfigEngine.symbol);
+  const dataEngine = container.resolve<SheetDataEngine>(DataEngine.symbol);
   container.registerFactory(
     Tree.symbol,
     () => new QuadTreeFactory().create(new PositionRect(0, 0, viewport.width, viewport.height), 16),

@@ -1,12 +1,12 @@
 import { SearError } from '@searsuite/sear-foundation-error';
-import type { SheetRenderSession } from '@searsuite/sear-sheet-editor-contract';
+import { createFontDescriptor } from '@searsuite/sear-render-metrics';
 import type {
   SheetEmbeddedEditorContext,
   SheetPointerHit,
   SheetPointerInput,
+  SheetRenderSession,
   SheetRenderUpdate,
 } from '@searsuite/sear-sheet-editor-contract';
-import { createFontDescriptor } from '@searsuite/sear-render-metrics';
 import { toDocSelection } from './DocumentBoundary';
 import { lockSheetDocumentSnapshot } from './DocumentSnapshotBoundary';
 import { SearCoreEditorRuntime } from './SearCoreEditorRuntime';
@@ -70,7 +70,7 @@ export class SearCoreRenderSession implements SheetRenderSession {
       this.#context.renderContext,
       createContextFont(this.#context, this.#runtime),
     );
-    const position = this.#runtime.core.resolveCursorFromPoint(point.x, point.y, prepared.snapshot);
+    const position = this.#runtime.layout.resolveCursorFromPoint(point.x, point.y, prepared.snapshot);
     return {
       target: hasText(this.#document) ? 'text' : 'empty',
       position: { path: position.path, offset: position.offset },

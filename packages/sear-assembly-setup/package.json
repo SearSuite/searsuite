@@ -1,6 +1,6 @@
 {
   "name": "@searsuite/sear-assembly-setup",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [
@@ -26,7 +26,9 @@
     "@searsuite/sear-assembly-config": "workspace:*",
     "@searsuite/sear-assembly-core": "workspace:*",
     "@searsuite/sear-assembly-doc": "workspace:*",
+    "@searsuite/sear-assembly-doc-kernel": "workspace:*",
     "@searsuite/sear-assembly-plugin": "workspace:*",
+    "@searsuite/sear-assembly-sheet-doc": "workspace:*",
     "@searsuite/sear-assembly-sheet-kernel": "workspace:*",
     "@searsuite/sear-assembly-sheet-state": "workspace:*",
     "@searsuite/sear-domain-cell": "workspace:*",
@@ -35,7 +37,6 @@
     "@searsuite/sear-domain-doc": "workspace:*",
     "@searsuite/sear-domain-editor": "workspace:*",
     "@searsuite/sear-domain-formula-engine": "workspace:*",
-    "@searsuite/sear-domain-formula-engine-ts": "workspace:*",
     "@searsuite/sear-domain-matrix": "workspace:*",
     "@searsuite/sear-domain-sheet": "workspace:*",
     "@searsuite/sear-domain-state": "workspace:*",

@@ -1,7 +1,7 @@
 import { defineStateObservation, type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 
-import { type DocEditorChange } from './DocEditorContracts';
 import { type DocDocumentSessionCoordinator } from './DocDocumentSessionCoordinator';
+import { type DocEditorChange } from './DocKernelContracts';
 
 /** Committed document content exposed as an editor-local typed state observation. */
 export const DocDocumentObservation = defineStateObservation<DocEditorChange>('doc.document');

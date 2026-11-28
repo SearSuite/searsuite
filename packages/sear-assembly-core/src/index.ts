@@ -29,29 +29,27 @@
  * contributes ordered work to the state runtime.
  */
 
-export { SearCoreSheet } from './SearCoreSheet';
+export { DocRenderEngine, type DocRenderViewport } from '@searsuite/sear-render-engine';
+export { DocCompositionManager, type DocCompositionLayout, type DocCompositionProvider } from './DocCompositionManager';
+export { DocCursorManager, type CursorRenderInfo, type SelectionRect } from './DocCursorManager';
+export { DocImmediateRenderPainter, type DocImmediateRenderPainterContentInput } from './DocImmediateRenderPainter';
+export {
+  collectDocReflowBlockIds,
+  collectDocRenderOperations,
+  collectDocRepaintBlockIds,
+  type DocRenderDirtyBlockIds,
+  type DocRenderOperation,
+  type DocRenderOperations,
+} from './DocRenderDirtyBlocks';
+export { NoopDocCompositionProvider } from './NoopDocCompositionProvider';
 export {
   SearCoreDoc,
-  type DocEditorRenderLayoutInput,
-  type DocPreparedEditorRenderLayout,
   type DocRenderLayoutState,
   type DocRenderRequest,
   type DocRenderRequestHandler,
   type SearCoreDocRuntimeLayers,
 } from './SearCoreDoc';
-export {
-  collectDocReflowBlockIds,
-  collectDocRepaintBlockIds,
-  collectDocRenderOperations,
-  type DocRenderDirtyBlockIds,
-  type DocRenderOperation,
-  type DocRenderOperations,
-} from './DocRenderDirtyBlocks';
-export { DocCursorManager, type CursorRenderInfo, type SelectionRect } from './DocCursorManager';
-export { DocCompositionManager, type DocCompositionLayout, type DocCompositionProvider } from './DocCompositionManager';
-export { NoopDocCompositionProvider } from './NoopDocCompositionProvider';
-export { DocImmediateRenderPainter, type DocImmediateRenderPainterContentInput } from './DocImmediateRenderPainter';
-export { DocRenderEngine, type DocRenderViewport } from '@searsuite/sear-render-engine';
+export { SearCoreSheet } from './SearCoreSheet';
 
 export { ConsolePipelineLogger } from './ConsolePipelineLogger';
 
@@ -61,3 +59,9 @@ export { SheetViewportResizeController } from './SheetViewportResizeController';
 export { type SheetLifecycleContext, type SheetLifecycleController } from './SheetLifecycleController';
 
 export { DocRenderOperationType } from './DocRenderDirtyBlocks';
+
+export {
+  DocEditorLayout,
+  type DocEditorRenderLayoutInput,
+  type DocPreparedEditorRenderLayout,
+} from './DocEditorLayout';

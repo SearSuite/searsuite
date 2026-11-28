@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-plugin-history",
   "description": "Provides commit-driven undo and redo for Sheet and Doc editors.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

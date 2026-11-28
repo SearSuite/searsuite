@@ -1,28 +1,48 @@
-import { registerSheetRuntimeServices } from '@searsuite/sear-assembly-sheet-kernel';
 import { bindSheetFormulaPriority } from './bindSheetFormulaPriority';
 
 import { ViewExtensionRegistry } from '@searsuite/sear-render-event-engine';
 
-import { type SearCoreSheet } from '@searsuite/sear-assembly-core';
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
+import { type SearCoreSheet } from '@searsuite/sear-assembly-core';
 
-import { type Container, Scope } from '@searsuite/sear-foundation-di';
+import { Scope, type Container } from '@searsuite/sear-foundation-di';
 
-import { type CellProperties, NodeFactory, RenderCoordinatorManager, RendererRegistry, SheetCellVisualReaderRegistry, SheetNodeFactory, SheetRenderCoordinatorManager, SheetRendererRegistry } from '@searsuite/sear-render-registry';
 import { CoordinateTransformer, RenderContext } from '@searsuite/sear-render-context';
 import { CoordinateEngine } from '@searsuite/sear-render-coord';
-import { EventEngine, EventRegistrar } from '@searsuite/sear-render-event-engine';
 import { SheetRenderEngine } from '@searsuite/sear-render-engine';
+import { EventEngine, EventRegistrar } from '@searsuite/sear-render-event-engine';
+import {
+  NodeFactory,
+  RenderCoordinatorManager,
+  RendererRegistry,
+  SheetCellVisualReaderRegistry,
+  SheetNodeFactory,
+  SheetRenderCoordinatorManager,
+  SheetRendererRegistry,
+  type CellProperties,
+} from '@searsuite/sear-render-registry';
 
+import { PluginManager, SearFormulaBar, SearToolbar } from '@searsuite/sear-assembly-plugin';
 import { RenderContextTextShaper, TextShaper } from '@searsuite/sear-render-metrics';
 import { ScrollManager, Scroller, type ScrollPublisher } from '@searsuite/sear-render-scroll';
-import { DirtyRenderStrategy, EventRenderStrategy, HitRenderStrategy, OverlayRenderStrategy, RasterCopyExecutor, RenderStrategyManager, ScreenRenderStrategy, StickyRenderStrategy } from '@searsuite/sear-render-strategy';
-import { PluginManager } from '@searsuite/sear-assembly-plugin';
-import { SearFormulaBar, SearToolbar } from '@searsuite/sear-assembly-plugin';
+import {
+  DirtyRenderStrategy,
+  EventRenderStrategy,
+  HitRenderStrategy,
+  OverlayRenderStrategy,
+  RasterCopyExecutor,
+  RenderStrategyManager,
+  ScreenRenderStrategy,
+  StickyRenderStrategy,
+} from '@searsuite/sear-render-strategy';
 
 import { type SheetEditorAdapters } from './SheetEditorContracts';
 
-import { SheetEmbeddedEditor, type SheetDocument, type SheetEmbeddedEditorContext } from '@searsuite/sear-sheet-editor-contract';
+import {
+  SheetEmbeddedEditor,
+  type SheetDocument,
+  type SheetEmbeddedEditorContext,
+} from '@searsuite/sear-sheet-editor-contract';
 
 /** Runtime services assembled after base services and host adapters are available. */
 export interface EditorRuntime {
@@ -58,7 +78,7 @@ export function registerEditorRuntime(
   viewport: { width: number; height: number },
   devicePixelRatio: number,
 ): EditorRuntime {
-  const { pluginManager } = registerSheetRuntimeServices(container, adapters);
+  const pluginManager = container.resolve<PluginManager>(PluginManager.symbol);
   const { renderContext, offScreenRenderContext, hitRenderContext } = adapters.createRenderContexts();
   renderContext.initialize(devicePixelRatio);
   offScreenRenderContext.initialize(devicePixelRatio);
@@ -102,7 +122,7 @@ export function registerEditorRuntime(
   container.register(EventRenderStrategy.symbol, EventRenderStrategy, Scope.Singleton);
   container.register(HitRenderStrategy.symbol, HitRenderStrategy, Scope.Singleton);
   container.register(EventRegistrar.symbol, adapters.eventRegistrar, Scope.Singleton);
-  container.register(SearToolbar.symbol, adapters.toolbar, Scope.Singleton);
+  if (adapters.toolbar) container.register(SearToolbar.symbol, adapters.toolbar, Scope.Singleton);
   if (adapters.formulaBar) container.register(SearFormulaBar.symbol, adapters.formulaBar, Scope.Singleton);
   container.register(EventEngine.symbol, EventEngine, Scope.Singleton);
   container.registerInstance(ViewExtensionRegistry.symbol, new ViewExtensionRegistry<SearCoreSheet, CellProperties>());

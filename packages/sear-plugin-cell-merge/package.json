@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-plugin-cell-merge",
   "description": "Adds merged-range state, structural transforms, commands, rendering, and persistence.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

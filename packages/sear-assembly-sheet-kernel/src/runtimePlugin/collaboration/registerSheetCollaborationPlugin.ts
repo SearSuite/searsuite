@@ -1,4 +1,3 @@
-import { SheetOwnerLifecycle } from '../../SheetOwnerLifecycle';
 import { type PluginManager } from '@searsuite/sear-assembly-plugin';
 import { type Container, Scope } from '@searsuite/sear-foundation-di';
 import { Platform } from '@searsuite/sear-foundation-platform';
@@ -8,6 +7,7 @@ import {
   CollaborationChannelBinding,
   SheetCollaborationPlugin,
 } from '@searsuite/sear-plugin-collab';
+import { SheetOwnerLifecycle } from '../../SheetOwnerLifecycle';
 
 import { type SheetRuntimeAdapters } from '../../SheetKernelContracts';
 
@@ -17,7 +17,8 @@ export function registerSheetCollaborationPlugin(
   manager: PluginManager,
   adapters: SheetRuntimeAdapters,
 ): void {
-  container.register(CollabTransport.symbol, adapters.collabTransport, Scope.Singleton);
+  if (!adapters.collabTransport && !container.hasBinding(CollaborationChannelBinding.symbol)) return;
+  if (adapters.collabTransport) container.register(CollabTransport.symbol, adapters.collabTransport, Scope.Singleton);
   if (!container.hasBinding(CollaborationChannelBinding.symbol)) {
     container.registerInstance(CollaborationChannelBinding.symbol, {
       channel: new CollaborationChannel(

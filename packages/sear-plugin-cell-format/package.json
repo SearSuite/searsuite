@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-plugin-cell-format",
   "description": "Adds cell number formats, commands, display projections, and persistence.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

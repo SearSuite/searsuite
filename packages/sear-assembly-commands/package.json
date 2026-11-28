@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-assembly-commands",
   "description": "Runs Sheet and Doc commands and builds the transactions they commit.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

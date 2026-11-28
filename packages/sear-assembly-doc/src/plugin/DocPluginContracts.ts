@@ -1,5 +1,5 @@
+import { DocCommandBus, DocQueryRegistry } from '@searsuite/sear-assembly-commands';
 import { DocInputPlugin } from '../input/DocInputPlugin';
-import { DocCommandBus } from '@searsuite/sear-assembly-commands';
 
 import {
   hasPluginCommandRegistrar,
@@ -13,12 +13,12 @@ import {
 } from '@searsuite/sear-assembly-plugin';
 import {
   DocNodeRegistry,
+  RichTextBlockFlowRegistry,
   RichTextInlineStyleRegistry,
   RichTextLineBoxRegistry,
-  RichTextBlockFlowRegistry,
+  type RichTextBlockFlowContribution,
   type RichTextInlineStyleContribution,
   type RichTextLineBoxContribution,
-  type RichTextBlockFlowContribution,
 } from '@searsuite/sear-domain-doc';
 import { DocLayoutEngine } from '@searsuite/sear-domain-editor';
 import { type Container } from '@searsuite/sear-foundation-di';
@@ -31,6 +31,7 @@ export interface DocPluginRuntime {
   readonly extensions: DocRuntimeExtensionRegistry;
   readonly platform: Platform;
   readonly commands: DocCommandBus;
+  readonly queries: DocQueryRegistry;
   readonly observations: ObservationRegistry;
   readonly session: SessionStateRegistry;
   readonly plugins: PluginManager;
@@ -46,6 +47,7 @@ export interface DocPluginRuntime {
 export const DocRuntimeCapability = {
   Platform: defineDocRuntimeCapability<Platform>('doc.runtime.platform'),
   Commands: defineDocRuntimeCapability<DocCommandBus>('doc.runtime.commands'),
+  Queries: defineDocRuntimeCapability<DocQueryRegistry>('doc.runtime.queries'),
   Observations: defineDocRuntimeCapability<ObservationRegistry>('doc.runtime.observations'),
   Session: defineDocRuntimeCapability<SessionStateRegistry>('doc.runtime.session'),
   Plugins: defineDocRuntimeCapability<PluginManager>('doc.runtime.plugins'),
@@ -82,6 +84,9 @@ export abstract class DocPlugin<StateType>
 
   /** Registers every stable command id owned by this document plugin. */
   public registerCommands?(commands: DocCommandBus): void;
+
+  /** Registers typed, side-effect-free queries owned by this document plugin. */
+  public registerQueries?(queries: DocQueryRegistry): void;
 
   /** Registers typed state and event observations owned by this document plugin. */
   public registerObservations?(observations: ObservationRegistry): void;

@@ -1,7 +1,7 @@
 import { CSRMatrix } from '@searsuite/sear-domain-matrix';
 import { SearError } from '@searsuite/sear-foundation-error';
 import { Rect } from '@searsuite/sear-foundation-rect';
-import { lockCommittedPluginState } from './lockCommittedSheetState';
+import { lockCommittedPluginState } from './lockCommittedPluginState';
 
 const adoptedValues = new WeakSet<object>();
 

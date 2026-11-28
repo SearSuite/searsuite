@@ -1,19 +1,21 @@
-import { type NodeSchema } from '@searsuite/sear-domain-ot';
 import {
   DocNodeRegistry,
   isTextNode,
   segmentTextGraphemes,
-  type DocSelection,
   type DocCursorPos,
+  type DocSelection,
   type RichDocNode,
 } from '@searsuite/sear-domain-doc';
 import { type DocLayoutEngine, type LayoutSnapshot } from '@searsuite/sear-domain-editor';
+import { type NodeSchema } from '@searsuite/sear-domain-ot';
 import { DocTransaction } from './DocTransaction';
 
 /** Runtime state available while a rich-document command builds a transaction. */
 export interface DocCommandContext {
   /** Pending document tree used for reads before the transaction is committed. */
   pendingDoc: RichDocNode[];
+  /** Editor-local schema definitions used when creating new blocks and text. */
+  nodes?: DocNodeRegistry;
   /** Current document selection before the command applies. */
   docSelection: DocSelection;
   /** Preferred horizontal position used by repeated vertical cursor navigation. */
@@ -260,7 +262,9 @@ export function deleteBackwardCommand(): DocCommand {
       if (currentText.length > 0) {
         tr.insertText(prevPath, prevTextLen, currentText);
       }
-      tr.deleteNode([paraIdx], { type: DocNodeRegistry.requireDefaultBlockType() } as NodeSchema);
+      tr.deleteNode([paraIdx], {
+        type: state.nodes?.requireDefaultBlockType() ?? DocNodeRegistry.requireDefaultBlockType(),
+      } as NodeSchema);
 
       const newCursor: DocCursorPos = {
         path: prevPath,
@@ -306,9 +310,7 @@ export function splitParagraphCommand(): DocCommand {
       after = text.slice(head.offset);
     }
 
-    const nodesAfter: NodeSchema[] = para.content
-      .slice(textNodeIdx + 1)
-      .map((n) => JSON.parse(JSON.stringify(n)));
+    const nodesAfter: NodeSchema[] = para.content.slice(textNodeIdx + 1).map((n) => JSON.parse(JSON.stringify(n)));
 
     if (after.length > 0) {
       tr.deleteText(head.path, deleteAfterOffset, after);
@@ -319,11 +321,14 @@ export function splitParagraphCommand(): DocCommand {
     }
 
     const newParaContent: NodeSchema[] = [
-      { type: DocNodeRegistry.requireDefaultTextType(), text: after } as NodeSchema,
+      {
+        type: state.nodes?.requireDefaultTextType() ?? DocNodeRegistry.requireDefaultTextType(),
+        text: after,
+      } as NodeSchema,
       ...nodesAfter,
     ];
     tr.insertNode([paraIdx + 1], {
-      type: DocNodeRegistry.requireDefaultBlockType(),
+      type: state.nodes?.requireDefaultBlockType() ?? DocNodeRegistry.requireDefaultBlockType(),
       content: newParaContent,
     });
 
@@ -402,8 +407,9 @@ function computeArrowMove(
 
   if (direction === DocCursorDirection.Left) {
     if (head.offset > 0) {
-      const range = segmentTextGraphemes(resolveTextContent(doc, head.path))
-        .find(({ start, end }) => start < head.offset && head.offset <= end);
+      const range = segmentTextGraphemes(resolveTextContent(doc, head.path)).find(
+        ({ start, end }) => start < head.offset && head.offset <= end,
+      );
       return { path: head.path, offset: range?.start ?? head.offset - 1 };
     } else if (head.path[0] > 0) {
       const previousPath = getPreviousTextPath(doc, head.path);
@@ -415,8 +421,9 @@ function computeArrowMove(
   if (direction === DocCursorDirection.Right) {
     const textLen = getTextNodeLength(doc, head.path);
     if (head.offset < textLen) {
-      const range = segmentTextGraphemes(resolveTextContent(doc, head.path))
-        .find(({ start, end }) => start <= head.offset && head.offset < end);
+      const range = segmentTextGraphemes(resolveTextContent(doc, head.path)).find(
+        ({ start, end }) => start <= head.offset && head.offset < end,
+      );
       return { path: head.path, offset: range?.end ?? head.offset + 1 };
     } else {
       const nextPath = getNextTextPath(doc, head.path);

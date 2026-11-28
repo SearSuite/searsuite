@@ -1,5 +1,10 @@
 import { Injectable } from '@searsuite/sear-foundation-di';
 import { SearError } from '@searsuite/sear-foundation-error';
+import { ParagraphNode } from './ParagraphNode';
+import { TableCellNode } from './TableCellNode';
+import { TableNode } from './TableNode';
+import { TableRowNode } from './TableRowNode';
+import { TextNode } from './TextNode';
 
 import { type RichDocNode } from './RichDocNode';
 import { type Schema } from './RichDocSchema';
@@ -27,118 +32,87 @@ export interface DocNodeDefinition {
   readonly defaultText?: boolean;
 }
 
-const creators: Record<string, (schema: Schema) => RichDocNode> = {
-  paragraph: createDefaultDocNode,
-  text: createDefaultDocNode,
-};
-const roles = new Map<string, DocNodeRole>([
-  ['paragraph', DocNodeRole.Block],
-  ['text', DocNodeRole.Text],
-]);
-let defaultBlockType: string | null = 'paragraph';
-let defaultTextType: string | null = 'text';
-
-/** Registry that maps persisted rich-document node types to constructors. */
+/** Editor-local node definitions; static helpers only materialize built-in schemas. */
 @Injectable()
 export class DocNodeRegistry {
-  /** DI token for resolving the document node registry. */
   public static readonly symbol = Symbol.for('DocNodeRegistry');
-  /** Registers a node factory for a persisted node type. */
-  static register(type: string, creator: (schema: Schema) => RichDocNode): void;
-  /** Registers a complete node definition for a persisted node type. */
-  static register(definition: DocNodeDefinition): void;
-  static register(
-    typeOrDefinition: string | DocNodeDefinition,
-    creator?: (schema: Schema) => RichDocNode,
-  ): void {
-    if (typeof typeOrDefinition === 'string' && !creator) {
-      throw new SearError(`Missing creator for document node type: ${typeOrDefinition}`);
-    }
-    const definition: DocNodeDefinition =
-      typeof typeOrDefinition === 'string'
-        ? createLegacyDefinition(typeOrDefinition, creator)
-        : typeOrDefinition;
-    creators[definition.type] = definition.create;
-    if (definition.role) roles.set(definition.type, definition.role);
-    if (definition.defaultBlock) defaultBlockType = definition.type;
-    if (definition.defaultText) defaultTextType = definition.type;
+  readonly #creators = new Map<string, (schema: Schema) => RichDocNode>([
+    ['paragraph', (schema) => new ParagraphNode(schema)],
+    ['text', (schema) => new TextNode(schema)],
+    ['table', (schema) => new TableNode(schema)],
+    ['tableRow', (schema) => new TableRowNode(schema)],
+    ['tableCell', (schema) => new TableCellNode(schema)],
+  ]);
+  readonly #roles = new Map<string, DocNodeRole>([
+    ['paragraph', DocNodeRole.Block],
+    ['text', DocNodeRole.Text],
+    ['table', DocNodeRole.Block],
+  ]);
+  #assertWrite: (() => void) | undefined;
+  #defaultBlockType = 'paragraph';
+  #defaultTextType = 'text';
+
+  /** Reserves runtime registration changes for the owning editor's commands. */
+  public enforceWriteBoundary(assertWrite: () => void): void {
+    if (this.#assertWrite) throw new SearError('Doc node registry boundary is already installed.');
+    this.#assertWrite = assertWrite;
+    Object.freeze(this);
   }
 
-  /** Creates a rich-document node from persisted schema. */
-  static create(schema: Schema): RichDocNode {
-    const creator = creators[schema.type];
+  /** Installs a definition for this editor without changing other registries. */
+  public register(definition: DocNodeDefinition): void {
+    this.#assertWrite?.();
+    this.#creators.set(definition.type, definition.create);
+    if (definition.role) this.#roles.set(definition.type, definition.role);
+    else this.#roles.delete(definition.type);
+    if (definition.defaultBlock) this.#defaultBlockType = definition.type;
+    if (definition.defaultText) this.#defaultTextType = definition.type;
+  }
+
+  /** Materializes the complete tree through this registry, including nested custom nodes. */
+  public create(schema: Schema): RichDocNode {
+    const creator = this.#creators.get(schema.type);
     if (!creator) throw new SearError(`Unknown node type: ${schema.type}`);
-    return creator(schema);
+    const node = creator({ ...schema, content: [] });
+    node.content = (schema.content ?? []).map((child) => this.create(child));
+    return node;
+  }
+  public isTextType(type: string): boolean {
+    return this.#roles.get(type) === DocNodeRole.Text;
+  }
+  public isBlockType(type: string): boolean {
+    return this.#roles.get(type) === DocNodeRole.Block;
+  }
+  public requireDefaultBlockType(): string {
+    return this.#defaultBlockType;
+  }
+  public requireDefaultTextType(): string {
+    return this.#defaultTextType;
   }
 
-  /** Instance method: delegates to the static registry; used by DI-injected consumers. */
-  create(schema: Schema): RichDocNode {
-    return DocNodeRegistry.create(schema);
+  /** Creates built-in values without reading or mutating any editor's registrations. */
+  public static create(schema: Schema): RichDocNode {
+    if (!['paragraph', 'text', 'table', 'tableRow', 'tableCell'].includes(schema.type))
+      throw new SearError(`Unknown node type: ${schema.type}`);
+    const node = {
+      id: schema.id,
+      type: schema.type,
+      attrs: schema.attrs ?? {},
+      content: (schema.content ?? []).map((child) => DocNodeRegistry.create(child)),
+      ...('text' in schema ? { text: schema.text } : {}),
+    };
+    return node as RichDocNode;
   }
-
-  /** Registers a node factory on this registry instance. */
-  register(definition: DocNodeDefinition): void {
-    DocNodeRegistry.register(definition);
+  public static isTextType(type: string): boolean {
+    return type === 'text';
   }
-
-  /** Returns whether the persisted type has been registered as text-like. */
-  static isTextType(type: string): boolean {
-    return roles.get(type) === DocNodeRole.Text;
+  public static isBlockType(type: string): boolean {
+    return type === 'paragraph' || type === 'table';
   }
-
-  /** Returns whether the persisted type has been registered as a block container. */
-  static isBlockType(type: string): boolean {
-    return roles.get(type) === DocNodeRole.Block;
+  public static requireDefaultBlockType(): string {
+    return 'paragraph';
   }
-
-  /** Returns the registered default block type for generic text editing. */
-  static requireDefaultBlockType(): string {
-    if (!defaultBlockType) throw new SearError('No default document block node type has been registered.');
-    return defaultBlockType;
+  public static requireDefaultTextType(): string {
+    return 'text';
   }
-
-  /** Returns the registered default text type for generic text editing. */
-  static requireDefaultTextType(): string {
-    if (!defaultTextType) throw new SearError('No default document text node type has been registered.');
-    return defaultTextType;
-  }
-
-  /** Instance method: returns whether the persisted type has been registered as text-like. */
-  isTextType(type: string): boolean {
-    return DocNodeRegistry.isTextType(type);
-  }
-
-  /** Instance method: returns whether the persisted type has been registered as a block container. */
-  isBlockType(type: string): boolean {
-    return DocNodeRegistry.isBlockType(type);
-  }
-
-  /** Instance method: returns the registered default block type for generic text editing. */
-  requireDefaultBlockType(): string {
-    return DocNodeRegistry.requireDefaultBlockType();
-  }
-
-  /** Instance method: returns the registered default text type for generic text editing. */
-  requireDefaultTextType(): string {
-    return DocNodeRegistry.requireDefaultTextType();
-  }
-}
-
-function createLegacyDefinition(
-  type: string,
-  creator: ((schema: Schema) => RichDocNode) | undefined,
-): DocNodeDefinition {
-  if (!creator) throw new SearError(`Missing creator for document node type: ${type}`);
-  return { type, create: creator };
-}
-
-function createDefaultDocNode(schema: Schema): RichDocNode {
-  const node = {
-    id: schema.id,
-    type: schema.type,
-    attrs: schema.attrs || {},
-    content: (schema.content || []).map((child) => DocNodeRegistry.create(child)),
-  } as RichDocNode & { text?: string };
-  if ('text' in schema) node.text = schema.text;
-  return node;
 }

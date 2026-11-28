@@ -1,38 +1,37 @@
-import { Injectable, Inject } from '@searsuite/sear-foundation-di';
+import { ConfigEngine } from '@searsuite/sear-assembly-config';
 import {
+  Pipeline,
+  PipelineStepExecutorRegistry,
+  PipelineStepKind,
   Plugin,
   PluginKey,
   PluginManager,
-  Pipeline,
-  PipelineStepKind,
-  PipelineStepExecutorRegistry,
-  SheetInteractionStore,
   SearContractViolationError,
   SearPipelineStepExecutorNotFoundError,
+  SheetInteractionStore,
+  adoptCommittedPluginState,
   warnIfOutsideCommandExecution,
   type PipelineStep,
   type PipelineStepExecutionContext,
   type SheetInteractionSignal,
   type SheetInteractionState,
 } from '@searsuite/sear-assembly-plugin';
-import { ConfigEngine } from '@searsuite/sear-assembly-config';
+import { CSRMatrix } from '@searsuite/sear-domain-matrix';
+import { getAllActionNames } from '@searsuite/sear-domain-ot';
+import { SheetDataEngine, readSheetDataMatrix, type SheetProjectionInvalidation } from '@searsuite/sear-domain-sheet';
 import {
   DataEngine,
   StateKernel,
   type DataEngineRegistrationOptions,
   type StateKernelCommit,
 } from '@searsuite/sear-domain-state';
-import { SheetDataEngine, readSheetDataMatrix, type SheetProjectionInvalidation } from '@searsuite/sear-domain-sheet';
 import { Transaction } from '@searsuite/sear-domain-transaction';
-import { getAllActionNames } from '@searsuite/sear-domain-ot';
-import { CSRMatrix } from '@searsuite/sear-domain-matrix';
-import { Rect } from '@searsuite/sear-foundation-rect';
-import { SearError } from '@searsuite/sear-foundation-error';
+import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { Platform } from '@searsuite/sear-foundation-platform';
-import { adoptCommittedPluginState } from '@searsuite/sear-assembly-sheet-state';
-import { projectSheetTransaction } from './SheetTransactionProjection';
-import { SheetOwnerLifecycle } from './SheetOwnerLifecycle';
+import { Rect } from '@searsuite/sear-foundation-rect';
 import { type SheetCommitSnapshot } from './SheetCommitSnapshot';
+import { SheetOwnerLifecycle } from './SheetOwnerLifecycle';
+import { projectSheetTransaction } from './SheetTransactionProjection';
 
 /** One committed state/effect publication available to independent consumers. */
 export type SheetKernelPublication = StateKernelCommit<Plugin<unknown>, Transaction, SheetProjectionInvalidation>;

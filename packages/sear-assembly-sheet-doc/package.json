@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-assembly-sheet-doc",
   "description": "Adapts the Doc runtime for rich-text editing inside Sheet cells.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [
@@ -32,7 +32,6 @@
     "@searsuite/sear-foundation-rect": "workspace:*",
     "@searsuite/sear-foundation-subscription": "workspace:*",
     "@searsuite/sear-render-context": "workspace:*",
-    "@searsuite/sear-render-event-engine": "workspace:*",
     "@searsuite/sear-render-metrics": "workspace:*",
     "@searsuite/sear-render-node": "workspace:*",
     "@searsuite/sear-sheet-editor-contract": "workspace:*"

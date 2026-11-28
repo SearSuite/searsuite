@@ -1,10 +1,10 @@
 # @searsuite/sear-assembly-headless
 
-Creates Sheet and Workbook editors for tests, servers, and other runtimes without a visual host.
+Creates Sheet, Workbook and Doc editors for tests, servers, and other runtimes without a visual host.
 
 ## Start from npm
 
-This example follows the current source API and requires an updated npm release; the previously published `0.0.1` set does not provide the independent state package. Use Node.js 22 or later. Install the Headless runtime and the APIs used by this example:
+This example follows the current source API and requires an updated npm release; the Doc kernel entry requires a matching release of the new document business package. Use Node.js 22 or later. Install the Headless runtime and the APIs used by this example:
 
 ```sh
 npm install @searsuite/sear-assembly-headless @searsuite/sear-assembly-sheet-state @searsuite/sear-plugin-formula
@@ -45,3 +45,9 @@ For durable Sheet JSON, obtain the runtime state through `ExportSheetStateComman
 See the [complete Headless example](https://searsuite.com/docs/quickstart/#headless) and the [standalone npm project](https://github.com/SearSuite/searsuite-browser/tree/main/examples/npm) for calculation, serialization and round-trip checks against matching package releases. Network-backed formula services and storage are host responsibilities.
 
 [API reference](https://searsuite.com/docs/ref/#sear-assembly-headless)
+
+## Document runtime
+
+`createHeadlessDocEditor({ documentState: { document: [] } })` creates a document business runtime with default semantic plugins, editing, selection, undo/redo, queries, committed observations and session restoration. It requires no renderer, text shaper, native input or toolbar. See [Doc kernel](../sear-assembly-doc-kernel/README.md) for a complete example.
+
+Collaboration is optional. Sheet and Workbook hosts register collaboration capabilities and commands only when they explicitly provide a transport. An editor without a transport retains local history and editing; it does not claim a successful network connection.

@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-render-metrics",
   "description": "Defines text shaping and glyph measurement contracts.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

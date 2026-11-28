@@ -1,6 +1,6 @@
 {
   "name": "@searsuite/sear-assembly-headless",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@searsuite/sear-assembly-commands": "workspace:*",
+    "@searsuite/sear-assembly-doc-kernel": "workspace:*",
     "@searsuite/sear-assembly-sheet-kernel": "workspace:*",
     "@searsuite/sear-assembly-workbook-kernel": "workspace:*",
     "@searsuite/sear-domain-formula-engine": "workspace:*",

@@ -1,11 +1,11 @@
 import { DocInputPlugin } from '@searsuite/sear-assembly-doc';
-import { DocTransaction, type DocCommand } from '@searsuite/sear-domain-commands';
+import { type DocCommand } from '@searsuite/sear-domain-commands';
 import { createTransaction, Transaction } from '@searsuite/sear-domain-transaction';
 
-import { RichDocOT } from '@searsuite/sear-domain-ot';
-import { DocLayoutEngine } from '@searsuite/sear-domain-editor';
-import { RichTextBlockFlowRegistry } from '@searsuite/sear-domain-doc';
 import { isInsideCommandExecution, runInsideCommandExecution } from '@searsuite/sear-assembly-plugin';
+import { DocNodeRegistry, RichTextBlockFlowRegistry } from '@searsuite/sear-domain-doc';
+import { DocLayoutEngine } from '@searsuite/sear-domain-editor';
+import { RichDocOT } from '@searsuite/sear-domain-ot';
 
 // Mock dependencies
 jest.mock('@searsuite/sear-domain-commands', () => ({
@@ -35,7 +35,7 @@ describe('DocInputPlugin', () => {
   let plugin: DocInputPlugin;
 
   beforeEach(() => {
-    plugin = new DocInputPlugin(new DocLayoutEngine(new RichTextBlockFlowRegistry()));
+    plugin = new DocInputPlugin(new DocLayoutEngine(new RichTextBlockFlowRegistry()), new DocNodeRegistry());
   });
 
   it('does not let document or selection listeners mutate an assembled session', () => {

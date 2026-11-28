@@ -1,38 +1,38 @@
 import { runOutsideCommandExecution } from '@searsuite/sear-assembly-plugin';
-import { SearError } from '@searsuite/sear-foundation-error';
-import { DocLayoutEngine, type LayoutSnapshot } from '@searsuite/sear-domain-editor';
+import { DocCursorDirection } from '@searsuite/sear-domain-commands';
 import {
-  buildInlineTextRangePatchPlan,
-  getDocumentOffset,
-  resolveNode,
-  resolveTextContent,
-  cloneRichDocument,
-  normalizeDocForEdit,
   DocNodeRegistry,
+  RichTextBlockFlowRegistry,
+  RichTextInlineStyleRegistry,
+  applyRichTextFormat,
+  buildInlineTextRangePatchPlan,
+  captureRichTextFormat,
+  cloneRichDocument,
+  getDocumentOffset,
+  normalizeDocForEdit,
   registerParagraphDocNode,
   registerTextDocNode,
-  RichTextInlineStyleRegistry,
-  RichTextBlockFlowRegistry,
-  captureRichTextFormat,
-  applyRichTextFormat,
-  type RichDocNode,
+  resolveNode,
+  resolveTextContent,
   type DocSelection,
+  type RichDocNode,
 } from '@searsuite/sear-domain-doc';
-import { DocCursorDirection } from '@searsuite/sear-domain-commands';
+import { DocLayoutEngine, type LayoutSnapshot } from '@searsuite/sear-domain-editor';
 import { type Transaction } from '@searsuite/sear-domain-transaction';
-import { DocInputPlugin } from './DocInputPlugin';
-import { DocEditHistory } from './DocEditHistory';
-import { type SheetEditInput, type SheetTextSelection, type SheetInlineStyleUpdate } from './DocEditInput';
+import { SearError } from '@searsuite/sear-foundation-error';
 import { BoldTextStyleKey, createBoldContribution } from '../inlinePlugin/bold/BoldTextStylePlugin';
+import { createFontFamilyContribution } from '../inlinePlugin/fontFamily/FontFamilyTextStylePlugin';
+import { createFontSizeContribution } from '../inlinePlugin/fontSize/FontSizeTextStylePlugin';
 import { ItalicTextStyleKey, createItalicContribution } from '../inlinePlugin/italic/ItalicTextStylePlugin';
-import { UnderlineTextStyleKey, createUnderlineContribution } from '../inlinePlugin/underline/UnderlineTextStylePlugin';
 import {
   StrikethroughTextStyleKey,
   createStrikethroughContribution,
 } from '../inlinePlugin/strikethrough/StrikethroughTextStylePlugin';
-import { createFontFamilyContribution } from '../inlinePlugin/fontFamily/FontFamilyTextStylePlugin';
-import { createFontSizeContribution } from '../inlinePlugin/fontSize/FontSizeTextStylePlugin';
 import { createTextColorContribution } from '../inlinePlugin/textColor/TextColorStylePlugin';
+import { UnderlineTextStyleKey, createUnderlineContribution } from '../inlinePlugin/underline/UnderlineTextStylePlugin';
+import { DocEditHistory } from './DocEditHistory';
+import { type SheetEditInput, type SheetInlineStyleUpdate, type SheetTextSelection } from './DocEditInput';
+import { DocInputPlugin } from './DocInputPlugin';
 
 /** Semantic draft change delivered without a rendering lifecycle. */
 export interface DocEditModelChange {
@@ -71,7 +71,7 @@ export class DocEditModel {
     const nodes = new DocNodeRegistry();
     registerParagraphDocNode(nodes);
     registerTextDocNode(nodes);
-    this.#input = new DocInputPlugin(new DocLayoutEngine(new RichTextBlockFlowRegistry()));
+    this.#input = new DocInputPlugin(new DocLayoutEngine(new RichTextBlockFlowRegistry()), nodes);
     this.#originalDocument = normalizeDocForEdit(cloneRichDocument(document));
     this.#input.resetSession(this.#originalDocument, createDocumentEndSelection(this.#originalDocument));
 

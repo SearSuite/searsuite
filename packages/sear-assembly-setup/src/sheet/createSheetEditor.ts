@@ -1,17 +1,16 @@
-import {
-  registerSheetKernelContributions,
-  bindSheetKernelCommands,
-  sealSheetKernelRuntime,
-} from '@searsuite/sear-assembly-sheet-kernel';
-import { registerDefaultSheetViews } from './registerDefaultSheetViews';
-import { SheetKernel } from '@searsuite/sear-assembly-sheet-kernel';
-import { type SheetPlugin, type SheetPluginImplementation } from '@searsuite/sear-assembly-commands';
-import { type SheetView, type SheetViewSetupContext, type SheetViewRuntimeContext } from './SheetViewContracts';
-import { sealSheetViewWrites } from './sealSheetViewWrites';
 import { SheetCommandEffectRegistry } from '@searsuite/sear-assembly-commands';
-import { SheetViewCapability } from './SheetViewContracts';
-import { ViewExtensionRegistry } from '@searsuite/sear-render-event-engine';
+import { createSheetEmbeddedSearCoreEditor } from '@searsuite/sear-assembly-sheet-doc';
+import { prepareSheetKernel, SheetKernel } from '@searsuite/sear-assembly-sheet-kernel';
 import { registerSheetCellStyleView } from '@searsuite/sear-render';
+import { ViewExtensionRegistry } from '@searsuite/sear-render-event-engine';
+import {
+  SheetViewCapability,
+  type SheetView,
+  type SheetViewRuntimeContext,
+  type SheetViewSetupContext,
+} from './SheetViewContracts';
+import { registerDefaultSheetViews } from './registerDefaultSheetViews';
+import { sealSheetViewWrites } from './sealSheetViewWrites';
 
 import { SheetCellStyleRegistry } from '@searsuite/sear-domain-cell-types';
 
@@ -20,59 +19,40 @@ import { bindSheetFormatPainterHighlight } from './runtimePlugin/formatPainter/b
 
 import { sealSheetContributionWrites } from '@searsuite/sear-assembly-plugin';
 
-import { Container, Scope } from '@searsuite/sear-foundation-di';
-import {
-  createRuntimeCapabilityReader,
-  EditorLifecycleStack,
-  PluginManager,
-  SessionStateRestorePhase,
-} from '@searsuite/sear-assembly-plugin';
 import { SheetCommandBus } from '@searsuite/sear-assembly-commands';
+import { createRuntimeCapabilityReader, EditorLifecycleStack } from '@searsuite/sear-assembly-plugin';
+import { Container, Scope } from '@searsuite/sear-foundation-di';
 
-import { createSheetViewSetupRuntime } from './SheetViewContracts';
 import {
-  registerSheetPluginCommands,
-  registerSheetPluginQueries,
   registerSheetPluginCapabilities,
+  registerSheetPluginCommands,
   registerSheetPluginObservations,
+  registerSheetPluginQueries,
   registerSheetPluginSessionStates,
   SheetRuntimeCapability,
-  type SheetPluginRuntimeContext,
   type SheetPluginServiceContext,
-  type SheetPluginSetupContext,
 } from '@searsuite/sear-assembly-commands';
 import { SearCoreSheet, SheetLifecycleCoordinator, SheetViewportResizeController } from '@searsuite/sear-assembly-core';
+import { createSheetViewSetupRuntime } from './SheetViewContracts';
 
-import { EventEngine, EventRegistrar } from '@searsuite/sear-render-event-engine';
-import { ScrollManager } from '@searsuite/sear-render-scroll';
-import { SheetRenderCoordinatorManager, type CellProperties } from '@searsuite/sear-render-registry';
-import { FakeSheetEmbeddedEditor, SheetEmbeddedEditor } from '@searsuite/sear-sheet-editor-contract';
-import { RenderStrategyManager } from '@searsuite/sear-render-strategy';
 import { SearFormulaBar, SearToolbar } from '@searsuite/sear-assembly-plugin';
 import { sealCellExtensionWrites, SheetDisplayedValueChanges } from '@searsuite/sear-domain-cell-types';
+import { EventEngine, EventRegistrar } from '@searsuite/sear-render-event-engine';
+import { SheetRenderCoordinatorManager, type CellProperties } from '@searsuite/sear-render-registry';
+import { ScrollManager } from '@searsuite/sear-render-scroll';
+import { RenderStrategyManager } from '@searsuite/sear-render-strategy';
+import { SheetEmbeddedEditor } from '@searsuite/sear-sheet-editor-contract';
 
-import {
-  FormulaDateSystem,
-  IFormulaDateSystemProvider,
-  IFormulaExternalServiceProvider,
-  IFunctionRegistry,
-} from '@searsuite/sear-domain-formula-engine';
-
-import { RecalcScheduler } from '@searsuite/sear-plugin-formula';
-import { FormulaExternalServiceRegistry } from '@searsuite/sear-domain-formula-engine-ts';
-
-import { SheetCellMergeRender, SheetGridView } from '@searsuite/sear-render';
 import { readSheetCellMerges } from '@searsuite/sear-plugin-cell-merge';
 import { SheetFilterPlugin } from '@searsuite/sear-plugin-filter';
-import { registerDefaultSheetFeatures } from '@searsuite/sear-assembly-sheet-kernel';
-import { cloneSheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
+import { SheetCellMergeRender, SheetGridView } from '@searsuite/sear-render';
 import { registerEditorBaseServices } from './registerEditorBaseServices';
 import { registerEditorRuntime } from './registerEditorRuntime';
 
 import { registerSheetViewportCommands, registerSheetViewportSessionState } from './SheetViewportCommands';
 
 import { type SheetEditor } from '@searsuite/sear-assembly-commands';
-import { type SheetEditorAdapters, type SheetEditorConfiguration } from './SheetEditorContracts';
+import { type SheetEditorConfiguration } from './SheetEditorContracts';
 
 export type { SheetEditorAdapters, SheetEditorConfiguration } from './SheetEditorContracts';
 
@@ -111,29 +91,14 @@ function assembleSheetEditor(
 ): SheetEditor {
   const { adapters } = options;
   const viewport = options.viewport ?? { width: 800, height: 600 };
-  const { configEngine, dataEngine, stage } = registerEditorBaseServices(editorDIContainer, adapters, viewport, {
-    ...(options.cellFontSize === undefined ? {} : { sheetCellFontSize: options.cellFontSize }),
-    ...(options.cellFontFamily === undefined ? {} : { sheetCellFontFamily: options.cellFontFamily }),
-  });
-  adapters.registerEnvironment?.(editorDIContainer);
-  if (!editorDIContainer.hasBinding(IFormulaDateSystemProvider.symbol)) {
-    editorDIContainer.registerInstance(IFormulaDateSystemProvider.symbol, {
-      getDateSystem: () => FormulaDateSystem.Excel1900,
-    });
-  }
-  if (adapters.createFunctionRegistry && !editorDIContainer.hasBinding(IFunctionRegistry.symbol)) {
-    editorDIContainer.registerFactory(IFunctionRegistry.symbol, adapters.createFunctionRegistry, Scope.Singleton);
-  }
-  const embeddedEditor = options.embeddedEditor ?? new FakeSheetEmbeddedEditor();
+  const business = prepareSheetKernel(editorDIContainer, lifecycle, options);
+  const { configEngine, dataEngine } = business;
+  const { stage } = registerEditorBaseServices(editorDIContainer, viewport);
+  const embeddedEditor = options.embeddedEditor ?? createSheetEmbeddedSearCoreEditor();
   editorDIContainer.registerFactory(SheetEmbeddedEditor.symbol, () => embeddedEditor, Scope.Singleton);
   const pluginServiceContext: SheetPluginServiceContext = {
     container: editorDIContainer,
   };
-  options.plugins?.forEach((implementation) => {
-    editorDIContainer.register(implementation.symbol, implementation, Scope.Singleton);
-    implementation.registerServices?.(pluginServiceContext);
-  });
-
   for (const implementation of options.viewExtensions ?? []) {
     editorDIContainer.register(implementation.symbol, implementation, Scope.Singleton);
     implementation.registerServices?.(pluginServiceContext);
@@ -146,17 +111,9 @@ function assembleSheetEditor(
     embeddedEditor: runtimeEmbeddedEditor,
     pluginManager,
   } = registerEditorRuntime(editorDIContainer, adapters, viewport, configEngine.getDefaultConfig().devicePixelRatio);
-  const ownsExternalServices = !editorDIContainer.hasBinding(IFormulaExternalServiceProvider.symbol);
-  registerDefaultSheetFeatures(editorDIContainer, pluginManager, adapters, cloneSheetDocumentState(options.sheetState));
   registerDefaultSheetViews(editorDIContainer, adapters);
-  if (ownsExternalServices) {
-    const services = editorDIContainer.resolve<IFormulaExternalServiceProvider>(IFormulaExternalServiceProvider.symbol);
-    const teardownToken = {};
-    FormulaExternalServiceRegistry.prototype.enforceTeardownBoundary.call(services, teardownToken);
-    lifecycle.add(() => services.destroy(teardownToken));
-  }
-  const customPlugins = registerConfiguredPlugins(editorDIContainer, pluginManager, options.plugins);
   const viewSetupRuntime = createSheetViewSetupRuntime({
+    stateRuntime: business.runtime,
     container: editorDIContainer,
     configEngine,
     dataEngine,
@@ -172,24 +129,7 @@ function assembleSheetEditor(
     embeddedEditor: runtimeEmbeddedEditor,
     pluginManager,
   });
-  const stateSetupRuntime: import('@searsuite/sear-assembly-commands').SheetPluginSetupRuntime = {
-    extensions: viewSetupRuntime.extensions,
-    platform: viewSetupRuntime.platform,
-    config: viewSetupRuntime.config,
-    observations: viewSetupRuntime.observations,
-    queries: viewSetupRuntime.queries,
-    session: viewSetupRuntime.session,
-    plugins: viewSetupRuntime.plugins,
-    data: viewSetupRuntime.data,
-    styles: viewSetupRuntime.styles,
-    cells: viewSetupRuntime.cells,
-    formula: viewSetupRuntime.formula,
-    interaction: viewSetupRuntime.interaction,
-  };
-  const pluginSetupContext: SheetPluginSetupContext = {
-    container: editorDIContainer,
-    runtime: stateSetupRuntime,
-  };
+  const stateSetupRuntime = business.runtime;
   const commands = editorDIContainer.resolve<SheetCommandBus>(SheetCommandBus.symbol);
   const queries = viewSetupRuntime.queries;
   const observations = viewSetupRuntime.observations;
@@ -212,8 +152,7 @@ function assembleSheetEditor(
   const cellVisualReaders = viewSetupRuntime.render.cellVisualReaders;
   lifecycle.add(() => cellVisualReaders.destroy());
   const styles = editorDIContainer.resolve<SheetCellStyleRegistry>(SheetCellStyleRegistry.symbol);
-  lifecycle.add(() => styles.destroy());
-  registerSheetKernelContributions(editorDIContainer, stateSetupRuntime, options);
+
   registerSheetCellStyleView(cellVisualReaders, viewSetupRuntime.styles);
   registerSheetViewportSessionState(viewSetupRuntime.session, scrollManager);
   registerSheetPluginCommands(views.getAll(), commands);
@@ -221,72 +160,43 @@ function assembleSheetEditor(
   registerSheetPluginObservations(views.getAll(), observations);
   registerSheetPluginSessionStates(views.getAll(), viewSetupRuntime.session);
   registerSheetPluginCapabilities(views.getAll(), viewSetupRuntime.extensions);
-  viewSetupRuntime.session.restorePhase(SessionStateRestorePhase.BeforeInitialize);
-  customPlugins.forEach((plugin) => plugin.configure?.(pluginSetupContext));
   editorDIContainer.register(SearCoreSheet.symbol, SearCoreSheet, Scope.Singleton);
   const core = editorDIContainer.resolve<SearCoreSheet>(SearCoreSheet.symbol);
   const kernel = editorDIContainer.resolve<SheetKernel>(SheetKernel.symbol);
-  bindSheetKernelCommands(editorDIContainer, kernel, stateSetupRuntime);
-  SearCoreSheet.prototype.enforceCommandBoundary.call(core, commands.isExecuting.bind(commands));
   const disposeDisplayedValueRender = bindDisplayedValueRender(editorDIContainer, core);
   const effectRegistry = editorDIContainer.resolve<SheetCommandEffectRegistry>(SheetCommandEffectRegistry.symbol);
-  lifecycle.add(() => effectRegistry.destroy());
   registerSheetViewportCommands(
     commands,
     scrollManager,
     editorDIContainer.resolve<SheetViewportResizeController>(SheetViewportResizeController.symbol),
   );
-  viewSetupRuntime.extensions.register(
-    SheetViewCapability.Toolbar,
-    editorDIContainer.resolve<SearToolbar>(SearToolbar.symbol),
-  );
+  if (editorDIContainer.hasBinding(SearToolbar.symbol)) {
+    viewSetupRuntime.extensions.register(
+      SheetViewCapability.Toolbar,
+      editorDIContainer.resolve<SearToolbar>(SearToolbar.symbol),
+    );
+  }
   if (editorDIContainer.hasBinding(SearFormulaBar.symbol)) {
     const formulaBar = editorDIContainer.resolve<SearFormulaBar>(SearFormulaBar.symbol);
     viewSetupRuntime.extensions.register(SheetViewCapability.FormulaBar, formulaBar);
   }
   const viewRuntime = {
     ...viewSetupRuntime,
-    commands: viewSetupRuntime.extensions.require(SheetRuntimeCapability.Commands),
-    toolbar: viewSetupRuntime.extensions.require(SheetViewCapability.Toolbar),
+    commands,
+    toolbar: viewSetupRuntime.extensions.get(SheetViewCapability.Toolbar),
   };
   const viewRuntimeContext: SheetViewRuntimeContext = { ...viewSetupContext, core, runtime: viewRuntime };
-  const pluginRuntimeContext: SheetPluginRuntimeContext = {
-    ...pluginSetupContext,
-    runtime: { ...stateSetupRuntime, commands },
-  };
-  const sessionLifecycleToken = {};
-  lifecycle.add(() => viewRuntime.session.clear(sessionLifecycleToken));
   const embeddedEditorTeardownToken = {};
   embeddedEditor.bindTeardownToken?.(embeddedEditorTeardownToken);
-  lifecycle.add(() => viewRuntime.extensions.destroy());
   const coreTeardownToken = {};
-  lifecycle.add(() => core.destroy(coreTeardownToken));
-  lifecycle.add(() => commands.destroy());
-  const formulaScheduler = editorDIContainer.resolve<RecalcScheduler>(RecalcScheduler.symbol);
-  const formulaSchedulerTeardownToken = {};
-  formulaScheduler.bindTeardownToken(formulaSchedulerTeardownToken);
-  lifecycle.add(() => formulaScheduler.dispose(formulaSchedulerTeardownToken));
-  lifecycle.add(() => queries.destroy());
-  lifecycle.add(() => observations.destroy());
+  lifecycle.add(() => core.destroyView(coreTeardownToken));
   lifecycle.add(disposeDisplayedValueRender);
   lifecycle.add(() => views.destroy());
   lifecycle.add(() => embeddedEditor.dispose(embeddedEditorTeardownToken));
-  lifecycle.add(() => {
-    [...pluginManager.getAllPlugins()]
-      .reverse()
-      .forEach((plugin) =>
-        (plugin as import('@searsuite/sear-assembly-commands').SheetPlugin<unknown>).onEditorDestroy?.(
-          pluginRuntimeContext,
-        ),
-      );
-  });
   views.forEach((view) => {
     view.registerConfig?.().forEach((entry) => configEngine.registerConfig(entry.key, entry.config));
   });
-  core.initialize();
-  viewSetupRuntime.session.restorePhase(SessionStateRestorePhase.AfterInitialize);
-  viewSetupRuntime.session.sealRestoration(sessionLifecycleToken);
-  customPlugins.forEach((plugin) => plugin.initialize?.(pluginRuntimeContext));
+  business.initialize(() => core.initialize());
   customViews.forEach((view) => view.initialize?.(viewRuntimeContext));
   lifecycle.add(
     bindSheetFormatPainterHighlight(
@@ -295,10 +205,10 @@ function assembleSheetEditor(
       viewRuntime.input.cursor,
     ),
   );
+  business.start();
   core.start();
-  customPlugins.forEach((plugin) => plugin.start?.(pluginRuntimeContext));
   customViews.forEach((view) => view.start?.(viewRuntimeContext));
-  const assertExtensionCommand = sealSheetKernelRuntime(editorDIContainer, stateSetupRuntime, lifecycle);
+  const assertExtensionCommand = business.seal();
   const lifecycleCoordinator = editorDIContainer.resolve<SheetLifecycleCoordinator>(SheetLifecycleCoordinator.symbol);
   const lifecycleTeardownToken = {};
   lifecycle.add(() => lifecycleCoordinator.beginTeardown(lifecycleTeardownToken));
@@ -307,7 +217,7 @@ function assembleSheetEditor(
     assertExtensionCommand,
     lifecycleTeardownToken,
   );
-  SearCoreSheet.prototype.enforceTeardownBoundary.call(core, coreTeardownToken);
+  SearCoreSheet.prototype.enforceViewTeardownBoundary.call(core, coreTeardownToken);
   EventEngine.prototype.enforceWriteBoundary.call(core.eventEngine, assertExtensionCommand, coreTeardownToken);
   EventRegistrar.prototype.enforceCommandBoundary.call(core.eventEngine.eventRegistrar, assertExtensionCommand);
   const cellCoordinator = editorDIContainer.resolve<SheetRenderCoordinatorManager>(
@@ -351,7 +261,7 @@ function assembleSheetEditor(
   };
   lifecycle.add(() => core.beginTeardown(coreTeardownToken));
   options.onCreated?.(editor);
-  SheetCommandBus.prototype.enforceRegistrationBoundary.call(commands, assertExtensionCommand);
+  business.sealCommands();
   return editor;
 }
 
@@ -387,18 +297,4 @@ function bindDisplayedValueRender(container: Container, core: SearCoreSheet): ()
     }
     core.requestRender(...core.getViewExtensions().getAll());
   });
-}
-
-function registerConfiguredPlugins(
-  container: Container,
-  manager: PluginManager,
-  implementations: readonly SheetPluginImplementation<SheetPlugin<unknown>>[] | undefined,
-): SheetPlugin<unknown>[] {
-  return (
-    implementations?.map((implementation) => {
-      const plugin = container.resolve<SheetPlugin<unknown>>(implementation.symbol);
-      manager.registerPlugin(plugin);
-      return plugin;
-    }) ?? []
-  );
 }

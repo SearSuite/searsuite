@@ -1,7 +1,7 @@
-import './testSetup';
-import { EventRenderStrategy } from '../src/EventRenderStrategy';
 import { type Node, type NodeProperties } from '@searsuite/sear-render-node';
+import { EventRenderStrategy } from '../src/EventRenderStrategy';
 import { createDirtyTracker, createRenderContext, createScrollManager, createTree } from './testFactories';
+import './testSetup';
 
 function asNode(value: object): Node<NodeProperties> {
   return value as unknown as Node<NodeProperties>;
@@ -14,7 +14,6 @@ describe('EventRenderStrategy', () => {
       createRenderContext(),
       createRenderContext(),
       createScrollManager(),
-      {},
       {},
       {},
       createTree(),

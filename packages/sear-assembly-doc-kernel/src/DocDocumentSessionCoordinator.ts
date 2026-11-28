@@ -1,15 +1,13 @@
-import { DocCursorManager } from '@searsuite/sear-assembly-core';
 import { DocInputPlugin } from '@searsuite/sear-assembly-doc';
-import { cloneRichDocument, RichDocNode, TextNode, normalizeDocForEdit } from '@searsuite/sear-domain-doc';
+import { cloneRichDocument, normalizeDocForEdit, RichDocNode, TextNode } from '@searsuite/sear-domain-doc';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 
-import { type DocEditorChange } from './DocEditorContracts';
+import { type DocEditorChange } from './DocKernelContracts';
 
 /** Owns rich-document session state and host-facing document snapshots. */
 @Injectable()
 export class DocDocumentSessionCoordinator {
   readonly #inputPlugin: DocInputPlugin;
-  readonly #cursorManager: DocCursorManager;
 
   /** DI token for resolving the session coordinator. */
   public static readonly symbol = Symbol.for('DocDocumentSessionCoordinator');
@@ -18,11 +16,8 @@ export class DocDocumentSessionCoordinator {
   public constructor(
     @Inject(DocInputPlugin.symbol)
     inputPlugin: DocInputPlugin,
-    @Inject(DocCursorManager.symbol)
-    cursorManager: DocCursorManager,
   ) {
     this.#inputPlugin = inputPlugin;
-    this.#cursorManager = cursorManager;
   }
 
   /** Replaces the active document and resets transient cursor/session state. */
@@ -32,7 +27,6 @@ export class DocDocumentSessionCoordinator {
       anchor: { path: [0, 0], offset: 0 },
       head: { path: [0, 0], offset: 0 },
     });
-    this.#cursorManager.clearCursor();
   }
 
   /** Returns a detached host-facing snapshot from the committed document state. */

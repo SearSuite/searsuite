@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-domain-sheet",
   "description": "Defines sparse Sheet content, axis projections, and typed read contracts.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

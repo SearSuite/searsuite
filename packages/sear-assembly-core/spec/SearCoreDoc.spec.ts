@@ -1,14 +1,19 @@
-import { PipelineStepExecutorRegistry } from '@searsuite/sear-assembly-plugin';
-import { ViewExtensionRegistry } from '@searsuite/sear-render-event-engine';
-import { createTransaction } from '@searsuite/sear-domain-transaction';
-import { ViewExtensionBase } from '@searsuite/sear-render-event-engine';
-import { SearCoreDoc } from '../src/SearCoreDoc';
-import { Pipeline, PipelineStepKind } from '@searsuite/sear-assembly-plugin';
-import { Plugin, PluginKey, PluginManager } from '@searsuite/sear-assembly-plugin';
-import { type Node, type NodeProperties } from '@searsuite/sear-render-node';
-import { DocLayoutEngine } from '@searsuite/sear-domain-editor';
+import { DocKernel } from '@searsuite/sear-assembly-doc-kernel';
+import {
+  Pipeline,
+  PipelineStepExecutorRegistry,
+  PipelineStepKind,
+  Plugin,
+  PluginKey,
+  PluginManager,
+} from '@searsuite/sear-assembly-plugin';
 import { RichTextBlockFlowRegistry } from '@searsuite/sear-domain-doc';
 import type { Schema } from '@searsuite/sear-domain-doc-schema';
+import { DocLayoutEngine } from '@searsuite/sear-domain-editor';
+import { createTransaction } from '@searsuite/sear-domain-transaction';
+import { ViewExtensionBase, ViewExtensionRegistry } from '@searsuite/sear-render-event-engine';
+import { type Node, type NodeProperties } from '@searsuite/sear-render-node';
+import { SearCoreDoc } from '../src/SearCoreDoc';
 
 class TestDocPlugin extends Plugin<number> {
   constructor(public readonly testKey = new PluginKey('test-doc-plugin')) {
@@ -74,8 +79,7 @@ function createCore() {
     cursor as never,
     composition as never,
     new DocLayoutEngine(new RichTextBlockFlowRegistry()),
-    new PluginManager(),
-    new PipelineStepExecutorRegistry(),
+    new DocKernel(new PluginManager(), new PipelineStepExecutorRegistry()),
     {},
     new ViewExtensionRegistry(),
   );
@@ -190,7 +194,7 @@ describe('SearCoreDoc', () => {
     expect(published).toHaveBeenCalledTimes(1);
   });
 
-  it('loads and exports the shared rich-document schema without leaking mutable snapshots', () => {
+  it('materializes detached layout input without retaining a second document state', () => {
     const { core } = createCore();
     const snapshot: Schema[] = [
       {
@@ -199,14 +203,14 @@ describe('SearCoreDoc', () => {
       },
     ];
 
-    const runtimeDocument = core.loadSnapshot(snapshot);
+    const runtimeDocument = core.materializeSnapshot(snapshot);
     snapshot[0]!.content![0]!.text = 'changed outside';
-    const exported = core.exportSnapshot(runtimeDocument);
+    const exported = JSON.parse(JSON.stringify(runtimeDocument));
 
     expect(exported[0]?.content?.[0]?.text).toBe('shared');
     expect(exported[0]?.content?.[0]?.attrs).toEqual({ textStyle: { fontFamily: 'Georgia' } });
     exported[0]!.content![0]!.text = 'changed export';
-    expect(core.exportSnapshot()[0]?.content?.[0]?.text).toBe('shared');
+    expect((JSON.parse(JSON.stringify(runtimeDocument)) as Schema[])[0]?.content?.[0]?.text).toBe('shared');
   });
 
   it('prepares editor render layout through document-owned layout state', () => {
@@ -218,7 +222,6 @@ describe('SearCoreDoc', () => {
         content: [{ type: 'text', text: 'A' }],
       },
     ];
-    core.loadSnapshot([{ type: 'paragraph', content: [{ type: 'text', text: 'persisted' }] }]);
     blockManager.clear.mockClear();
     blockManager.add.mockClear();
 
@@ -241,12 +244,12 @@ describe('SearCoreDoc', () => {
     expect(prepared.snapshot.lines).toHaveLength(1);
     expect(cursor.setCursor).toHaveBeenCalledWith(expect.objectContaining({ x: expect.any(Number), visible: true }));
     expect(cursor.setSelectionRects).toHaveBeenCalled();
-    expect(core.exportSnapshot()[0]?.content?.[0]?.text).toBe('persisted');
+    expect('loadSnapshot' in core).toBe(false);
+    expect('exportSnapshot' in core).toBe(false);
   });
 
   it('keeps read-only layout preparation outside commands from publishing state', () => {
     const { blockManager, core, cursor } = createCore();
-    core.loadSnapshot([{ type: 'paragraph', content: [{ type: 'text', text: 'persisted' }] }]);
     blockManager.clear.mockClear();
     blockManager.add.mockClear();
     core.enforceCommandBoundary(() => false);
@@ -267,7 +270,8 @@ describe('SearCoreDoc', () => {
     expect(blockManager.clear).not.toHaveBeenCalled();
     expect(blockManager.add).not.toHaveBeenCalled();
     expect(core.getLayoutSnapshot()).toBeNull();
-    expect(core.exportSnapshot()[0]?.content?.[0]?.text).toBe('persisted');
+    expect('loadSnapshot' in core).toBe(false);
+    expect('exportSnapshot' in core).toBe(false);
     expect(cursor.setCursor).not.toHaveBeenCalled();
   });
 
@@ -407,8 +411,7 @@ describe('SearCoreDoc', () => {
       } as never,
       { measure: jest.fn(() => ({ active: false, text: '', textWidth: 0, caretPixelOffset: 0 })) } as never,
       new DocLayoutEngine(new RichTextBlockFlowRegistry()),
-      new PluginManager(),
-      new PipelineStepExecutorRegistry(),
+      new DocKernel(new PluginManager(), new PipelineStepExecutorRegistry()),
       { renderStage: stage as never },
       new ViewExtensionRegistry(),
     );

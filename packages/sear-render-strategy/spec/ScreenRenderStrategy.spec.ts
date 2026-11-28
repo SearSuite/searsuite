@@ -1,10 +1,10 @@
-import './testSetup';
-import { BlockRasterCopyPlan, RasterCopyExecutor, ScreenRenderStrategy } from '../src';
-import { type Node, type NodeProperties } from '@searsuite/sear-render-node';
-import { type ScrollManagerState } from '@searsuite/sear-render-scroll';
 import { PositionRect } from '@searsuite/sear-foundation-rect';
 import { type HexColor } from '@searsuite/sear-foundation-utils';
+import { type Node, type NodeProperties } from '@searsuite/sear-render-node';
+import { type ScrollManagerState } from '@searsuite/sear-render-scroll';
+import { BlockRasterCopyPlan, RasterCopyExecutor, ScreenRenderStrategy } from '../src';
 import { createDirtyTracker, createRenderContext, createScrollManager, createTree } from './testFactories';
+import './testSetup';
 
 class TestScreenRenderStrategy extends ScreenRenderStrategy<NodeProperties> {
   setStates(previous: ScrollManagerState, current: ScrollManagerState): void {
@@ -40,7 +40,6 @@ describe('ScreenRenderStrategy', () => {
       offScreenRenderContext,
       createRenderContext(),
       scrollManager,
-      {},
       {},
       {},
       createTree(1000, 800),
@@ -163,17 +162,7 @@ describe('ScreenRenderStrategy', () => {
     strategy.render(root);
 
     expect(strategy.renderContext.clearRect).toHaveBeenCalledWith(0, 0, 200, 100);
-    expect(strategy.renderContext.drawImage).toHaveBeenCalledWith(
-      cacheTarget,
-      0,
-      40,
-      200,
-      40,
-      0,
-      20,
-      200,
-      40,
-    );
+    expect(strategy.renderContext.drawImage).toHaveBeenCalledWith(cacheTarget, 0, 40, 200, 40, 0, 20, 200, 40);
     expect(invalidNode.drawScene).toHaveBeenCalledTimes(1);
     expect(strategy.offScreenRenderContext.drawImage).toHaveBeenCalled();
   });
@@ -274,10 +263,9 @@ describe('ScreenRenderStrategy', () => {
     strategy.setStates({ x: 0, y: 0, deltaX: 0, deltaY: 0 }, { x: 30, y: 40, deltaX: -8, deltaY: 0 });
     const visibleNode = { sticky: false, drawScene: jest.fn() };
     const root = asNode({ query: jest.fn(() => [visibleNode]) });
-    const queryNodes = jest.fn<
-      readonly Node<NodeProperties>[],
-      [Node<NodeProperties>, PositionRect<HexColor>]
-    >(() => [visibleNode as unknown as Node<NodeProperties>]);
+    const queryNodes = jest.fn<readonly Node<NodeProperties>[], [Node<NodeProperties>, PositionRect<HexColor>]>(() => [
+      visibleNode as unknown as Node<NodeProperties>,
+    ]);
     const drawNodes = jest.fn((input: { readonly nodes: readonly Node<NodeProperties>[] }) => {
       const { nodes } = input;
       nodes.forEach((node) => node.drawScene(strategy.renderContext, new PositionRect(0, 0, 1, 1)));

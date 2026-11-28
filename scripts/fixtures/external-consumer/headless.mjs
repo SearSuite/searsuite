@@ -1,7 +1,13 @@
+import { InsertDocTextCommand, UndoDocCommand } from '@searsuite/sear-assembly-doc';
+import { ReadDocTextQuery, DocCommitObservation } from '@searsuite/sear-assembly-doc-kernel';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-import { createHeadlessEditor, createHeadlessWorkbookEditor } from '@searsuite/sear-assembly-headless';
+import {
+  createHeadlessEditor,
+  createHeadlessWorkbookEditor,
+  createHeadlessDocEditor,
+} from '@searsuite/sear-assembly-headless';
 import { createEmptySheetDocumentState } from '@searsuite/sear-assembly-sheet-state';
 import { SheetPlugin, ReadSheetCellStyleQuery } from '@searsuite/sear-assembly-commands';
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
@@ -63,6 +69,21 @@ Injectable()(ExternalStylePlugin);
   } finally {
     workbook.destroy();
   }
+  const doc = createHeadlessDocEditor({ documentState: { document: [] } });
+  try {
+    const revisions = [];
+    const unsubscribe = doc.observations.subscribe(DocCommitObservation, (snapshot) =>
+      revisions.push(snapshot.revision),
+    );
+    doc.commands.run(InsertDocTextCommand, { text: 'Independent document' });
+    assert.equal(doc.queries.run(ReadDocTextQuery, undefined), 'Independent document');
+    doc.commands.run(UndoDocCommand, undefined);
+    assert.equal(doc.getText(), '');
+    assert.deepEqual(revisions, [0, 1, 2]);
+    unsubscribe();
+  } finally {
+    doc.destroy();
+  }
   const presentation = Object.keys(require.cache).filter((path) =>
     /[\\/]sear-(?:render(?:-|[\\/])|assembly-(?:core|setup|sheet-doc|workbook)[\\/]|sheet-editor-contract[\\/])/.test(
       path,
@@ -70,7 +91,7 @@ Injectable()(ExternalStylePlugin);
   );
   assert.deepEqual(presentation, [], 'Headless must not load presentation packages');
   console.log(
-    'Packed Headless runtime passed: plugin styles, formulas, commits, undo and Workbook; no presentation loaded.',
+    'Packed Headless runtime passed: plugin styles, formulas, commits, undo, Workbook and Doc; no presentation loaded.',
   );
 })().catch((error) => {
   console.error(error);

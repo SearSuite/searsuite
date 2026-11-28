@@ -156,47 +156,42 @@
  * ```
  */
 
-export { PluginKey } from './PluginKey';
-export { SearToolbar } from './SearToolbar';
-export { SearFormulaBar } from './SearFormulaBar';
-export { HeadlessToolbar } from './HeadlessToolbar';
-export { EditorLifecycleStack } from './EditorLifecycleStack';
+export { cloneSessionStateValue } from './cloneSessionStateValue';
 export { EditorLifecycleError, EditorLifecycleErrorCode } from './EditorLifecycleError';
+export { EditorLifecycleStack } from './EditorLifecycleStack';
+export { HeadlessToolbar } from './HeadlessToolbar';
 export {
   Plugin,
-  type PluginDataEngineRegistrationOptions,
-  type PluginDataViewFieldSelector,
-  type PluginDataViewFieldRegistration,
   type PluginConfigRegistration,
-  type PluginSpec,
-  type PluginStateRegistration,
+  type PluginDataEngineRegistrationOptions,
+  type PluginDataViewFieldRegistration,
+  type PluginDataViewFieldSelector,
   type PluginDocumentStateCodec,
   type PluginDocumentStateContribution,
+  type PluginSpec,
+  type PluginStateRegistration,
   type PluginTransactionHistoryAdapter,
   type PluginTransactionOTContribution,
 } from './Plugin';
-export { PluginManager, type RegisteredPluginDocumentStateContribution } from './PluginManager';
-export {
-  createPluginTransactionHistoryAdapter,
-  type PluginTransactionHistoryOperations,
-} from './TransactionHistoryAdapter';
 export {
   hasPluginCommandRegistrar,
-  hasPluginQueryRegistrar,
   hasPluginObservationRegistrar,
+  hasPluginQueryRegistrar,
   hasPluginRuntimeCapabilityRegistrar,
   hasPluginSessionStateRegistrar,
   type PluginCommandExtension,
   type PluginCommandRegistrar,
-  type PluginQueryRegistrar,
   type PluginExtension,
   type PluginObservationExtension,
   type PluginObservationRegistrar,
+  type PluginQueryRegistrar,
   type PluginRuntimeCapabilityExtension,
   type PluginRuntimeCapabilityRegistrar,
   type PluginSessionStateExtension,
   type PluginSessionStateRegistrar,
 } from './PluginExtension';
+export { PluginKey } from './PluginKey';
+export { PluginManager, type RegisteredPluginDocumentStateContribution } from './PluginManager';
 export {
   RuntimeCapabilityRegistry,
   createRuntimeCapabilityReader,
@@ -205,6 +200,8 @@ export {
   type RuntimeCapabilityReader,
 } from './RuntimeCapability';
 export { RuntimeCapabilityError, RuntimeCapabilityErrorCode } from './RuntimeCapabilityError';
+export { SearFormulaBar } from './SearFormulaBar';
+export { SearToolbar } from './SearToolbar';
 export {
   SessionStateRestorePhase,
   defineSessionState,
@@ -215,35 +212,37 @@ export {
 } from './SessionState';
 export { SessionStateError, SessionStateErrorCode } from './SessionStateError';
 export { SessionStateRegistry } from './SessionStateRegistry';
-export { cloneSessionStateValue } from './cloneSessionStateValue';
+export { intersectSheetMoveRanges, subtractSheetMoveRange, translateSheetMoveRange } from './SheetMoveRangeGeometry';
+export { SheetRangeMoveStatus, type SheetRangeMoveAnalysis } from './SheetRangeMoveAnalysis';
+export {
+  isPointInSheetMoveRange,
+  type SheetMoveRange,
+  type SheetRangeMoveContext,
+  type SheetRangeMoveContribution,
+  type SheetRangeMovePlan,
+} from './SheetRangeMoveContribution';
 export { SheetRangeMoveRegistry } from './SheetRangeMoveRegistry';
+export { SheetRangeMoveRejectedError } from './SheetRangeMoveRejectedError';
 export {
   SheetRangeReorderRegistry,
   type SheetRangeReorderContext,
-  type SheetRangeReorderPlan,
   type SheetRangeReorderContribution,
+  type SheetRangeReorderPlan,
 } from './SheetRangeReorderRegistry';
-export { intersectSheetMoveRanges, subtractSheetMoveRange, translateSheetMoveRange } from './SheetMoveRangeGeometry';
 export {
   createSheetRangeRuleMoveContribution,
   type SheetRangeRuleEntry,
   type SheetRangeRuleFragment,
   type SheetRangeRuleMoveAdapter,
 } from './SheetRangeRuleMove';
-export { SheetRangeMoveStatus, type SheetRangeMoveAnalysis } from './SheetRangeMoveAnalysis';
-export { SheetRangeMoveRejectedError } from './SheetRangeMoveRejectedError';
-export { SheetStructureMoveRegistry } from './SheetStructureMoveRegistry';
 export { type SheetStructureMoveContext, type SheetStructureMoveContribution } from './SheetStructureMoveContribution';
+export { SheetStructureMoveRegistry } from './SheetStructureMoveRegistry';
 export {
-  isPointInSheetMoveRange,
-  type SheetMoveRange,
-  type SheetRangeMoveContext,
-  type SheetRangeMovePlan,
-  type SheetRangeMoveContribution,
-} from './SheetRangeMoveContribution';
+  createPluginTransactionHistoryAdapter,
+  type PluginTransactionHistoryOperations,
+} from './TransactionHistoryAdapter';
 
-export { SheetFormatTransferRegistry } from './SheetFormatTransferRegistry';
-export { SheetClipboardTransferRegistry } from './SheetClipboardTransferRegistry';
+export { createMatrixFormatTransfer, type SheetFormatMatrix } from './createMatrixFormatTransfer';
 export type {
   SheetClipboardCapturedInstance,
   SheetClipboardTransferContribution,
@@ -252,22 +251,19 @@ export type {
   SheetClipboardTransferRequest,
   SheetPortableClipboardTransfer,
 } from './SheetClipboardTransfer';
-export { sealSheetContributionWrites, assertSheetContributionWrite } from './SheetContributionWriteBoundary';
-export { createMatrixFormatTransfer, type SheetFormatMatrix } from './createMatrixFormatTransfer';
+export { SheetClipboardTransferRegistry } from './SheetClipboardTransferRegistry';
+export { assertSheetContributionWrite, sealSheetContributionWrites } from './SheetContributionWriteBoundary';
 export {
   type SheetFormatRange,
-  type SheetFormatTransferPlan,
-  type SheetPortableFormatTransfer,
-  type SheetFormatTransferSnapshot,
   type SheetFormatTransferContribution,
+  type SheetFormatTransferPlan,
   type SheetFormatTransferRegistrar,
+  type SheetFormatTransferSnapshot,
+  type SheetPortableFormatTransfer,
 } from './SheetFormatTransfer';
+export { SheetFormatTransferRegistry } from './SheetFormatTransferRegistry';
 
 export * from './CommandExecutionScope';
-export * from './Pipeline';
-export * from './SheetInteractionStore';
-export * from './SheetInteractionReducerRegistry';
-export * from './PipelineStepExecutorRegistry';
 export * from './errors/SearAssemblyErrorCode';
 export * from './errors/SearContractViolationError';
 export * from './errors/SearDocParseError';
@@ -275,3 +271,10 @@ export * from './errors/SearLifecycleError';
 export * from './errors/SearPipelineStepExecutorNotFoundError';
 export * from './errors/SearRegistryConflictError';
 export * from './errors/SearRegistryEntryNotFoundError';
+export * from './Pipeline';
+export * from './PipelineStepExecutorRegistry';
+export * from './SheetInteractionReducerRegistry';
+export * from './SheetInteractionStore';
+
+export { adoptCommittedPluginState } from './adoptCommittedPluginState';
+export { lockCommittedPluginState } from './lockCommittedPluginState';

@@ -2,9 +2,9 @@ import {
   applyTextAttributeRanges,
   DocNodeRegistry,
   ParagraphNode,
-  TextNode,
   registerParagraphDocNode,
   registerTextDocNode,
+  TextNode,
 } from '../src';
 
 beforeAll(function registerBlockManagerSpecDocNodes() {
@@ -45,12 +45,13 @@ describe('rich document node utilities', () => {
   });
 
   it('clones non-text nodes and nodes without text during text style application', () => {
-    DocNodeRegistry.register(
-      'custom-inline',
-      (schema) => ({ type: 'custom-inline', attrs: schema.attrs || {}, content: [] } as never),
-    );
+    const nodes = new DocNodeRegistry();
+    nodes.register({
+      type: 'custom-inline',
+      create: (schema) => ({ type: 'custom-inline', attrs: schema.attrs || {}, content: [] } as never),
+    });
     const doc = [
-      DocNodeRegistry.create({
+      nodes.create({
         type: ParagraphNode.nodeType,
         content: [
           { type: TextNode.nodeType, text: 'a' } as never,
@@ -59,7 +60,7 @@ describe('rich document node utilities', () => {
         ],
       }),
     ];
-    const styled = applyTextAttributeRanges(doc, []);
+    const styled = applyTextAttributeRanges(doc, [], nodes);
     expect(styled[0].content).toHaveLength(2); // The empty text node is dropped
     expect(styled[0].content[1].type).toBe('custom-inline');
   });

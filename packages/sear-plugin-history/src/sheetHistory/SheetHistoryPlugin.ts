@@ -1,12 +1,6 @@
 import { SearError } from '@searsuite/sear-foundation-error';
 
 import {
-  Pipeline,
-  PipelineStepKind,
-  runOutsideCommandExecution,
-  SheetInteractionStore,
-} from '@searsuite/sear-assembly-plugin';
-import {
   CommandExecutionPhase,
   createSheetTransaction,
   defineSheetCommand,
@@ -17,23 +11,27 @@ import {
   type SheetCommandResult,
 } from '@searsuite/sear-assembly-commands';
 import {
+  defineSessionState,
+  Pipeline,
+  PipelineStepKind,
   Plugin,
   PluginKey,
   PluginManager,
+  runOutsideCommandExecution,
   SessionStateRegistry,
   SessionStateRestorePhase,
-  defineSessionState,
+  SheetInteractionStore,
 } from '@searsuite/sear-assembly-plugin';
 import { OTClone } from '@searsuite/sear-domain-ot';
-import { TRANSACTION_ORIGIN_META_KEY, Transaction, TransactionOrigin } from '@searsuite/sear-domain-transaction';
+import { Transaction, TRANSACTION_ORIGIN_META_KEY, TransactionOrigin } from '@searsuite/sear-domain-transaction';
 import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { Platform } from '@searsuite/sear-foundation-platform';
 import { type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 
+import { SheetExternalHistory } from '../SheetExternalHistory';
 import { RedoSheetCommand, UndoSheetCommand } from '../SheetHistoryCommands';
 import { SheetHistoryStatusObservation } from '../SheetHistoryObservation';
 import { type SheetHistoryStatus, SheetHistoryStatusProvider } from '../SheetHistoryStatusProvider';
-import { SheetExternalHistory } from '../SheetExternalHistory';
 
 export interface SheetHistoryEntry {
   undo: Transaction[];
@@ -63,7 +61,7 @@ export class SheetHistoryPlugin extends Plugin<null> implements SheetHistoryStat
   readonly #plugins: PluginManager;
   readonly #interaction: SheetInteractionStore;
   readonly #platform: Platform;
-  readonly #externalHistory: SheetExternalHistory;
+  readonly #externalHistory: SheetExternalHistory | undefined;
 
   /** DI token for resolving the default Sheet history plugin. */
   public static readonly symbol = Symbol.for('SheetHistoryPlugin');
@@ -91,7 +89,7 @@ export class SheetHistoryPlugin extends Plugin<null> implements SheetHistoryStat
     @Inject(SheetCommandBus.symbol)
     commands: SheetCommandBus,
     @Inject(SheetExternalHistory.symbol)
-    externalHistory: SheetExternalHistory,
+    externalHistory?: SheetExternalHistory,
   ) {
     super({ key: pluginKey, state: null });
     this.#plugins = plugins;
@@ -151,7 +149,7 @@ export class SheetHistoryPlugin extends Plugin<null> implements SheetHistoryStat
     if (this.#disposeCommandListener) return;
     this.#disposeCommandListener = this.#commands.subscribe(this.#handleCommandEvent.bind(this));
     this.#disposeInteractionListener = this.#interaction.subscribe(() => this.#emitStatus());
-    this.#disposeExternalHistory = this.#externalHistory.subscribe(() => this.#emitStatus());
+    this.#disposeExternalHistory = this.#externalHistory?.subscribe(() => this.#emitStatus()) ?? null;
   }
 
   /** Releases command/status subscriptions owned by this editor instance. */
@@ -177,7 +175,7 @@ export class SheetHistoryPlugin extends Plugin<null> implements SheetHistoryStat
   }
 
   #useExternalUndo(): boolean {
-    const external = this.#externalHistory.getStatus();
+    const external = this.#externalHistory?.getStatus() ?? { canUndo: false, canRedo: false };
     if (!external.canUndo) return false;
     const local = this.#historyState.undoStack.at(-1);
     return (
@@ -186,7 +184,7 @@ export class SheetHistoryPlugin extends Plugin<null> implements SheetHistoryStat
   }
 
   #useExternalRedo(): boolean {
-    const external = this.#externalHistory.getStatus();
+    const external = this.#externalHistory?.getStatus() ?? { canUndo: false, canRedo: false };
     if (!external.canRedo) return false;
     const local = this.#historyState.redoStack.at(-1);
     return (
@@ -195,7 +193,7 @@ export class SheetHistoryPlugin extends Plugin<null> implements SheetHistoryStat
   }
 
   #nextOrder(): number {
-    this.#localSequence = Math.max(this.#localSequence + 1, this.#externalHistory.nextSequence());
+    this.#localSequence = Math.max(this.#localSequence + 1, this.#externalHistory?.nextSequence() ?? 0);
     return this.#localSequence;
   }
 
@@ -205,7 +203,7 @@ export class SheetHistoryPlugin extends Plugin<null> implements SheetHistoryStat
       id,
       execute: () => ({
         pipeline: new Pipeline(id),
-        completion: Promise.resolve().then(() => this.#externalHistory[direction]()),
+        completion: Promise.resolve().then(() => this.#externalHistory?.[direction]()),
       }),
     };
   }

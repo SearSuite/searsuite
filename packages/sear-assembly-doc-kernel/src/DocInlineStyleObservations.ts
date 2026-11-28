@@ -1,5 +1,9 @@
 import { DocInputPlugin } from '@searsuite/sear-assembly-doc';
-import { buildInlineTextRangePatchPlan, type RichTextInlineStyleRegistry, type RichTextInlineStyle } from '@searsuite/sear-domain-doc';
+import {
+  buildInlineTextRangePatchPlan,
+  type RichTextInlineStyle,
+  type RichTextInlineStyleRegistry,
+} from '@searsuite/sear-domain-doc';
 import { defineStateObservation, type ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 
 /** Whether one inline style can be applied, is active, and has a common selected value. */

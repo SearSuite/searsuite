@@ -1,16 +1,16 @@
-import { SearError } from '@searsuite/sear-foundation-error';
 import { DocCommandBus, defineDocCommand } from '@searsuite/sear-assembly-commands';
 import { PluginKey } from '@searsuite/sear-assembly-plugin';
 import {
   DocNodeRegistry,
-  registerTableDocNodes,
   TableCellNode,
   TableNode,
   TableRowNode,
   normalizeDocForEdit,
+  registerTableDocNodes,
   type RichDocNode,
 } from '@searsuite/sear-domain-doc';
 import { Injectable } from '@searsuite/sear-foundation-di';
+import { SearError } from '@searsuite/sear-foundation-error';
 
 import {
   DocPlugin,
@@ -84,7 +84,7 @@ export class TablePlugin extends DocPlugin<null> {
     const runtime = this.#requireRuntime();
     const state = runtime.document.input.session;
     const insertIndex = Math.min(state.pendingDoc.length, this.#currentBlockIndex() + 1);
-    const table = createTableNode(rows, columns);
+    const table = createTableNode(rows, columns, runtime.document.nodes);
     return runtime.document.input.createTransaction((transaction, currentState) =>
       transaction.insertNode([insertIndex], table).setSelection(currentState.docSelection),
     );
@@ -101,29 +101,29 @@ export class TablePlugin extends DocPlugin<null> {
   }
 }
 
-function createTableNode(rows: number, columns: number): RichDocNode {
+function createTableNode(rows: number, columns: number, nodes: DocNodeRegistry): RichDocNode {
   const content: RichDocNode[] = [];
   for (let rowIndex = 0; rowIndex < rows; rowIndex++) {
     const cells: RichDocNode[] = [];
     for (let columnIndex = 0; columnIndex < columns; columnIndex++) {
-      cells.push(createTableCellNode());
+      cells.push(createTableCellNode(nodes));
     }
     content.push(
-      DocNodeRegistry.create({
+      nodes.create({
         type: TableRowNode.nodeType,
         content: cells,
       }),
     );
   }
-  return DocNodeRegistry.create({
+  return nodes.create({
     type: TableNode.nodeType,
     attrs: { rows, columns },
     content,
   });
 }
 
-function createTableCellNode(): RichDocNode {
-  return DocNodeRegistry.create({
+function createTableCellNode(nodes: DocNodeRegistry): RichDocNode {
+  return nodes.create({
     type: TableCellNode.nodeType,
     content: normalizeDocForEdit([]),
   });

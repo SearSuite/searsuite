@@ -1,39 +1,66 @@
-import { createSheetPluginSetupRuntime } from '@searsuite/sear-assembly-sheet-kernel';
-import { ViewExtensionBase } from '@searsuite/sear-render-event-engine';
-import { type SheetCellStyleReader } from '@searsuite/sear-domain-cell-types';
 import { SheetRuntimeCapability } from '@searsuite/sear-assembly-commands';
+import { createSheetPluginSetupRuntime } from '@searsuite/sear-assembly-sheet-kernel';
+import { type SheetCellStyleReader } from '@searsuite/sear-domain-cell-types';
+import { ViewExtensionBase } from '@searsuite/sear-render-event-engine';
 
+import {
+  defineSheetRuntimeCapability,
+  SheetCommandBus,
+  SheetQueryRegistry,
+  SheetRuntimeExtensionRegistry,
+} from '@searsuite/sear-assembly-commands';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
-import { SheetCommandBus, SheetQueryRegistry } from '@searsuite/sear-assembly-commands';
-import { IFunctionRegistry } from '@searsuite/sear-domain-formula-engine';
-import { IFormulaTextServiceProvider } from '@searsuite/sear-domain-formula-engine';
-import { IFormulaExternalServiceProvider } from '@searsuite/sear-domain-formula-engine';
 import { SearCoreSheet, SheetLifecycleCoordinator } from '@searsuite/sear-assembly-core';
-import { PipelineStepExecutorRegistry, SheetInteractionReducerRegistry, SheetInteractionStore } from '@searsuite/sear-assembly-plugin';
-import { SessionStateRegistry, type PluginManager } from '@searsuite/sear-assembly-plugin';
+import {
+  PipelineStepExecutorRegistry,
+  SearFormulaBar,
+  SearToolbar,
+  SessionStateRegistry,
+  SheetInteractionReducerRegistry,
+  SheetInteractionStore,
+  type PluginManager,
+} from '@searsuite/sear-assembly-plugin';
 import { CellTypeCatalog } from '@searsuite/sear-domain-cell';
+import {
+  IFormulaExternalServiceProvider,
+  IFormulaTextServiceProvider,
+  IFunctionRegistry,
+} from '@searsuite/sear-domain-formula-engine';
+import { SheetDataEngine } from '@searsuite/sear-domain-sheet';
 import { type Container } from '@searsuite/sear-foundation-di';
 import { Platform, WebServiceClient, XmlXPathEvaluator } from '@searsuite/sear-foundation-platform';
-import { type SheetEmbeddedEditor } from '@searsuite/sear-sheet-editor-contract';
 import { PositionRect } from '@searsuite/sear-foundation-rect';
 import { ObservationRegistry } from '@searsuite/sear-foundation-subscription';
 import { type HexColor } from '@searsuite/sear-foundation-utils';
-import { Container as RenderContainer, DirtyTree, FrameDirtyTracker, SceneGraph, Tree } from '@searsuite/sear-render-node';
+import { SheetCollaborationPlugin, type CollaborationSession } from '@searsuite/sear-plugin-collab';
+import {
+  FormulaResultProviderRegistry,
+  FormulaRichResultProviderRegistry,
+  FormulaSourceProviderRegistry,
+} from '@searsuite/sear-plugin-formula';
 import { CoordinateTransformer, RenderContext } from '@searsuite/sear-render-context';
-import { ScrollManager, Scroller } from '@searsuite/sear-render-scroll';
+import { CoordinateEngine } from '@searsuite/sear-render-coord';
+import { CursorEngine, CursorRegistry } from '@searsuite/sear-render-cursor';
 import { SheetRenderEngine } from '@searsuite/sear-render-engine';
-import { SheetDataEngine } from '@searsuite/sear-domain-sheet';
-import { TextShaper } from '@searsuite/sear-render-metrics';
-import { type CellProperties, SheetCellVisualReaderRegistry, SheetRenderCoordinatorManager, SheetRendererRegistry } from '@searsuite/sear-render-registry';
-import { RenderStrategyManager, type RenderStrategy } from '@searsuite/sear-render-strategy';
 import { EventEngine, EventRegistrar } from '@searsuite/sear-render-event-engine';
 import { KeyboardRouter, PointerCapture, TextInput } from '@searsuite/sear-render-input';
-import { CursorEngine, CursorRegistry } from '@searsuite/sear-render-cursor';
-import { CoordinateEngine } from '@searsuite/sear-render-coord';
-import { type CollaborationSession, SheetCollaborationPlugin } from '@searsuite/sear-plugin-collab';
-import { SearFormulaBar, SearToolbar } from '@searsuite/sear-assembly-plugin';
-import { FormulaResultProviderRegistry, FormulaRichResultProviderRegistry, FormulaSourceProviderRegistry } from '@searsuite/sear-plugin-formula';
-import { defineSheetRuntimeCapability, SheetRuntimeExtensionRegistry } from '@searsuite/sear-assembly-commands';
+import { TextShaper } from '@searsuite/sear-render-metrics';
+import {
+  DirtyTree,
+  FrameDirtyTracker,
+  Container as RenderContainer,
+  SceneGraph,
+  Tree,
+} from '@searsuite/sear-render-node';
+import {
+  SheetCellVisualReaderRegistry,
+  SheetRenderCoordinatorManager,
+  SheetRendererRegistry,
+  type CellProperties,
+} from '@searsuite/sear-render-registry';
+import { Scroller, ScrollManager } from '@searsuite/sear-render-scroll';
+import { RenderStrategyManager, type RenderStrategy } from '@searsuite/sear-render-strategy';
+import { type SheetEmbeddedEditor } from '@searsuite/sear-sheet-editor-contract';
 
 /**
  * Stable host capabilities available before the command bus and Core are
@@ -133,17 +160,19 @@ export interface SheetViewSetupRuntime {
         readonly editor: SheetEmbeddedEditor;
       }
     | undefined;
-  readonly collaboration: {
-    /** Editor-local collaboration status; lifecycle changes use typed commands. */
-    readonly session: Pick<CollaborationSession, 'getStatus'>;
-  };
+  readonly collaboration:
+    | {
+        /** Editor-local collaboration status; lifecycle changes use typed commands. */
+        readonly session: Pick<CollaborationSession, 'getStatus'>;
+      }
+    | undefined;
 }
 
 /** Runtime capabilities available after the command bus is bound and Core exists. */
 export interface SheetViewRuntime extends SheetViewSetupRuntime {
   /** The owning typed dispatcher through which state mutations are executed. */
   readonly commands: SheetCommandBus;
-  readonly toolbar: SearToolbar;
+  readonly toolbar?: SearToolbar | undefined;
 }
 
 export const SheetViewCapability = {
@@ -156,7 +185,8 @@ export const SheetViewCapability = {
   EmbeddedEditor: defineSheetRuntimeCapability<{ readonly editor: SheetEmbeddedEditor }>(
     'sheet.runtime.embedded-editor',
   ),
-  Collaboration: defineSheetRuntimeCapability<SheetViewSetupRuntime['collaboration']>('sheet.runtime.collaboration'),
+  Collaboration:
+    defineSheetRuntimeCapability<NonNullable<SheetViewSetupRuntime['collaboration']>>('sheet.runtime.collaboration'),
   Toolbar: defineSheetRuntimeCapability<SearToolbar>('sheet.runtime.toolbar'),
   FormulaBar: defineSheetRuntimeCapability<SearFormulaBar>('sheet.runtime.formula-bar'),
 } as const;
@@ -190,6 +220,7 @@ export interface SheetViewRuntimeContext extends SheetViewSetupContext {
 interface SheetViewRuntimeOptions {
   /** Editor-local dependency container available only during composition. */
   readonly container: Container;
+  readonly stateRuntime: ReturnType<typeof createSheetPluginSetupRuntime>;
   readonly configEngine: ConfigEngine;
   readonly dataEngine: SheetDataEngine;
   readonly stage: SceneGraph<CellProperties>;
@@ -204,7 +235,7 @@ interface SheetViewRuntimeOptions {
 /** Creates the typed setup facade available before the command bus and Core are ready. */
 export function createSheetViewSetupRuntime(options: SheetViewRuntimeOptions): SheetViewSetupRuntime {
   const { container } = options;
-  const stateRuntime = createSheetPluginSetupRuntime(options);
+  const stateRuntime = options.stateRuntime;
   const { styles, extensions, cells, formula, interaction } = stateRuntime;
   const render = {
     engine: container.resolve<SheetRenderEngine>(SheetRenderEngine.symbol),
@@ -235,12 +266,14 @@ export function createSheetViewSetupRuntime(options: SheetViewRuntimeOptions): S
     coordinates: container.resolve<CoordinateEngine>(CoordinateEngine.symbol),
     transformer: container.resolve<CoordinateTransformer>(CoordinateTransformer.symbol),
   };
-  const collaborationPlugin = container.resolve<SheetCollaborationPlugin>(SheetCollaborationPlugin.symbol);
-  const collaboration = Object.freeze({
-    session: Object.freeze({
-      getStatus: () => collaborationPlugin.getStatus(),
-    }),
-  });
+  const collaborationPlugin = container.hasBinding(SheetCollaborationPlugin.symbol)
+    ? container.resolve<SheetCollaborationPlugin>(SheetCollaborationPlugin.symbol)
+    : undefined;
+  const collaboration = collaborationPlugin
+    ? Object.freeze({
+        session: Object.freeze({ getStatus: () => collaborationPlugin.getStatus() }),
+      })
+    : undefined;
   extensions.register(SheetViewCapability.TextShaper, container.resolve<TextShaper>(TextShaper.symbol));
   extensions.register(SheetViewCapability.Render, render);
   extensions.register(SheetViewCapability.Events, events);
@@ -253,7 +286,7 @@ export function createSheetViewSetupRuntime(options: SheetViewRuntimeOptions): S
   if (options.embeddedEditor) {
     extensions.register(SheetViewCapability.EmbeddedEditor, { editor: options.embeddedEditor });
   }
-  extensions.register(SheetViewCapability.Collaboration, collaboration);
+  if (collaboration) extensions.register(SheetViewCapability.Collaboration, collaboration);
   return {
     extensions,
     platform: extensions.require(SheetRuntimeCapability.Platform),
@@ -274,7 +307,7 @@ export function createSheetViewSetupRuntime(options: SheetViewRuntimeOptions): S
     interaction: extensions.require(SheetRuntimeCapability.Interaction),
     lifecycle: extensions.require(SheetViewCapability.Lifecycle),
     embeddedEditor: options.embeddedEditor ? extensions.require(SheetViewCapability.EmbeddedEditor) : undefined,
-    collaboration: extensions.require(SheetViewCapability.Collaboration),
+    collaboration: extensions.get(SheetViewCapability.Collaboration),
   };
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "@searsuite/sear-render-context",
   "description": "Defines platform-neutral drawing contracts and headless render contexts.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "homepage": "https://searsuite.com/",
   "keywords": [

@@ -1,8 +1,8 @@
 import { type PluginManager } from '@searsuite/sear-assembly-plugin';
 
+import { type DocPlugin, type DocPluginImplementation } from '@searsuite/sear-assembly-doc';
 import { type Container } from '@searsuite/sear-foundation-di';
 import { DefaultDocFeaturePlugins } from './DefaultDocFeaturePlugins';
-import { type DocPlugin, type DocPluginImplementation } from '@searsuite/sear-assembly-doc';
 
 /** Registers the default document feature plugins selected for one editor instance. */
 export function registerDefaultDocFeatures(
@@ -14,7 +14,7 @@ export function registerDefaultDocFeatures(
   return registerDocFeaturePlugins(container, manager, implementations ?? DefaultDocFeaturePlugins);
 }
 
-/** Registers document feature plugin instances with the Core-owned PluginManager. */
+/** Registers document feature plugin instances with the kernel-owned PluginManager. */
 export function registerDocFeaturePlugins(
   container: Container,
   manager: PluginManager,

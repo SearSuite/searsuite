@@ -1,8 +1,8 @@
-import './testSetup';
-import { OverlayRenderStrategy } from '../src/OverlayRenderStrategy';
 import { type Node, type NodeProperties } from '@searsuite/sear-render-node';
 import { type ScrollManagerState } from '@searsuite/sear-render-scroll';
+import { OverlayRenderStrategy } from '../src/OverlayRenderStrategy';
 import { createDirtyTracker, createRenderContext, createScrollManager, createTree } from './testFactories';
+import './testSetup';
 
 class TestOverlayRenderStrategy extends OverlayRenderStrategy<NodeProperties> {
   setScrollState(scrollState: ScrollManagerState): void {
@@ -25,7 +25,6 @@ describe('OverlayRenderStrategy', () => {
       createRenderContext(),
       createRenderContext(),
       createScrollManager(200, 100),
-      {},
       {},
       {},
       createTree(1000, 800),

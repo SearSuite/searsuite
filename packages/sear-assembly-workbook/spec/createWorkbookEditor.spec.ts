@@ -1,78 +1,80 @@
-import { WorkbookDocumentStateObservation } from '@searsuite/sear-assembly-workbook-kernel';
 import {
-  CaptureWorkbookSessionStateCommand,
-  ExportWorkbookStateCommand,
-  WorkbookActiveSheetEditorObservation,
-} from '@searsuite/sear-assembly-workbook-kernel';
-import { createWorkbookEditor, type WorkbookSheetEditorFactoryInput } from '../src';
+  SheetPlugin,
+  SheetQueryRegistry,
+  type SheetCommandBus,
+  type SheetEditor,
+} from '@searsuite/sear-assembly-commands';
 import {
-  ActivateWorkbookSheetCommand,
-  AddWorkbookSheetCommand,
-  HideWorkbookSheetCommand,
-  MoveWorkbookSheetCommand,
-  RecalculateWorkbookFormulasCommand,
-  SetWorkbookDefinedNameCommand,
-  RemoveWorkbookDefinedNameCommand,
-  SetWorkbookFormulaTableCommand,
-  RemoveWorkbookFormulaTableCommand,
-  WorkbookFormulaObjectsObservation,
-  WorkbookFormulaEvaluationRuntime,
-  RemoveWorkbookSheetCommand,
-  RenameWorkbookSheetCommand,
-  RedoWorkbookCommand,
-  UnhideWorkbookSheetCommand,
-  UndoWorkbookCommand,
-  WorkbookActiveSheetSessionStateDefinition,
-  WorkbookFormulaPlugin,
-  WorkbookFormulaObjectsPlugin,
-  WorkbookCollaborationPlugin,
-  WorkbookFormulaSheetTransactionObservation,
-  WorkbookFormulaStateObservation,
-  WorkbookHistoryAction,
-  WorkbookHistoryPlugin,
-  WorkbookHistoryStatusObservation,
-  WorkbookSessionStore,
-  WorkbookSheetSessionsStateDefinition,
-  defineWorkbookCommand,
-  WorkbookCommandBus,
-  WorkbookPlugin,
-  WorkbookTransaction,
-  defineWorkbookRuntimeCapability,
-  type WorkbookCompanionSheetPluginContext,
-  type WorkbookPluginContext,
-  type WorkbookPluginServiceContext,
-  type WorkbookCommandResult,
-  type WorkbookCommandDefinition,
-  type WorkbookTransactionCommittedEvent,
-} from '@searsuite/sear-assembly-workbook-kernel';
-import { createWorkbookDocumentState } from '@searsuite/sear-domain-workbook';
-import { type SearCoreSheet } from '@searsuite/sear-assembly-core';
-import { Pipeline, runInsideCommandExecution } from '@searsuite/sear-assembly-plugin';
-import { SheetQueryRegistry, type SheetCommandBus } from '@searsuite/sear-assembly-commands';
-import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
-import { type SheetEditor } from '@searsuite/sear-assembly-commands';
+  defineSessionState,
+  Pipeline,
+  PluginKey,
+  readSessionState,
+  runInsideCommandExecution,
+  SessionStateRegistry,
+  SessionStateRestorePhase,
+  type PluginStateRegistration,
+} from '@searsuite/sear-assembly-plugin';
 import { type SheetEditorAdapters } from '@searsuite/sear-assembly-setup';
+import { ExportSheetStateCommand } from '@searsuite/sear-assembly-sheet-kernel';
 import {
   cloneSheetDocumentState,
   createEmptySheetDocumentState,
   type SheetDocumentState,
   type SheetSessionState,
 } from '@searsuite/sear-assembly-sheet-state';
-import { SheetPlugin } from '@searsuite/sear-assembly-commands';
 import {
-  PluginKey,
-  SessionStateRestorePhase,
-  defineSessionState,
-  readSessionState,
-  SessionStateRegistry,
-} from '@searsuite/sear-assembly-plugin';
-import { Inject, Injectable, Scope } from '@searsuite/sear-foundation-di';
-import { type PluginStateRegistration } from '@searsuite/sear-assembly-plugin';
+  ActivateWorkbookSheetCommand,
+  AddWorkbookSheetCommand,
+  CaptureWorkbookSessionStateCommand,
+  defineWorkbookCommand,
+  defineWorkbookRuntimeCapability,
+  ExportWorkbookStateCommand,
+  HideWorkbookSheetCommand,
+  MoveWorkbookSheetCommand,
+  RecalculateWorkbookFormulasCommand,
+  RedoWorkbookCommand,
+  RemoveWorkbookDefinedNameCommand,
+  RemoveWorkbookFormulaTableCommand,
+  RemoveWorkbookSheetCommand,
+  RenameWorkbookSheetCommand,
+  SetWorkbookDefinedNameCommand,
+  SetWorkbookFormulaTableCommand,
+  UndoWorkbookCommand,
+  UnhideWorkbookSheetCommand,
+  WorkbookActiveSheetEditorObservation,
+  WorkbookActiveSheetSessionStateDefinition,
+  WorkbookCollaborationPlugin,
+  WorkbookCommandBus,
+  WorkbookDocumentStateObservation,
+  WorkbookFormulaEvaluationRuntime,
+  WorkbookFormulaObjectsObservation,
+  WorkbookFormulaObjectsPlugin,
+  WorkbookFormulaPlugin,
+  WorkbookFormulaSheetTransactionObservation,
+  WorkbookFormulaStateObservation,
+  WorkbookHistoryAction,
+  WorkbookHistoryPlugin,
+  WorkbookHistoryStatusObservation,
+  WorkbookPlugin,
+  WorkbookSessionStore,
+  WorkbookSheetSessionsStateDefinition,
+  WorkbookTransaction,
+  type WorkbookCommandDefinition,
+  type WorkbookCommandResult,
+  type WorkbookCompanionSheetPluginContext,
+  type WorkbookPluginContext,
+  type WorkbookPluginServiceContext,
+  type WorkbookTransactionCommittedEvent,
+} from '@searsuite/sear-assembly-workbook-kernel';
 import { MatrixOT, MatrixOTActionName } from '@searsuite/sear-domain-ot';
-import { createTransaction, Transaction } from '@searsuite/sear-domain-transaction';
-import { defineStateObservation, ObservationRegistry } from '@searsuite/sear-foundation-subscription';
-import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
 import { ReadSheetCellDataQuery, SheetMatrix } from '@searsuite/sear-domain-sheet';
+import { createTransaction, Transaction } from '@searsuite/sear-domain-transaction';
+import { createWorkbookDocumentState } from '@searsuite/sear-domain-workbook';
+import { Inject, Injectable, Scope } from '@searsuite/sear-foundation-di';
+import { defineStateObservation, ObservationRegistry } from '@searsuite/sear-foundation-subscription';
+import { HeadlessCollabTransport } from '@searsuite/sear-plugin-collab';
+import { SheetDataPlugin } from '@searsuite/sear-plugin-sheet-data';
+import { createWorkbookEditor, type WorkbookSheetEditorFactoryInput } from '../src';
 
 import { CommandExecutionPhase } from '@searsuite/sear-foundation-common';
 
@@ -550,7 +552,7 @@ describe('createWorkbookEditor', () => {
     const { factory } = createFakeFactory();
     const editor = createWorkbookEditor({
       documentState: createWorkbook(),
-      adapters,
+      adapters: { ...adapters, collabTransport: HeadlessCollabTransport },
       sheetEditorFactory: factory,
       plugins: [RetainPlugins],
     });
@@ -897,9 +899,6 @@ describe('createWorkbookEditor', () => {
       'workbook.addSheet',
       'workbook.captureSessionState',
       'workbook.clipboard.commitMove',
-      'workbook.collaboration.applyTransportEvent',
-      'workbook.collaboration.connect',
-      'workbook.collaboration.disconnect',
       'workbook.exportState',
       'workbook.hideSheet',
       'workbook.moveSheet',

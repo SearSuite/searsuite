@@ -1,13 +1,12 @@
-import { RenderContext } from '@searsuite/sear-render-context';
-import { SceneGraph, Node, Tree, NodeProperties, FrameDirtyTracker } from '@searsuite/sear-render-node';
+import { Inject, Injectable } from '@searsuite/sear-foundation-di';
 import { PositionRect } from '@searsuite/sear-foundation-rect';
-import { Injectable, Inject } from '@searsuite/sear-foundation-di';
+import { RenderContext } from '@searsuite/sear-render-context';
+import { FrameDirtyTracker, Node, NodeProperties, SceneGraph, Tree } from '@searsuite/sear-render-node';
 
-import { HexColor } from '@searsuite/sear-foundation-utils';
 import { ConfigEngine } from '@searsuite/sear-assembly-config';
-import { ScrollManager } from '@searsuite/sear-render-scroll';
-import { RenderCoordinatorManager } from '@searsuite/sear-render-registry';
 import { Platform } from '@searsuite/sear-foundation-platform';
+import { HexColor } from '@searsuite/sear-foundation-utils';
+import { ScrollManager } from '@searsuite/sear-render-scroll';
 import { RenderStrategy } from './RenderStrategy';
 
 /**
@@ -42,25 +41,13 @@ export class HitRenderStrategy<NodeTypeProperties extends NodeProperties> extend
     hitRenderContext: RenderContext,
     @Inject(ScrollManager.symbol) scrollManager: ScrollManager,
     @Inject(ConfigEngine.symbol) configEngine: ConfigEngine,
-    @Inject(RenderCoordinatorManager.symbol)
-    renderCoordinatorManager: RenderCoordinatorManager,
     @Inject(SceneGraph.symbol) stage: SceneGraph<NodeTypeProperties>,
     @Inject(Tree.symbol) tree: Tree<PositionRect<HexColor>>,
     @Inject(FrameDirtyTracker.symbol)
     dirtyTree: FrameDirtyTracker,
     @Inject(Platform.symbol) protected readonly platform: Platform,
   ) {
-    super(
-      renderContext,
-      offScreenRenderContext,
-      hitRenderContext,
-      scrollManager,
-      configEngine,
-      renderCoordinatorManager,
-      stage,
-      tree,
-      dirtyTree,
-    );
+    super(renderContext, offScreenRenderContext, hitRenderContext, scrollManager, configEngine, stage, tree, dirtyTree);
   }
 
   /**

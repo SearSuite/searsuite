@@ -1,8 +1,8 @@
-import './testSetup';
-import { RenderStrategy } from '../src/RenderStrategy';
 import { type Node, type NodeProperties } from '@searsuite/sear-render-node';
 import { type ScrollManagerState } from '@searsuite/sear-render-scroll';
+import { RenderStrategy } from '../src/RenderStrategy';
 import { createDirtyTracker, createRenderContext, createScrollManager, createTree } from './testFactories';
+import './testSetup';
 
 class TestRenderStrategy extends RenderStrategy<NodeProperties> {
   public render = jest.fn();
@@ -53,7 +53,6 @@ function createStrategy(
     createScrollManager(viewportWidth, viewportHeight),
     {},
     {},
-    {},
     createTree(treeWidth, treeHeight),
     createDirtyTracker(),
   ] as unknown as ConstructorParameters<typeof TestRenderStrategy>;
@@ -77,10 +76,9 @@ describe('RenderStrategy', () => {
       hitRenderContext as unknown as ConstructorParameters<typeof TestRenderStrategy>[2],
       scrollManager as unknown as ConstructorParameters<typeof TestRenderStrategy>[3],
       {} as ConstructorParameters<typeof TestRenderStrategy>[4],
-      {} as ConstructorParameters<typeof TestRenderStrategy>[5],
-      stage as unknown as ConstructorParameters<typeof TestRenderStrategy>[6],
-      tree as unknown as ConstructorParameters<typeof TestRenderStrategy>[7],
-      dirtyTree as unknown as ConstructorParameters<typeof TestRenderStrategy>[8],
+      stage as unknown as ConstructorParameters<typeof TestRenderStrategy>[5],
+      tree as unknown as ConstructorParameters<typeof TestRenderStrategy>[6],
+      dirtyTree as unknown as ConstructorParameters<typeof TestRenderStrategy>[7],
     );
 
     expect(scrollManager.subscribeScroll).toHaveBeenCalledTimes(1);
